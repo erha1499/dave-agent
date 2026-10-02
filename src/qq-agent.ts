@@ -84,6 +84,7 @@ export class QQAgent {
         conversation.session ??= await this.createSession();
         if (this.closed) return;
         const session = conversation.session;
+        const previousMessageCount = session.messages.length;
         await Promise.race([
           session.prompt(msg.content, { expandPromptTemplates: false }),
           new Promise<never>((_resolve, reject) => {
@@ -96,7 +97,10 @@ export class QQAgent {
         if (!text) throw new Error("模型未生成回复");
         conversation.turns++;
         await this.deliver(msg, [...text].slice(0, 1000).join(""));
-        this.log(`[agent] session=${tag} model_ok duration_ms=${Date.now() - started}`);
+        const tools = session.messages.slice(previousMessageCount).flatMap(message =>
+          message.role === "toolResult" && !message.isError && session.getActiveToolNames().includes(message.toolName)
+            ? [message.toolName] : []);
+        this.log(`[agent] session=${tag} model_ok tools=${tools.join(",") || "none"} duration_ms=${Date.now() - started}`);
       } catch {
         failed = true;
         clearTimeout(timer);

@@ -65,6 +65,7 @@ try {
   ]);
   await agent.handle(message("echo", "/skill:shop-support 请回显工具测试"));
   assert.equal(sent.at(-1)?.text, "已回显：工具测试");
+  assert.ok(logs.some(text => text.includes("tools=echo")), "trace must record the actual successful tool result");
   assert.deepEqual(sessions[0]?.getActiveToolNames(), ["echo"]);
   assert.equal(faux.getPendingResponseCount(), 0);
 
