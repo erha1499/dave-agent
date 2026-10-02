@@ -153,7 +153,7 @@ try {
   faux.setResponses([fauxAssistantMessage("只发送一次")]);
   await failedSend.handle(message("send-failure", "发送失败测试"));
   assert.equal(sendAttempts, 1, "ambiguous QQ send must not be retried or replaced with another reply");
-  assert.ok(logs.some((text) => text.startsWith("[qq] 回复发送失败")));
+  assert.ok(logs.some((text) => text.startsWith("[qq] 回复发送或确认登记失败")));
   assert.ok(!logs.join("\n").includes("synthetic send uncertainty"));
 } finally {
   await failedSend.close();

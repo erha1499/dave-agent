@@ -86,7 +86,7 @@ async function main() {
     assert.ok(progress.reply.includes(orderId));
     assert.match(progress.reply, /模拟/);
     assert.match(progress.reply, /79\.80/);
-    assert.match(progress.reply, /未.{0,8}退款|没有.{0,8}退款|尚未.{0,8}退/);
+    assert.match(progress.reply, /退款状态请另行查询/);
     const after = await store.getOrder(identity, orderId);
     assert.deepEqual(after.amounts, before.amounts);
     assert.deepEqual(after.refunds, before.refunds);

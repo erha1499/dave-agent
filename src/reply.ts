@@ -1,4 +1,5 @@
 import { merchantReasonControls, type MerchantTask } from "./after-sales.ts";
+import type { RefundOperation } from "./refunds.ts";
 
 type TextReply<K extends "answer" | "notice"> = { kind: K; text: string; evidenceIds?: string[] };
 type Replies = {
@@ -11,6 +12,8 @@ type Replies = {
   };
   merchant_confirmation: { kind: "merchant_confirmation"; orderId: string; amountCents: number; confirmationText: string };
   merchant_status: { kind: "merchant_status"; task: MerchantTask };
+  refund_confirmation: { kind: "refund_confirmation"; operation: RefundOperation };
+  refund_status: { kind: "refund_status"; operation: RefundOperation };
 };
 export type Reply = Replies[keyof Replies];
 export type RenderedReply = {
@@ -19,7 +22,26 @@ export type RenderedReply = {
 };
 type Content = Omit<RenderedReply, "kind">;
 
-const simulation = "这是模拟结果，未联系真实商家，也未执行退款；重复确认会返回同一任务。";
+const simulation = "这是模拟协商结果，未联系真实商家；退款状态请另行查询，重复确认返回同一任务。";
+const refundSimulation = "仅更新演示数据，不涉及真实资金。";
+const uuid = (value: unknown): value is string => typeof value === "string"
+  && /^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i.test(value);
+const timestamp = (value: unknown): value is string => typeof value === "string"
+  && Number.isFinite(Date.parse(value)) && new Date(value).toISOString() === value;
+
+export function isRefundOperation(value: unknown): value is RefundOperation {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const operation = value as Record<string, unknown>;
+  if (operation.simulation !== true || !uuid(operation.operationId) || !uuid(operation.taskId)
+    || typeof operation.orderId !== "string" || !/^COUPON-2\d{3}$/.test(operation.orderId)
+    || !Number.isSafeInteger(operation.amountCents) || Number(operation.amountCents) <= 0
+    || !timestamp(operation.expiresAt)) return false;
+  if (operation.status === "prepared") return operation.presentedAt === null && operation.confirmedAt === null && operation.refundId === null;
+  if (!timestamp(operation.presentedAt) || operation.presentedAt > operation.expiresAt) return false;
+  if (operation.status === "awaiting_confirmation") return operation.confirmedAt === null && operation.refundId === null;
+  return operation.status === "succeeded" && uuid(operation.refundId) && timestamp(operation.confirmedAt)
+    && operation.confirmedAt >= operation.presentedAt && operation.confirmedAt <= operation.expiresAt;
+}
 const orderStatuses = new Map([
   ["pending_payment", "待付款"], ["paid", "已支付"], ["partially_redeemed", "部分核销"],
   ["redeemed", "已核销"], ["refunded", "已退款"], ["closed", "已关闭"],
@@ -109,6 +131,28 @@ const strategies: { [K in keyof Replies]: (reply: Replies[K]) => Content } = {
       text: `模拟协商 ${taskId}\n订单：${orderId}，申请金额：${amount} 元。\n登记原因：${reason}\n${status}\n${simulation}`,
       markdown: `## 模拟协商进度\n\n${indicator} **${status}**\n\n- 任务：${escape(taskId)}\n- 订单：${escape(orderId)}\n- 申请金额：${amount} 元\n- 登记原因：${escape(reason)}\n\n🔴 **${simulation}**`,
       ...(task.status === "pending" && { button: { label: "查询进度", command: `查询 ${task.orderId} 的模拟协商进度` } }),
+    };
+  },
+  refund_confirmation({ operation }) {
+    if (!isRefundOperation(operation) || operation.status === "succeeded") throw new Error("模拟退款确认方案无效。");
+    const amount = money(operation.amountCents);
+    const expires = `${new Date(operation.expiresAt).toLocaleString("zh-CN", { timeZone: "Asia/Shanghai", hour12: false })}（北京时间）`;
+    const expired = Date.parse(operation.expiresAt) <= Date.now();
+    const command = `确认退款 ${operation.operationId}`;
+    const action = expired ? "该方案已过期，请按订单号重新生成退款方案。" : `请完整发送以下单行文字：\n${command}`;
+    return {
+      text: `模拟退款${expired ? "方案已过期" : "待确认"}\n订单：${operation.orderId}\n退款金额：${amount} 元\n操作编号：${operation.operationId}\n有效期至：${expires}\n\n${action}\n\n${refundSimulation}`,
+      markdown: `## 模拟退款${expired ? "方案已过期" : "待确认"}\n\n- 订单：${escape(operation.orderId)}\n- 退款金额：${amount} 元\n- 操作编号：${escape(operation.operationId)}\n- 有效期至：${escape(expires)}\n\n${expired ? `**${action}**` : `**请完整发送以下单行文字：**\n\n${prose(command)}`}\n\n🔴 **${refundSimulation}**`,
+      ...(!expired && { button: { label: "确认模拟退款", command,
+        confirmation: "继续后将填入确认指令，请核对订单与金额后发送；仅操作演示数据，不涉及真实资金。" } }),
+    };
+  },
+  refund_status({ operation }) {
+    if (!isRefundOperation(operation) || operation.status !== "succeeded") throw new Error("模拟退款结果无效。");
+    const amount = money(operation.amountCents);
+    return {
+      text: `模拟退款成功\n订单：${operation.orderId}\n退款金额：${amount} 元\n操作编号：${operation.operationId}\n退款记录：${operation.refundId}\n\n${refundSimulation}重复确认返回同一结果。`,
+      markdown: `## 模拟退款结果\n\n🟢 **模拟退款成功**\n\n- 订单：${escape(operation.orderId)}\n- 退款金额：${amount} 元\n- 操作编号：${escape(operation.operationId)}\n- 退款记录：${escape(operation.refundId!)}\n\n🔴 **${refundSimulation}**\n\n重复确认返回同一结果。`,
     };
   },
 };

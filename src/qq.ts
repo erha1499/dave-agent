@@ -1,6 +1,6 @@
 import {
-  QQBot, accessPolicy, contentSanitizer, mentionGate, messageFilter,
-  type QQBotOptions,
+  QQBot, accessPolicy, mentionGate, messageFilter,
+  type QQBotOptions, type Middleware,
 } from "@tencent-connect/qqbot-nodejs";
 import { QQWebhookServer } from "./qq-http.ts";
 import { createPool } from "mysql2/promise";
@@ -11,9 +11,18 @@ import { QQAgent } from "./qq-agent.ts";
 import { AfterSalesStore, readAfterSalesDatabaseConfig, startMockMerchant } from "./after-sales.ts";
 import { confirmMerchantReply, merchantSourceKey } from "./after-sales-entry.ts";
 import { readQQReplyButtons, readQQReplyFormat, sendQQReply } from "./qq-reply.ts";
+import { RefundStore, readRefundDatabaseConfig } from "./refunds.ts";
+import { confirmRefundReply, markRefundReplyPresented } from "./refund-entry.ts";
 
-// Keep internal newlines intact so the host can reject malformed confirmation commands.
-export const sanitizeQQContent = contentSanitizer({ stripBotMention: true, collapseWhitespace: false });
+// Remove the leading transport mention/spaces (QQ may already have removed the mention).
+// Stripping embedded mentions/faces or trimming
+// newlines could turn malformed text into an executable business confirmation.
+export const sanitizeQQContent: Middleware = async (ctx, next) => {
+  const content = (ctx.message.content ?? "").replace(/^[ \t]+/, "");
+  const prefix = /^<@!?(\d+)>[ \t]*/.exec(content);
+  ctx.message.content = prefix?.[1] === ctx.bot.appId ? content.slice(prefix[0].length) : content;
+  await next();
+};
 
 export function readQQConfig(env: NodeJS.ProcessEnv = process.env) {
   const appId = env.QQBOT_APP_ID?.trim();
@@ -54,6 +63,7 @@ async function main() {
   const replyButtons = readQQReplyButtons();
   const store = new CouponStore(createPool(readDatabaseConfig()));
   let afterSales: AfterSalesStore | undefined;
+  let refunds: RefundStore | undefined;
   let stopMerchant: (() => Promise<void>) | undefined;
   try {
     await store.ping();
@@ -62,8 +72,13 @@ async function main() {
       await afterSales.ping();
       stopMerchant = startMockMerchant(afterSales);
     }
+    if (process.env.REFUND_DB_PASSWORD) {
+      if (!afterSales) throw new Error("模拟退款需要先配置商家协商数据库。");
+      refunds = new RefundStore(createPool(readRefundDatabaseConfig()));
+      await refunds.ping();
+    }
     const { modelRuntime, model } = await createConfiguredModelRuntime();
-    const secrets = [options.appSecret, process.env.DEEPSEEK_API_KEY, process.env.MODEL_API_KEY, process.env.DB_PASSWORD, process.env.AFTER_SALES_DB_PASSWORD].filter((key): key is string => !!key);
+    const secrets = [options.appSecret, process.env.DEEPSEEK_API_KEY, process.env.MODEL_API_KEY, process.env.DB_PASSWORD, process.env.AFTER_SALES_DB_PASSWORD, process.env.REFUND_DB_PASSWORD].filter((key): key is string => !!key);
     const redact = (text: string) => secrets.reduce((value, key) => value.replaceAll(key, "[redacted]"), text);
     const bot = new QQBot({
       ...options,
@@ -93,7 +108,7 @@ async function main() {
           console.log(`[qq] 未绑定模拟客户 identity=${tag}；管理员核对发信人后运行 npm run qq:bind -- ${tag} customer-demo-1`);
         }
         return createCouponSession(identity, store, modelRuntime, model, afterSales ? {
-          store: afterSales, sourceKey: merchantSourceKey(identity, msg.groupOpenid!),
+          store: afterSales, sourceKey: merchantSourceKey(identity, msg.groupOpenid!), refunds,
         } : undefined);
       },
       async (target, _text, reply, requesterId) => {
@@ -105,14 +120,21 @@ async function main() {
       async (msg) => {
         if (!afterSales) return undefined;
         const identity = { appId: options.appId, senderId: msg.senderId };
-        return confirmMerchantReply(afterSales, identity, merchantSourceKey(identity, msg.groupOpenid!), msg.content);
+        const sourceKey = merchantSourceKey(identity, msg.groupOpenid!);
+        return (refunds ? await confirmRefundReply(refunds, identity, sourceKey, msg.content) : undefined)
+          ?? confirmMerchantReply(afterSales, identity, sourceKey, msg.content);
+      },
+      async (msg, reply) => {
+        if (!refunds) return;
+        const identity = { appId: options.appId, senderId: msg.senderId };
+        await markRefundReplyPresented(refunds, identity, merchantSourceKey(identity, msg.groupOpenid!), reply);
       },
     );
     bot.on("message", async (_ctx, msg) => {
       await agent.handle(msg);
     });
     bot.on("error", (error) => console.error(`[qq] ${redact(error.message)}`));
-    bot.on("ready", () => console.log(`[qq] ${options.transport} 团购券客服已就绪；模型 ${model.provider}/${model.id}；${afterSales ? "模拟商家协商已启用，订单/资金只读" : "只读咨询"}。`));
+    bot.on("ready", () => console.log(`[qq] ${options.transport} 团购券客服已就绪；模型 ${model.provider}/${model.id}；${refunds ? "模拟协商与模拟退款已启用，无真实资金操作" : afterSales ? "模拟商家协商已启用，订单/资金只读" : "只读咨询"}。`));
     const controller = new AbortController();
     const stop = () => controller.abort();
     process.once("SIGINT", stop);
@@ -128,6 +150,7 @@ async function main() {
     }
   } finally {
     await stopMerchant?.();
+    await refunds?.close();
     await afterSales?.close();
     await store.close();
   }
@@ -136,7 +159,7 @@ async function main() {
 if (import.meta.main) {
   main().catch((error: unknown) => {
     const text = error instanceof Error ? error.message : "QQ 启动失败。";
-    const secrets = [process.env.QQBOT_APP_SECRET, process.env.DEEPSEEK_API_KEY, process.env.MODEL_API_KEY, process.env.DB_PASSWORD, process.env.AFTER_SALES_DB_PASSWORD].filter((key): key is string => !!key);
+    const secrets = [process.env.QQBOT_APP_SECRET, process.env.DEEPSEEK_API_KEY, process.env.MODEL_API_KEY, process.env.DB_PASSWORD, process.env.AFTER_SALES_DB_PASSWORD, process.env.REFUND_DB_PASSWORD].filter((key): key is string => !!key);
     console.error(secrets.reduce((value, key) => value.replaceAll(key, "[redacted]"), text));
     process.exitCode = 1;
   });

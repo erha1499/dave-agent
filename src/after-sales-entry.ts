@@ -29,6 +29,6 @@ export async function confirmMerchantReply(
     const task = await store.request(identity, sourceKey, match[1]!, match[2]!);
     return { kind: "merchant_status", task };
   } catch {
-    return { kind: "notice", text: "暂未能确认模拟协商结果，请核对本人订单和原确认文字；可用同一句确认文字重试或查询订单协商进度。未执行退款。" };
+    return { kind: "notice", text: "暂未能确认模拟协商结果，请核对本人订单和原确认文字，或查询订单协商进度。协商指令不会执行退款；退款状态请另行查询。" };
   }
 }

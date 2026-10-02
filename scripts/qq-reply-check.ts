@@ -52,6 +52,16 @@ const pending = renderReply({ kind: "merchant_status", task: {
   reason: "行程变化", amountCents: 7980, approvedAmountCents: null,
   createdAt: "2026-10-02T00:00:00.000Z", dueAt: "2026-10-02T00:00:05.000Z", completedAt: null, simulation: true,
 } });
+const refund = {
+  operationId: "00000000-0000-4000-8000-000000000002", orderId: "COUPON-2001",
+  taskId: "00000000-0000-4000-8000-000000000001", status: "prepared" as const,
+  amountCents: 7980, expiresAt: "2099-01-01T00:15:00.000Z", presentedAt: null,
+  confirmedAt: null, refundId: null, simulation: true as const,
+};
+const refundConfirmation = renderReply({ kind: "refund_confirmation", operation: refund });
+const refundSuccess = renderReply({ kind: "refund_status", operation: { ...refund, status: "succeeded",
+  presentedAt: "2099-01-01T00:00:00.000Z", confirmedAt: "2099-01-01T00:01:00.000Z",
+  refundId: "00000000-0000-4000-8000-000000000003" } });
 const permission = { type: 0, specify_user_ids: [requesterId] };
 const commonAction = { type: 2, permission, enter: false, reply: false, unsupport_tips: "请复制消息中的文字，@机器人后发送。" };
 const confirmationKeyboard = { content: { rows: [{ buttons: [{
@@ -83,6 +93,21 @@ try {
     id: "merchant_status", render_data: { label: "查询进度", visited_label: "查询进度", style: 1 },
     action: { ...commonAction, data: "查询 COUPON-2001 的模拟协商进度" },
   }] }] } }, "pending query uses a blue button without confirmation modal");
+  await sendQQReply(bot, target, refundConfirmation, "markdown", requesterId);
+  assert.deepEqual(received.at(-1)?.body.keyboard, { content: { rows: [{ buttons: [{
+    id: "refund_confirmation", render_data: { label: "确认模拟退款", visited_label: "确认模拟退款", style: 1 },
+    action: { ...commonAction, data: `确认退款 ${refund.operationId}`, modal: {
+      content: "继续后将填入确认指令，请核对订单与金额后发送；仅操作演示数据，不涉及真实资金。",
+      confirm_text: "继续", cancel_text: "返回",
+    } },
+  }] }] } }, "refund confirmation remains user-restricted, fills the exact command, and requires sending");
+  assert.deepEqual(received.at(-1)?.body.markdown, { content: refundConfirmation.markdown });
+  await sendQQReply(bot, target, refundConfirmation, "text", requesterId);
+  assert.equal(received.at(-1)?.body.keyboard, undefined);
+  assert.ok(String(received.at(-1)?.body.content).includes(`\n确认退款 ${refund.operationId}\n`));
+  await sendQQReply(bot, target, refundSuccess, "markdown", requesterId);
+  assert.equal(received.at(-1)?.body.keyboard, undefined, "successful refund receipts cannot trigger a repeat action");
+  assert.deepEqual(received.at(-1)?.body.markdown, { content: refundSuccess.markdown });
   // Missing identity means buttons are disabled, never a button open to everyone.
   await sendQQReply(bot, target, confirmation, "markdown");
   assert.equal(received.at(-1)?.body.keyboard, undefined);

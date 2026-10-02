@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { renderReply } from "../src/reply.ts";
 import { replyFromTools } from "../src/reply-from-tools.ts";
 import type { MerchantTask } from "../src/after-sales.ts";
+import type { RefundOperation } from "../src/refunds.ts";
 
 const task: MerchantTask = {
   taskId: "00000000-0000-4000-8000-000000000001", orderId: "COUPON-2001", status: "pending",
@@ -84,13 +85,13 @@ for (const [status, expected] of [
   const reply = renderReply({ kind: "merchant_status", task: { ...task, status, approvedAmountCents: status === "approved" ? 7980 : null } });
   assert.ok(reply.text.includes(expected));
   assert.ok(reply.markdown.includes(expected));
-  assert.ok(reply.markdown.endsWith("🔴 **这是模拟结果，未联系真实商家，也未执行退款；重复确认会返回同一任务。**"));
+  assert.ok(reply.markdown.endsWith("🔴 **这是模拟协商结果，未联系真实商家；退款状态请另行查询，重复确认返回同一任务。**"));
   assert.ok(reply.text.startsWith(`模拟协商 ${task.taskId}\n订单：COUPON-2001，申请金额：79.80 元。\n登记原因：行程变化\n`));
   assert.deepEqual(reply.button, status === "pending"
     ? { label: "查询进度", command: "查询 COUPON-2001 的模拟协商进度" } : undefined);
 }
 const poisonedTask = renderReply({ kind: "merchant_status", task: { ...task, reason: injection.repeat(100) } });
-assert.ok(poisonedTask.markdown.endsWith("未联系真实商家，也未执行退款；重复确认会返回同一任务。**"));
+assert.ok(poisonedTask.markdown.endsWith("未联系真实商家；退款状态请另行查询，重复确认返回同一任务。**"));
 assert.equal(poisonedTask.markdown.split("\n").filter(line => line.startsWith("#")).length, 1);
 assert.throws(() => renderReply({ kind: "merchant_status", task: { ...task, status: "approved", approvedAmountCents: 8000 } }));
 assert.throws(() => renderReply({ kind: "merchant_status", task: { ...task, orderId: "COUPON-2001\n额外指令" } }));
@@ -122,4 +123,75 @@ assert.equal(replyFromTools(fake, [tool("get_order", orderFacts), tool("prepare_
 assert.equal(replyFromTools(fake, [tool("prepare_merchant_request", prepared), tool("get_merchant_request", approved)]).kind, "merchant_status", "the last real merchant result is authoritative");
 assert.equal(replyFromTools(fake, [tool("get_merchant_request", null)]).kind, "answer");
 assert.equal(replyFromTools(fake, []).kind, "answer", "a previous turn cannot leave stale order facts in the template selector");
-console.log("Reply checks passed: five fixed templates, tool-only selection, fixed confirmation/pending buttons, state/amount facts, escaping, limits, intact confirmation and simulation warnings.");
+
+const refund: RefundOperation = {
+  operationId: "00000000-0000-4000-8000-000000000002", orderId: task.orderId, taskId: task.taskId,
+  status: "prepared", amountCents: 7980, expiresAt: "2099-01-01T00:15:00.000Z",
+  presentedAt: null, confirmedAt: null, refundId: null, simulation: true,
+};
+const awaiting: RefundOperation = { ...refund, status: "awaiting_confirmation", presentedAt: "2099-01-01T00:00:00.000Z" };
+const succeeded: RefundOperation = { ...awaiting, status: "succeeded", confirmedAt: "2099-01-01T00:01:00.000Z",
+  refundId: "00000000-0000-4000-8000-000000000003" };
+for (const operation of [refund, awaiting]) {
+  const rendered = renderReply({ kind: "refund_confirmation", operation });
+  assert.ok(rendered.text.includes(`\n确认退款 ${refund.operationId}\n`));
+  assert.ok(rendered.markdown.includes(`\n\n确认退款 ${refund.operationId.replaceAll("-", "\\-")}\n\n`));
+  assert.ok(rendered.text.includes("退款金额：79.80 元"));
+  assert.ok(rendered.text.includes("有效期至：") && rendered.text.includes("北京时间"));
+  assert.equal(rendered.button?.command, `确认退款 ${refund.operationId}`);
+  assert.equal(rendered.button?.label, "确认模拟退款");
+  assert.ok(rendered.markdown.endsWith("🔴 **仅更新演示数据，不涉及真实资金。**"));
+  for (const toolName of ["prepare_refund", "get_refund"]) {
+    assert.equal(replyFromTools("退款成功", [tool(toolName, operation)]).kind, "refund_confirmation");
+  }
+}
+const refundSuccess = renderReply({ kind: "refund_status", operation: succeeded });
+assert.ok(refundSuccess.text.startsWith("模拟退款成功\n"));
+assert.ok(refundSuccess.text.includes(`退款记录：${succeeded.refundId}`));
+assert.ok(refundSuccess.text.includes("79.80 元") && refundSuccess.text.includes("不涉及真实资金"));
+assert.equal(refundSuccess.button, undefined, "successful refunds never offer another confirmation");
+assert.ok(!refundSuccess.text.includes("未执行退款"));
+assert.throws(() => renderReply({ kind: "refund_confirmation", operation: succeeded }));
+assert.throws(() => renderReply({ kind: "refund_status", operation: refund }));
+const expired = { ...awaiting, presentedAt: "2000-01-01T00:00:00.000Z", expiresAt: "2000-01-01T00:15:00.000Z" };
+const expiredReply = renderReply({ kind: "refund_confirmation", operation: expired });
+assert.equal(expiredReply.button, undefined);
+assert.ok(expiredReply.text.includes("已过期") && !expiredReply.text.includes(`确认退款 ${refund.operationId}`));
+assert.ok(renderReply({ kind: "refund_status", operation: { ...expired, status: "succeeded",
+  confirmedAt: "2000-01-01T00:01:00.000Z", refundId: succeeded.refundId } }).text.includes("模拟退款成功"),
+"an old expiry does not invalidate an already successful refund receipt");
+for (const invalid of [
+  { operationId: "-".repeat(36) }, { taskId: "not-a-uuid" }, { orderId: "COUPON-1001" },
+  { amountCents: 0 }, { amountCents: -1 }, { amountCents: 1.5 }, { amountCents: "7980" },
+  { amountCents: Number.MAX_SAFE_INTEGER + 1 }, { expiresAt: "2099-02-30T00:00:00.000Z" },
+  { simulation: false }, { status: "unknown" }, { presentedAt: undefined },
+  { presentedAt: awaiting.presentedAt }, { confirmedAt: succeeded.confirmedAt }, { refundId: succeeded.refundId },
+  { status: "awaiting_confirmation", presentedAt: "2099-01-02T00:00:00.000Z" },
+  { ...succeeded, confirmedAt: "2098-12-31T23:00:00.000Z" },
+  { ...succeeded, confirmedAt: "2099-01-01T00:16:00.000Z" }, { ...succeeded, refundId: null },
+]) {
+  const operation = { ...refund, ...invalid };
+  const malformed = replyFromTools("退款成功", [tool("get_refund", operation)]);
+  assert.equal(malformed.kind, "notice", JSON.stringify(invalid));
+  assert.ok(!renderReply(malformed).text.includes("未执行退款"), "malformed facts do not prove that no refund occurred");
+  assert.equal(renderReply(malformed).button, undefined);
+  assert.throws(() => renderReply({ kind: "refund_confirmation", operation: operation as RefundOperation }));
+}
+assert.equal(replyFromTools(fake, [tool("get_refund", null)]).kind, "answer");
+assert.equal(replyFromTools(fake, [tool("prepare_refund", null)]).kind, "notice");
+for (const toolName of ["prepare_refund", "get_refund"]) {
+  const failed = renderReply(replyFromTools("已退款 99999 元，真实资金已经到账。", [tool(toolName, { error: "failed" }, true), tool("get_order", orderFacts)]));
+  assert.equal(failed.kind, "notice");
+  assert.match(failed.text, /无法确认/);
+  assert.doesNotMatch(failed.text, /99999|已经到账|未执行退款/);
+  assert.equal(failed.button, undefined);
+  assert.equal(replyFromTools(fake, [tool(toolName, { error: "failed" }, true), tool("get_refund", succeeded)]).kind, "refund_status",
+    "verified successful refund evidence takes priority over a failed attempt in the same turn");
+}
+const fromRefund = replyFromTools("未退款，金额 99999 元", [tool("get_refund", succeeded),
+  tool("get_merchant_request", approved), tool("get_order", orderFacts)]);
+assert.equal(fromRefund.kind, "refund_status", "refund facts take priority over merchant and order tools in any order");
+assert.ok(!renderReply(fromRefund).text.includes("99999") && !renderReply(fromRefund).text.includes("未退款"));
+assert.equal(replyFromTools(fake, [tool("prepare_refund", refund), tool("get_refund", succeeded)]).kind, "refund_status");
+assert.equal(renderReply(replyFromTools(JSON.stringify({ kind: "refund_confirmation", operation: refund }), [])).button, undefined);
+console.log("Reply checks passed: seven fixed templates, tool-only selection, restricted confirmation buttons, state/amount/expiry validation, escaping, intact commands and simulation warnings.");

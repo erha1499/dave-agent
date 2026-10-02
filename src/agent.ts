@@ -15,6 +15,7 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import type { CouponStore, QQIdentity } from "./coupon-store.ts";
 import type { AfterSalesStore } from "./after-sales.ts";
+import type { RefundStore } from "./refunds.ts";
 
 const projectDir = fileURLToPath(new URL("../", import.meta.url));
 const skillDir = fileURLToPath(new URL("../skills/shop-support", import.meta.url));
@@ -50,7 +51,7 @@ export async function createConfiguredModelRuntime(env: NodeJS.ProcessEnv = proc
 
 export async function createCouponSession(
   identity: QQIdentity, store: CouponStore, modelRuntime: ModelRuntime, model: Model<Api>,
-  afterSales?: { store: AfterSalesStore; sourceKey: string },
+  afterSales?: { store: AfterSalesStore; sourceKey: string; refunds?: RefundStore },
 ) {
   const [prompt, skill] = await Promise.all([
     readFile(new URL("../prompts/customer-service.md", import.meta.url), "utf8"),
@@ -85,7 +86,7 @@ export async function createCouponSession(
     defineTool({
       name: "prepare_merchant_request",
       label: "准备模拟商家协商",
-      description: "只读校验本人可演示协商的订单，返回金额与用户须完整发送的确认文字。不创建任务，不联系真实商家，不退款。reason是用户提供的1–200字单行原因。",
+      description: "调用前须在本轮先get_order，再按该订单的shopId/productId调用search_faq查询适用规则，不能仅查订单就准备协商。本工具只读校验本人可演示协商的订单，返回金额与用户须完整发送的确认文字。不创建任务，不联系真实商家，不退款。reason是用户提供的1–200字单行原因。",
       parameters: Type.Object({
         orderId: Type.String({ pattern: "^COUPON-\\d{4}$" }),
         reason: Type.String({ minLength: 1, maxLength: 200 }),
@@ -104,6 +105,25 @@ export async function createCouponSession(
       }),
     }),
   );
+  if (afterSales?.refunds) {
+    const refunds = afterSales.refunds;
+    tools.push(
+      defineTool({
+        name: "prepare_refund",
+        label: "生成模拟退款方案",
+        description: "为本人在当前会话已获模拟商家批准的单张未核销券生成整笔退款方案。仅保存待确认方案，不执行退款；金额由业务服务计算，不能传入或修改金额。必须展示操作编号和方案，请用户本人另发确认。",
+        parameters: Type.Object({ orderId: Type.String({ pattern: "^COUPON-2\\d{3}$" }) }, { additionalProperties: false }),
+        execute: async (_id, { orderId }) => ({ content: [{ type: "text", text: JSON.stringify(await refunds.prepare(identity, afterSales.sourceKey, orderId)) }], details: {} }),
+      }),
+      defineTool({
+        name: "get_refund",
+        label: "查询模拟退款状态",
+        description: "按订单号查询本人在当前会话的模拟退款操作，重启后仍可查。null为没有方案，prepared未开放确认，awaiting_confirmation等待用户确认，只有succeeded代表模拟退款已完成；没有真实资金到账。",
+        parameters: Type.Object({ orderId: Type.String({ pattern: "^COUPON-2\\d{3}$" }) }, { additionalProperties: false }),
+        execute: async (_id, { orderId }) => ({ content: [{ type: "text", text: JSON.stringify(await refunds.get(identity, afterSales.sourceKey, orderId) ?? null) }], details: {} }),
+      }),
+    );
+  }
   return createSession(modelRuntime, { ...model, maxTokens: Math.min(model.maxTokens, 2048) }, systemPrompt, tools, skills);
 }
 

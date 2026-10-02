@@ -28,6 +28,7 @@ export class QQAgent {
   private log: (text: string) => void;
   private timeoutMs: number;
   private beforePrompt?: (msg: QQBotInboundMessage) => Promise<string | Reply | undefined>;
+  private afterDeliver?: (msg: QQBotInboundMessage, reply: Reply) => Promise<void>;
 
   constructor(
     createSession: (msg: QQBotInboundMessage) => Promise<AgentSession>,
@@ -35,12 +36,14 @@ export class QQAgent {
     log: (text: string) => void = console.log,
     timeoutMs = 60_000,
     beforePrompt?: (msg: QQBotInboundMessage) => Promise<string | Reply | undefined>,
+    afterDeliver?: (msg: QQBotInboundMessage, reply: Reply) => Promise<void>,
   ) {
     this.createSession = createSession;
     this.send = send;
     this.log = log;
     this.timeoutMs = timeoutMs;
     this.beforePrompt = beforePrompt;
+    this.afterDeliver = afterDeliver;
   }
 
   private prune() {
@@ -150,12 +153,15 @@ export class QQAgent {
   private async deliver(msg: QQBotInboundMessage, reply: string | Reply): Promise<boolean> {
     if (this.closed || !validQQMessage(msg)) return false;
     try {
-      const rendered = renderReply(typeof reply === "string" ? { kind: "notice", text: reply } : reply);
+      const structured: Reply = typeof reply === "string" ? { kind: "notice", text: reply } : reply;
+      const rendered = renderReply(structured);
       await this.send(msg.replyTarget, rendered.text, rendered, msg.senderId);
+      // A refund proposal becomes confirmable only after the platform accepts this exact summary.
+      await this.afterDeliver?.(msg, structured);
       return true;
     } catch {
       // Do not blindly retry an ambiguous send: QQ may already have accepted it.
-      this.log("[qq] 回复发送失败，请检查机器人权限、出口 IP 和网络。");
+      this.log("[qq] 回复发送或确认登记失败，请查询状态后重试；未自动重发。");
       return false;
     }
   }

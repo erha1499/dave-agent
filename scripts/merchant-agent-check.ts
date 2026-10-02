@@ -89,7 +89,7 @@ try {
   assert.ok(task);
   assert.equal(task.status, "pending");
   assert.ok(reply?.includes(task.taskId));
-  assert.match(reply!, /未执行退款/);
+  assert.match(reply!, /模拟协商结果/);
   assert.equal(JSON.parse(await toolRound(session, "get_merchant_request", { orderId }, false)).taskId, task.taskId);
   assert.equal(await merchant.getTask(identity, otherSource, orderId), undefined, "another conversation cannot read this task");
   const repeated = await confirmMerchantMessage(merchant, identity, sourceKey, confirmation);

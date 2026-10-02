@@ -1,6 +1,6 @@
 import type { AgentSession } from "@earendil-works/pi-coding-agent";
 import { merchantReasonControls, type MerchantTask } from "./after-sales.ts";
-import type { Reply } from "./reply.ts";
+import { isRefundOperation, type Reply } from "./reply.ts";
 
 type ToolResult = Extract<AgentSession["messages"][number], { role: "toolResult" }>;
 type Evidence = Pick<ToolResult, "toolName" | "isError" | "content">;
@@ -25,9 +25,12 @@ export function replyFromTools(text: string, results: Evidence[]): Reply {
   const orders: Extract<Reply, { kind: "order" }>["orders"] = [];
   const evidenceIds = new Set<string>();
   let merchant: Reply | undefined;
+  let refund: Reply | undefined;
+  let refundFailed = false;
   try {
     for (const result of results) {
-      if (result.isError || !["get_order", "search_faq", "prepare_merchant_request", "get_merchant_request"].includes(result.toolName)) continue;
+      if (result.isError && ["prepare_refund", "get_refund"].includes(result.toolName)) refundFailed = true;
+      if (result.isError || !["get_order", "search_faq", "prepare_merchant_request", "get_merchant_request", "prepare_refund", "get_refund"].includes(result.toolName)) continue;
       const value: unknown = JSON.parse(result.content.map(part => part.type === "text" ? part.text : "").join(""));
       if (result.toolName === "get_order") {
         if (!record(value) || value.source !== "demo-database" || !orderId(value.id) || typeof value.status !== "string"
@@ -40,6 +43,10 @@ export function replyFromTools(text: string, results: Evidence[]): Reply {
         for (const document of value) {
           if (record(document) && typeof document.sourceId === "string" && /^KB-[A-Z0-9-]{1,80}$/.test(document.sourceId)) evidenceIds.add(document.sourceId);
         }
+      } else if (result.toolName === "prepare_refund" || result.toolName === "get_refund") {
+        if (result.toolName === "get_refund" && value === null) continue;
+        if (!isRefundOperation(value)) throw new Error();
+        refund = { kind: value.status === "succeeded" ? "refund_status" : "refund_confirmation", operation: value };
       } else if (result.toolName === "prepare_merchant_request") {
         if (!record(value) || value.simulation !== true || value.status !== "confirmation_required"
           || !orderId(value.orderId) || !cents(value.amountCents) || value.amountCents === 0
@@ -52,8 +59,10 @@ export function replyFromTools(text: string, results: Evidence[]): Reply {
       }
     }
   } catch {
-    return { kind: "notice", text: "查询结果格式异常，请按订单号重新查询；未执行退款。" };
+    return { kind: "notice", text: "查询结果格式异常，无法确认当前状态，请按订单号重新查询。" };
   }
+  if (refund) return refund;
+  if (refundFailed) return { kind: "notice", text: "无法确认当前模拟退款状态，请在原会话按订单号重新查询，或联系测试管理员核实。" };
   if (merchant) return merchant;
   if (orders.length) return { kind: "order", text, orders: [...new Map(orders.map(order => [order.id, order])).values()], evidenceIds: [...evidenceIds] };
   return { kind: "answer", text, evidenceIds: [...evidenceIds] };
