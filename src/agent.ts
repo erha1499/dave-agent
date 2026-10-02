@@ -13,35 +13,10 @@ import {
   type ResourceLoader,
   type ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
+import type { CouponStore, QQIdentity } from "./coupon-store.ts";
 
 const projectDir = fileURLToPath(new URL("../", import.meta.url));
 const skillDir = fileURLToPath(new URL("../skills/shop-support", import.meta.url));
-
-const faq = [
-  { id: "FAQ-SHIPPING", keywords: ["发货", "物流", "配送", "快递"], answer: "测试店铺的现货订单通常在付款后 48 小时内发货；实际进度以订单查询结果为准。" },
-  { id: "FAQ-RETURN", keywords: ["退货", "退款", "售后"], answer: "测试店铺支持联系客服申请售后；需要订单号、问题描述。当前助手只能说明流程，不能提交退款或修改订单。" },
-  { id: "FAQ-INVOICE", keywords: ["发票", "开票"], answer: "测试店铺可由人工客服登记开票需求；请说明订单号与发票类型，不要在群聊发送完整身份证号或银行卡号。" },
-];
-
-const orders = [
-  { id: "DEMO-1001", customerId: "demo-customer-1", status: "已发货", item: "演示帆布包", carrier: "演示快递", tracking: "DEMO-TRACK-001" },
-  { id: "DEMO-1002", customerId: "demo-customer-2", status: "待发货", item: "演示水杯", carrier: null, tracking: null },
-];
-
-export function searchFaq(query: string) {
-  if (!query.trim() || query.length > 500) throw new Error("请输入 1–500 字的 FAQ 查询。");
-  // ponytail: keyword matching covers the three demo FAQs; add retrieval when a real corpus is available.
-  return faq.filter((entry) => entry.keywords.some((word) => query.includes(word)))
-    .map(({ id, answer }) => ({ source: "demo-faq", id, answer }));
-}
-
-export function getOrder(customerId: string, orderId: string) {
-  if (!/^DEMO-\d{4}$/.test(orderId)) throw new Error("演示订单号格式为 DEMO-1001。");
-  const order = orders.find((entry) => entry.id === orderId && entry.customerId === customerId);
-  if (!order) throw new Error("未找到当前客户可查询的订单，请核对订单号或联系人工客服。");
-  const { customerId: _owner, ...details } = order;
-  return { source: "demo-order", ...details };
-}
 
 export function createModelRuntime() {
   return ModelRuntime.create({
@@ -72,8 +47,7 @@ export async function createConfiguredModelRuntime(env: NodeJS.ProcessEnv = proc
   return { modelRuntime, model };
 }
 
-export async function createSupportSession(customerId: string, modelRuntime: ModelRuntime, model: Model<Api>) {
-  if (!/^[a-z0-9-]{1,64}$/.test(customerId)) throw new Error("无效的演示客户身份。");
+export async function createCouponSession(identity: QQIdentity, store: CouponStore, modelRuntime: ModelRuntime, model: Model<Api>) {
   const [prompt, skill] = await Promise.all([
     readFile(new URL("../prompts/customer-service.md", import.meta.url), "utf8"),
     readFile(new URL("../skills/shop-support/SKILL.md", import.meta.url), "utf8"),
@@ -86,20 +60,24 @@ export async function createSupportSession(customerId: string, modelRuntime: Mod
   const tools = [
     defineTool({
       name: "search_faq",
-      label: "查询测试店铺 FAQ",
-      description: "检索测试店铺发货、售后、发票 FAQ，返回答案和证据 ID；无匹配时返回空列表。",
-      parameters: Type.Object({ query: Type.String({ minLength: 1, maxLength: 500 }) }, { additionalProperties: false }),
-      execute: async (_id, { query }) => ({ content: [{ type: "text", text: JSON.stringify(searchFaq(query)) }], details: {} }),
+      label: "查询模拟团购券规则",
+      description: "检索公开团购券规则并返回证据ID及适用门店/套餐。具体订单应先get_order，再使用结果中的shopId/productId查询适用规则；不传范围只查询通用规则，空结果表示未知。",
+      parameters: Type.Object({
+        query: Type.String({ minLength: 1, maxLength: 500 }),
+        shopId: Type.Optional(Type.String({ minLength: 1, maxLength: 64 })),
+        productId: Type.Optional(Type.String({ minLength: 1, maxLength: 64 })),
+      }, { additionalProperties: false }),
+      execute: async (_id, { query, shopId, productId }) => ({ content: [{ type: "text", text: JSON.stringify(await store.searchKnowledge(query, shopId, productId)) }], details: {} }),
     }),
     defineTool({
       name: "get_order",
-      label: "查询当前演示客户订单",
-      description: "按 DEMO-1001 格式订单号查询当前客户的模拟订单。身份由宿主绑定；不能查询其他客户，不能修改订单。",
-      parameters: Type.Object({ orderId: Type.String({ pattern: "^DEMO-\\d{4}$" }) }, { additionalProperties: false }),
-      execute: async (_id, { orderId }) => ({ content: [{ type: "text", text: JSON.stringify(getOrder(customerId, orderId)) }], details: {} }),
+      label: "查询本人模拟券单",
+      description: "按COUPON-1001格式订单号查询当前QQ身份的模拟团购券订单、核销、付款和历史退款事实。身份由宿主绑定并在每次执行时校验；不能查询他人或修改数据。金额单位为分。",
+      parameters: Type.Object({ orderId: Type.String({ pattern: "^COUPON-\\d{4}$" }) }, { additionalProperties: false }),
+      execute: async (_id, { orderId }) => ({ content: [{ type: "text", text: JSON.stringify(await store.getOrder(identity, orderId)) }], details: {} }),
     }),
   ];
-  return createSession(modelRuntime, model, systemPrompt, tools, skills);
+  return createSession(modelRuntime, { ...model, maxTokens: Math.min(model.maxTokens, 2048) }, systemPrompt, tools, skills);
 }
 
 export function createQQSession(modelRuntime: ModelRuntime, model: Model<Api>) {

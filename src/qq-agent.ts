@@ -21,13 +21,13 @@ export class QQAgent {
   private conversations = new Map<string, Conversation>();
   private closed = false;
   private sweep = setInterval(() => this.prune(), 5 * 60_000).unref();
-  private createSession: () => Promise<AgentSession>;
+  private createSession: (msg: QQBotInboundMessage) => Promise<AgentSession>;
   private send: (target: ReplyTarget, text: string) => Promise<unknown>;
   private log: (text: string) => void;
   private timeoutMs: number;
 
   constructor(
-    createSession: () => Promise<AgentSession>,
+    createSession: (msg: QQBotInboundMessage) => Promise<AgentSession>,
     send: (target: ReplyTarget, text: string) => Promise<unknown>,
     log: (text: string) => void = console.log,
     timeoutMs = 60_000,
@@ -81,7 +81,7 @@ export class QQAgent {
           conversation.session = undefined;
           conversation.turns = 0;
         }
-        conversation.session ??= await this.createSession();
+        conversation.session ??= await this.createSession(msg);
         if (this.closed) return;
         const session = conversation.session;
         const previousMessageCount = session.messages.length;
@@ -97,10 +97,11 @@ export class QQAgent {
         if (!text) throw new Error("模型未生成回复");
         conversation.turns++;
         await this.deliver(msg, [...text].slice(0, 1000).join(""));
-        const tools = session.messages.slice(previousMessageCount).flatMap(message =>
-          message.role === "toolResult" && !message.isError && session.getActiveToolNames().includes(message.toolName)
-            ? [message.toolName] : []);
-        this.log(`[agent] session=${tag} model_ok tools=${tools.join(",") || "none"} duration_ms=${Date.now() - started}`);
+        const results = session.messages.slice(previousMessageCount).flatMap(message =>
+          message.role === "toolResult" && session.getActiveToolNames().includes(message.toolName) ? [message] : []);
+        const tools = results.filter(result => !result.isError).map(result => result.toolName);
+        const toolErrors = results.filter(result => result.isError).map(result => result.toolName);
+        this.log(`[agent] session=${tag} model_ok tools=${tools.join(",") || "none"} tool_errors=${toolErrors.join(",") || "none"} duration_ms=${Date.now() - started}`);
       } catch {
         failed = true;
         clearTimeout(timer);

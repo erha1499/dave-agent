@@ -45,7 +45,12 @@ function inputs(context: TranscriptContext) {
   });
 }
 
-const agent = new QQAgent(create, send, (text) => logs.push(text));
+const agent = new QQAgent(async (msg) => {
+  assert.equal(msg.senderId, "user_one", "session factory must receive the trusted SDK sender");
+  assert.equal(msg.groupOpenid, "group_one");
+  assert.equal(msg.rawEventType, "GROUP_AT_MESSAGE_CREATE");
+  return create();
+}, send, (text) => logs.push(text));
 try {
   faux.setResponses([
     (context, _options, _state, model) => {

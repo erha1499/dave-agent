@@ -3,7 +3,10 @@ import {
   type QQBotOptions,
 } from "@tencent-connect/qqbot-nodejs";
 import { QQWebhookServer } from "./qq-http.ts";
-import { createConfiguredModelRuntime, createQQSession } from "./agent.ts";
+import { createPool } from "mysql2/promise";
+import { createConfiguredModelRuntime, createCouponSession } from "./agent.ts";
+import { CouponStore, readDatabaseConfig } from "./coupon-store.ts";
+import { recordQQIdentity } from "./qq-identity.ts";
 import { QQAgent } from "./qq-agent.ts";
 
 export function readQQConfig(env: NodeJS.ProcessEnv = process.env) {
@@ -41,61 +44,74 @@ export function readQQConfig(env: NodeJS.ProcessEnv = process.env) {
 
 async function main() {
   const { options, allowedGroups } = readQQConfig();
-  const { modelRuntime, model } = await createConfiguredModelRuntime();
-  const secrets = [options.appSecret, process.env.DEEPSEEK_API_KEY, process.env.MODEL_API_KEY].filter((key): key is string => !!key);
-  const redact = (text: string) => secrets.reduce((value, key) => value.replaceAll(key, "[redacted]"), text);
-  const bot = new QQBot({
-    ...options,
-    ...(options.webhook && { webhook: { ...options.webhook, server: new QQWebhookServer() } }),
-    logger: {
-      info: (text) => console.log(redact(text)),
-      warn: (text) => console.warn(redact(text)),
-      error: (text) => console.error(redact(text)),
-    },
-  });
-  bot.use(accessPolicy({
-    c2c: { mode: "disabled" }, guild: { mode: "disabled" },
-    group: { mode: "allowlist", allow: allowedGroups },
-    onBlock: (ctx) => {
-      if (ctx.message.kind === "group") console.log(`[qq] 未启用群 OpenID：${JSON.stringify(ctx.message.groupOpenid)}`);
-    },
-  }));
-  // ponytail: SDK memory dedup is for this demo; persist business idempotency before adding mutations.
-  bot.use(messageFilter({ dedup: { windowMs: 5 * 60_000, maxSize: 1000 } }));
-  bot.use(mentionGate({ requireMentionInGroup: true, alwaysAnswerC2C: false, passthrough: false }));
-  bot.use(contentSanitizer({ stripBotMention: true, collapseWhitespace: true }));
-  const agent = new QQAgent(
-    () => createQQSession(modelRuntime, model),
-    async (target, text) => {
-      const result = await bot.sendText(target, text);
-      if (!result.id) throw new Error("QQ 未返回消息 ID");
-      console.log("[qq] 回复已被平台接收");
-    },
-  );
-  bot.on("message", async (_ctx, msg) => {
-    await agent.handle(msg);
-  });
-  bot.on("error", (error) => console.error(`[qq] ${redact(error.message)}`));
-  bot.on("ready", () => console.log(`[qq] ${options.transport} 已就绪；模型 ${model.provider}/${model.id}。`));
-  const controller = new AbortController();
-  const stop = () => controller.abort();
-  process.once("SIGINT", stop);
-  process.once("SIGTERM", stop);
-  if (!allowedGroups.length) console.log("[qq] QQ_ALLOWED_GROUPS 为空：仅发现群 OpenID，不发送回复。");
+  const store = new CouponStore(createPool(readDatabaseConfig()));
   try {
-    await bot.start(controller.signal);
+    await store.ping();
+    const { modelRuntime, model } = await createConfiguredModelRuntime();
+    const secrets = [options.appSecret, process.env.DEEPSEEK_API_KEY, process.env.MODEL_API_KEY, process.env.DB_PASSWORD].filter((key): key is string => !!key);
+    const redact = (text: string) => secrets.reduce((value, key) => value.replaceAll(key, "[redacted]"), text);
+    const bot = new QQBot({
+      ...options,
+      ...(options.webhook && { webhook: { ...options.webhook, server: new QQWebhookServer() } }),
+      logger: {
+        info: (text) => console.log(redact(text)),
+        warn: (text) => console.warn(redact(text)),
+        error: (text) => console.error(redact(text)),
+      },
+    });
+    bot.use(accessPolicy({
+      c2c: { mode: "disabled" }, guild: { mode: "disabled" },
+      group: { mode: "allowlist", allow: allowedGroups },
+      onBlock: (ctx) => {
+        if (ctx.message.kind === "group") console.log(`[qq] 未启用群 OpenID：${JSON.stringify(ctx.message.groupOpenid)}`);
+      },
+    }));
+    // ponytail: SDK memory dedup is for this demo; persist business idempotency before adding mutations.
+    bot.use(messageFilter({ dedup: { windowMs: 5 * 60_000, maxSize: 1000 } }));
+    bot.use(mentionGate({ requireMentionInGroup: true, alwaysAnswerC2C: false, passthrough: false }));
+    bot.use(contentSanitizer({ stripBotMention: true, collapseWhitespace: true }));
+    const agent = new QQAgent(
+      async (msg) => {
+        const identity = { appId: options.appId, senderId: msg.senderId };
+        if (!await store.resolveCustomer(identity)) {
+          const tag = await recordQQIdentity(options.appId, msg);
+          console.log(`[qq] 未绑定模拟客户 identity=${tag}；管理员核对发信人后运行 npm run qq:bind -- ${tag} customer-demo-1`);
+        }
+        return createCouponSession(identity, store, modelRuntime, model);
+      },
+      async (target, text) => {
+        const result = await bot.sendText(target, text);
+        if (!result.id) throw new Error("QQ 未返回消息 ID");
+        console.log("[qq] 回复已被平台接收");
+      },
+    );
+    bot.on("message", async (_ctx, msg) => {
+      await agent.handle(msg);
+    });
+    bot.on("error", (error) => console.error(`[qq] ${redact(error.message)}`));
+    bot.on("ready", () => console.log(`[qq] ${options.transport} 团购券客服已就绪；模型 ${model.provider}/${model.id}；数据库只读。`));
+    const controller = new AbortController();
+    const stop = () => controller.abort();
+    process.once("SIGINT", stop);
+    process.once("SIGTERM", stop);
+    if (!allowedGroups.length) console.log("[qq] QQ_ALLOWED_GROUPS 为空：仅发现群 OpenID，不发送回复。");
+    try {
+      await bot.start(controller.signal);
+    } finally {
+      await agent.close();
+      bot.stop();
+      process.removeListener("SIGINT", stop);
+      process.removeListener("SIGTERM", stop);
+    }
   } finally {
-    await agent.close();
-    bot.stop();
-    process.removeListener("SIGINT", stop);
-    process.removeListener("SIGTERM", stop);
+    await store.close();
   }
 }
 
 if (import.meta.main) {
   main().catch((error: unknown) => {
     const text = error instanceof Error ? error.message : "QQ 启动失败。";
-    const secrets = [process.env.QQBOT_APP_SECRET, process.env.DEEPSEEK_API_KEY, process.env.MODEL_API_KEY].filter((key): key is string => !!key);
+    const secrets = [process.env.QQBOT_APP_SECRET, process.env.DEEPSEEK_API_KEY, process.env.MODEL_API_KEY, process.env.DB_PASSWORD].filter((key): key is string => !!key);
     console.error(secrets.reduce((value, key) => value.replaceAll(key, "[redacted]"), text));
     process.exitCode = 1;
   });

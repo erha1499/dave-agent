@@ -11,6 +11,11 @@
     "start": "node --env-file-if-exists=.env src/cli.ts",
     "qq": "node --env-file-if-exists=.env src/qq.ts",
     "qq:deploy": "NODE_ENV=production node --env-file-if-exists=.env src/qq.ts",
+    "db:up": "docker compose up -d --wait --wait-timeout 150",
+    "db:stop": "docker compose stop mysql",
+    "qq:bind": "node --env-file-if-exists=.env scripts/bind-qq.ts",
+    "check:business": "node --env-file-if-exists=.env scripts/coupon-db-check.ts && node --env-file-if-exists=.env scripts/coupon-agent-check.ts",
+    "check:model": "node --env-file-if-exists=.env scripts/coupon-model-check.ts",
     "check": "node scripts/check.ts",
     "check:qq": "node scripts/qq-check.ts",
     "check:qq-agent": "node scripts/qq-agent-check.ts",
@@ -20,7 +25,8 @@
   "dependencies": {
     "@earendil-works/pi-ai": "1.0.0",
     "@earendil-works/pi-coding-agent": "1.0.0",
-    "@tencent-connect/qqbot-nodejs": "1.0.4"
+    "@tencent-connect/qqbot-nodejs": "1.0.4",
+    "mysql2": "3.24.5"
   },
   "devDependencies": {
     "@types/node": "26.6.4",
