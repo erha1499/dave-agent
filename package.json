@@ -14,13 +14,17 @@
     "db:up": "docker compose up -d --wait --wait-timeout 150",
     "db:stop": "docker compose stop mysql",
     "qq:bind": "node --env-file-if-exists=.env scripts/bind-qq.ts",
+    "eval:init": "node --env-file-if-exists=.env scripts/init-evaluation.ts",
+    "eval:serve": "node --env-file-if-exists=.env src/eval-server.ts",
+    "check:eval": "node scripts/eval-check.ts",
+    "check:eval-db": "node --env-file-if-exists=.env scripts/eval-db-check.ts",
     "check:business": "node --env-file-if-exists=.env scripts/coupon-db-check.ts && node --env-file-if-exists=.env scripts/coupon-agent-check.ts",
     "check:model": "node --env-file-if-exists=.env scripts/coupon-model-check.ts",
     "check": "node scripts/check.ts",
     "check:qq": "node scripts/qq-check.ts",
     "check:qq-agent": "node scripts/qq-agent-check.ts",
     "typecheck": "tsc --noEmit",
-    "validate": "npm run typecheck && npm run check && npm run check:qq && npm run check:qq-agent"
+    "validate": "npm run typecheck && npm run check && npm run check:qq && npm run check:qq-agent && npm run check:eval"
   },
   "dependencies": {
     "@earendil-works/pi-ai": "1.0.0",
