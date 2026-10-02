@@ -47,8 +47,11 @@ async function api(path) {
 }
 
 async function detail(id) {
-  if (!state.details.has(id)) state.details.set(id, await api(`/api/runs/${encodeURIComponent(id)}`));
-  return state.details.get(id);
+  if (state.details.has(id)) return state.details.get(id);
+  const result = await api(`/api/runs/${encodeURIComponent(id)}`);
+  // Completed records are immutable; an in-flight response must not cache an older running snapshot.
+  if (result.run.status !== "running") state.details.set(id, result);
+  return result;
 }
 
 function setView(view) {
@@ -164,7 +167,8 @@ function metricsPanel(run, cases) {
 function stepNode(step) {
   const status = step.isError ? step.expectedDenial ? badge("passed", "预期身份拒绝") : badge("failed", "执行错误") : badge("passed", "已完成");
   return node("div", { class: "step" },
-    node("div", { class: "step-top" }, text("span", `#${step.index} ${step.type === "model" ? "模型" : "工具"}`, "step-index"), text("span", step.name, "step-name"), status, text("span", duration(step.durationMs), "step-timing")),
+    node("div", { class: "step-top" }, text("span", `#${step.index} ${step.type === "model" ? "模型" : "工具"}`, "step-index"), text("span", step.name, "step-name"), status, text("span", `${step.type === "model" ? "响应流 " : ""}${duration(step.durationMs)}`, "step-timing")),
+    step.type === "model" ? text("p", "步骤耗时从模型消息开始事件计起，表示响应流阶段，不包含请求等待；单轮总耗时包含等待。", "metric-note") : null,
     step.input !== undefined ? node("div", {}, text("p", step.type === "tool" ? "调用参数" : "请求摘要", "step-label"), json(step.input)) : null,
     step.output !== undefined ? node("div", {}, text("p", step.type === "tool" ? "返回证据" : "模型响应", "step-label"), json(step.output)) : null,
     step.type === "model" ? text("p", step.usage ? `输入 ${number(step.usage.input)} · 输出 ${number(step.usage.output)} · 缓存读 ${number(step.usage.cacheRead)} / 写 ${number(step.usage.cacheWrite)} · 估算 ${money(step.usage.estimatedCostUsd)}` : "此请求未提供用量数据", "step-usage") : null);
