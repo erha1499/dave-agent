@@ -1,6 +1,6 @@
 # QQ 开放平台接入调研
 
-核对日期：2026-10-02。依据当前官方协议、腾讯 SDK 源码及登录后的后台只读检查。账号已完成个人认证；查看了机器人列表，并抽查一个现有机器人的服务范围、开发设置和旧版沙箱/回调表单。现已实现 WebSocket / Webhook → Pi → 模型 → QQ 的代码；本地真实 DeepSeek 工具循环通过，仍缺机器人凭据与真实群联调证据。账号状态仅代表检查时的后台展示。
+核对日期：2026-10-02。依据当前官方协议、腾讯 SDK 源码、后台操作与真实群联调。独立测试机器人已创建，凭据与群 OpenID 白名单仅写入被 Git 忽略的本机 `.env`。WebSocket → 嵌入式 Pi SDK → DeepSeek → QQ 已通过真实群内回答与 echo 工具循环验收；公网 Webhook 与两用户真实隔离尚未实测。账号状态仅代表检查时的后台展示。
 
 ## 接入方案
 
@@ -38,25 +38,25 @@ flowchart LR
 | 回复内容 | Pi/模型生成的最终纯文本；仅开放 echo 工具，不加载 CLI 客户身份、订单工具或电商 Skill |
 | 离线检查 | `npm run check:qq` 检查协议，`npm run check:qq-agent` 检查会话入口；`npm run validate` 包含类型与全部离线检查，本轮已通过 |
 
-两种模式都只处理白名单测试群的 `@` 纯文本，当前已接真实模型，不接订单查询或私聊流式消息。后台事件接收方式需与运行模式一致；切换程序配置不会自动修改开放平台配置。WebSocket 需要进程主动访问 QQ 网关，Webhook 需要平台访问公网回调入口；两者都仍需 API 出口 IP 符合后台白名单。
+两种模式都只处理白名单测试群的 `@` 纯文本，当前已接真实模型，不接订单查询或私聊流式消息。后台事件接收方式需与运行模式一致；切换程序配置不会自动修改开放平台配置。WebSocket 需要进程主动访问 QQ 网关，Webhook 需要平台访问公网回调入口；后台设置服务器 IP 列表后，两者的 API 出口 IP 都必须匹配。未设置列表时，后台说明允许所有请求来源 IP。
 
 ## 开放平台需要准备什么
 
 | 条件 | 准备方式 / 核实状态 |
 | --- | --- |
-| 机器人应用 | 已有两个机器人，均显示离线；还可创建三个。建议为 dave-agent 创建独立机器人，本轮未创建 |
-| AppID / AppSecret | 接入凭据入口可用；AppSecret 保持遮蔽，没有查看或复制。实现时从本地环境读取，密钥不进入 Prompt、日志或 Git |
-| 群聊能力 | 新版说明个人认证可设置公开使用，进群上限 500；抽查机器人公开群聊开关关闭。旧版回调表单可选择 `GROUP_AT_MESSAGE_CREATE`，当前未勾选 |
-| 测试成员和测试群 | 新版开发体验用户为 0/20；旧版沙箱已有管理员成员，QQ群尚未选择。沙箱要求管理员为群主/管理员、群成员不超过 20 人 |
-| HTTPS 回调 | Webhook 入口可用，旧版表单要求 HTTPS、地址为空；抽查机器人当前使用 WebSocket，切换方式会立即生效。本轮未切换或提交 |
-| API 出口 IP | 抽查机器人已有服务器 IP 白名单，后台支持最多 50 个 IP。部署服务调用 QQ API 的出口 IP 需符合该白名单 |
+| 机器人应用 | 已为 dave-agent 成功创建独立测试机器人 |
+| AppID / AppSecret | 用户已重置 AppSecret 并填入本机 `.env`，QQ API 鉴权已成功；后台不保存可查看的密钥明文，密钥不进入 Prompt、日志或 Git |
+| 群聊能力 | 机器人已添加到内部测试群并收到真实 `GROUP_AT_MESSAGE_CREATE`；公开服务开关保持关闭 |
+| 测试成员和测试群 | 已完成目标测试群接入，从真实 @ 事件取得 OpenID 并加入本机白名单；此前旧版沙箱要求管理员为群主/管理员、群成员不超过 20 人，配置时以当前后台提示为准 |
+| HTTPS 回调 | Webhook 入口可用，旧版表单要求 HTTPS；新机器人默认 WebSocket，未切换接收方式 |
+| API 出口 IP | 新机器人服务器 IP 列表为空；后台明确说明未设置时允许所有请求来源 IP。已设置列表的机器人需匹配实际出口 IP，后台支持最多 50 个 IP |
 | 域名 / 备案限制 | 查看到的表单未展示备案条件；具体校验仍待准备实际 HTTPS 地址后确认，尚未验证任何隧道或域名 |
 
 Webhook 协议允许回调端口 `80/443/8080/8443`，要求 HTTPS。可以由公网入口终止 TLS，再转发到 SDK 的本地 HTTP 监听端口。WebSocket 由服务主动连接 QQ 网关，不配置公网回调地址。[事件订阅与通知](https://bot.q.qq.com/wiki/develop/api-v2/dev-prepare/interface-framework/event-emit.html)
 
-后台路径：新版「我的机器人 → 机器人详情 → 开发设置 → 事件订阅与回调地址」；旧版「开发 → 沙箱配置 / 回调配置」。旧版回调表单的群事件标签中可见群 @ 事件，勾选与提交仍待实现阶段进行。
+后台路径：新版「我的机器人 → 机器人详情 → 开发设置 → 事件订阅与回调地址」；旧版「开发 → 沙箱配置 / 回调配置」。旧版回调表单的群事件标签中可见群 @ 事件，Webhook 勾选与提交仍待部署验收时进行。
 
-旧版沙箱说明仍包含 AIGC 机器人进入社群及全量公开使用的限制，而新版个人认证页面给出公开群聊能力。两处说明存在差异，公开发布 AIGC 服务的适用范围仍待确认；首版只做内部测试群。旧版沙箱选群并配置后，页面提示群主可从 QQ 群「设置 → 群机器人」添加测试机器人。上述配置尚未执行，也没有验证实际群消息投递。
+旧版沙箱说明仍包含 AIGC 机器人进入社群及全量公开使用的限制，而新版个人认证页面给出公开群聊能力。两处说明存在差异，公开发布 AIGC 服务的适用范围仍待确认；首版只做内部测试群。本轮已通过添加到群入口完成测试群接入，并验证实际群消息投递。
 
 ## 接收与回复协议
 
@@ -69,6 +69,8 @@ Webhook 协议允许回调端口 `80/443/8080/8443`，要求 HTTPS。可以由�
 | `payload.d.author.member_openid` | 发送者标识，不是昵称或可自行填写的 QQ 号 |
 
 每个进程只服务一个 AppID，因此当前会话键采用 `group_openid + member_openid`，机器人身份由进程隔离。不同用户隔离，同一用户消息串行；业务回调续接与内部客户映射在后续业务阶段补齐。当前不开放订单工具。官方文档说明群 @ 的 `content` 已去掉机器人 mention 前缀；过滤依据可信事件类型，不能把文本中的昵称当作身份。[群 @ 事件](https://bot.q.qq.com/wiki/develop/api-v2/autogen/event/group_at_message_create.html)
+
+群 OpenID 与 AppID 相关：更换机器人后，即使目标 QQ 群不变，也需通过新机器人的入站事件重新取得 OpenID。[唯一身份机制](https://bot.q.qq.com/wiki/develop/api-v2/dev-prepare/api-call-guide.html)
 
 群回复调用 `POST https://api.bot.qq.com/v2/groups/{group_openid}/messages`，纯文本使用 `msg_type: 0`，携带原消息 `msg_id`；同一消息的多次回复需要区分 `msg_seq`。首版经 SDK 的 `sendText(msg.replyTarget, text)` 发送，保留入站 SDK 给出的回复目标，不自行拼接群号。
 
@@ -86,14 +88,16 @@ ACK 只说明收到事件，不证明模型成功、退款成功或事件已持�
 
 API 当前通过 `AppID + AppSecret` 获取 AccessToken：`POST https://api.bot.qq.com/app/getAppAccessToken`，请求字段为 `appId/clientSecret`；调用 API 使用 `Authorization: QQBot <AccessToken>`。有效期按返回的 `expires_in` 处理，通常不超过 7200 秒，接近到期 60 秒内可获取新 token。优先复用 SDK 的缓存和刷新；不要沿用已弃用的静态 Token 方案。[接口调用与鉴权](https://bot.q.qq.com/wiki/develop/api-v2/dev-prepare/interface-framework/api-use.html)
 
-SDK `1.0.4` 的默认 API / Token 域名仍是 `api.sgroup.qq.com` / `bots.qq.com`，与当前文档有差异。实例的 `baseUrl` 和 `tokenBaseUrl` 都可以配置，接入时按当前文档设为 `https://api.bot.qq.com`，再通过真实获取 token 与发送消息验证。旧地址是否继续兼容，本轮没有实际调用证据；无需为这个差异 fork SDK。[配置透传对照](https://github.com/tencent-connect/qqbot-nodejs/blob/ca55d9c395b582b7fcfad0ec27209c35dd04e0b3/src/QQBot.ts)，该段已同时核对 npm 发布源码和编译产物。
+SDK `1.0.4` 的默认 API / Token 域名仍是 `api.sgroup.qq.com` / `bots.qq.com`，与当前文档有差异。实例的 `baseUrl` 和 `tokenBaseUrl` 均已设为 `https://api.bot.qq.com`，真实获取 token、网关连接和群消息发送已成功。旧地址是否继续兼容，本轮没有实际调用证据；无需为这个差异 fork SDK。[配置透传对照](https://github.com/tencent-connect/qqbot-nodejs/blob/ca55d9c395b582b7fcfad0ec27209c35dd04e0b3/src/QQBot.ts)，该段已同时核对 npm 发布源码和编译产物。
 
 ## 最小验收顺序
 
-1. 准备独立机器人和不超过 20 人的内部测试群，管理员担任群主/管理员；确认 API 出口 IP，不公开凭据。本地 WebSocket 联调不需要公网地址。
-2. 填写 QQ 凭据和群 OpenID 白名单，保留已有 `DEEPSEEK_API_KEY`，确认后台使用 WebSocket，运行 `npm run qq`；在测试群 @ 获得模型生成的纯文本回复，再发送“请调用 echo 回显：dave-agent 基座联调成功”。
+1. 准备独立机器人、AppSecret 与内部测试群，管理员担任群主/管理员。若后台配置服务器 IP 列表，核对实际 API 出口 IP；不公开凭据。本地 WebSocket 联调不需要公网地址。
+2. 填写 QQ 凭据，保留已有 `DEEPSEEK_API_KEY`，确认后台使用 WebSocket，运行 `npm run qq`；先留空群白名单，在测试群 @ 后从日志取得新机器人的群 OpenID，填入白名单并重启，再验证模型纯文本回复和“请调用 echo 回显：dave-agent 基座联调成功”。
 3. 运行 `npm run validate`，覆盖协议与会话离线检查；确认两名成员不串历史、同一成员消息串行、只发送最终文本。核对 QQ 入站、模型处理和平台返回消息 ID，群内实际可见回复才是最终证据。
 4. 部署时用 `npm run qq:deploy`，配置公网 HTTPS 回调并切换后台接收方式，通过地址验证和真实群投递。验签与慢处理 ACK 的离线结果不能替代真实网络联调；重复事件处理也要在联调中验证。
 5. 后续进入异步业务时，用模拟后台任务验证结果回到原会话；单独检查回复窗口过期及 Pi 回调续接的实际上下文。
 
-已完成公开协议研究、账号后台只读检查和 QQ → Pi 双模式代码。本轮 `npm run validate` 全部通过：既有 Pi/QQ 检查，加上真实 Pi 与离线模型的 echo 循环、专用上下文、工具白名单、群和用户隔离、串行与队列上限、失败/超时恢复、发送不盲重试和退出清理。本地真实 DeepSeek 已调用 echo 并返回最终文本“dave-agent 基座联调成功”，这证明模型工具循环，不证明 QQ 投递。账号认证、接入凭据入口、群 @ 事件选项及 Webhook 入口已确认；QQ AppSecret 尚未读取，真实群消息投递仍未执行。下一步准备凭据和测试群，先用本地 WebSocket 获取真实可见回复，再验收部署用 HTTPS Webhook。
+2026-10-02 验收：QQ API 鉴权成功，WebSocket gateway READY；从测试群真实 @ 事件取得 OpenID 并加入本机白名单。普通介绍请求已收到 DeepSeek 中文回答；第二条要求调用 echo，群内可见回复 `DAVE-QQ-PI-20261002`，服务记录 `model_ok tools=echo duration_ms=2717`，QQ 发送 API 返回 200 并确认接收，证明真实 Pi 工具调用、结果回填与 QQ 回复闭环。当前本地 WebSocket 服务运行中，基础目标完成。
+
+`npm run validate` 全部通过，覆盖 Pi/QQ 协议与会话离线检查。两用户隔离仅有离线证据，尚未真实双用户实测；公网 HTTPS Webhook 尚未部署，业务工具和异步回调继续留后续。联调截图仅保存于忽略的 `.runtime`，公开文档不保存真实账号、群或凭据字段。
