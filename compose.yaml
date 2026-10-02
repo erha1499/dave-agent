@@ -1,0 +1,26 @@
+services:
+  mysql:
+    image: mysql:8.4.11@sha256:6ea90827b1100f8f2ae306a539f86d2c264a26ed435a2a9f75551dd5c3aeb242
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Set MYSQL_ROOT_PASSWORD in your local .env}
+      MYSQL_DATABASE: dave_agent
+      MYSQL_USER: dave_agent_read
+      MYSQL_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in your local .env}
+      TZ: UTC
+    ports:
+      - "127.0.0.1:13306:3306"
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_0900_ai_ci
+      - --default-time-zone=+00:00
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./db:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "MYSQL_PWD=\"$${MYSQL_PASSWORD}\" mysql -h127.0.0.1 -u\"$${MYSQL_USER}\" -e 'SELECT 1' dave_agent >/dev/null 2>&1"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+volumes:
+  mysql-data:
