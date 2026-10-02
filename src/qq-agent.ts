@@ -1,6 +1,8 @@
 import { createHash } from "node:crypto";
 import type { AgentSession } from "@earendil-works/pi-coding-agent";
 import type { QQBotInboundMessage, ReplyTarget } from "@tencent-connect/qqbot-nodejs";
+import { renderReply, type Reply, type RenderedReply } from "./reply.ts";
+import { replyFromTools } from "./reply-from-tools.ts";
 
 export function validQQMessage(msg: QQBotInboundMessage, now = Date.now()) {
   if (msg.kind !== "group" || msg.rawEventType !== "GROUP_AT_MESSAGE_CREATE"
@@ -22,17 +24,17 @@ export class QQAgent {
   private closed = false;
   private sweep = setInterval(() => this.prune(), 5 * 60_000).unref();
   private createSession: (msg: QQBotInboundMessage) => Promise<AgentSession>;
-  private send: (target: ReplyTarget, text: string) => Promise<unknown>;
+  private send: (target: ReplyTarget, text: string, reply: RenderedReply) => Promise<unknown>;
   private log: (text: string) => void;
   private timeoutMs: number;
-  private beforePrompt?: (msg: QQBotInboundMessage) => Promise<string | undefined>;
+  private beforePrompt?: (msg: QQBotInboundMessage) => Promise<string | Reply | undefined>;
 
   constructor(
     createSession: (msg: QQBotInboundMessage) => Promise<AgentSession>,
-    send: (target: ReplyTarget, text: string) => Promise<unknown>,
+    send: (target: ReplyTarget, text: string, reply: RenderedReply) => Promise<unknown>,
     log: (text: string) => void = console.log,
     timeoutMs = 60_000,
-    beforePrompt?: (msg: QQBotInboundMessage) => Promise<string | undefined>,
+    beforePrompt?: (msg: QQBotInboundMessage) => Promise<string | Reply | undefined>,
   ) {
     this.createSession = createSession;
     this.send = send;
@@ -94,7 +96,7 @@ export class QQAgent {
           conversation.turns++;
           try {
             // Remember the receipt without triggering another model turn; the next normal prompt uses the business system prompt.
-            await session.sendCustomMessage({ customType: "merchant-receipt", content: hostReply, display: true }, { triggerTurn: false });
+            await session.sendCustomMessage({ customType: "merchant-receipt", content: typeof hostReply === "string" ? hostReply : renderReply(hostReply).text, display: true }, { triggerTurn: false });
           } catch {
             this.log("[agent] 业务回执未加入会话，可按订单号重新查询持久化结果。");
           }
@@ -113,9 +115,9 @@ export class QQAgent {
         const text = session.getLastAssistantText()?.trim();
         if (!text) throw new Error("模型未生成回复");
         conversation.turns++;
-        const delivered = await this.deliver(msg, [...text].slice(0, 1000).join(""));
         const results = session.messages.slice(previousMessageCount).flatMap(message =>
           message.role === "toolResult" && session.getActiveToolNames().includes(message.toolName) ? [message] : []);
+        const delivered = await this.deliver(msg, replyFromTools(text, results));
         const tools = results.filter(result => !result.isError).map(result => result.toolName);
         const toolErrors = results.filter(result => result.isError).map(result => result.toolName);
         this.log(`[agent] session=${tag} model_ok tools=${tools.join(",") || "none"} tool_errors=${toolErrors.join(",") || "none"} reply_sent=${delivered} duration_ms=${Date.now() - started}`);
@@ -145,10 +147,11 @@ export class QQAgent {
     await entry.tail;
   }
 
-  private async deliver(msg: QQBotInboundMessage, text: string): Promise<boolean> {
+  private async deliver(msg: QQBotInboundMessage, reply: string | Reply): Promise<boolean> {
     if (this.closed || !validQQMessage(msg)) return false;
     try {
-      await this.send(msg.replyTarget, text);
+      const rendered = renderReply(typeof reply === "string" ? { kind: "notice", text: reply } : reply);
+      await this.send(msg.replyTarget, rendered.text, rendered);
       return true;
     } catch {
       // Do not blindly retry an ambiguous send: QQ may already have accepted it.

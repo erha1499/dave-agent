@@ -1,10 +1,10 @@
 # QQ 开放平台接入调研
 
-核对日期：2026-10-02。依据当前官方协议、腾讯 SDK 源码、后台操作与真实群联调。独立测试机器人已创建，凭据与群 OpenID 白名单仅写入被 Git 忽略的本机 `.env`。当前 WebSocket → 可信身份/只读 MySQL 工具 → 嵌入式 Pi SDK/DeepSeek → QQ 已跑通本人券单与规则查询、多轮追问、越权拒绝和未知节假日政策处理；公网 Webhook 与两用户真实隔离尚未实测。账号状态仅代表检查时的后台展示。
+核对日期：2026-10-02。依据当前官方协议、腾讯 SDK 源码、后台操作与真实群联调。独立测试机器人已创建，凭据与群 OpenID 白名单仅写入被 Git 忽略的本机 `.env`。当前 WebSocket → 可信身份/只读 MySQL 工具 → 嵌入式 Pi SDK/DeepSeek → QQ 已跑通本人券单与规则查询、多轮追问、越权拒绝、未知节假日政策处理，以及 D1 模拟协商同意路径；公网 Webhook 与两用户真实隔离尚未实测。账号状态仅代表检查时的后台展示。
 
 ## 接入方案
 
-在 dave-agent 的 Node.js 服务中使用腾讯 QQ SDK 负责通信，宿主按群和发送者路由到 Pi AgentSession SDK 的模型与工具循环。无需运行 OpenClaw，也无需独立启动 Pi CLI。**本地默认 WebSocket，部署默认 HTTP Webhook；两种模式共用消息处理器和发送 API。** 接收方式不决定 QQ 客户端是否支持流式显示，当前群聊入口只发送完整文本。
+在 dave-agent 的 Node.js 服务中使用腾讯 QQ SDK 负责通信，宿主按群和发送者路由到 Pi AgentSession SDK 的模型与工具循环。无需运行 OpenClaw，也无需独立启动 Pi CLI。**本地默认 WebSocket，部署默认 HTTP Webhook；两种模式共用消息处理器和发送 API。** 接收方式不决定 QQ 客户端是否支持流式显示；当前群聊一次发送完整回复，默认使用固定模板 Markdown，可配置纯文本。
 
 ```mermaid
 flowchart LR
@@ -21,12 +21,12 @@ flowchart LR
   T --> P
   P --> M[DeepSeek 模型与工具循环]
   M --> P
-  P --> R[最终文本]
+  P --> R[Reply 类型与固定模板]
   R --> A[腾讯 SDK 发送 API]
   A --> Q
 ```
 
-首版已固定安装 `@tencent-connect/qqbot-nodejs@1.0.4`，固定回复已替换为 Pi 对话。[npm 发布信息](https://registry.npmjs.org/@tencent-connect%2Fqqbot-nodejs/1.0.4)与 GitHub main 不完全一致，落地以安装的发布包为准。本轮对照 GitHub commit 为 `ca55d9c395b582b7fcfad0ec27209c35dd04e0b3`；Webhook、发送和去重源码已与发布包比对，QQBot 全文件并不完全相同。参考腾讯的 [Webhook 示例](https://github.com/tencent-connect/qqbot-nodejs/blob/ca55d9c395b582b7fcfad0ec27209c35dd04e0b3/examples/webhook/index.ts)；按运行模式配置 `transport`，Webhook 再配置监听端口和路径，并关闭 Markdown，先验证纯文本。
+首版已固定安装 `@tencent-connect/qqbot-nodejs@1.0.4`，固定回复已替换为 Pi 对话。[npm 发布信息](https://registry.npmjs.org/@tencent-connect%2Fqqbot-nodejs/1.0.4)与 GitHub main 不完全一致，落地以安装的发布包为准。本轮对照 GitHub commit 为 `ca55d9c395b582b7fcfad0ec27209c35dd04e0b3`；Webhook、发送和去重源码已与发布包比对，QQBot 全文件并不完全相同。参考腾讯的 [Webhook 示例](https://github.com/tencent-connect/qqbot-nodejs/blob/ca55d9c395b582b7fcfad0ec27209c35dd04e0b3/examples/webhook/index.ts)；按运行模式配置 `transport`，Webhook 再配置监听端口和路径。初版先验证纯文本，现在通过显式发送类型接入 Markdown。
 
 ### 当前启动与配置
 
@@ -40,9 +40,9 @@ flowchart LR
 | 测试群 | `QQ_ALLOWED_GROUPS`，逗号分隔群 OpenID；为空时仅记录被拦截群的 OpenID，不回复 |
 | Webhook 监听 | `QQBOT_WEBHOOK_PORT=8080`、`QQBOT_WEBHOOK_PATH=/qq/callback` 为默认值，外层配置公网 HTTPS 反向代理 |
 | 模型配置 | 默认 `deepseek/deepseek-flash`，读取运行时 `DEEPSEEK_API_KEY`；`MODEL_PROVIDER`、`MODEL_ID`、`MODEL_API_KEY` 可显式覆盖 |
-| 回复内容 | Pi/模型生成的最终纯文本；开放只读 `get_order` / `search_faq`，宿主预加载团购券 Prompt/Skill，不加载终端/文件工具或 CLI 合成客户身份 |
+| 回复内容 | `QQ_REPLY_FORMAT` 默认 `markdown`，可显式设为 `text`；宿主按本轮工具/任务结果选择固定模板，CLI 保持纯文本 |
 | 可信身份绑定 | 未绑定身份保存本机忽略目录；管理员核对发信人后运行 `npm run qq:bind -- <12位identity代号> <对应演示客户ID>` |
-| 工程检查 | `npm run validate` 检查类型、Pi 与 QQ 协议/会话；`npm run check:business` 用真实 MySQL＋Pi/faux 检查只读业务边界 |
+| 工程检查 | `npm run validate` 检查类型、Pi、QQ 协议/会话及 `check:reply` 模板；`npm run check:business` 用真实 MySQL＋Pi/faux 检查只读业务边界 |
 | 真实模型检查 | `npm run check:model` 使用配置的真实模型与数据库，单独记录业务样例结果，会产生模型调用 |
 
 两种模式都只处理白名单测试群的 `@` 纯文本，当前接真实模型和本人模拟券单查询，只发送最终回复。后台事件接收方式需与运行模式一致；切换程序配置不会自动修改开放平台配置。WebSocket 需要进程主动访问 QQ 网关，Webhook 需要平台访问公网回调入口；后台设置服务器 IP 列表后，两者的 API 出口 IP 都必须匹配。未设置列表时，后台说明允许所有请求来源 IP。
@@ -81,15 +81,25 @@ Webhook 协议允许回调端口 `80/443/8080/8443`，要求 HTTPS。可以由�
 
 群 OpenID 与 AppID 相关：更换机器人后，即使目标 QQ 群不变，也需通过新机器人的入站事件重新取得 OpenID。[唯一身份机制](https://bot.q.qq.com/wiki/develop/api-v2/dev-prepare/api-call-guide.html)
 
-群回复调用 `POST https://api.bot.qq.com/v2/groups/{group_openid}/messages`，纯文本使用 `msg_type: 0`，携带原消息 `msg_id`；同一消息的多次回复需要区分 `msg_seq`。首版经 SDK 的 `sendText(msg.replyTarget, text)` 发送，保留入站 SDK 给出的回复目标，不自行拼接群号。
+群回复调用 `POST https://api.bot.qq.com/v2/groups/{group_openid}/messages`，Markdown 使用 `msg_type: 2` 和 `markdown.content`，纯文本使用 `msg_type: 0` 和 `content`。经 SDK 的 `bot.send` 显式选择类型，保留入站 `msg.replyTarget` 和原消息 `msg_id`，不自行拼接群号；同一消息的多次回复需要区分 `msg_seq`。
 
-**被动回复窗口是 5 分钟，每条消息最多回复 5 次。** 相同 `msg_id + msg_seq` 不能重复发送，群消息不支持流式参数。因此只发送最终文本；必要的“已受理”提示也计入次数。商家结果超过窗口时先保存，等同一用户再次 @ 查询；主动通知能力未核实前不作为首版前提。[发送群聊消息](https://bot.q.qq.com/wiki/develop/api-v2/autogen/api/v2_groups_group_openid_messages.post.html)
+**被动回复窗口是 5 分钟，每条消息最多回复 5 次。** 相同 `msg_id + msg_seq` 不能重复发送，群消息不支持流式参数。因此只发送完整回复；必要的“已受理”提示也计入次数。商家结果超过窗口时先保存，等同一用户再次 @ 查询；主动通知能力未核实前不作为首版前提。[发送群聊消息](https://bot.q.qq.com/wiki/develop/api-v2/autogen/api/v2_groups_group_openid_messages.post.html)
+
+### 固定模板 Markdown
+
+官方 2026-04-23 更新已将单聊、群聊自定义 Markdown 开放给所有机器人，无需单独申请模板；频道仍需内邀。当前安装包的旧权限说明与官网有差异，以 [官方 Markdown 文档](https://bot.q.qq.com/wiki/develop/api-v2/server-inter/message/type/markdown.html) 为准。这里的模板是应用内排版函数，无需平台 `custom_template_id`。
+
+宿主将本轮成功工具结果或任务回执映射为 `Reply`，再按 `answer`、`order`、`merchant_confirmation`、`merchant_status`、`notice` 五种类型选择固定策略模板。订单、金额、确认文字和状态只使用实际业务结果；模型正文经过转义，不能自行插入标题、链接或改变模板。首版使用标题、粗体和列表等官方列出的语法，不依赖表格或代码块；CLI 保持原纯文本输出。
+
+`QQ_REPLY_FORMAT=markdown` 为默认值，显式设为 `text` 可切回纯文本。发送错误只记录失败，不自动切换格式或重发；网络超时或响应读取失败时，原消息可能已经送达。模型正文最多 1000 个 Unicode 码点，渲染后应用输出上限为 4000 码点，不能把它写成 QQ 官方长度限制。
+
+2026-10-02 验收：`validate` 通过五种模板、内容注入、长度限制与真实 SDK HTTP 发送失败不重发检查。真实 QQ API 返回 200，客户端已验证 `answer`、`order`、`merchant_confirmation`、`merchant_status`、`notice` 五类显示；空原因确认触发固定服务提示，不调用模型、不创建任务。协商确认采用独立普通文本行，已验证复制后精确发送；隐形字符在模板、确认入口和存储边界均拒绝。
 
 ## 腾讯 SDK 与宿主的职责
 
 腾讯 SDK 已实现地址验证 `op:13`、普通事件 Ed25519 验签、事件分发和 HTTP ACK。当前 Webhook 实现将事件处理放到后台，立即返回 HTTP 200 与 `{"op":12,"d":0}`；普通事件缺失或错误签名会返回 401。地址验证走独立路径，不能把它当成用户消息交给 Pi。[Webhook 源码](https://github.com/tencent-connect/qqbot-nodejs/blob/ca55d9c395b582b7fcfad0ec27209c35dd04e0b3/src/protocol/transport/webhook.ts)
 
-ACK 只说明收到事件，不证明模型成功、退款成功或事件已持久保存。当前宿主负责测试群白名单、Pi 会话队列、模型超时与发送失败记录，Webhook 请求体限制为 64 KiB。最多 20 个内存会话，每会话最多 3 条在途消息（含正在处理）；模型限时 60 秒，空闲 30 分钟清理，20 轮后换新上下文。自动压缩关闭，模型输出最多 2048 token，最终发送最多 1000 个 Unicode 码点，并在发送前重新检查原消息仍处于 4 分 30 秒回复余量内。SDK 去重中间件使用进程内状态，重启后丢失，不能替代业务幂等或持久事件队列。
+ACK 只说明收到事件，不证明模型成功、退款成功或事件已持久保存。当前宿主负责测试群白名单、Pi 会话队列、模型超时与发送失败记录，Webhook 请求体限制为 64 KiB。最多 20 个内存会话，每会话最多 3 条在途消息（含正在处理）；模型限时 60 秒，空闲 30 分钟清理，20 轮后换新上下文。自动压缩关闭，模型输出最多 2048 token；输出长度按上述模板限制，并在发送前重新检查原消息仍处于 4 分 30 秒回复余量内。SDK 去重中间件使用进程内状态，重启后丢失，不能替代业务幂等或持久事件队列。
 
 发布包的 `msg_seq` 由时间和随机数生成，并非每个原消息的持久递增计数；重新调用发送会生成新序号，不能把 SDK 发送当成业务幂等保障。SDK 的群级并发中间件也不能替代我们的“群＋发送者”会话队列；初期不用 SDK 自带历史缓冲，由 Pi 统一管理对话。[发送实现](https://github.com/tencent-connect/qqbot-nodejs/blob/ca55d9c395b582b7fcfad0ec27209c35dd04e0b3/src/protocol/api/routes.ts)、[并发中间件](https://github.com/tencent-connect/qqbot-nodejs/blob/ca55d9c395b582b7fcfad0ec27209c35dd04e0b3/src/middleware/concurrency-guard.ts)
 
@@ -111,8 +121,8 @@ SDK `1.0.4` 的默认 API / Token 域名仍是 `api.sgroup.qq.com` / `bots.qq.co
 
 2026-10-02 基座验收：QQ API 鉴权成功，WebSocket gateway READY；从真实 @ 事件取得 OpenID 并加入本机白名单。普通回答和 echo 工具调用均在群内可见，工具成功记录与发送 API 200 共同证明 QQ → Pi/DeepSeek → QQ 链路。
 
-2026-10-02 业务验收：退款咨询先追问订单号；本机管理员基于可信事件绑定客户一后，原会话补充 `COUPON-1001` 获得数据库实付 79.80 元、未核销状态、有效期和 KB 规则引用，仅说明申请资格。服务记录实际 `get_order` 与 `search_faq` 成功，发送 API 返回 200，群内答复可见。同一身份查询他人 `COUPON-1002` 时，实际 `get_order` 返回错误且群内得到拒绝。当前没有商家协商、审批、申请或退款执行能力。
+2026-10-02 业务验收：退款咨询先追问订单号；本机管理员基于可信事件绑定客户一后，原会话补充 `COUPON-1001` 获得数据库实付 79.80 元、未核销状态、有效期和 KB 规则引用，仅说明申请资格。服务记录实际 `get_order` 与 `search_faq` 成功，发送 API 返回 200，群内答复可见。同一身份查询他人 `COUPON-1002` 时，实际 `get_order` 返回错误且群内得到拒绝。该次只读验收尚未接入 D1；当前仍没有退款执行能力。
 
 同日未知政策验收：真实群内查询 `COUPON-1008` 的节假日可用性，实际工具为 `get_order` 和 `search_faq`，无工具错误，发送 API 返回 200。群内可见私享套餐实付 99.80 元、未核销事实与 `KB-SHOP-DEMO-1` 引用；答复明确法定节假日/特殊活动/私享套餐限制未录入，无法判断，并建议用户自行向商家核实，没有承诺未知政策或编造操作入口。
 
-最终 `npm run validate` 与真实 MySQL＋Pi/faux 的 `npm run check:business` 均通过。真实 DeepSeek 的 `npm run check:model` 在最终 Prompt 上通过 9 个场景、10 轮，验证多轮、订单状态、未绑定/越权、证据与未知政策；这是固定小样本验收，不是 faux 成绩或外部数据集指标。两用户隔离仅有离线证据，尚未真实双用户实测；公网 HTTPS Webhook 尚未部署，异步商家回调仍留后续。截图、模型完整回答和可信身份文件仅保存于忽略的 `.runtime`，公开文档不保存真实账号、群、匿名身份代号或凭据字段。
+本轮 `npm run validate`、真实 MySQL＋Pi/faux 的 `check:merchant` 通过；`check:merchant-model` 使用真实 DeepSeek，通过 3 轮模型回复与 1 轮宿主确认。新 Prompt 的 `check:model` 通过 9 场景、10 轮、88/88 项检查，run `419ed809-e366-4a1a-98b6-9c0a4e47448d` 已进入工作台，这是只读回归，不是 D1 协商指标。另在真实 QQ 群用临时合成订单跑通“准备协商 → 复制确认文字 → 精确发送 → pending → 查询 approved 79.80 元”，回复始终明确未退款；清理临时订单前 SQL 核对同意金额为 7980 分、退款金额与退款记录数均为零、仍有一张未核销券；测试夹具已按精确标识清理，公开演示单 2001–2003 未被验收消费。真实群拒绝/超时、双用户隔离和公网 HTTPS Webhook 尚未验收，D1 持久评测及主动续接留后续。截图、模型完整回答和可信身份文件仅保存于忽略的 `.runtime`，公开文档不保存真实账号、群、匿名身份代号或凭据字段。

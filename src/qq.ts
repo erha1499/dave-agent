@@ -9,7 +9,8 @@ import { CouponStore, readDatabaseConfig } from "./coupon-store.ts";
 import { recordQQIdentity } from "./qq-identity.ts";
 import { QQAgent } from "./qq-agent.ts";
 import { AfterSalesStore, readAfterSalesDatabaseConfig, startMockMerchant } from "./after-sales.ts";
-import { confirmMerchantMessage, merchantSourceKey } from "./after-sales-entry.ts";
+import { confirmMerchantReply, merchantSourceKey } from "./after-sales-entry.ts";
+import { readQQReplyFormat, sendQQReply } from "./qq-reply.ts";
 
 // Keep internal newlines intact so the host can reject malformed confirmation commands.
 export const sanitizeQQContent = contentSanitizer({ stripBotMention: true, collapseWhitespace: false });
@@ -49,6 +50,7 @@ export function readQQConfig(env: NodeJS.ProcessEnv = process.env) {
 
 async function main() {
   const { options, allowedGroups } = readQQConfig();
+  const replyFormat = readQQReplyFormat();
   const store = new CouponStore(createPool(readDatabaseConfig()));
   let afterSales: AfterSalesStore | undefined;
   let stopMerchant: (() => Promise<void>) | undefined;
@@ -93,17 +95,16 @@ async function main() {
           store: afterSales, sourceKey: merchantSourceKey(identity, msg.groupOpenid!),
         } : undefined);
       },
-      async (target, text) => {
-        const result = await bot.sendText(target, text);
-        if (!result.id) throw new Error("QQ 未返回消息 ID");
-        console.log("[qq] 回复已被平台接收");
+      async (target, _text, reply) => {
+        await sendQQReply(bot, target, reply, replyFormat);
+        console.log(`[qq] 回复已被平台接收 format=${replyFormat} template=${reply.kind}`);
       },
       console.log,
       60_000,
       async (msg) => {
         if (!afterSales) return undefined;
         const identity = { appId: options.appId, senderId: msg.senderId };
-        return confirmMerchantMessage(afterSales, identity, merchantSourceKey(identity, msg.groupOpenid!), msg.content);
+        return confirmMerchantReply(afterSales, identity, merchantSourceKey(identity, msg.groupOpenid!), msg.content);
       },
     );
     bot.on("message", async (_ctx, msg) => {

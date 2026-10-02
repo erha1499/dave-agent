@@ -26,8 +26,9 @@
     "check": "node scripts/check.ts",
     "check:qq": "node scripts/qq-check.ts",
     "check:qq-agent": "node scripts/qq-agent-check.ts",
+    "check:reply": "node scripts/reply-check.ts && node scripts/qq-reply-check.ts",
     "typecheck": "tsc --noEmit",
-    "validate": "npm run typecheck && npm run check && npm run check:qq && npm run check:qq-agent && npm run check:eval"
+    "validate": "npm run typecheck && npm run check && npm run check:qq && npm run check:qq-agent && npm run check:reply && npm run check:eval"
   },
   "dependencies": {
     "@earendil-works/pi-ai": "1.0.0",

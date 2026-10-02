@@ -68,7 +68,7 @@ try {
     await assert.rejects(store.prepare(deniedIdentity, sourceKey, approveOrder, reason));
     await assert.rejects(store.request(deniedIdentity, sourceKey, approveOrder, reason));
   }
-  for (const invalidReason of [" ", "x".repeat(201), "两行\n原因"]) {
+  for (const invalidReason of [" ", "x".repeat(201), "两行\n原因", "\u200b行程变化", "行程\u202e变化"]) {
     await assert.rejects(store.prepare(identity, sourceKey, approveOrder, invalidReason), /原因/);
   }
   await assert.rejects(store.request(identity, "user-supplied-group", approveOrder, reason));

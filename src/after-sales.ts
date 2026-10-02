@@ -5,6 +5,8 @@ import { readDatabaseConfig, type QQIdentity } from "./coupon-store.ts";
 const unavailable = "未找到当前客户在本会话可操作的演示协商订单，请核对订单号或联系人工客服。";
 const failure = "演示商家协商暂时不可用，请稍后重试。";
 class BusinessError extends Error {}
+// Confirmation commands must survive display/copy without hidden characters changing their meaning.
+export const merchantReasonControls = /[\u0000-\u001f\u007f\u200b-\u200f\u2028-\u202e\u2060-\u206f]/u;
 
 type MerchantStatus = "pending" | "approved" | "rejected" | "timed_out";
 export type MerchantTask = {
@@ -24,7 +26,7 @@ function validate(identity: QQIdentity, sourceKey: string, orderId: string, reas
   if (!/^[A-Za-z0-9_-]{1,32}$/.test(identity?.appId ?? "") || !/^[A-Za-z0-9_-]{1,128}$/.test(identity?.senderId ?? "")
     || !/^[a-f0-9]{64}$/.test(sourceKey)) throw new BusinessError(unavailable);
   if (!/^COUPON-2\d{3}$/.test(orderId)) throw new BusinessError("商家协商首版仅支持 COUPON-2001、COUPON-2002、COUPON-2003 演示订单。");
-  if (reason !== undefined && (!reason.trim() || [...reason.trim()].length > 200 || /[\u0000-\u001f\u007f\u2028\u2029]/u.test(reason))) {
+  if (reason !== undefined && (!reason.trim() || [...reason.trim()].length > 200 || merchantReasonControls.test(reason))) {
     throw new BusinessError("协商原因应为 1–200 字的单行文本。");
   }
 }
