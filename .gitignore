@@ -6,3 +6,4 @@ dist/
 .runtime/
 *.log
 .DS_Store
+.tmp/
