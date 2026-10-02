@@ -201,6 +201,6 @@ Pi 的普通 prompt 和自定义消息触发路径需要分别验证：当前纯
 
 每个通过检查的小闭环单独提交。源码、Prompt、Skill、fixture、来源说明与锁文件进入 Git；密钥、`.runtime/`、完整用户消息和运行日志不提交。当前 Pi 的间接依赖审计告警保留在 README，升级时复查。
 
-下一项工作：阶段 A 的 QQ 通信闭环，再接入阶段 B 的 Pi 对话和测试工具。团购券业务、数据集与检索调优在链路跑通后加入。本次仅调整实现顺序与 README，尚未开发 QQ 接入。
+下一项工作：先按 [QQ 接入调研](./docs/qq-integration.md) 核实账号后台条件，再完成阶段 A 的 QQ 通信闭环，随后接入阶段 B 的 Pi 对话和测试工具。团购券业务、数据集与检索调优在链路跑通后加入。当前已核对公开协议；账号后台仍待扫码登录，尚未开发 QQ 接入。
 
 参考：[Pi SDK](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/sdk.md)、[腾讯 QQ SDK](https://github.com/tencent-connect/qqbot-nodejs)、[QQ 回调规范](https://bot.q.qq.com/wiki/develop/api-v2/dev-prepare/interface-framework/event-emit.html)。
