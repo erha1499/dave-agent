@@ -261,7 +261,11 @@ try {
 assert.equal(faux.getPendingResponseCount(), 0);
 
 let confirmationWrites = 0;
-const confirmationStore = { request: async () => { confirmationWrites++; throw new Error("synthetic request stop"); } } as unknown as AfterSalesStore;
+let confirmationArgumentsValid = true;
+const confirmationStore = { request: async (_identity: unknown, _sourceKey: string, orderId: string, reason: string) => {
+  confirmationArgumentsValid &&= orderId === "COUPON-2001" && reason === "行程变化";
+  confirmationWrites++; throw new Error("synthetic request stop");
+} } as unknown as AfterSalesStore;
 for (const separator of ["\n", "\r\n", "\u2028"]) {
   const malformed = message("multiline-confirm", `<@!123> 确认联系商家 COUPON-2001${separator}原因：行程变化`);
   const context = { bot: { appId: "123" }, message: malformed } as Parameters<typeof sanitizeQQContent>[0];
@@ -269,10 +273,25 @@ for (const separator of ["\n", "\r\n", "\u2028"]) {
   assert.match((await confirmMerchantMessage(confirmationStore, { appId: "TEST_APP", senderId: "TEST_USER1" }, "0".repeat(64), malformed.content))!, /完整发送单行确认文字/);
 }
 assert.equal(confirmationWrites, 0, "SDK sanitization must not turn a multiline message into an executable confirmation");
-const validConfirmation = message("valid-confirm", "<@!123> 确认联系商家 COUPON-2001 原因：行程变化");
-await sanitizeQQContent({ bot: { appId: "123" }, message: validConfirmation } as Parameters<typeof sanitizeQQContent>[0], async () => {});
-await confirmMerchantMessage(confirmationStore, { appId: "TEST_APP", senderId: "TEST_USER1" }, "0".repeat(64), validConfirmation.content);
-assert.equal(confirmationWrites, 1, "stripping the QQ bot mention must preserve a valid confirmation");
+const merchantCommand = "确认联系商家 COUPON-2001 原因：行程变化";
+for (const text of [`\n${merchantCommand}`, `${merchantCommand} \n`, `${merchantCommand}\n\t`,
+  `${merchantCommand}\n额外内容`, `${merchantCommand}\u2028`, `${merchantCommand}\u200b`, `${merchantCommand}\u00a0`,
+  merchantCommand.replace("商家 ", "商家\t"), merchantCommand.replace("行程变化", "行程\t变化")]) {
+  await confirmMerchantMessage(confirmationStore, { appId: "TEST_APP", senderId: "TEST_USER1" }, "0".repeat(64), text);
+  const malformed = message("padded-malformed", `<@!123> ${text}`);
+  await sanitizeQQContent({ bot: { appId: "123" }, message: malformed } as Parameters<typeof sanitizeQQContent>[0], async () => {});
+  await confirmMerchantMessage(confirmationStore, { appId: "TEST_APP", senderId: "TEST_USER1" }, "0".repeat(64), malformed.content);
+}
+assert.equal(confirmationWrites, 0, "horizontal padding normalization must preserve malformed command rejection");
+for (const padding of ["", " ", "\t", " \t "]) {
+  const text = `${padding}${merchantCommand}${padding}`;
+  await confirmMerchantMessage(confirmationStore, { appId: "TEST_APP", senderId: "TEST_USER1" }, "0".repeat(64), text);
+  const validConfirmation = message("valid-confirm", `<@!123> ${text}`);
+  await sanitizeQQContent({ bot: { appId: "123" }, message: validConfirmation } as Parameters<typeof sanitizeQQContent>[0], async () => {});
+  await confirmMerchantMessage(confirmationStore, { appId: "TEST_APP", senderId: "TEST_USER1" }, "0".repeat(64), validConfirmation.content);
+}
+assert.equal(confirmationWrites, 8, "exact commands accept outer ASCII space/tab padding before or after QQ mention removal");
+assert.equal(confirmationArgumentsValid, true, "padding normalization preserves the exact order and reason");
 
 const originalNow = Date.now;
 let simulatedNow = originalNow();

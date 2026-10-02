@@ -105,7 +105,7 @@ async function main() {
         const identity = { appId: options.appId, senderId: msg.senderId };
         if (!await store.resolveCustomer(identity)) {
           const tag = await recordQQIdentity(options.appId, msg);
-          console.log(`[qq] 未绑定模拟客户 identity=${tag}；管理员核对发信人后运行 npm run qq:bind -- ${tag} customer-demo-1`);
+          console.log(`[qq] 未绑定模拟客户 identity=${tag}；管理员核对发信人与订单归属后运行 npm run qq:bind -- ${tag} <模拟客户ID>，不同客户须分别绑定。`);
         }
         return createCouponSession(identity, store, modelRuntime, model, afterSales ? {
           store: afterSales, sourceKey: merchantSourceKey(identity, msg.groupOpenid!), refunds,

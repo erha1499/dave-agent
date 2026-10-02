@@ -16,10 +16,13 @@ function admin(sql: string) {
 }
 
 // Administrator-only test helper. Every mutation is scoped to fresh orders plus a random payment marker.
-export async function createMerchantFixture(outcomes: Outcome[], options: { delayMs?: number } = {}) {
+export async function createMerchantFixture(outcomes: Outcome[], options: { delayMs?: number; senderId?: "TEST_USER1" | "TEST_USER2" } = {}) {
   if (!outcomes.length || outcomes.length > 20 || outcomes.some(value => !["approve", "reject", "timeout"].includes(value))) {
     throw new Error("测试场景无效。");
   }
+  const senderId = options.senderId === undefined ? "TEST_USER1" : options.senderId;
+  if (senderId !== "TEST_USER1" && senderId !== "TEST_USER2") throw new Error("仅支持已有的两个合成测试客户。");
+  const identity = { appId: "TEST_APP", senderId };
   const delayMs = options.delayMs ?? 100;
   function timing(delay: number) {
     if (!Number.isInteger(delay) || delay < 1 || delay > 5000) {
@@ -36,7 +39,8 @@ export async function createMerchantFixture(outcomes: Outcome[], options: { dela
     const inserts = orders.map((orderId, index) => {
       const suffix = orderId.slice(-4);
       return `INSERT INTO orders (id, customer_id, shop_id, status, total_cents, paid_cents, refunded_cents, created_at, paid_at)
-SELECT '${orderId}', customer_id, shop_id, 'paid', 7980, 7980, 0, UTC_TIMESTAMP(3), UTC_TIMESTAMP(3) FROM orders WHERE id = 'COUPON-2001';
+SELECT '${orderId}', q.customer_id, o.shop_id, 'paid', 7980, 7980, 0, UTC_TIMESTAMP(3), UTC_TIMESTAMP(3)
+FROM orders o JOIN qq_identities q ON q.app_id = 'TEST_APP' AND q.sender_id = '${senderId}' WHERE o.id = 'COUPON-2001';
 INSERT INTO order_items (id, order_id, product_id, shop_id, quantity, unit_price_cents, total_cents)
 SELECT '${marker}-item-${suffix}', '${orderId}', product_id, shop_id, quantity, unit_price_cents, total_cents FROM order_items WHERE order_id = 'COUPON-2001';
 INSERT INTO coupons (id, order_item_id, status, expires_at, redeemed_at, redeemed_shop_id)
@@ -58,7 +62,7 @@ WHERE o.id IN (${orderList}) AND p.id = CONCAT('${marker}-payment-', RIGHT(o.id,
   let cleaned = false;
   return {
     orders,
-    identity: { appId: "TEST_APP", senderId: "TEST_USER1" },
+    identity,
     async setTiming(orderId: string, delay: number) {
       if (!orders.includes(orderId) || cleaned) throw new Error("只能调整本次测试创建的订单。");
       timing(delay);

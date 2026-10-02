@@ -49,6 +49,9 @@ export class RefundStore {
     return this.controlled(async () => {
       const connection = await this.pool.getConnection();
       try {
+        // D2 writes serialize on the order row; RC avoids empty-range gap locks between different orders.
+        // This applies only to the next transaction; identity and business rows remain explicitly locked.
+        await connection.query("SET TRANSACTION ISOLATION LEVEL READ COMMITTED");
         await connection.beginTransaction();
         const result = await action(connection);
         await connection.commit();

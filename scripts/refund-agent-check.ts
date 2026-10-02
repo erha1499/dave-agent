@@ -181,6 +181,7 @@ try {
   const beforeMalformed = confirms;
   for (const text of ["确认", `引用：${command}`, `> ${command}`, JSON.stringify({ confirmation: command }),
     `\n${command}`, ` \n${command}`, `${command}\n`, `${command}\n额外内容`, `${command}\r\n`, `${command}\u2028`,
+    `${command} \n`, `${command}\n\t`, ` \t\n${command} \t`, `${command}\u00a0`, `${command}\u000b`,
     `确认退款\n${initial.operationId}`, `确认退款\r\n${initial.operationId}`, `确认退款 ${"-".repeat(36)}`,
     `${command} amount=1`, `${command}\u200b`, `确认退款 ${initial.operationId}\u202e`, `确认退<@!123>款 ${initial.operationId}`,
     `确认退款 ${initial.operationId.slice(0, 8)}[<face,id=1/>]${initial.operationId.slice(8)}`]) {
@@ -190,12 +191,14 @@ try {
     assert.notEqual(result?.kind, "refund_status", `sanitization must not authorize malformed input ${JSON.stringify(text)}`);
     assert.equal(confirms, beforeMalformed, `malformed input reached store.confirm: ${JSON.stringify(text)}`);
   }
-  for (const text of [`<@!123> ${command}`, ` ${command}`]) {
-    const valid = message("valid", text);
+  for (const padding of ["", " ", "\t", " \t "]) {
+    const text = `${padding}${command}${padding}`;
+    assert.equal((await confirmRefundReply(refunds, identity, sourceKey, text))?.kind, "refund_status");
+    const valid = message("valid", `<@!123> ${text}`);
     await sanitizeQQContent({ bot: { appId: "123" }, message: valid } as Parameters<typeof sanitizeQQContent>[0], async () => {});
     assert.equal((await confirmRefundReply(refunds, identity, sourceKey, valid.content))?.kind, "refund_status");
   }
-  assert.equal(confirms, beforeMalformed + 2);
+  assert.equal(confirms, beforeMalformed + 8, "only exact commands with outer ASCII space/tab padding are accepted");
   assert.ok(!logs.join("\n").includes("synthetic private"));
   assert.equal(faux.getPendingResponseCount(), 0);
   console.log("模拟退款 Agent 离线检查通过：真实 Pi 六工具、固定方案、发送后登记、排队确认、失败不重发、用户原文边界、宿主幂等确认、丢失回执后查询。业务事务另由 MySQL 检查覆盖。");

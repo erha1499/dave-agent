@@ -15,6 +15,8 @@ export async function confirmMerchantMessage(
 export async function confirmMerchantReply(
   store: AfterSalesStore, identity: QQIdentity, sourceKey: string, text: string, route?: MerchantReplyRoute,
 ): Promise<Reply | undefined> {
+  // Mobile input may add horizontal padding; preserve every newline and embedded character.
+  text = text.replace(/^[ \t]+|[ \t]+$/g, "");
   if (!text.startsWith("确认联系商家")) return undefined;
   const match = /^确认联系商家 (COUPON-\d{4}) 原因：([^\r\n]{1,200})$/u.exec(text);
   if (!match || merchantReasonControls.test(text) || match[2] !== match[2]?.trim()) {
