@@ -1,0 +1,22 @@
+{
+  "name": "dave-agent",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A small e-commerce support agent built on the Pi SDK, with planned QQ Webhook integration.",
+  "engines": { "node": ">=22.19.0" },
+  "scripts": {
+    "start": "node --env-file-if-exists=.env src/cli.ts",
+    "check": "node scripts/check.ts",
+    "typecheck": "tsc --noEmit",
+    "validate": "npm run typecheck && npm run check"
+  },
+  "dependencies": {
+    "@earendil-works/pi-ai": "1.0.0",
+    "@earendil-works/pi-coding-agent": "1.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.4",
+    "typescript": "7.0.2"
+  }
+}
