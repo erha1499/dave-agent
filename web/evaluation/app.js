@@ -27,6 +27,9 @@ function node(tag, attrs = {}, ...children) {
 }
 const text = (tag, value, className) => node(tag, className ? { class: className } : {}, value);
 const badge = (status, label) => text("span", label || statusNames[status] || status, `status ${status}`);
+// 简约图标标记：✓ 通过 / ✕ 失败 / − 跳过或未执行 / … 进行中；完整措辞见 aria-label。
+const glyphs = { passed: "✓", completed: "✓", failed: "✕", skipped: "−", pending: "−", running: "…" };
+const mark = status => node("span", { class: `mark ${status}`, role: "img", "aria-label": statusNames[status] || status }, glyphs[status] || "?");
 const empty = (title, copy, command) => node("div", { class: "empty-state" }, text("h2", title), text("p", copy), command ? text("code", command) : null);
 const json = value => text("pre", JSON.stringify(value, null, 2));
 const metricValue = (run, key) => run.metrics?.[key] ?? null;
@@ -65,13 +68,29 @@ function setView(view) {
   }
 }
 
+// 历史记录里一眼扫出质量：按指标汇总渲染每轮的迷你校准条（失败优先靠左）。
+function miniStrip(run) {
+  const planned = run.plannedCases ?? 0;
+  if (!planned) return null;
+  const blocks = [];
+  const push = (status, count) => { for (let i = 0; i < count; i++) blocks.push(node("span", { class: `mini-block ${status}` })); };
+  if (run.metrics) {
+    push("failed", run.metrics.casesFailed);
+    push("passed", run.metrics.casesPassed);
+    push("skipped", run.metrics.casesSkipped);
+  }
+  push(run.status === "running" ? "running" : "pending", Math.max(0, planned - blocks.length));
+  return node("div", { class: "mini-strip", "aria-hidden": "true" }, ...blocks);
+}
+
 function renderRunList() {
   $("run-list").replaceChildren(...state.runs.map(run => node("button", {
     type: "button", class: `run-button${run.id === state.selected ? " selected" : ""}`,
     "aria-pressed": String(run.id === state.selected), onclick: () => selectRun(run.id),
   }, text("span", run.label || run.suiteName, "run-title"),
-  text("p", date(run.startedAt), "run-date"),
-  node("div", { class: "run-row" }, badge(run.status), text("span", score(run), "run-score")))));
+  // 日期与比分同一行；常态（已完成）不占用文字，只有进行中或失败才标记。
+  node("div", { class: "run-row" }, text("p", date(run.startedAt), "run-date"), run.status === "completed" ? null : mark(run.status), text("span", score(run), "run-score")),
+  miniStrip(run))));
   if (!state.runs.length) $("run-list").append(text("p", "这里还没有运行记录。", "sidebar-empty"));
 }
 
@@ -135,8 +154,8 @@ async function selectRun(id) {
   }
 }
 
-function metric(label, value, note) {
-  return node("div", { class: "metric" }, text("p", label, "metric-label"), text("p", value, "metric-value"), text("p", note, "metric-note"));
+function metric(label, value) {
+  return node("div", { class: "metric" }, text("p", label, "metric-label"), text("p", value, "metric-value"));
 }
 
 function metricsPanel(run, cases) {
@@ -144,21 +163,18 @@ function metricsPanel(run, cases) {
   const doneCases = m ? m.casesPassed + m.casesFailed + m.casesSkipped : cases.length;
   const doneTurns = m ? m.turnsPassed + m.turnsFailed + m.turnsSkipped : cases.reduce((n, item) => n + item.turns.length, 0);
   const durationSamples = cases.flatMap(item => item.turns).filter(turn => turn.durationMs !== null).length;
-  const passed = m ? `${m.casesPassed} / ${run.plannedCases}` : `— / ${run.plannedCases}`;
   const pending = Math.max(0, run.plannedCases - doneCases);
   const caseNote = m ? [["失败", m.casesFailed], ["跳过", m.casesSkipped], ["未执行", pending]].filter(([, count]) => count).map(([label, count]) => `${label} ${count}`).join(" · ") || "全部通过" : "尚未汇总";
   const partialUsage = m && m.usageRequests < m.modelRequests;
   const coverage = m ? `用量覆盖 ${m.usageRequests} / ${m.modelRequests} 次模型请求${partialUsage ? " · 仅统计已报告部分" : ""}` : "用量尚未汇总";
   const panel = node("section", { class: "panel", "aria-label": "运行指标" },
     node("div", { class: "metric-strip" },
-      metric("场景通过 / 计划", passed, caseNote),
-      metric("单轮耗时 P95", duration(m?.durationP95Ms), `P50 ${duration(m?.durationP50Ms)}`),
-      metric(partialUsage ? "Tokens · 部分用量" : "Tokens", number(m?.totalTokens), m ? `${m.usageRequests} / ${m.modelRequests} 次请求报告用量` : "尚未汇总"),
-      metric(partialUsage ? "估算 USD · 部分用量" : "估算费用 · USD", money(m?.estimatedCostUsd), "SDK 估算，非账单")));
+      metric("单轮耗时 P95", duration(m?.durationP95Ms)),
+      metric(partialUsage ? "Tokens · 部分用量" : "Tokens", number(m?.totalTokens))));
   const details = node("details", { class: "metric-details" }, node("summary", {}, "指标明细与口径"),
     node("div", { class: "metrics-foot" },
       text("span", `场景计划 ${run.plannedCases} · ${caseNote}`),
-      text("span", m ? `用户轮次通过 ${m.turnsPassed} / ${run.plannedTurns} · 失败 ${m.turnsFailed} · 跳过 ${m.turnsSkipped} · 未执行 ${Math.max(0, run.plannedTurns - doneTurns)}` : "用户轮次结果尚未汇总"),
+      text("span", m ? `处理轮次通过 ${m.turnsPassed} / ${run.plannedTurns} · 失败 ${m.turnsFailed} · 跳过 ${m.turnsSkipped} · 未执行 ${Math.max(0, run.plannedTurns - doneTurns)}` : "处理轮次结果尚未汇总"),
       text("span", `耗时样本 ${durationSamples} · 已记录 ${doneTurns} / ${run.plannedTurns} 轮`),
       text("span", coverage),
       text("span", `模型请求 ${number(m?.modelRequests)} · 工具调用 ${number(m?.toolCalls)}`),
@@ -186,13 +202,15 @@ function stepNode(step) {
 function checksNode(checks, onlyFailures = false) {
   const items = onlyFailures ? checks.filter(check => check.status !== "passed") : checks;
   if (!items.length) return null;
-  return node("ul", { class: "check-list", "aria-label": "检查结果" }, ...items.map(check => node("li", {}, badge(check.status), text("span", check.name), check.reason ? text("span", check.reason, "check-reason") : null)));
+  return node("ul", { class: "check-list", "aria-label": "检查结果" }, ...items.map(check => node("li", {}, mark(check.status), text("span", check.name), check.reason ? text("span", check.reason, "check-reason") : null)));
 }
 
 function turnNode(turn, compact = false) {
+  // merchant-notification 套件的末轮是商家结果事件而非用户发言，按事件样式展示。
+  const isEvent = turn.question.trimStart().startsWith("[商家结果事件]");
   const element = node("div", { class: "turn" },
-    node("div", { class: "turn-top" }, text("h4", `第 ${turn.index} 轮`), badge(turn.status), text("span", duration(turn.durationMs), "turn-timing")),
-    node("div", { class: "dialogue" }, text("span", "用户", "speaker"), text("p", turn.question, "bubble"), text("span", "Agent", "speaker"), text("p", turn.reply || "此轮没有回复", "bubble answer")),
+    node("div", { class: "turn-top" }, text("h4", `第 ${turn.index} 轮`), mark(turn.status), text("span", duration(turn.durationMs), "turn-timing")),
+    node("div", { class: "dialogue" }, text("span", isEvent ? "事件" : "用户", isEvent ? "speaker event-speaker" : "speaker"), text("p", turn.question, isEvent ? "bubble event" : "bubble"), text("span", "Agent", "speaker"), text("p", turn.reply || "此轮没有回复", "bubble answer")),
     turn.evidenceIds.length ? node("div", { class: "evidence-line" }, text("span", "实际工具证据"), ...turn.evidenceIds.map(id => text("code", id, "evidence-tag"))) : text("p", "本轮没有返回工具证据", "metric-note"),
     turn.error ? text("p", turn.error, "turn-error") : null,
     checksNode(turn.checks, true));
@@ -203,7 +221,7 @@ function turnNode(turn, compact = false) {
 }
 
 function caseNode(item) {
-  const details = node("details", { class: "case" }, node("summary", {}, text("span", item.name, "case-name"), text("span", `${item.turns.length} 轮`, "case-meta"), badge(item.status)), node("div", { class: "case-body" }, ...item.turns.map(turn => turnNode(turn))));
+  const details = node("details", { class: "case" }, node("summary", {}, text("span", item.name, "case-name"), text("span", `${item.turns.length} 轮`, "case-meta"), mark(item.status)), node("div", { class: "case-body" }, ...item.turns.map(turn => turnNode(turn))));
   if (isFailed(item)) details.open = true;
   return details;
 }
@@ -221,6 +239,30 @@ function snapshotPanel(run, heading = "配置与评测快照") {
   return node("section", { class: "panel" }, node("details", { class: "snapshot" }, node("summary", {}, heading),
     node("dl", { class: "snapshot-grid" }, ...fields.flatMap(([label, value]) => [text("dt", label), text("dd", value, "mono")])),
     node("details", {}, node("summary", { class: "metric-note" }, "查看完整快照 JSON"), json(s))));
+}
+
+// 判定区：打开一次运行，先看到检验报告式的判词，再向下钻取证据。
+function verdictPanel(run, cases) {
+  const m = run.metrics;
+  const failedCount = cases.filter(isFailed).length;
+  const passedCount = cases.filter(item => item.status === "passed" && !isFailed(item)).length;
+  let word = statusNames[run.status] || run.status, tone = "";
+  if (run.status === "running" || run.status === "pending") { word = "进行中"; tone = "idle"; }
+  else if (failedCount) { word = `存在失败 ×${failedCount}`; tone = "bad"; }
+  else if (m && m.casesPassed === run.plannedCases && run.plannedCases > 0) { word = "全部通过"; tone = "good"; }
+  const count = m ? `${m.casesPassed} / ${run.plannedCases}` : `— / ${run.plannedCases}`;
+  const glyph = run.status === "failed" || tone === "bad" ? "✕" : run.status === "running" || run.status === "pending" || tone === "idle" ? "…" : "✓";
+  const iconTone = glyph === "✕" ? "bad" : glyph === "…" ? "idle" : "good";
+  return node("section", { class: `panel verdict-panel${tone ? ` ${tone}` : ""}`, "aria-label": "评测结论" },
+    node("div", { class: "verdict-head" },
+      node("div", {}, text("h2", run.label || run.suiteName), text("p", `${date(run.startedAt)} · ${run.snapshot.model.id}`, "meta"))),
+    // 一行读数：比分 + 判定图标 + 场景校准条（右对齐），非常态时才附计数。
+    node("div", { class: "verdict-grid" },
+      text("p", count, "verdict-count"),
+      node("span", { class: `verdict-mark ${iconTone}`, role: "img", "aria-label": word, title: word }, glyph),
+      cases.length ? node("div", { class: "case-strip-blocks", role: "img", "aria-label": `场景校准条：${cases.map(item => `${item.name} ${statusNames[item.status] || item.status}`).join("，")}` },
+        ...cases.map(item => node("span", { class: `case-block ${isFailed(item) ? "failed" : item.status}`, title: `${item.name} · ${statusNames[item.status] || item.status}` }))) : null,
+      cases.length && (failedCount || cases.length - passedCount - failedCount) ? text("span", [["失败", failedCount], ["其他", cases.length - passedCount - failedCount]].filter(([, n]) => n).map(([label, n]) => `${label} ${n}`).join(" · "), "case-strip-legend") : null));
 }
 
 function renderDetail(result) {
@@ -241,7 +283,7 @@ function renderDetail(result) {
   failed.addEventListener("click", () => renderCases(true));
   renderCases(false);
   $("run-detail").replaceChildren(
-    node("div", { class: "run-heading" }, node("div", {}, text("h2", run.label || run.suiteName), text("p", `${date(run.startedAt)} · ${run.snapshot.model.id}`)), badge(run.status)),
+    verdictPanel(run, cases),
     ...(run.error ? [text("p", run.error, "error-note")] : []),
     metricsPanel(run, cases),
     node("section", { class: "panel" }, node("div", { class: "panel-heading" }, text("h3", "场景结果"), node("div", { class: "case-toolbar" }, all, failed)), list),
@@ -267,12 +309,16 @@ function compatibility(a, b) {
       node("div", { class: "condition-tags" }, ...requirements.map(([label, matches]) => text("span", `${label} ${matches ? "一致" : "不同"}`, "condition-tag")))));
 }
 
-function deltaMetric(label, a, b, formatter, lowerBetter = false, note = "", deltaFormatter = formatter) {
+// delta 卡：与运行指标同款软卡；变化浓缩为一枚徽章（↑/↓ 表方向，绿/红表优劣，= 持平，— 缺数据）。
+function deltaMetric(label, a, b, formatter, lowerBetter = false, deltaFormatter = formatter) {
   const known = a !== null && b !== null;
   const delta = known ? b - a : null;
-  const className = known && delta !== 0 ? (lowerBetter ? delta < 0 : delta > 0) ? " good" : " bad" : "";
-  const diff = !known ? "缺少完整数据" : delta === 0 ? "无变化" : `${delta > 0 ? "+" : "−"}${deltaFormatter(Math.abs(delta))}`;
-  return node("div", { class: "delta-metric" }, text("p", label, "metric-label"), node("div", { class: "delta-values" }, text("span", formatter(a)), text("span", "→", "arrow"), text("span", formatter(b))), text("p", `${diff}${note ? ` · ${note}` : ""}`, `delta-note${className}`));
+  const tone = !known || delta === 0 ? "flat" : (lowerBetter ? delta < 0 : delta > 0) ? "good" : "bad";
+  const arrow = !known ? "—" : delta === 0 ? "=" : delta > 0 ? "↑" : "↓";
+  const hint = !known ? "缺少完整数据，不作对比" : delta === 0 ? "无变化" : tone === "good" ? "候选相对基线更优" : "候选相对基线更差";
+  return node("div", { class: "metric delta-metric" }, text("p", label, "metric-label"),
+    node("div", { class: "delta-values" }, text("span", formatter(a)), text("span", "→", "arrow"), text("span", formatter(b)),
+      node("span", { class: `delta-chip ${tone}`, role: "img", "aria-label": hint, title: hint }, delta ? `${arrow} ${deltaFormatter(Math.abs(delta))}` : arrow)));
 }
 
 function compareRows(a, b) {
@@ -294,7 +340,7 @@ function change(row) {
 
 function pairedSide(item, label) {
   if (!item) return node("div", { class: "paired-side" }, text("p", label, "paired-side-heading"), text("p", "该运行没有此场景结果。", "metric-note"));
-  return node("div", { class: "paired-side" }, node("div", { class: "paired-side-heading" }, text("span", label), badge(item.status)), ...item.turns.map(turn => turnNode(turn, true)));
+  return node("div", { class: "paired-side" }, node("div", { class: "paired-side-heading" }, text("span", label), mark(item.status)), ...item.turns.map(turn => turnNode(turn, true)));
 }
 
 async function compare() {
@@ -324,7 +370,7 @@ async function compare() {
       const selected = onlyChanges ? rows.filter(row => !row.a || !row.b || row.a.status !== row.b.status) : rows;
       pairedList.replaceChildren(...selected.map(row => node("details", { class: `paired-case ${change(row).rowClass || ""}` },
         node("summary", { class: "paired-heading" }, text("span", row.b?.name || row.a.name, "case-name"),
-          node("span", { class: "paired-status" }, text("span", "A", "case-meta"), badge(row.a?.status || "pending"), text("span", "→", "case-meta"), text("span", "B", "case-meta"), badge(row.b?.status || "pending")),
+          node("span", { class: "paired-status" }, text("span", "A", "case-meta"), mark(row.a?.status || "pending"), text("span", "→", "case-meta"), text("span", "B", "case-meta"), mark(row.b?.status || "pending")),
           text("span", change(row).label, `change-tag ${change(row).className}`)),
         text("p", row.id, "subtle-id"), node("div", { class: "paired-columns" }, pairedSide(row.a, "A · 基线"), pairedSide(row.b, "B · 候选")))));
       if (!selected.length) pairedList.append(text("p", "没有状态变化，可在“全部场景”查看回复差异。", "sidebar-empty"));
@@ -334,11 +380,11 @@ async function compare() {
     renderPairs(false);
     const completeUsageMetric = (run, key) => run.metrics && run.metrics.usageRequests === run.metrics.modelRequests ? metricValue(run, key) : null;
     $("compare-detail").replaceChildren(compatibility(a.run, b.run),
-      node("div", { class: "comparison-grid" },
-        deltaMetric("场景通过率", caseRate(a.run), caseRate(b.run), percent, false, "含全部计划场景", value => `${value.toFixed(1)} 个百分点`),
-        deltaMetric("单轮耗时 P95", metricValue(a.run, "durationP95Ms"), metricValue(b.run, "durationP95Ms"), duration, true),
-        deltaMetric("Tokens · 完整用量", completeUsageMetric(a.run, "totalTokens"), completeUsageMetric(b.run, "totalTokens"), number, true),
-        deltaMetric("估算 USD · 完整用量", completeUsageMetric(a.run, "estimatedCostUsd"), completeUsageMetric(b.run, "estimatedCostUsd"), money, true)),
+      node("section", { class: "panel", "aria-label": "指标对比" },
+        node("div", { class: "comparison-grid" },
+          deltaMetric("场景通过率", caseRate(a.run), caseRate(b.run), percent, false, value => `${value.toFixed(1)}pp`),
+          deltaMetric("单轮耗时 P95", metricValue(a.run, "durationP95Ms"), metricValue(b.run, "durationP95Ms"), duration, true),
+          deltaMetric("Tokens", completeUsageMetric(a.run, "totalTokens"), completeUsageMetric(b.run, "totalTokens"), number, true))),
       node("section", { class: "panel" }, node("div", { class: "panel-heading" }, text("h3", `场景对比 · ${rows.filter(row => row.a && row.b).length} / ${rows.length} 已配对`), node("div", { class: "case-toolbar" }, all, changed)), pairedList),
       node("div", { class: "compare-snapshots" }, snapshotPanel(a.run, "A · 基线配置快照"), snapshotPanel(b.run, "B · 候选配置快照")));
   } catch (error) {
