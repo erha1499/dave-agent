@@ -2,6 +2,8 @@
 
 基于 Pi SDK 的电商客服 Agent。业务通过 Prompt、Skill 和受限工具实现，计划通过 QQ Webhook 服务测试群的 `@机器人` 消息。
 
+实现顺序、责任边界和分阶段验收见 [plan.md](./plan.md)。
+
 独立应用仓库，通过 npm 依赖复用 [Pi AgentSession SDK](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/sdk.md)，无需 fork Pi。只有确认现有扩展点无法覆盖需求时，才修改上游框架。
 
 ## 起步版本
