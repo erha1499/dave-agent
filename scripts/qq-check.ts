@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
 import { request } from "node:http";
-import type { QQBotInboundMessage, ReplyTarget } from "@tencent-connect/qqbot-nodejs";
+import type { QQBotInboundMessage } from "@tencent-connect/qqbot-nodejs";
 import {
   WebhookTransport, ed25519Sign, verifyWebhookSignature,
   type WebhookRequestHandler, type WebhookServerAdapter,
 } from "@tencent-connect/qqbot-nodejs/protocol";
-import { readQQConfig, replyToQQMessage } from "../src/qq.ts";
+import { readQQConfig } from "../src/qq.ts";
+import { validQQMessage } from "../src/qq-agent.ts";
 import { QQWebhookServer } from "../src/qq-http.ts";
 
 const credentials = {
@@ -53,15 +54,7 @@ const message: QQBotInboundMessage = {
     content: "测试客服", timestamp: new Date(now).toISOString(),
   },
 };
-const sent: Array<{ target: ReplyTarget; text: string }> = [];
-const send = async (target: ReplyTarget, text: string) => { sent.push({ target, text }); };
-await replyToQQMessage(message, send, now);
-assert.equal(sent.length, 1);
-assert.deepEqual(sent[0]?.target, message.replyTarget);
-assert.ok(sent[0]?.text.trim());
-await replyToQQMessage({ ...message, content: "另一条问题" }, send, now);
-assert.equal(sent.length, 2);
-assert.equal(sent[1]?.text, sent[0]?.text);
+assert.equal(validQQMessage(message, now), true);
 for (const changes of [
   { kind: "c2c" }, { rawEventType: "GROUP_MESSAGE_CREATE" }, { senderId: "" },
   { groupOpenid: "" }, { messageId: "" }, { content: " " }, { content: "字".repeat(5001) },
@@ -73,10 +66,9 @@ for (const changes of [
   { replyTarget: { ...message.replyTarget, msgId: "another_message" } },
   { replyTarget: undefined },
 ]) {
-  await replyToQQMessage({ ...message, ...changes } as QQBotInboundMessage, send, now);
-  assert.equal(sent.length, 2, `invalid message unexpectedly sent: ${JSON.stringify(changes)}`);
+  assert.equal(validQQMessage({ ...message, ...changes } as QQBotInboundMessage, now), false,
+    `invalid message unexpectedly accepted: ${JSON.stringify(changes)}`);
 }
-await assert.rejects(replyToQQMessage(message, async () => { throw new Error("synthetic send failure"); }, now), /synthetic send failure/);
 
 const abort = new AbortController();
 let handler: WebhookRequestHandler | undefined;

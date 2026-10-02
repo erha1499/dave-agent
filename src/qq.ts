@@ -1,8 +1,10 @@
 import {
   QQBot, accessPolicy, contentSanitizer, mentionGate, messageFilter,
-  type QQBotInboundMessage, type QQBotOptions, type ReplyTarget,
+  type QQBotOptions,
 } from "@tencent-connect/qqbot-nodejs";
 import { QQWebhookServer } from "./qq-http.ts";
+import { createConfiguredModelRuntime, createQQSession } from "./agent.ts";
+import { QQAgent } from "./qq-agent.ts";
 
 export function readQQConfig(env: NodeJS.ProcessEnv = process.env) {
   const appId = env.QQBOT_APP_ID?.trim();
@@ -37,27 +39,11 @@ export function readQQConfig(env: NodeJS.ProcessEnv = process.env) {
   return { options, allowedGroups };
 }
 
-export async function replyToQQMessage(
-  msg: QQBotInboundMessage,
-  send: (target: ReplyTarget, text: string) => Promise<unknown>,
-  now = Date.now(),
-) {
-  if (msg.kind !== "group" || msg.rawEventType !== "GROUP_AT_MESSAGE_CREATE"
-    || typeof msg.senderId !== "string" || !msg.senderId
-    || typeof msg.groupOpenid !== "string" || !msg.groupOpenid
-    || typeof msg.messageId !== "string" || !msg.messageId
-    || msg.replyTarget?.scope !== "group" || msg.replyTarget.targetId !== msg.groupOpenid
-    || msg.replyTarget.msgId !== msg.messageId
-    || typeof msg.content !== "string" || !msg.content.trim() || msg.content.length > 5000
-    || typeof msg.timestamp !== "string") return;
-  const age = now - Date.parse(msg.timestamp);
-  if (!Number.isFinite(age) || age < -30_000 || age >= 5 * 60_000) return;
-  await send(msg.replyTarget, "QQ 通信测试成功，已收到你的消息。");
-}
-
 async function main() {
   const { options, allowedGroups } = readQQConfig();
-  const redact = (text: string) => text.replaceAll(options.appSecret, "[redacted]");
+  const { modelRuntime, model } = await createConfiguredModelRuntime();
+  const secrets = [options.appSecret, process.env.DEEPSEEK_API_KEY, process.env.MODEL_API_KEY].filter((key): key is string => !!key);
+  const redact = (text: string) => secrets.reduce((value, key) => value.replaceAll(key, "[redacted]"), text);
   const bot = new QQBot({
     ...options,
     ...(options.webhook && { webhook: { ...options.webhook, server: new QQWebhookServer() } }),
@@ -78,11 +64,19 @@ async function main() {
   bot.use(messageFilter({ dedup: { windowMs: 5 * 60_000, maxSize: 1000 } }));
   bot.use(mentionGate({ requireMentionInGroup: true, alwaysAnswerC2C: false, passthrough: false }));
   bot.use(contentSanitizer({ stripBotMention: true, collapseWhitespace: true }));
+  const agent = new QQAgent(
+    () => createQQSession(modelRuntime, model),
+    async (target, text) => {
+      const result = await bot.sendText(target, text);
+      if (!result.id) throw new Error("QQ 未返回消息 ID");
+      console.log("[qq] 回复已被平台接收");
+    },
+  );
   bot.on("message", async (_ctx, msg) => {
-    await replyToQQMessage(msg, (target, text) => bot.sendText(target, text));
+    await agent.handle(msg);
   });
   bot.on("error", (error) => console.error(`[qq] ${redact(error.message)}`));
-  bot.on("ready", () => console.log(`[qq] ${options.transport} 已就绪；当前仅返回通信测试文本。`));
+  bot.on("ready", () => console.log(`[qq] ${options.transport} 已就绪；模型 ${model.provider}/${model.id}。`));
   const controller = new AbortController();
   const stop = () => controller.abort();
   process.once("SIGINT", stop);
@@ -91,6 +85,7 @@ async function main() {
   try {
     await bot.start(controller.signal);
   } finally {
+    await agent.close();
     bot.stop();
     process.removeListener("SIGINT", stop);
     process.removeListener("SIGTERM", stop);
@@ -100,7 +95,8 @@ async function main() {
 if (import.meta.main) {
   main().catch((error: unknown) => {
     const text = error instanceof Error ? error.message : "QQ 启动失败。";
-    console.error(process.env.QQBOT_APP_SECRET ? text.replaceAll(process.env.QQBOT_APP_SECRET, "[redacted]") : text);
+    const secrets = [process.env.QQBOT_APP_SECRET, process.env.DEEPSEEK_API_KEY, process.env.MODEL_API_KEY].filter((key): key is string => !!key);
+    console.error(secrets.reduce((value, key) => value.replaceAll(key, "[redacted]"), text));
     process.exitCode = 1;
   });
 }
