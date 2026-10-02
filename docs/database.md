@@ -1,8 +1,8 @@
 # 团购券演示数据库
 
-本项目使用 Docker 中的 MySQL `8.4.11`，数据库名 `dave_agent`。数据全部原创合成，不包含真实订单、客户、门店或支付信息，也不复制参考项目的数据。当前数据库支持团购券规则问答和本人订单查询；退款表只展示历史事实，Agent 没有退款写工具。
+本项目使用 Docker 中的 MySQL `8.4.11`，数据库名 `dave_agent`。数据全部原创合成，不包含真实订单、客户、门店或支付信息，也不复制参考项目的数据。当前数据库支持团购券规则问答、本人订单查询，以及可选的 D1 模拟商家协商。退款表只展示历史事实，Agent 没有退款写工具。
 
-2026-10-02 已实际启动 Docker MySQL 并通过 11 表/8 订单的数据检查，以及真实 Pi＋faux 模型的只读业务工具检查。CLI 与 QQ 共用 `createCouponSession(identity, store, runtime, model)`，都从此库读取订单和规则；CLI 已删除旧内存数组演示。真实模型与 QQ 的效果另行验收，数据库通过不能单独证明模型会正确使用工具。
+基础业务包含 11 表/8 个只读订单，评测另有四张 `eval_*` 表；D1 增加两张协商表与三张独立订单，均复用同一个 MySQL。2026-10-02 基础业务和 D1 的真实数据库＋Pi/faux 工程检查通过。CLI 与 QQ 共用 `createCouponSession(identity, store, runtime, model, afterSales?)`，可选第五参数只增加准备与查询工具。真实模型与 QQ 的效果另行验收，数据库通过不能单独证明模型会正确使用工具。
 
 ## 启动与连接
 
@@ -31,7 +31,7 @@ npm run db:stop
 
 SQL 文件保存为 UTF-8，schema 与 seed 开头显式执行 `SET NAMES utf8mb4`，同时设置客户端、连接和结果字符集。服务器的 `--character-set-server=utf8mb4` 不会自动修正导入客户端的字符集；管理员手工导入也应使用 `mysql --default-character-set=utf8mb4`，防止中文标题、正文和 JSON 标签被错误解码。已经导入的乱码不会因更改配置自动恢复，需要明确的数据修复或重建这份合成 seed。
 
-官方镜像只在空数据目录首次启动时依次执行 `db/01-schema.sql`、`02-seed.sql`、`03-readonly.sql`。修改 SQL 不会自动修改已有数据卷，重新执行 `up` 也不会重新 seed。保留已有数据时需要管理员执行明确的数据变更；`docker compose down` 保留 volume。`docker compose down -v` 会删除本项目的所有演示数据与身份绑定，只在明确需要重建时使用。
+官方镜像只在空数据目录首次启动时按文件名顺序执行 `db/` 中的 SQL；现有文件包括基础结构/seed/只读授权，以及 `04-evaluation.sql`、`05-merchant.sql`。修改 SQL 不会自动修改已有数据卷，重新执行 `up` 也不会重新 seed。已有库使用 `npm run eval:init`、`npm run after-sales:init` 分别补充对应结构和独立受限账户；空库首次启动后也需这些命令配置账户密码。`docker compose down` 保留 volume；`docker compose down -v` 会删除本项目的所有演示数据与身份绑定，只在明确需要重建时使用。
 
 ## 表关系与约束
 
@@ -50,6 +50,8 @@ SQL 文件保存为 UTF-8，schema 与 seed 开头显式执行 `SET NAMES utf8mb
 | `payments` | 支付事实：订单、状态、支付金额与时间 |
 | `refunds` | 历史退款事实：订单、状态、金额、原因与完成时间 |
 | `knowledge_documents` | 规则证据：稳定 `id`、可选门店/套餐范围、标题、正文、JSON 关键词数组、启用状态 |
+| `merchant_demo_scenarios` | D1 模拟配置：订单、固定 approve/reject/timeout 结果、延迟；模型不可读取或修改配置 |
+| `merchant_requests` | D1 持久任务：唯一订单、taskId、客户与原会话哈希、原始原因、金额、pending/approved/rejected/timed_out 状态及时间 |
 
 ```text
 QQ AppID + senderId → qq_identities → customers → orders
@@ -79,6 +81,8 @@ knowledge_documents → 可选 shops / products 范围
 
 `TEST_APP`＋`TEST_USER1/TEST_USER2` 是自动检查和 CLI 使用的合成绑定，不是真实 QQ 身份；CLI 通过 `CLI_DEMO_USER` 选择其中一个，QQ 不读取该配置或旧 `CUSTOMER_ID`。真实群里可用的身份必须来自 SDK 已验证消息的发送者标识，再由本机管理员绑定；消息正文里的客户 ID、订单归属声明或 QQ 群成员身份不能自行建立绑定。
 
+D1 另加 `COUPON-2001/2002/2003`，均为客户一、单张未核销午餐券、实付 79.80 元，初始化时有效期 30 天。2001 固定模拟同意、2002 固定模拟拒绝，均延迟约 5 秒；2003 不返回商家结果，约 8 秒到期。它们不参与原 100x 只读案例；任务由用户明确确认才创建，迁移不会自动发起任务，也不会重置已存在的任务或刷新券有效期。
+
 未绑定发信人的可信身份文件保存本机忽略目录 `.runtime/qq-identities/`，日志只输出 12 位匿名身份代号。管理员核对实际发信人及其演示客户归属后运行 `npm run qq:bind -- <身份代号> <对应客户ID>`；脚本用容器管理员权限写入 `qq_identities`，不会覆盖已有绑定。不能自动把所有发信人绑定到客户一。应用在每次查询时重新检查数据库映射，绑定完成后无需重启 QQ 会话；未绑定用户仍可咨询通用规则，订单查询与他人/不存在订单使用同一种拒绝结果。
 
 ## 知识证据与只读权限
@@ -94,9 +98,17 @@ REVOKE ALL PRIVILEGES, GRANT OPTION FROM 'dave_agent_read'@'%';
 GRANT SELECT ON `dave\_agent`.* TO 'dave_agent_read'@'%';
 ```
 
-上述数据库授权中的 `\_` 匹配字面下划线，避免将 `_` 当成授权模式的单字符通配符；按账户撤权也避免与镜像创建的转义授权名称不匹配。语法依据是 MySQL 8.4 官方 [REVOKE](https://dev.mysql.com/doc/refman/8.4/en/revoke.html) 与 [GRANT](https://dev.mysql.com/doc/refman/8.4/en/grant.html) 说明。应用仅用这个账号，管理员密码不进入应用数据库连接配置。验收需查询实际 grants，并确认 UPDATE 被拒绝；环境声明、Prompt 或“没有写工具”均不能单独证明数据库只读。更改 `.env` 密码不会修改已有 MySQL 账户密码，必须由管理员显式变更，保持宿主配置同步。
+上述数据库授权中的 `\_` 匹配字面下划线，避免将 `_` 当成授权模式的单字符通配符；按账户撤权也避免与镜像创建的转义授权名称不匹配。语法依据是 MySQL 8.4 官方 [REVOKE](https://dev.mysql.com/doc/refman/8.4/en/revoke.html) 与 [GRANT](https://dev.mysql.com/doc/refman/8.4/en/grant.html) 说明。基础订单与规则工具仅用这个账号，管理员密码不进入应用数据库连接配置。验收需查询实际 grants，并确认 UPDATE 被拒绝；环境声明、Prompt 或“没有写工具”均不能单独证明数据库只读。更改 `.env` 密码不会修改已有 MySQL 账户密码，必须由管理员显式变更，保持宿主配置同步。
 
-本阶段不提供 SQL 执行工具、数据库迁移框架、退款提交或商家协商任务表；这些能力在对应业务流程开始实现时再添加。
+## D1 协商账户与事务
+
+运行 `npm run after-sales:init`，脚本通过本机 Docker 管理员连接补充 `05-merchant.sql`，创建默认账号 `dave_agent_after_sales`，并在本机 `.env` 生成 `AFTER_SALES_DB_PASSWORD`；文件权限为 `0600`。账号只能 SELECT 订单、身份、券、支付、退款和模拟配置等所需表，以及 SELECT/INSERT/UPDATE `merchant_requests`，不能修改订单、支付、退款、身份绑定或模拟场景配置。初始化会按本机配置同步该专用账号密码和权限，不清空业务表或 QQ 绑定。
+
+宿主根据可信 AppID、用户与原会话生成 `source_key`，模型参数不能提供这些值。准备建议只读；宿主收到精确单行确认后，在事务中重新校验当前归属、单券未核销/未过期、全额支付且未退款等事实。`order_id` 唯一约束保证每个演示订单一个任务，重复确认保留原任务和原原因；另一用户或会话不能读取或接管它。任务结果检查 taskId、订单、状态与金额上限，重复或过期结果不覆盖终态。
+
+QQ/CLI 的同进程 worker 默认每 500 毫秒检查数据库中的到期任务，模拟结果约 5 秒、超时约 8 秒，并非精确定时承诺。停止进程后不会推进状态；重启会继续扫描，超过截止时间的任务进入超时。持久化任务不等于持久化 Pi 对话。D1 不写退款事实、不通知真实商家、不公开网络商家回调；后续退款确认和原会话主动通知分别留 D2/D3。运行与验证见 [模拟协商说明](./after-sales.md)。
+
+当前不提供 SQL 执行工具、数据库迁移框架或退款提交；D2 再增加退款方案和执行结果。
 
 ## 验收范围
 
@@ -105,4 +117,8 @@ GRANT SELECT ON `dave\_agent`.* TO 'dave_agent_read'@'%';
 - 真实 MySQL：11 表关联、8 个订单案例、整数金额和支付/退款事实、可信身份与 AppID 隔离、归属和输入校验、规则作用域及有效证据、中文规则检索、未知问题和 UPDATE 权限拒绝。
 - 真实 Pi SDK＋faux 模型＋真实 MySQL：精确 Prompt/Skill、两个工具声明、参数中不接受客户身份、工具结果回填，以及未绑定/越权/错误路径。这是工程回放，不是模型语义成绩。
 
-两层以及最终 `npm run validate` 均已通过。`npm run check:model` 使用真实 DeepSeek 及当前数据库，在最终 Prompt 上通过 9 场景、10 轮，覆盖多轮澄清/未核销、过期、已退款、部分核销、待支付、已核销、未知政策、未绑定和越权边界。不引用参考项目的评测成绩，也不把少量关键词断言称为完整检索基线。真实 QQ 已验证多轮追问、管理员可信绑定、本人订单和规则查询、实际工具拒绝他人订单，以及 `COUPON-1008` 查询引用门店证据并明确节假日政策缺失。公网 HTTP、真实双用户隔离与异步售后未在本轮完成。
+只读业务的两层工程检查与真实 DeepSeek 9 场景、10 轮回归均已通过，覆盖多轮澄清/未核销、过期、已退款、部分核销、待支付、已核销、未知政策、未绑定和越权边界。不引用参考项目的评测成绩，也不把少量关键词断言称为完整检索基线。真实 QQ 已验证多轮追问、管理员可信绑定、本人订单和规则查询、实际工具拒绝他人订单，以及 `COUPON-1008` 查询引用门店证据并明确节假日政策缺失。公网 HTTP、真实双用户隔离和 D1 真实平台协商仍待验收。
+
+`npm run check:merchant` 已通过真实 MySQL 与 Pi/faux 工程检查，覆盖只读准备、精确宿主确认、用户/会话隔离、重复申请与回调、同意/拒绝/超时、重建 store 后查结果，以及权限拒绝和退款事实不变。检查使用临时合成订单并按随机标记清理，保留 2001–2003 供人工演示；这些是工程检查，尚未写入评测平台，也不作为真实 QQ 或模型质量成绩。
+
+本轮 D1 Prompt 修改后，`npm run validate` 和原只读真实模型回归再次通过：9 场景、10 轮、88 项检查，已保存评测运行 `8ab32fb3-6ce9-4eb8-b5d9-5a013c8acb2c`。另一个独立的 `npm run check:merchant-model` 使用真实 DeepSeek＋MySQL＋QQAgent、本地替代发送函数，通过 3 轮模型回复及 1 轮宿主确认，验证准备、期间咨询和结果查询；D1 结果尚未写入评测工作台，也没有通过 QQ 平台发送。

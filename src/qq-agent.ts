@@ -25,17 +25,20 @@ export class QQAgent {
   private send: (target: ReplyTarget, text: string) => Promise<unknown>;
   private log: (text: string) => void;
   private timeoutMs: number;
+  private beforePrompt?: (msg: QQBotInboundMessage) => Promise<string | undefined>;
 
   constructor(
     createSession: (msg: QQBotInboundMessage) => Promise<AgentSession>,
     send: (target: ReplyTarget, text: string) => Promise<unknown>,
     log: (text: string) => void = console.log,
     timeoutMs = 60_000,
+    beforePrompt?: (msg: QQBotInboundMessage) => Promise<string | undefined>,
   ) {
     this.createSession = createSession;
     this.send = send;
     this.log = log;
     this.timeoutMs = timeoutMs;
+    this.beforePrompt = beforePrompt;
   }
 
   private prune() {
@@ -82,8 +85,22 @@ export class QQAgent {
           conversation.turns = 0;
         }
         conversation.session ??= await this.createSession(msg);
-        if (this.closed) return;
+        if (this.closed || !validQQMessage(msg)) return;
         const session = conversation.session;
+        // Only trusted ingress text reaches this host action. Tools cannot invent consent.
+        const hostReply = await this.beforePrompt?.(msg);
+        if (hostReply !== undefined) {
+          const delivered = await this.deliver(msg, hostReply);
+          conversation.turns++;
+          try {
+            // Remember the receipt without triggering another model turn; the next normal prompt uses the business system prompt.
+            await session.sendCustomMessage({ customType: "merchant-receipt", content: hostReply, display: true }, { triggerTurn: false });
+          } catch {
+            this.log("[agent] 业务回执未加入会话，可按订单号重新查询持久化结果。");
+          }
+          this.log(`[agent] session=${tag} host_reply sent=${delivered} duration_ms=${Date.now() - started}`);
+          return;
+        }
         const previousMessageCount = session.messages.length;
         await Promise.race([
           session.prompt(msg.content, { expandPromptTemplates: false }),
@@ -96,12 +113,12 @@ export class QQAgent {
         const text = session.getLastAssistantText()?.trim();
         if (!text) throw new Error("模型未生成回复");
         conversation.turns++;
-        await this.deliver(msg, [...text].slice(0, 1000).join(""));
+        const delivered = await this.deliver(msg, [...text].slice(0, 1000).join(""));
         const results = session.messages.slice(previousMessageCount).flatMap(message =>
           message.role === "toolResult" && session.getActiveToolNames().includes(message.toolName) ? [message] : []);
         const tools = results.filter(result => !result.isError).map(result => result.toolName);
         const toolErrors = results.filter(result => result.isError).map(result => result.toolName);
-        this.log(`[agent] session=${tag} model_ok tools=${tools.join(",") || "none"} tool_errors=${toolErrors.join(",") || "none"} duration_ms=${Date.now() - started}`);
+        this.log(`[agent] session=${tag} model_ok tools=${tools.join(",") || "none"} tool_errors=${toolErrors.join(",") || "none"} reply_sent=${delivered} duration_ms=${Date.now() - started}`);
       } catch {
         failed = true;
         clearTimeout(timer);
@@ -128,13 +145,15 @@ export class QQAgent {
     await entry.tail;
   }
 
-  private async deliver(msg: QQBotInboundMessage, text: string) {
-    if (this.closed || !validQQMessage(msg)) return;
+  private async deliver(msg: QQBotInboundMessage, text: string): Promise<boolean> {
+    if (this.closed || !validQQMessage(msg)) return false;
     try {
       await this.send(msg.replyTarget, text);
+      return true;
     } catch {
       // Do not blindly retry an ambiguous send: QQ may already have accepted it.
       this.log("[qq] 回复发送失败，请检查机器人权限、出口 IP 和网络。");
+      return false;
     }
   }
 

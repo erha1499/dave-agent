@@ -14,6 +14,7 @@ import {
   type ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
 import type { CouponStore, QQIdentity } from "./coupon-store.ts";
+import type { AfterSalesStore } from "./after-sales.ts";
 
 const projectDir = fileURLToPath(new URL("../", import.meta.url));
 const skillDir = fileURLToPath(new URL("../skills/shop-support", import.meta.url));
@@ -47,7 +48,10 @@ export async function createConfiguredModelRuntime(env: NodeJS.ProcessEnv = proc
   return { modelRuntime, model };
 }
 
-export async function createCouponSession(identity: QQIdentity, store: CouponStore, modelRuntime: ModelRuntime, model: Model<Api>) {
+export async function createCouponSession(
+  identity: QQIdentity, store: CouponStore, modelRuntime: ModelRuntime, model: Model<Api>,
+  afterSales?: { store: AfterSalesStore; sourceKey: string },
+) {
   const [prompt, skill] = await Promise.all([
     readFile(new URL("../prompts/customer-service.md", import.meta.url), "utf8"),
     readFile(new URL("../skills/shop-support/SKILL.md", import.meta.url), "utf8"),
@@ -57,7 +61,7 @@ export async function createCouponSession(identity: QQIdentity, store: CouponSto
   const skills = loadSkillsFromDir({ dir: skillDir, source: "project" });
   if (skills.skills.length !== 1 || skills.diagnostics.length) throw new Error("客服 Skill 加载失败。");
 
-  const tools = [
+  const tools: ToolDefinition[] = [
     defineTool({
       name: "search_faq",
       label: "查询模拟团购券规则",
@@ -77,6 +81,29 @@ export async function createCouponSession(identity: QQIdentity, store: CouponSto
       execute: async (_id, { orderId }) => ({ content: [{ type: "text", text: JSON.stringify(await store.getOrder(identity, orderId)) }], details: {} }),
     }),
   ];
+  if (afterSales) tools.push(
+    defineTool({
+      name: "prepare_merchant_request",
+      label: "准备模拟商家协商",
+      description: "只读校验本人可演示协商的订单，返回金额与用户须完整发送的确认文字。不创建任务，不联系真实商家，不退款。reason是用户提供的1–200字单行原因。",
+      parameters: Type.Object({
+        orderId: Type.String({ pattern: "^COUPON-\\d{4}$" }),
+        reason: Type.String({ minLength: 1, maxLength: 200 }),
+      }, { additionalProperties: false }),
+      execute: async (_id, { orderId, reason }) => ({
+        content: [{ type: "text", text: JSON.stringify(await afterSales.store.prepare(identity, afterSales.sourceKey, orderId, reason)) }], details: {},
+      }),
+    }),
+    defineTool({
+      name: "get_merchant_request",
+      label: "查询模拟协商进度",
+      description: "查询当前用户在当前会话中为本人订单创建的模拟商家协商。无任务返回null；pending仍在等待，approved仅为模拟商家同意，绝不代表已退款。",
+      parameters: Type.Object({ orderId: Type.String({ pattern: "^COUPON-\\d{4}$" }) }, { additionalProperties: false }),
+      execute: async (_id, { orderId }) => ({
+        content: [{ type: "text", text: JSON.stringify(await afterSales.store.getTask(identity, afterSales.sourceKey, orderId) ?? null) }], details: {},
+      }),
+    }),
+  );
   return createSession(modelRuntime, { ...model, maxTokens: Math.min(model.maxTokens, 2048) }, systemPrompt, tools, skills);
 }
 

@@ -6,6 +6,9 @@ import {
 import type { QQBotInboundMessage, ReplyTarget } from "@tencent-connect/qqbot-nodejs";
 import { createModelRuntime, createQQSession } from "../src/agent.ts";
 import { QQAgent } from "../src/qq-agent.ts";
+import { sanitizeQQContent } from "../src/qq.ts";
+import { confirmMerchantMessage } from "../src/after-sales-entry.ts";
+import type { AfterSalesStore } from "../src/after-sales.ts";
 
 const expectedPrompt = "你是 QQ 通信联调助手。用简洁中文纯文本自然回复用户，每次回复最多 500 字，不输出网址。\n"
   + "当前只验证 QQ 通信和 Agent 工具循环。用户要求回显或测试工具时，调用 echo 并按结果回复。\n"
@@ -210,4 +213,83 @@ try {
   await shuttingDown.close();
 }
 assert.equal(faux.getPendingResponseCount(), 0);
-console.log("QQ→Pi 离线检查通过：真实 echo 工具循环、精确上下文、群与用户隔离、串行队列、可控失败、发送不重试、超时中止与恢复、安全关闭。");
+
+const hostStarted = deferred();
+const hostRelease = deferred();
+let hostActions = 0;
+const hostReceipt = "模拟协商 COUPON-2001 已受理，任务 TEST-TASK，当前处理中，未执行退款。";
+const hostAgent = new QQAgent(create, send, (text) => logs.push(text), 1000, async msg => {
+  if (msg.content !== "确认联系商家 COUPON-2001 原因：行程变化") return undefined;
+  assert.equal(msg.senderId, "user_one");
+  assert.equal(msg.groupOpenid, "group_one");
+  hostActions++;
+  hostStarted.resolve();
+  await hostRelease.promise;
+  return hostReceipt;
+});
+try {
+  const modelCalls = faux.state.callCount;
+  const confirming = hostAgent.handle(message("host-confirm", "确认联系商家 COUPON-2001 原因：行程变化"));
+  await hostStarted.promise;
+  faux.setResponses([context => {
+    assert.equal(getCurrentSystemPrompt(context.messages), expectedPrompt);
+    assert.deepEqual(getCurrentTools(context.messages).map(tool => tool.name), ["echo"]);
+    assert.ok(JSON.stringify(context.messages).includes(hostReceipt), "next normal prompt must see the actual host receipt");
+    return fauxAssistantMessage("工程检查：按原订单查询持久化任务。");
+  }]);
+  const querying = hostAgent.handle(message("host-query", "进度如何？"));
+  assert.equal(faux.state.callCount, modelCalls, "queued query cannot overtake the trusted host command");
+  hostRelease.resolve();
+  await Promise.all([confirming, querying]);
+  assert.equal(hostActions, 1);
+  assert.equal(faux.state.callCount, modelCalls + 1, "host receipt must not trigger a model call");
+  assert.deepEqual(sent.filter(item => item.target.msgId?.startsWith("host-")).map(item => item.target.msgId), ["host-confirm", "host-query"]);
+  assert.ok(sent.some(item => item.target.msgId === "host-confirm" && item.text === hostReceipt));
+  faux.setResponses([context => {
+    assert.ok(!JSON.stringify(context.messages).includes(hostReceipt), "host receipts cannot leak to another QQ user");
+    return fauxAssistantMessage("独立会话");
+  }]);
+  await hostAgent.handle(message("independent-host", "进度如何？", "user_two"));
+} finally {
+  hostRelease.resolve();
+  await hostAgent.close();
+}
+assert.equal(faux.getPendingResponseCount(), 0);
+
+let confirmationWrites = 0;
+const confirmationStore = { request: async () => { confirmationWrites++; throw new Error("synthetic request stop"); } } as unknown as AfterSalesStore;
+for (const separator of ["\n", "\r\n", "\u2028"]) {
+  const malformed = message("multiline-confirm", `<@!123> 确认联系商家 COUPON-2001${separator}原因：行程变化`);
+  const context = { bot: { appId: "123" }, message: malformed } as Parameters<typeof sanitizeQQContent>[0];
+  await sanitizeQQContent(context, async () => {});
+  assert.match((await confirmMerchantMessage(confirmationStore, { appId: "TEST_APP", senderId: "TEST_USER1" }, "0".repeat(64), malformed.content))!, /完整发送单行确认文字/);
+}
+assert.equal(confirmationWrites, 0, "SDK sanitization must not turn a multiline message into an executable confirmation");
+const validConfirmation = message("valid-confirm", "<@!123> 确认联系商家 COUPON-2001 原因：行程变化");
+await sanitizeQQContent({ bot: { appId: "123" }, message: validConfirmation } as Parameters<typeof sanitizeQQContent>[0], async () => {});
+await confirmMerchantMessage(confirmationStore, { appId: "TEST_APP", senderId: "TEST_USER1" }, "0".repeat(64), validConfirmation.content);
+assert.equal(confirmationWrites, 1, "stripping the QQ bot mention must preserve a valid confirmation");
+
+const originalNow = Date.now;
+let simulatedNow = originalNow();
+let expiredHostActions = 0;
+const expiredSendCount = sent.length;
+const expiredModelCalls = faux.state.callCount;
+const expiresDuringCreate = new QQAgent(async () => {
+  const session = await create();
+  simulatedNow += 10_000;
+  return session;
+}, send, (text) => logs.push(text), 1000, async () => { expiredHostActions++; return "不应执行的确认回执"; });
+try {
+  Date.now = () => simulatedNow;
+  const expiring = message("expires-during-create", "确认联系商家 COUPON-2001 原因：行程变化");
+  expiring.timestamp = new Date(simulatedNow - 265_000).toISOString();
+  await expiresDuringCreate.handle(expiring);
+  assert.equal(expiredHostActions, 0, "a confirmation expiring during session initialization must not write business state");
+  assert.equal(faux.state.callCount, expiredModelCalls);
+  assert.equal(sent.length, expiredSendCount);
+} finally {
+  Date.now = originalNow;
+  await expiresDuringCreate.close();
+}
+console.log("QQ→Pi 离线检查通过：工具循环、专用上下文、隔离/队列、宿主确认串行与回执上下文、真实 SDK 清洗后确认边界、初始化期间过期拒绝、可控失败、发送不重试、超时恢复和安全关闭。");
