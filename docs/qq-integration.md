@@ -1,10 +1,10 @@
 # QQ 开放平台接入调研
 
-核对日期：2026-10-02。依据当前官方协议、腾讯 SDK 源码及登录后的后台只读检查。账号已完成个人认证；查看了机器人列表，并抽查一个现有机器人的服务范围、开发设置和旧版沙箱/回调表单。现已实现 WebSocket / Webhook 双模式固定回复入口；尚未修改机器人配置或完成真实群联调，账号状态仅代表检查时的后台展示。
+核对日期：2026-10-02。依据当前官方协议、腾讯 SDK 源码及登录后的后台只读检查。账号已完成个人认证；查看了机器人列表，并抽查一个现有机器人的服务范围、开发设置和旧版沙箱/回调表单。现已实现 WebSocket / Webhook → Pi → 模型 → QQ 的代码；本地真实 DeepSeek 工具循环通过，仍缺机器人凭据与真实群联调证据。账号状态仅代表检查时的后台展示。
 
 ## 接入方案
 
-在 dave-agent 的 Node.js 服务中使用腾讯 QQ SDK 负责通信，后续由宿主路由到 Pi AgentSession SDK 的模型与工具循环。无需运行 OpenClaw，也无需独立启动 Pi CLI。**本地默认 WebSocket，部署默认 HTTP Webhook；两种模式共用消息处理器和发送 API。** 接收方式不决定 QQ 客户端是否支持流式显示，当前群聊入口只发送完整文本。
+在 dave-agent 的 Node.js 服务中使用腾讯 QQ SDK 负责通信，宿主按群和发送者路由到 Pi AgentSession SDK 的模型与工具循环。无需运行 OpenClaw，也无需独立启动 Pi CLI。**本地默认 WebSocket，部署默认 HTTP Webhook；两种模式共用消息处理器和发送 API。** 接收方式不决定 QQ 客户端是否支持流式显示，当前群聊入口只发送完整文本。
 
 ```mermaid
 flowchart LR
@@ -13,15 +13,16 @@ flowchart LR
   W --> S[腾讯 SDK：地址验证、验签、快速 ACK]
   C --> H[同一消息处理器：测试群过滤与去重]
   S --> H
-  H --> F[阶段 A：固定文本回复]
-  H -. 阶段 B：身份映射与会话串行 .-> P[Pi AgentSession]
+  H --> I[群和发送者隔离、会话串行]
+  I --> P[Pi AgentSession：简短 Prompt、echo]
+  P --> M[DeepSeek 模型与工具循环]
+  M --> P
   P --> R[最终文本]
-  F --> A[腾讯 SDK 发送 API]
   R --> A[腾讯 SDK 发送 API]
   A --> Q
 ```
 
-首版已固定安装 `@tencent-connect/qqbot-nodejs@1.0.4`，先固定回复，再替换为 Pi 对话。[npm 发布信息](https://registry.npmjs.org/@tencent-connect%2Fqqbot-nodejs/1.0.4)与 GitHub main 不完全一致，落地以安装的发布包为准。本轮对照 GitHub commit 为 `ca55d9c395b582b7fcfad0ec27209c35dd04e0b3`；Webhook、发送和去重源码已与发布包比对，QQBot 全文件并不完全相同。参考腾讯的 [Webhook 示例](https://github.com/tencent-connect/qqbot-nodejs/blob/ca55d9c395b582b7fcfad0ec27209c35dd04e0b3/examples/webhook/index.ts)；按运行模式配置 `transport`，Webhook 再配置监听端口和路径，并关闭 Markdown，先验证纯文本。
+首版已固定安装 `@tencent-connect/qqbot-nodejs@1.0.4`，固定回复已替换为 Pi 对话。[npm 发布信息](https://registry.npmjs.org/@tencent-connect%2Fqqbot-nodejs/1.0.4)与 GitHub main 不完全一致，落地以安装的发布包为准。本轮对照 GitHub commit 为 `ca55d9c395b582b7fcfad0ec27209c35dd04e0b3`；Webhook、发送和去重源码已与发布包比对，QQBot 全文件并不完全相同。参考腾讯的 [Webhook 示例](https://github.com/tencent-connect/qqbot-nodejs/blob/ca55d9c395b582b7fcfad0ec27209c35dd04e0b3/examples/webhook/index.ts)；按运行模式配置 `transport`，Webhook 再配置监听端口和路径，并关闭 Markdown，先验证纯文本。
 
 ### 当前启动与配置
 
@@ -33,10 +34,11 @@ flowchart LR
 | 凭据 | `QQBOT_APP_ID`、`QQBOT_APP_SECRET`，仅运行时读取 |
 | 测试群 | `QQ_ALLOWED_GROUPS`，逗号分隔群 OpenID；为空时仅记录被拦截群的 OpenID，不回复 |
 | Webhook 监听 | `QQBOT_WEBHOOK_PORT=8080`、`QQBOT_WEBHOOK_PATH=/qq/callback` 为默认值，外层配置公网 HTTPS 反向代理 |
-| 回复内容 | “QQ 通信测试成功，已收到你的消息。” |
-| 离线检查 | `npm run check:qq`；`npm run validate` 包含类型、Pi 和 QQ 离线检查 |
+| 模型配置 | 默认 `deepseek/deepseek-flash`，读取运行时 `DEEPSEEK_API_KEY`；`MODEL_PROVIDER`、`MODEL_ID`、`MODEL_API_KEY` 可显式覆盖 |
+| 回复内容 | Pi/模型生成的最终纯文本；仅开放 echo 工具，不加载 CLI 客户身份、订单工具或电商 Skill |
+| 离线检查 | `npm run check:qq` 检查协议，`npm run check:qq-agent` 检查会话入口；`npm run validate` 包含类型与全部离线检查，本轮已通过 |
 
-两种模式都只处理白名单测试群的 `@` 纯文本，当前不接真实模型、订单查询或私聊流式消息。后台事件接收方式需与运行模式一致；切换程序配置不会自动修改开放平台配置。WebSocket 需要进程主动访问 QQ 网关，Webhook 需要平台访问公网回调入口；两者都仍需 API 出口 IP 符合后台白名单。
+两种模式都只处理白名单测试群的 `@` 纯文本，当前已接真实模型，不接订单查询或私聊流式消息。后台事件接收方式需与运行模式一致；切换程序配置不会自动修改开放平台配置。WebSocket 需要进程主动访问 QQ 网关，Webhook 需要平台访问公网回调入口；两者都仍需 API 出口 IP 符合后台白名单。
 
 ## 开放平台需要准备什么
 
@@ -66,7 +68,7 @@ Webhook 协议允许回调端口 `80/443/8080/8443`，要求 HTTPS。可以由�
 | `payload.d.group_openid` | 群路由标识，不是界面显示的 QQ 群号 |
 | `payload.d.author.member_openid` | 发送者标识，不是昵称或可自行填写的 QQ 号 |
 
-会话键采用 `AppID + group_openid + member_openid`。不同用户隔离；同一会话的用户消息和业务回调共用串行入口。客户身份由宿主映射，未映射用户只能问通用规则。当前官方文档说明群 @ 的 `content` 已去掉机器人 mention 前缀；过滤应依据可信事件类型，不能把文本中的昵称当作身份。[群 @ 事件](https://bot.q.qq.com/wiki/develop/api-v2/autogen/event/group_at_message_create.html)
+每个进程只服务一个 AppID，因此当前会话键采用 `group_openid + member_openid`，机器人身份由进程隔离。不同用户隔离，同一用户消息串行；业务回调续接与内部客户映射在后续业务阶段补齐。当前不开放订单工具。官方文档说明群 @ 的 `content` 已去掉机器人 mention 前缀；过滤依据可信事件类型，不能把文本中的昵称当作身份。[群 @ 事件](https://bot.q.qq.com/wiki/develop/api-v2/autogen/event/group_at_message_create.html)
 
 群回复调用 `POST https://api.bot.qq.com/v2/groups/{group_openid}/messages`，纯文本使用 `msg_type: 0`，携带原消息 `msg_id`；同一消息的多次回复需要区分 `msg_seq`。首版经 SDK 的 `sendText(msg.replyTarget, text)` 发送，保留入站 SDK 给出的回复目标，不自行拼接群号。
 
@@ -76,7 +78,7 @@ Webhook 协议允许回调端口 `80/443/8080/8443`，要求 HTTPS。可以由�
 
 腾讯 SDK 已实现地址验证 `op:13`、普通事件 Ed25519 验签、事件分发和 HTTP ACK。当前 Webhook 实现将事件处理放到后台，立即返回 HTTP 200 与 `{"op":12,"d":0}`；普通事件缺失或错误签名会返回 401。地址验证走独立路径，不能把它当成用户消息交给 Pi。[Webhook 源码](https://github.com/tencent-connect/qqbot-nodejs/blob/ca55d9c395b582b7fcfad0ec27209c35dd04e0b3/src/protocol/transport/webhook.ts)
 
-ACK 只说明收到事件，不证明模型成功、退款成功或事件已持久保存。当前宿主负责测试群白名单、固定回复和发送失败记录，Webhook 请求体限制为 64 KiB；队列上限、超时、会话清理和业务授权在后续 Pi / 业务接入时加入。SDK 去重中间件已显式注册，使用进程内状态；重启后丢失，短时内存去重不能替代重启后的业务幂等或持久事件队列。
+ACK 只说明收到事件，不证明模型成功、退款成功或事件已持久保存。当前宿主负责测试群白名单、Pi 会话队列、模型超时与发送失败记录，Webhook 请求体限制为 64 KiB。最多 20 个内存会话，每会话最多 3 条在途消息（含正在处理）；模型限时 60 秒，空闲 30 分钟清理，20 轮后换新上下文。自动压缩关闭，模型输出最多 2048 token，最终发送最多 1000 个 Unicode 码点，并在发送前重新检查原消息仍处于 4 分 30 秒回复余量内。SDK 去重中间件使用进程内状态，重启后丢失，不能替代业务幂等或持久事件队列。
 
 发布包的 `msg_seq` 由时间和随机数生成，并非每个原消息的持久递增计数；重新调用发送会生成新序号，不能把 SDK 发送当成业务幂等保障。SDK 的群级并发中间件也不能替代我们的“群＋发送者”会话队列；初期不用 SDK 自带历史缓冲，由 Pi 统一管理对话。[发送实现](https://github.com/tencent-connect/qqbot-nodejs/blob/ca55d9c395b582b7fcfad0ec27209c35dd04e0b3/src/protocol/api/routes.ts)、[并发中间件](https://github.com/tencent-connect/qqbot-nodejs/blob/ca55d9c395b582b7fcfad0ec27209c35dd04e0b3/src/middleware/concurrency-guard.ts)
 
@@ -89,9 +91,9 @@ SDK `1.0.4` 的默认 API / Token 域名仍是 `api.sgroup.qq.com` / `bots.qq.co
 ## 最小验收顺序
 
 1. 准备独立机器人和不超过 20 人的内部测试群，管理员担任群主/管理员；确认 API 出口 IP，不公开凭据。本地 WebSocket 联调不需要公网地址。
-2. 填写凭据和群 OpenID 白名单，确认后台使用 WebSocket，运行 `npm run qq`；测试群 @ 获得固定纯文本回复。
-3. 运行 `npm run check:qq` 离线检查；部署时用 `npm run qq:deploy`，配置公网 HTTPS 回调并切换后台接收方式，通过地址验证和真实群投递。验签与慢处理 ACK 的离线结果不能替代真实网络联调；重复事件处理也要在联调中验证。
-4. 固定回复替换为 Pi，确认两名成员不串历史、同一成员消息串行、只发送最终文本。
-5. 用模拟后台任务验证结果回到原会话；单独检查回复窗口过期及 Pi 回调续接的实际上下文。
+2. 填写 QQ 凭据和群 OpenID 白名单，保留已有 `DEEPSEEK_API_KEY`，确认后台使用 WebSocket，运行 `npm run qq`；在测试群 @ 获得模型生成的纯文本回复，再发送“请调用 echo 回显：dave-agent 基座联调成功”。
+3. 运行 `npm run validate`，覆盖协议与会话离线检查；确认两名成员不串历史、同一成员消息串行、只发送最终文本。核对 QQ 入站、模型处理和平台返回消息 ID，群内实际可见回复才是最终证据。
+4. 部署时用 `npm run qq:deploy`，配置公网 HTTPS 回调并切换后台接收方式，通过地址验证和真实群投递。验签与慢处理 ACK 的离线结果不能替代真实网络联调；重复事件处理也要在联调中验证。
+5. 后续进入异步业务时，用模拟后台任务验证结果回到原会话；单独检查回复窗口过期及 Pi 回调续接的实际上下文。
 
-已完成公开协议研究、账号后台只读检查和双模式固定回复代码。2026-10-02 的 `npm run validate` 已通过，包含原有 Pi 检查及 QQ 双模式配置、消息校验、实际 SDK 握手验签、篡改拒绝、快速 ACK、HTTP 原始请求体保留和大小限制。账号认证、接入凭据入口、群 @ 事件选项及 Webhook 入口已确认；密钥读取、机器人/沙箱/回调配置和真实群消息投递均未执行。下一步准备测试入口，先用本地 WebSocket 联调，再验收部署用的 HTTPS Webhook。
+已完成公开协议研究、账号后台只读检查和 QQ → Pi 双模式代码。本轮 `npm run validate` 全部通过：既有 Pi/QQ 检查，加上真实 Pi 与离线模型的 echo 循环、专用上下文、工具白名单、群和用户隔离、串行与队列上限、失败/超时恢复、发送不盲重试和退出清理。本地真实 DeepSeek 已调用 echo 并返回最终文本“dave-agent 基座联调成功”，这证明模型工具循环，不证明 QQ 投递。账号认证、接入凭据入口、群 @ 事件选项及 Webhook 入口已确认；QQ AppSecret 尚未读取，真实群消息投递仍未执行。下一步准备凭据和测试群，先用本地 WebSocket 获取真实可见回复，再验收部署用 HTTPS Webhook。

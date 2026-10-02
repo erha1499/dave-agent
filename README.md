@@ -9,13 +9,14 @@
 ## 当前起步版本
 
 - 本地 CLI：店铺 FAQ、模拟订单查询。
-- QQ 独立通信入口：腾讯 SDK 接收测试群 `@` 文本并发送固定回复，支持 WebSocket / Webhook 切换。
+- QQ → Pi → 模型 → QQ 入口：腾讯 SDK 接收测试群 `@` 文本，按群和发送者隔离 Pi 会话，支持 WebSocket / Webhook 切换。
+- QQ 联调使用独立的简短 Prompt，仅开放无副作用的 `echo` 工具；默认读取 `DEEPSEEK_API_KEY`，模型为 `deepseek/deepseek-flash`。
 - 专用客服 Prompt，以及唯一的电商 Skill；首版由宿主加载 Skill，避免开放任意文件读取。
 - 工具白名单；模型不能使用 Pi 默认的终端和文件工具。
 - 工具从宿主获取当前用户身份，订单归属检查在工具内执行。
 - 会话和模拟数据用于本地演示；会话暂存内存，退出后不保留历史。首版关闭自动压缩，长会话需先适配并验证业务摘要提示。
 
-当前 CLI 仍是通用电商的旧演示，尚未适配团购券业务，也未实现商家异步协商或模拟退款。QQ 入口尚未接入 Pi、模型和业务工具，也未完成真实群联调。模拟数据不代表任何实际店铺或客户。
+当前 CLI 仍是通用电商的旧演示，尚未适配团购券业务，也未实现商家异步协商或模拟退款。QQ 已接入 Pi 和模型，暂不开放业务工具；本地真实 DeepSeek 调用已跑通 `echo → 结果回填 → 最终回复`，仍缺 QQ 凭据与真实群消息投递证据。模拟数据不代表任何实际店铺或客户。
 
 ## 本地运行
 
@@ -26,8 +27,8 @@
 ```sh
 npm ci
 npm run validate
-cp .env.example .env
-# 在 .env 中填写自己使用的模型 provider、model id 和 API key
+cp -n .env.example .env
+# 已有 DEEPSEEK_API_KEY 环境变量即可；其他模型按 .env.example 显式覆盖
 npm start
 ```
 
@@ -35,9 +36,9 @@ npm start
 
 默认演示用户是 `demo-customer-1`。可以提问“店铺多久发货？”或“查一下订单 DEMO-1001”。查询其他用户的 `DEMO-1002` 应返回不可查询结果。修改 `.env` 中模型配置即可换用 Pi 支持的其他模型；凭据仅来自这个应用的运行时环境。
 
-## QQ 通信测试
+## QQ → Pi 联调
 
-在 `.env` 填写 `QQBOT_APP_ID`、`QQBOT_APP_SECRET` 和 `QQ_ALLOWED_GROUPS`。群白名单填写逗号分隔的 **群 OpenID**，不是 QQ 群号；为空时不回复，仅记录被拦截群的 OpenID，便于补齐配置。只处理白名单群的 `@` 纯文本，固定回复“QQ 通信测试成功，已收到你的消息。”；这个入口不需要模型密钥。
+在 `.env` 填写 `QQBOT_APP_ID`、`QQBOT_APP_SECRET` 和 `QQ_ALLOWED_GROUPS`，模型默认使用环境变量中的 `DEEPSEEK_API_KEY`。群白名单填写逗号分隔的 **群 OpenID**，不是 QQ 群号；为空时不回复，仅记录被拦截群的 OpenID，便于补齐配置。只处理白名单群的 `@` 纯文本，由 Pi 调用模型后发送完整回复。可用“请调用 echo 回显：dave-agent 基座联调成功”验证工具循环。
 
 ```sh
 # 本地默认 WebSocket，无需公网回调地址
@@ -52,15 +53,18 @@ npm run qq:deploy
 | `QQ_TRANSPORT` | 未设置时，本地为 `websocket`，`NODE_ENV=production` 为 `webhook`；显式 `websocket` / `webhook` 覆盖默认 |
 | `QQBOT_WEBHOOK_PORT` | `8080`；Webhook 的本地 HTTP 监听端口 |
 | `QQBOT_WEBHOOK_PATH` | `/qq/callback`；Webhook 接收路径 |
+| `DEEPSEEK_API_KEY` | 默认模型的运行时密钥；`MODEL_PROVIDER`、`MODEL_ID`、`MODEL_API_KEY` 可显式覆盖 |
 
 Webhook 需要公网 HTTPS 入口，将请求反向代理到本地 HTTP 服务。Webhook 请求体上限为 64 KiB。WebSocket 由程序主动连接 QQ 网关，不需要公网入口；两种模式都需要进程持续运行，且 API 出口 IP 符合后台白名单。机器人后台的事件接收方式需与运行模式一致，本轮没有修改后台配置。
 
-`npm run check:qq` 是无需 QQ 凭据的离线检查，`npm run validate` 同时运行类型检查、原有 Pi 检查和 QQ 检查；离线通过不代表 QQ 登录鉴权、真实网络或测试群投递已验证。SDK 去重使用进程内状态，重启后丢失，不作为业务幂等或持久化保证。账号准备与联调步骤见 [QQ 接入调研](./docs/qq-integration.md)。
+同一群内不同用户使用独立会话，同一用户的消息串行处理。当前上限为 20 个内存会话、每会话 3 条在途消息（含正在处理的消息）；空闲 30 分钟清理、20 轮后换新上下文。模型处理限时 60 秒，输出最多 2048 token，最终发送最多 1000 个 Unicode 码点；超过 4 分 30 秒的原消息不再回复，为平台 5 分钟窗口留出余量。退出后不保留历史。
+
+`npm run validate` 已通过，包含类型检查、原有 Pi 检查、`check:qq` 协议检查和 `check:qq-agent` 会话检查。会话检查覆盖真实 Pi/离线模型的 echo 循环、专用上下文、工具白名单、隔离、串行、队列上限、失败与超时恢复及退出清理，均无需真实密钥。离线结果不代表 QQ 登录鉴权、真实网络或群投递已验证；真实 DeepSeek 工具循环也不能替代群内可见回复。SDK 去重使用进程内状态，重启后丢失，不作为业务幂等或持久化保证。账号准备与联调步骤见 [QQ 接入调研](./docs/qq-integration.md)。
 
 ## 开发顺序
 
-1. QQ 通信：两种接收模式共用固定回复处理器；完成 WebSocket 真实群联调，并验证 Webhook 地址验证、验签、去重和快速 ACK。
-2. Pi 集成：跑通 QQ → Pi → 模型/无副作用测试工具 → QQ，验证会话隔离、串行和模拟后台回调续接。
+1. 基座联调：已实现双模式 QQ → Pi → 模型/echo → QQ；准备 QQ 凭据与测试群，验证 WebSocket 真实群回复，再验收部署用 Webhook。
+2. 会话验证：完成隔离、串行、超时和生命周期检查；进入异步业务时再补模拟后台任务回调续接。
 3. 团购券业务：适配数据、Prompt/Skill 与业务工具，再引入参考知识与评测，建立检索基线。
 4. 售后闭环：接入模拟商家协商、可信审批、用户确认和幂等模拟退款。
 5. 回放与端到端验证：扩展已有检查，分别记录工程、真实模型和 QQ 验收，不使用参考项目的指标作为自己的成绩。
@@ -71,14 +75,14 @@ QQ 阶段准备：开放平台机器人 AppID/AppSecret、具备群聊权限的�
 
 ## 版本控制
 
-远程仓库：[erha1499/dave-agent](https://github.com/erha1499/dave-agent)。默认分支 `main`；每个通过检查的小闭环提交一次。后续修改可以使用短期功能分支，例如 `codex/qq-transport`。
+远程仓库：[erha1499/dave-agent](https://github.com/erha1499/dave-agent)。默认分支 `main`；双模式通信提交 `cc38570`、QQ → Pi 提交 `7265519` 已分步推送。每个通过检查的小闭环分步 commit + push，密钥和运行数据不进入公开仓库。
 
 ```sh
 git switch -c codex/qq-transport
 # 修改并通过 npm run validate 后
 git add <明确要提交的文件>
 git commit -m "feat: add QQ dual transport ingress"
-# 准备公开代码时再执行
+# 通过检查后推送当前步骤
 git push -u origin codex/qq-transport
 ```
 
