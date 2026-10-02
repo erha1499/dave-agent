@@ -19,7 +19,7 @@
     "check:merchant-model": "node --env-file-if-exists=.env scripts/merchant-model-check.ts",
     "eval:init": "node --env-file-if-exists=.env scripts/init-evaluation.ts",
     "eval:serve": "node --env-file-if-exists=.env src/eval-server.ts",
-    "check:eval": "node scripts/eval-check.ts",
+    "check:eval": "node scripts/eval-check.ts && node scripts/eval-ui-check.ts",
     "check:eval-db": "node --env-file-if-exists=.env scripts/eval-db-check.ts",
     "check:business": "node --env-file-if-exists=.env scripts/coupon-db-check.ts && node --env-file-if-exists=.env scripts/coupon-agent-check.ts",
     "check:model": "node --env-file-if-exists=.env scripts/coupon-model-check.ts",
