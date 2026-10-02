@@ -3,17 +3,23 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "A small e-commerce support agent built on the Pi SDK, with planned QQ Webhook integration.",
-  "engines": { "node": ">=22.19.0" },
+  "description": "A customer-support agent built on the Pi SDK with QQ WebSocket and Webhook ingress.",
+  "engines": {
+    "node": ">=22.19.0"
+  },
   "scripts": {
     "start": "node --env-file-if-exists=.env src/cli.ts",
+    "qq": "node --env-file-if-exists=.env src/qq.ts",
+    "qq:deploy": "NODE_ENV=production node --env-file-if-exists=.env src/qq.ts",
     "check": "node scripts/check.ts",
+    "check:qq": "node scripts/qq-check.ts",
     "typecheck": "tsc --noEmit",
-    "validate": "npm run typecheck && npm run check"
+    "validate": "npm run typecheck && npm run check && npm run check:qq"
   },
   "dependencies": {
     "@earendil-works/pi-ai": "1.0.0",
-    "@earendil-works/pi-coding-agent": "1.0.0"
+    "@earendil-works/pi-coding-agent": "1.0.0",
+    "@tencent-connect/qqbot-nodejs": "1.0.4"
   },
   "devDependencies": {
     "@types/node": "26.6.4",

@@ -31,17 +31,19 @@
 - [x] Pi SDK 固定为 `1.0.0`，已提交依赖锁文件。
 - [x] CLI、客服 Prompt、一个宿主预加载的 Skill、两个只读工具。
 - [x] 离线检查验证 Pi 工具循环、精确请求上下文、工具白名单和订单归属。
+- [x] QQ 通信代码与配置：本地默认 WebSocket，部署默认 Webhook，同一处理器发送固定回复；SDK 固定为 `1.0.4`。
+- [x] `npm run validate` 通过：原有 Pi 检查，以及 QQ 配置、消息校验、握手验签、快速 ACK、HTTP 请求大小检查。
 - [ ] 将当前实物商品/物流模拟数据与 Skill 改为团购券/门店售后。
 - [ ] 数据集引入与检索基线、真实模型效果验证。
 - [ ] 模拟商家异步回调、用户确认与模拟退款。
-- [ ] QQ 通信、身份映射、多轮会话与端到端验证。
+- [ ] QQ 真实群通信联调、身份映射、多轮会话与端到端验证。
 
-现有 CLI 仍是旧业务演示，不能据此宣称新售后闭环已完成。当前会话在内存中，自动压缩关闭。既有 `npm run validate` 是工程检查，不是模型效果或 QQ 端到端评测。
+现有 CLI 仍是旧业务演示，不能据此宣称新售后闭环已完成。QQ 当前只做固定回复，未接 Pi 和业务工具；后台配置本轮未改，真实群投递未验证。当前 Pi 会话在内存中，自动压缩关闭。`npm run validate` 是离线工程检查，不是模型效果或 QQ 端到端评测。
 
 ## 3. 继续复用 Pi，业务状态放在宿主
 
 ```text
-QQ 已验签消息 → 测试群过滤/去重 → 身份映射 → 会话串行入口
+QQ SDK 消息（WebSocket / 已验签 Webhook）→ 测试群过滤/去重 → 身份映射 → 会话串行入口
                                                     ↓
                                              Pi AgentSession
                                              Prompt + Skill
@@ -125,12 +127,16 @@ Pi 的普通 prompt 和自定义消息触发路径需要分别验证：当前纯
 
 ### A：QQ 通信闭环（参考第 1–2 天）
 
-- [ ] 准备 AppID/AppSecret、所需群权限、测试群、公网 HTTPS 回调地址。
-- [ ] 复用腾讯 SDK 的地址验证、验签、快速 ACK 和发送 API。
-- [ ] 只处理白名单测试群的 `@` 文本，先返回固定文本，独立验证接收和发送。
-- [ ] 加入事件去重、错误记录和被动回复窗口检查；处理逻辑变慢时仍快速 ACK。
+- [x] 复用腾讯 SDK，配置本地默认 WebSocket、`NODE_ENV=production` 默认 Webhook；显式 `QQ_TRANSPORT=websocket|webhook` 可覆盖。
+- [x] 两种模式共用测试群白名单和固定回复处理器，不连接模型或业务工具。
+- [x] 使用 SDK 的去重、Webhook 地址验证/验签/快速 ACK 和发送 API；Webhook 请求体限制为 64 KiB。
+- [ ] 准备 AppID/AppSecret、所需群权限、测试群和 API 出口 IP 白名单；Webhook 模式另准备公网 HTTPS 地址。
+- [x] `npm run check:qq` 离线检查通过：双模式配置、群消息校验、握手验签、篡改拒绝、快速 ACK、HTTP 请求上限。
+- [ ] 按所选模式配置后台，验证真实群接收/发送及重复事件处理。
 
-验收：后台地址验证成功；测试群 `@` 收到固定回复；错误签名不进入处理；重复事件不重复回复；模型和业务尚未接入时通信仍能单独验证。
+本地运行 `npm run qq`；部署运行 `npm run qq:deploy`，由 HTTPS 反向代理将请求转发到默认 `8080/qq/callback`。空 `QQ_ALLOWED_GROUPS` 不回复，只记录被拦截群的 OpenID 便于配置。SDK 去重是进程内短时状态，重启后丢失，后续业务仍需持久化幂等。
+
+验收：WebSocket 和 Webhook 都能在测试群 `@` 后返回固定文本；Webhook 后台地址验证成功，错误签名不进入处理，慢处理仍快速 ACK；重复事件不重复回复。离线检查与真实群联调分别记录，前者不能替代后者。
 
 ### B：QQ → Pi → 模型/测试工具 → QQ（参考第 2–4 天）
 
@@ -201,6 +207,6 @@ Pi 的普通 prompt 和自定义消息触发路径需要分别验证：当前纯
 
 每个通过检查的小闭环单独提交。源码、Prompt、Skill、fixture、来源说明与锁文件进入 Git；密钥、`.runtime/`、完整用户消息和运行日志不提交。当前 Pi 的间接依赖审计告警保留在 README，升级时复查。
 
-下一项工作：按 [QQ 接入调研](./docs/qq-integration.md) 准备独立机器人、内部测试群和公网 HTTPS 地址，再完成阶段 A 的 QQ 通信闭环，随后接入阶段 B 的 Pi 对话和测试工具。团购券业务、数据集与检索调优在链路跑通后加入。公开协议和账号后台已只读核对，个人认证、群 @ 事件选项和 Webhook 入口可用；尚未修改机器人配置、开发 QQ 接入或完成群联调。
+下一项工作：按 [QQ 接入调研](./docs/qq-integration.md) 准备独立机器人和内部测试群，先用本地 WebSocket 完成阶段 A 的固定回复真实联调；部署时默认切换 Webhook，补齐公网 HTTPS 地址并验收。随后接入阶段 B 的 Pi 对话和测试工具，团购券业务、数据集与检索调优在链路跑通后加入。公开协议和账号后台已只读核对，个人认证、群 @ 事件选项和 Webhook 入口可用；本轮已实现双模式通信入口，尚未修改机器人配置或完成真实群联调。
 
 参考：[Pi SDK](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/sdk.md)、[腾讯 QQ SDK](https://github.com/tencent-connect/qqbot-nodejs)、[QQ 回调规范](https://bot.q.qq.com/wiki/develop/api-v2/dev-prepare/interface-framework/event-emit.html)。
