@@ -92,6 +92,7 @@ npm run qq:bind -- <12位identity代号> <对应的演示客户ID>
 | --- | --- |
 | `QQ_TRANSPORT` | 未设置时，本地为 `websocket`，`NODE_ENV=production` 为 `webhook`；显式 `websocket` / `webhook` 覆盖默认 |
 | `QQ_REPLY_FORMAT` | 默认 `markdown`；显式 `text` 使用纯文本，CLI 始终保持纯文本 |
+| `QQ_REPLY_BUTTONS` | 默认 `false`；设为 `true` 后，群聊 Markdown 的模拟协商确认/等待进度回复附带固定按钮；本机测试配置已启用 |
 | `QQBOT_WEBHOOK_PORT` | `8080`；Webhook 的本地 HTTP 监听端口 |
 | `QQBOT_WEBHOOK_PATH` | `/qq/callback`；Webhook 接收路径 |
 | `DEEPSEEK_API_KEY` | 默认模型的运行时密钥；`MODEL_PROVIDER`、`MODEL_ID`、`MODEL_API_KEY` 可显式覆盖 |

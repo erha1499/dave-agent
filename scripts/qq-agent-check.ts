@@ -9,6 +9,7 @@ import { QQAgent } from "../src/qq-agent.ts";
 import { sanitizeQQContent } from "../src/qq.ts";
 import { confirmMerchantMessage } from "../src/after-sales-entry.ts";
 import type { AfterSalesStore } from "../src/after-sales.ts";
+import type { RenderedReply } from "../src/reply.ts";
 
 const expectedPrompt = "你是 QQ 通信联调助手。用简洁中文纯文本自然回复用户，每次回复最多 500 字，不输出网址。\n"
   + "当前只验证 QQ 通信和 Agent 工具循环。用户要求回显或测试工具时，调用 echo 并按结果回复。\n"
@@ -17,14 +18,14 @@ const runtime = await createModelRuntime();
 const faux = fauxProvider();
 runtime.registerNativeProvider(faux.provider);
 const sessions: Awaited<ReturnType<typeof createQQSession>>[] = [];
-const sent: Array<{ target: ReplyTarget; text: string }> = [];
+const sent: Array<{ target: ReplyTarget; text: string; requesterId?: string }> = [];
 const logs: string[] = [];
 const create = async () => {
   const session = await createQQSession(runtime, faux.getModel());
   sessions.push(session);
   return session;
 };
-const send = async (target: ReplyTarget, text: string) => { sent.push({ target, text }); };
+const send = async (target: ReplyTarget, text: string, _reply?: RenderedReply, requesterId?: string) => { sent.push({ target, text, requesterId }); };
 const deferred = () => {
   let resolve!: () => void;
   const promise = new Promise<void>((done) => { resolve = done; });
@@ -73,6 +74,7 @@ try {
   ]);
   await agent.handle(message("echo", "/skill:shop-support 请回显工具测试"));
   assert.equal(sent.at(-1)?.text, "已回显：工具测试");
+  assert.equal(sent.at(-1)?.requesterId, "user_one", "button permissions must use the actual inbound sender");
   assert.ok(logs.some(text => text.includes("tools=echo")), "trace must record the actual successful tool result");
   assert.deepEqual(sessions[0]?.getActiveToolNames(), ["echo"]);
   assert.equal(faux.getPendingResponseCount(), 0);
@@ -133,6 +135,7 @@ try {
     queued.handle(message("other-group", "另一群", "user_one", "group_two")),
   ]);
   assert.ok(sent.some((item) => item.target.msgId === "other-user" && item.text === "独立回复：另一用户"));
+  assert.equal(sent.find(item => item.target.msgId === "other-user")?.requesterId, "user_two", "concurrent users must not share button permissions");
   assert.ok(sent.some((item) => item.target.msgId === "other-group" && item.text === "独立回复：另一群"));
   assert.ok(!sent.some((item) => item.target.msgId === "first"), "other conversations must complete while first is waiting");
   release.resolve();
@@ -245,6 +248,7 @@ try {
   assert.equal(faux.state.callCount, modelCalls + 1, "host receipt must not trigger a model call");
   assert.deepEqual(sent.filter(item => item.target.msgId?.startsWith("host-")).map(item => item.target.msgId), ["host-confirm", "host-query"]);
   assert.ok(sent.some(item => item.target.msgId === "host-confirm" && item.text === hostReceipt));
+  assert.equal(sent.find(item => item.target.msgId === "host-confirm")?.requesterId, "user_one", "host receipts must retain trusted button identity");
   faux.setResponses([context => {
     assert.ok(!JSON.stringify(context.messages).includes(hostReceipt), "host receipts cannot leak to another QQ user");
     return fauxAssistantMessage("独立会话");

@@ -3,7 +3,7 @@ import { createServer } from "node:http";
 import { once } from "node:events";
 import { QQBot, type ReplyTarget } from "@tencent-connect/qqbot-nodejs";
 import { renderReply } from "../src/reply.ts";
-import { readQQReplyFormat, sendQQReply } from "../src/qq-reply.ts";
+import { readQQReplyButtons, readQQReplyFormat, sendQQReply } from "../src/qq-reply.ts";
 
 assert.equal(readQQReplyFormat({}), "markdown");
 assert.equal(readQQReplyFormat({ QQ_REPLY_FORMAT: " markdown " }), "markdown");
@@ -11,6 +11,10 @@ assert.equal(readQQReplyFormat({ QQ_REPLY_FORMAT: "text" }), "text");
 for (const invalid of ["html", "Markdown", "0"]) {
   assert.throws(() => readQQReplyFormat({ QQ_REPLY_FORMAT: invalid }), /QQ_REPLY_FORMAT/);
 }
+assert.equal(readQQReplyButtons({}), false);
+assert.equal(readQQReplyButtons({ QQ_REPLY_BUTTONS: " true " }), true);
+assert.equal(readQQReplyButtons({ QQ_REPLY_BUTTONS: "false" }), false);
+for (const invalid of ["True", "1", "yes"]) assert.throws(() => readQQReplyButtons({ QQ_REPLY_BUTTONS: invalid }), /QQ_REPLY_BUTTONS/);
 
 // Exercise the installed SDK against localhost. No real credentials, model or QQ API.
 let outcome: "success" | "no_id" | "api_error" | "network_error" = "success";
@@ -40,9 +44,26 @@ const bot = new QQBot({ ...options, markdownSupport: false });
 const markdownBot = new QQBot({ ...options, markdownSupport: true });
 const target: ReplyTarget = { scope: "group", targetId: "synthetic-group", msgId: "synthetic-inbound" };
 const reply = renderReply({ kind: "answer", text: "这是一条测试答复。" });
+const requesterId = "synthetic-user";
+const command = "确认联系商家 COUPON-2001 原因：行程变化[*]";
+const confirmation = renderReply({ kind: "merchant_confirmation", orderId: "COUPON-2001", amountCents: 7980, confirmationText: command });
+const pending = renderReply({ kind: "merchant_status", task: {
+  taskId: "00000000-0000-4000-8000-000000000001", orderId: "COUPON-2001", status: "pending",
+  reason: "行程变化", amountCents: 7980, approvedAmountCents: null,
+  createdAt: "2026-10-02T00:00:00.000Z", dueAt: "2026-10-02T00:00:05.000Z", completedAt: null, simulation: true,
+} });
+const permission = { type: 0, specify_user_ids: [requesterId] };
+const commonAction = { type: 2, permission, enter: false, reply: false, unsupport_tips: "请复制消息中的文字，@机器人后发送。" };
+const confirmationKeyboard = { content: { rows: [{ buttons: [{
+  id: "merchant_confirmation",
+  render_data: { label: "确认模拟协商", visited_label: "确认模拟协商", style: 1 },
+  action: { ...commonAction, data: command, modal: {
+    content: "继续后将填入确认指令，请核对并发送；不会执行退款。", confirm_text: "继续", cancel_text: "返回",
+  } },
+}] }] } };
 assert.notEqual(reply.markdown, reply.text, "transport must receive a rendered template");
 try {
-  await sendQQReply(bot, target, reply, readQQReplyFormat({}));
+  await sendQQReply(bot, target, reply, readQQReplyFormat({}), requesterId);
   assert.deepEqual(received[0], {
     path: "/v2/groups/synthetic-group/messages",
     body: { msg_id: target.msgId, msg_type: 2, markdown: { content: reply.markdown }, msg_seq: received[0]?.body.msg_seq },
@@ -53,21 +74,44 @@ try {
     path: "/v2/groups/synthetic-group/messages",
     body: { msg_id: target.msgId, msg_type: 0, content: reply.text, msg_seq: received[1]?.body.msg_seq },
   });
+  await sendQQReply(bot, target, confirmation, "markdown", requesterId);
+  assert.deepEqual(received.at(-1)?.body.keyboard, confirmationKeyboard, "SDK must preserve restricted blue-outline confirmation button and modal");
+  assert.equal(received.at(-1)?.body.msg_id, target.msgId);
+  assert.deepEqual(received.at(-1)?.body.markdown, { content: confirmation.markdown });
+  await sendQQReply(bot, target, pending, "markdown", requesterId);
+  assert.deepEqual(received.at(-1)?.body.keyboard, { content: { rows: [{ buttons: [{
+    id: "merchant_status", render_data: { label: "查询进度", visited_label: "查询进度", style: 1 },
+    action: { ...commonAction, data: "查询 COUPON-2001 的模拟协商进度" },
+  }] }] } }, "pending query uses a blue button without confirmation modal");
+  // Missing identity means buttons are disabled, never a button open to everyone.
+  await sendQQReply(bot, target, confirmation, "markdown");
+  assert.equal(received.at(-1)?.body.keyboard, undefined);
+  await sendQQReply(bot, target, confirmation, "text", requesterId);
+  assert.equal(received.at(-1)?.body.keyboard, undefined);
+  assert.equal(received.at(-1)?.body.msg_type, 0);
+  await sendQQReply(bot, { scope: "c2c", targetId: "synthetic-user", msgId: "synthetic-inbound" }, confirmation, "markdown", requesterId);
+  assert.equal(received.at(-1)?.body.keyboard, undefined, "this button implementation only targets group messages");
+  for (const invalid of ["", "user two", "<all>", "x".repeat(129)]) {
+    const before = received.length;
+    await assert.rejects(sendQQReply(bot, target, confirmation, "markdown", invalid), /QQ 按钮缺少有效的当前用户/);
+    assert.equal(received.length, before, "invalid requester cannot send a button with broadened permissions");
+  }
   for (const { body } of received) {
     assert.ok(Number.isInteger(body.msg_seq) && Number(body.msg_seq) >= 0 && Number(body.msg_seq) < 65_536);
   }
   for (const failure of ["no_id", "api_error", "network_error"] as const) {
     outcome = failure;
     const before = received.length;
-    await assert.rejects(sendQQReply(bot, target, reply, "markdown"),
+    await assert.rejects(sendQQReply(bot, target, confirmation, "markdown", requesterId),
       failure === "no_id" ? /QQ 未返回消息 ID/ : failure === "api_error" ? /API Error/ : /Network error/);
     assert.equal(received.length, before + 1, `${failure}: must not retry or send a text fallback`);
     assert.equal(received.at(-1)?.body.msg_type, 2);
-    assert.deepEqual(received.at(-1)?.body.markdown, { content: reply.markdown });
+    assert.deepEqual(received.at(-1)?.body.markdown, { content: confirmation.markdown });
+    assert.deepEqual(received.at(-1)?.body.keyboard, confirmationKeyboard);
   }
 } finally {
   bot.stop();
   markdownBot.stop();
   await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
 }
-console.log("QQ 回复检查通过：真实 SDK 固定模板 Markdown、显式纯文本、原群/消息关联、无 ID/API/网络失败不重复发送。");
+console.log("QQ 回复检查通过：真实 SDK 固定模板 Markdown、指定用户确认/查询按钮、显式禁用/纯文本/非群无按钮、无效用户拒绝、原群/消息关联、无 ID/API/网络失败不重复发送。");

@@ -10,7 +10,7 @@ import { recordQQIdentity } from "./qq-identity.ts";
 import { QQAgent } from "./qq-agent.ts";
 import { AfterSalesStore, readAfterSalesDatabaseConfig, startMockMerchant } from "./after-sales.ts";
 import { confirmMerchantReply, merchantSourceKey } from "./after-sales-entry.ts";
-import { readQQReplyFormat, sendQQReply } from "./qq-reply.ts";
+import { readQQReplyButtons, readQQReplyFormat, sendQQReply } from "./qq-reply.ts";
 
 // Keep internal newlines intact so the host can reject malformed confirmation commands.
 export const sanitizeQQContent = contentSanitizer({ stripBotMention: true, collapseWhitespace: false });
@@ -51,6 +51,7 @@ export function readQQConfig(env: NodeJS.ProcessEnv = process.env) {
 async function main() {
   const { options, allowedGroups } = readQQConfig();
   const replyFormat = readQQReplyFormat();
+  const replyButtons = readQQReplyButtons();
   const store = new CouponStore(createPool(readDatabaseConfig()));
   let afterSales: AfterSalesStore | undefined;
   let stopMerchant: (() => Promise<void>) | undefined;
@@ -95,8 +96,8 @@ async function main() {
           store: afterSales, sourceKey: merchantSourceKey(identity, msg.groupOpenid!),
         } : undefined);
       },
-      async (target, _text, reply) => {
-        await sendQQReply(bot, target, reply, replyFormat);
+      async (target, _text, reply, requesterId) => {
+        await sendQQReply(bot, target, reply, replyFormat, replyButtons ? requesterId : undefined);
         console.log(`[qq] 回复已被平台接收 format=${replyFormat} template=${reply.kind}`);
       },
       console.log,

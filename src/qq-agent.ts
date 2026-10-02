@@ -24,14 +24,14 @@ export class QQAgent {
   private closed = false;
   private sweep = setInterval(() => this.prune(), 5 * 60_000).unref();
   private createSession: (msg: QQBotInboundMessage) => Promise<AgentSession>;
-  private send: (target: ReplyTarget, text: string, reply: RenderedReply) => Promise<unknown>;
+  private send: (target: ReplyTarget, text: string, reply: RenderedReply, requesterId: string) => Promise<unknown>;
   private log: (text: string) => void;
   private timeoutMs: number;
   private beforePrompt?: (msg: QQBotInboundMessage) => Promise<string | Reply | undefined>;
 
   constructor(
     createSession: (msg: QQBotInboundMessage) => Promise<AgentSession>,
-    send: (target: ReplyTarget, text: string, reply: RenderedReply) => Promise<unknown>,
+    send: (target: ReplyTarget, text: string, reply: RenderedReply, requesterId: string) => Promise<unknown>,
     log: (text: string) => void = console.log,
     timeoutMs = 60_000,
     beforePrompt?: (msg: QQBotInboundMessage) => Promise<string | Reply | undefined>,
@@ -151,7 +151,7 @@ export class QQAgent {
     if (this.closed || !validQQMessage(msg)) return false;
     try {
       const rendered = renderReply(typeof reply === "string" ? { kind: "notice", text: reply } : reply);
-      await this.send(msg.replyTarget, rendered.text, rendered);
+      await this.send(msg.replyTarget, rendered.text, rendered, msg.senderId);
       return true;
     } catch {
       // Do not blindly retry an ambiguous send: QQ may already have accepted it.

@@ -13,7 +13,10 @@ type Replies = {
   merchant_status: { kind: "merchant_status"; task: MerchantTask };
 };
 export type Reply = Replies[keyof Replies];
-export type RenderedReply = { kind: Reply["kind"]; text: string; markdown: string };
+export type RenderedReply = {
+  kind: Reply["kind"]; text: string; markdown: string;
+  button?: { label: string; command: string; confirmation?: string };
+};
 type Content = Omit<RenderedReply, "kind">;
 
 const simulation = "这是模拟结果，未联系真实商家，也未执行退款；重复确认会返回同一任务。";
@@ -82,11 +85,13 @@ const strategies: { [K in keyof Replies]: (reply: Replies[K]) => Content } = {
     return {
       text: `模拟协商待确认\n订单：${reply.orderId}\n申请金额：${amount} 元\n\n请完整发送以下单行文字：\n${reply.confirmationText}\n\n${note}`,
       // QQ copies a quote block with a literal > prefix; keep this command as a plain paragraph.
-      markdown: `## 模拟协商待确认\n\n- 订单：${escape(reply.orderId)}\n- 申请金额：${amount} 元\n\n**请完整发送以下单行文字：**\n\n${prose(reply.confirmationText)}\n\n${note}`,
+      markdown: `## 模拟协商待确认\n\n- 订单：${escape(reply.orderId)}\n- 申请金额：${amount} 元\n\n**请完整发送以下单行文字：**\n\n${prose(reply.confirmationText)}\n\n🔴 **${note}**`,
+      button: { label: "确认模拟协商", command: reply.confirmationText,
+        confirmation: "继续后将填入确认指令，请核对并发送；不会执行退款。" },
     };
   },
   merchant_status({ task }) {
-    if (task.simulation !== true) throw new Error("仅支持模拟商家协商结果。");
+    if (task.simulation !== true || !/^COUPON-\d{4}$/.test(task.orderId)) throw new Error("仅支持模拟商家协商结果。");
     const amount = money(task.amountCents);
     if (task.status === "approved" && (task.approvedAmountCents === null || task.approvedAmountCents <= 0
       || task.approvedAmountCents > task.amountCents)) throw new Error("模拟协商批准金额无效。");
@@ -98,10 +103,12 @@ const strategies: { [K in keyof Replies]: (reply: Replies[K]) => Content } = {
     };
     const status = statuses[task.status];
     if (!status) throw new Error("模拟协商状态无效。");
+    const indicator = { pending: "🟡", approved: "🟢", rejected: "🔴", timed_out: "🟠" }[task.status];
     const taskId = field(task.taskId), orderId = field(task.orderId), reason = field(task.reason, 200);
     return {
       text: `模拟协商 ${taskId}\n订单：${orderId}，申请金额：${amount} 元。\n登记原因：${reason}\n${status}\n${simulation}`,
-      markdown: `## 模拟协商进度\n\n- 任务：${escape(taskId)}\n- 订单：${escape(orderId)}\n- 申请金额：${amount} 元\n- 登记原因：${escape(reason)}\n\n**${status}**\n\n${simulation}`,
+      markdown: `## 模拟协商进度\n\n${indicator} **${status}**\n\n- 任务：${escape(taskId)}\n- 订单：${escape(orderId)}\n- 申请金额：${amount} 元\n- 登记原因：${escape(reason)}\n\n🔴 **${simulation}**`,
+      ...(task.status === "pending" && { button: { label: "查询进度", command: `查询 ${task.orderId} 的模拟协商进度` } }),
     };
   },
 };
