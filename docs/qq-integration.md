@@ -1,6 +1,6 @@
 # QQ 开放平台接入调研
 
-核对日期：2026-10-02。依据当前官方协议、腾讯 SDK 源码、后台操作与真实群联调。独立测试机器人已创建，凭据与群 OpenID 白名单仅写入被 Git 忽略的本机 `.env`。WebSocket → 嵌入式 Pi SDK → DeepSeek → QQ 已通过真实群内回答与 echo 工具循环验收；公网 Webhook 与两用户真实隔离尚未实测。账号状态仅代表检查时的后台展示。
+核对日期：2026-10-02。依据当前官方协议、腾讯 SDK 源码、后台操作与真实群联调。独立测试机器人已创建，凭据与群 OpenID 白名单仅写入被 Git 忽略的本机 `.env`。当前 WebSocket → 可信身份/只读 MySQL 工具 → 嵌入式 Pi SDK/DeepSeek → QQ 已跑通本人券单与规则查询、多轮追问、越权拒绝和未知节假日政策处理；公网 Webhook 与两用户真实隔离尚未实测。账号状态仅代表检查时的后台展示。
 
 ## 接入方案
 
@@ -14,7 +14,11 @@ flowchart LR
   C --> H[同一消息处理器：测试群过滤与去重]
   S --> H
   H --> I[群和发送者隔离、会话串行]
-  I --> P[Pi AgentSession：简短 Prompt、echo]
+  I --> P[Pi AgentSession：团购券 Prompt 和 Skill]
+  P --> T[只读 get_order / search_faq]
+  T --> D[MySQL：身份、订单、规则证据]
+  D --> T
+  T --> P
   P --> M[DeepSeek 模型与工具循环]
   M --> P
   P --> R[最终文本]
@@ -29,16 +33,19 @@ flowchart LR
 | 项目 | 约定 |
 | --- | --- |
 | 本地启动 | `npm run qq`，默认 `websocket`，无需公网回调地址 |
+| 数据库 | 先运行 `npm run db:up`；MySQL 仅发布本机 `127.0.0.1:13306`，配置 `DB_*` 与 `MYSQL_ROOT_PASSWORD`，详见[数据库说明](./database.md) |
 | 部署启动 | `npm run qq:deploy`，设置 `NODE_ENV=production`，默认 `webhook` |
 | 显式覆盖 | `QQ_TRANSPORT=websocket` 或 `webhook`，优先于环境默认；`.env.example` 中仅留注释 |
 | 凭据 | `QQBOT_APP_ID`、`QQBOT_APP_SECRET`，仅运行时读取 |
 | 测试群 | `QQ_ALLOWED_GROUPS`，逗号分隔群 OpenID；为空时仅记录被拦截群的 OpenID，不回复 |
 | Webhook 监听 | `QQBOT_WEBHOOK_PORT=8080`、`QQBOT_WEBHOOK_PATH=/qq/callback` 为默认值，外层配置公网 HTTPS 反向代理 |
 | 模型配置 | 默认 `deepseek/deepseek-flash`，读取运行时 `DEEPSEEK_API_KEY`；`MODEL_PROVIDER`、`MODEL_ID`、`MODEL_API_KEY` 可显式覆盖 |
-| 回复内容 | Pi/模型生成的最终纯文本；仅开放 echo 工具，不加载 CLI 客户身份、订单工具或电商 Skill |
-| 离线检查 | `npm run check:qq` 检查协议，`npm run check:qq-agent` 检查会话入口；`npm run validate` 包含类型与全部离线检查，本轮已通过 |
+| 回复内容 | Pi/模型生成的最终纯文本；开放只读 `get_order` / `search_faq`，宿主预加载团购券 Prompt/Skill，不加载终端/文件工具或 CLI 合成客户身份 |
+| 可信身份绑定 | 未绑定身份保存本机忽略目录；管理员核对发信人后运行 `npm run qq:bind -- <12位identity代号> <对应演示客户ID>` |
+| 工程检查 | `npm run validate` 检查类型、Pi 与 QQ 协议/会话；`npm run check:business` 用真实 MySQL＋Pi/faux 检查只读业务边界 |
+| 真实模型检查 | `npm run check:model` 使用配置的真实模型与数据库，单独记录业务样例结果，会产生模型调用 |
 
-两种模式都只处理白名单测试群的 `@` 纯文本，当前已接真实模型，不接订单查询或私聊流式消息。后台事件接收方式需与运行模式一致；切换程序配置不会自动修改开放平台配置。WebSocket 需要进程主动访问 QQ 网关，Webhook 需要平台访问公网回调入口；后台设置服务器 IP 列表后，两者的 API 出口 IP 都必须匹配。未设置列表时，后台说明允许所有请求来源 IP。
+两种模式都只处理白名单测试群的 `@` 纯文本，当前接真实模型和本人模拟券单查询，只发送最终回复。后台事件接收方式需与运行模式一致；切换程序配置不会自动修改开放平台配置。WebSocket 需要进程主动访问 QQ 网关，Webhook 需要平台访问公网回调入口；后台设置服务器 IP 列表后，两者的 API 出口 IP 都必须匹配。未设置列表时，后台说明允许所有请求来源 IP。
 
 ## 开放平台需要准备什么
 
@@ -68,7 +75,9 @@ Webhook 协议允许回调端口 `80/443/8080/8443`，要求 HTTPS。可以由�
 | `payload.d.group_openid` | 群路由标识，不是界面显示的 QQ 群号 |
 | `payload.d.author.member_openid` | 发送者标识，不是昵称或可自行填写的 QQ 号 |
 
-每个进程只服务一个 AppID，因此当前会话键采用 `group_openid + member_openid`，机器人身份由进程隔离。不同用户隔离，同一用户消息串行；业务回调续接与内部客户映射在后续业务阶段补齐。当前不开放订单工具。官方文档说明群 @ 的 `content` 已去掉机器人 mention 前缀；过滤依据可信事件类型，不能把文本中的昵称当作身份。[群 @ 事件](https://bot.q.qq.com/wiki/develop/api-v2/autogen/event/group_at_message_create.html)
+每个进程只服务一个 AppID，因此会话键采用 `group_openid + member_openid`，机器人身份由进程隔离。不同用户隔离，同一用户消息串行；业务异步回调续接尚未实现。订单身份则由可信 AppID＋发送者标识查询 `qq_identities`，每次工具执行都检查绑定及归属，不使用用户正文、昵称或 CLI 默认客户身份。官方文档说明群 @ 的 `content` 已去掉机器人 mention 前缀；过滤依据可信事件类型，不能把文本中的昵称当作身份。[群 @ 事件](https://bot.q.qq.com/wiki/develop/api-v2/autogen/event/group_at_message_create.html)
+
+未绑定用户可以问通用规则，不能查订单。宿主将可信事件身份记录在被 Git 忽略的 `.runtime/qq-identities/`，绑定日志只输出匿名代号，不公开真实发送者标识。本机管理员先核对发信人，再选择其对应的演示客户并运行 `qq:bind`；脚本通过容器管理员权限写入映射，不能覆盖已有绑定。不能将所有成员自动绑定为客户一，也不能让用户通过对话自行指定客户 ID。绑定完成后原会话下一次查询即生效。
 
 群 OpenID 与 AppID 相关：更换机器人后，即使目标 QQ 群不变，也需通过新机器人的入站事件重新取得 OpenID。[唯一身份机制](https://bot.q.qq.com/wiki/develop/api-v2/dev-prepare/api-call-guide.html)
 
@@ -93,11 +102,17 @@ SDK `1.0.4` 的默认 API / Token 域名仍是 `api.sgroup.qq.com` / `bots.qq.co
 ## 最小验收顺序
 
 1. 准备独立机器人、AppSecret 与内部测试群，管理员担任群主/管理员。若后台配置服务器 IP 列表，核对实际 API 出口 IP；不公开凭据。本地 WebSocket 联调不需要公网地址。
-2. 填写 QQ 凭据，保留已有 `DEEPSEEK_API_KEY`，确认后台使用 WebSocket，运行 `npm run qq`；先留空群白名单，在测试群 @ 后从日志取得新机器人的群 OpenID，填入白名单并重启，再验证模型纯文本回复和“请调用 echo 回显：dave-agent 基座联调成功”。
-3. 运行 `npm run validate`，覆盖协议与会话离线检查；确认两名成员不串历史、同一成员消息串行、只发送最终文本。核对 QQ 入站、模型处理和平台返回消息 ID，群内实际可见回复才是最终证据。
-4. 部署时用 `npm run qq:deploy`，配置公网 HTTPS 回调并切换后台接收方式，通过地址验证和真实群投递。验签与慢处理 ACK 的离线结果不能替代真实网络联调；重复事件处理也要在联调中验证。
-5. 后续进入异步业务时，用模拟后台任务验证结果回到原会话；单独检查回复窗口过期及 Pi 回调续接的实际上下文。
+2. 在本机填写数据库密码，运行 `npm run db:up` 与 `npm run check:business`；确认真实 MySQL、中文证据、只读权限和归属检查。
+3. 填写 QQ 凭据，保留已有 `DEEPSEEK_API_KEY`，确认后台使用 WebSocket，运行 `npm run qq`；先留空群白名单，在测试群 @ 后从日志取得新机器人的群 OpenID，填入白名单并重启。
+4. 用退款问题验证先追问订单号。管理员核对日志匿名代号对应的发信人，再运行 `qq:bind` 绑定其演示客户；同一会话补订单号，核对 `get_order` / `search_faq` 结果和群内可见金额、状态、证据。尝试他人订单应拒绝，缺失政策应明确未知，不能声称本轮已退款。
+5. 运行 `npm run validate` 和 `npm run check:model`，分别记录工程与真实模型结果。双用户隔离需另行真实联调，离线队列检查不能替代；群内可见回复与实际工具/发送结果共同构成端到端证据。
+6. 部署时用 `npm run qq:deploy`，配置公网 HTTPS 回调并切换后台接收方式，通过地址验证和真实群投递。验签与慢处理 ACK 的离线结果不能替代真实网络联调；重复事件处理也要在联调中验证。
+7. 后续进入异步业务时，用模拟后台任务验证结果回到原会话；单独检查回复窗口过期及 Pi 回调续接的实际上下文。
 
-2026-10-02 验收：QQ API 鉴权成功，WebSocket gateway READY；从测试群真实 @ 事件取得 OpenID 并加入本机白名单。普通介绍请求已收到 DeepSeek 中文回答；第二条要求调用 echo，群内可见回复 `DAVE-QQ-PI-20261002`，服务记录 `model_ok tools=echo duration_ms=2717`，QQ 发送 API 返回 200 并确认接收，证明真实 Pi 工具调用、结果回填与 QQ 回复闭环。当前本地 WebSocket 服务运行中，基础目标完成。
+2026-10-02 基座验收：QQ API 鉴权成功，WebSocket gateway READY；从真实 @ 事件取得 OpenID 并加入本机白名单。普通回答和 echo 工具调用均在群内可见，工具成功记录与发送 API 200 共同证明 QQ → Pi/DeepSeek → QQ 链路。
 
-`npm run validate` 全部通过，覆盖 Pi/QQ 协议与会话离线检查。两用户隔离仅有离线证据，尚未真实双用户实测；公网 HTTPS Webhook 尚未部署，业务工具和异步回调继续留后续。联调截图仅保存于忽略的 `.runtime`，公开文档不保存真实账号、群或凭据字段。
+2026-10-02 业务验收：退款咨询先追问订单号；本机管理员基于可信事件绑定客户一后，原会话补充 `COUPON-1001` 获得数据库实付 79.80 元、未核销状态、有效期和 KB 规则引用，仅说明申请资格。服务记录实际 `get_order` 与 `search_faq` 成功，发送 API 返回 200，群内答复可见。同一身份查询他人 `COUPON-1002` 时，实际 `get_order` 返回错误且群内得到拒绝。当前没有商家协商、审批、申请或退款执行能力。
+
+同日未知政策验收：真实群内查询 `COUPON-1008` 的节假日可用性，实际工具为 `get_order` 和 `search_faq`，无工具错误，发送 API 返回 200。群内可见私享套餐实付 99.80 元、未核销事实与 `KB-SHOP-DEMO-1` 引用；答复明确法定节假日/特殊活动/私享套餐限制未录入，无法判断，并建议用户自行向商家核实，没有承诺未知政策或编造操作入口。
+
+最终 `npm run validate` 与真实 MySQL＋Pi/faux 的 `npm run check:business` 均通过。真实 DeepSeek 的 `npm run check:model` 在最终 Prompt 上通过 9 个场景、10 轮，验证多轮、订单状态、未绑定/越权、证据与未知政策；这是固定小样本验收，不是 faux 成绩或外部数据集指标。两用户隔离仅有离线证据，尚未真实双用户实测；公网 HTTPS Webhook 尚未部署，异步商家回调仍留后续。截图、模型完整回答和可信身份文件仅保存于忽略的 `.runtime`，公开文档不保存真实账号、群、匿名身份代号或凭据字段。
