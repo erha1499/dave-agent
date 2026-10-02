@@ -13,6 +13,7 @@ import { confirmMerchantReply, merchantSourceKey } from "./after-sales-entry.ts"
 import { readQQReplyButtons, readQQReplyFormat, sendQQReply } from "./qq-reply.ts";
 import { RefundStore, readRefundDatabaseConfig } from "./refunds.ts";
 import { confirmRefundReply, markRefundReplyPresented } from "./refund-entry.ts";
+import { dispatchMerchantNotifications } from "./merchant-notifications.ts";
 
 // Remove the leading transport mention/spaces (QQ may already have removed the mention).
 // Stripping embedded mentions/faces or trimming
@@ -70,7 +71,6 @@ async function main() {
     if (process.env.AFTER_SALES_DB_PASSWORD) {
       afterSales = new AfterSalesStore(createPool(readAfterSalesDatabaseConfig()));
       await afterSales.ping();
-      stopMerchant = startMockMerchant(afterSales);
     }
     if (process.env.REFUND_DB_PASSWORD) {
       if (!afterSales) throw new Error("模拟退款需要先配置商家协商数据库。");
@@ -122,7 +122,9 @@ async function main() {
         const identity = { appId: options.appId, senderId: msg.senderId };
         const sourceKey = merchantSourceKey(identity, msg.groupOpenid!);
         return (refunds ? await confirmRefundReply(refunds, identity, sourceKey, msg.content) : undefined)
-          ?? confirmMerchantReply(afterSales, identity, sourceKey, msg.content);
+          ?? confirmMerchantReply(afterSales, identity, sourceKey, msg.content, {
+            groupOpenid: msg.groupOpenid!, messageId: msg.messageId, timestamp: msg.timestamp,
+          });
       },
       async (msg, reply) => {
         if (!refunds) return;
@@ -134,7 +136,12 @@ async function main() {
       await agent.handle(msg);
     });
     bot.on("error", (error) => console.error(`[qq] ${redact(error.message)}`));
-    bot.on("ready", () => console.log(`[qq] ${options.transport} 团购券客服已就绪；模型 ${model.provider}/${model.id}；${refunds ? "模拟协商与模拟退款已启用，无真实资金操作" : afterSales ? "模拟商家协商已启用，订单/资金只读" : "只读咨询"}。`));
+    bot.on("ready", () => {
+      if (afterSales && !stopMerchant) stopMerchant = startMockMerchant(afterSales, {
+        afterProcess: () => dispatchMerchantNotifications(afterSales!, agent, options.appId, allowedGroups),
+      });
+      console.log(`[qq] ${options.transport} 团购券客服已就绪；模型 ${model.provider}/${model.id}；${refunds ? "模拟协商与模拟退款已启用，无真实资金操作" : afterSales ? "模拟商家协商已启用，订单/资金只读" : "只读咨询"}。`);
+    });
     const controller = new AbortController();
     const stop = () => controller.abort();
     process.once("SIGINT", stop);
@@ -143,7 +150,9 @@ async function main() {
     try {
       await bot.start(controller.signal);
     } finally {
-      await agent.close();
+      const merchantStopped = stopMerchant?.();
+      try { await agent.close(); }
+      finally { await merchantStopped; stopMerchant = undefined; }
       bot.stop();
       process.removeListener("SIGINT", stop);
       process.removeListener("SIGTERM", stop);

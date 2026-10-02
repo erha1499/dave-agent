@@ -3,6 +3,9 @@ import type { AgentSession } from "@earendil-works/pi-coding-agent";
 import type { QQBotInboundMessage, ReplyTarget } from "@tencent-connect/qqbot-nodejs";
 import { renderReply, type Reply, type RenderedReply } from "./reply.ts";
 import { replyFromTools } from "./reply-from-tools.ts";
+import type { MerchantTask } from "./after-sales.ts";
+
+export type ContinuationOutcome = "busy" | "sent" | "deferred" | "unknown";
 
 export function validQQMessage(msg: QQBotInboundMessage, now = Date.now()) {
   if (msg.kind !== "group" || msg.rawEventType !== "GROUP_AT_MESSAGE_CREATE"
@@ -56,25 +59,37 @@ export class QQAgent {
   }
 
   async handle(msg: QQBotInboundMessage) {
-    if (this.closed || !validQQMessage(msg)) return;
+    await this.enqueue(msg);
+  }
+
+  // Only the host supplies this resolver; business events never enter the user-confirmation hook.
+  async resumeMerchant(msg: QQBotInboundMessage, resolve: () => Promise<MerchantTask | undefined>): Promise<ContinuationOutcome> {
+    return this.enqueue(msg, resolve);
+  }
+
+  private async enqueue(msg: QQBotInboundMessage, resolve?: () => Promise<MerchantTask | undefined>): Promise<ContinuationOutcome> {
+    if (this.closed || !validQQMessage(msg)) return "deferred";
     this.prune();
     const key = JSON.stringify([msg.groupOpenid, msg.senderId]);
     let entry = this.conversations.get(key);
     if (!entry) {
       // ponytail: 20 in-memory conversations cover a test group; persist sessions before production recovery.
       if (this.conversations.size >= 20) {
+        if (resolve) return "busy";
         await this.deliver(msg, "当前接待人数较多，请稍后再试。");
-        return;
+        return "busy";
       }
       entry = { tail: Promise.resolve(), pending: 0, turns: 0, touched: Date.now() };
       this.conversations.set(key, entry);
     }
     if (entry.pending >= 3) {
+      if (resolve) return "busy";
       await this.deliver(msg, "你的消息仍在处理中，请等待回复后再发送。");
-      return;
+      return "busy";
     }
     entry.pending++;
     const conversation = entry;
+    let outcome: ContinuationOutcome = "deferred";
     const task = entry.tail.then(async () => {
       if (this.closed || !validQQMessage(msg)) return;
       const started = Date.now();
@@ -82,7 +97,13 @@ export class QQAgent {
       let timer: ReturnType<typeof setTimeout> | undefined;
       let aborting: Promise<void> | undefined;
       let failed = false;
+      let merchant: MerchantTask | undefined;
+      let activeTools: string[] | undefined;
       try {
+        if (resolve) {
+          merchant = await resolve();
+          if (!merchant || merchant.status === "pending") return;
+        }
         // ponytail: restart after 20 turns instead of coding-specific compaction; add business summaries for long chats.
         if (conversation.turns >= 20) {
           conversation.session?.dispose();
@@ -93,9 +114,10 @@ export class QQAgent {
         if (this.closed || !validQQMessage(msg)) return;
         const session = conversation.session;
         // Only trusted ingress text reaches this host action. Tools cannot invent consent.
-        const hostReply = await this.beforePrompt?.(msg);
+        const hostReply = resolve ? undefined : await this.beforePrompt?.(msg);
         if (hostReply !== undefined) {
           const delivered = await this.deliver(msg, hostReply);
+          outcome = delivered ? "sent" : "unknown";
           conversation.turns++;
           try {
             // Remember the receipt without triggering another model turn; the next normal prompt uses the business system prompt.
@@ -107,8 +129,16 @@ export class QQAgent {
           return;
         }
         const previousMessageCount = session.messages.length;
+        if (merchant) {
+          // A result notification can read its task, but cannot prepare another action from conversation history.
+          activeTools = session.getActiveToolNames();
+          session.setActiveToolsByName(activeTools.filter(name => name === "get_merchant_request"));
+        }
+        const prompt = merchant
+          ? `宿主业务事件：模拟商家任务 ${merchant.taskId}（订单 ${merchant.orderId}）已结束。这不是用户消息，也不是用户授权。请调用 get_merchant_request 查询该订单的当前结果，只通知这一任务的结果，说明下一步需用户提出请求并确认。不得确认、创建协商或准备/执行退款，不得用对话中的其他订单替代。`
+          : msg.content;
         await Promise.race([
-          session.prompt(msg.content, { expandPromptTemplates: false }),
+          session.prompt(prompt, { expandPromptTemplates: false }),
           new Promise<never>((_resolve, reject) => {
             timer = setTimeout(() => reject(new Error("模型处理超时")), this.timeoutMs);
           }),
@@ -120,19 +150,33 @@ export class QQAgent {
         conversation.turns++;
         const results = session.messages.slice(previousMessageCount).flatMap(message =>
           message.role === "toolResult" && session.getActiveToolNames().includes(message.toolName) ? [message] : []);
-        const delivered = await this.deliver(msg, replyFromTools(text, results));
+        // The host reloaded this exact task after dequeue; a model cannot redirect a notification to another order.
+        const reply: Reply = merchant ? { kind: "merchant_status", task: merchant } : replyFromTools(text, results);
+        if (!validQQMessage(msg) || this.closed) return;
+        const delivered = await this.deliver(msg, reply);
+        outcome = delivered ? "sent" : "unknown";
+        if (merchant) {
+          await session.sendCustomMessage({ customType: "merchant-result", content: renderReply(reply).text, display: true }, { triggerTurn: false });
+        }
         const tools = results.filter(result => !result.isError).map(result => result.toolName);
         const toolErrors = results.filter(result => result.isError).map(result => result.toolName);
-        this.log(`[agent] session=${tag} model_ok tools=${tools.join(",") || "none"} tool_errors=${toolErrors.join(",") || "none"} reply_sent=${delivered} duration_ms=${Date.now() - started}`);
+        this.log(`[agent] session=${tag} ${merchant ? "merchant_event" : "model_ok"} tools=${tools.join(",") || "none"} tool_errors=${toolErrors.join(",") || "none"} reply_sent=${delivered} duration_ms=${Date.now() - started}`);
       } catch {
         failed = true;
         clearTimeout(timer);
         // Signal cancellation before waiting on QQ's network send.
         aborting = conversation.session?.abort();
         this.log(`[agent] session=${tag} model_failed duration_ms=${Date.now() - started}`);
-        await this.deliver(msg, "客服暂时无法处理这条消息，请稍后重试。");
+        if (!resolve || merchant) {
+          // Known durable business facts remain usable when the model fails. Never retry an attempted send.
+          if (outcome === "deferred" && validQQMessage(msg) && !this.closed) {
+            const delivered = await this.deliver(msg, merchant ? { kind: "merchant_status", task: merchant } : "客服暂时无法处理这条消息，请稍后重试。");
+            outcome = delivered ? "sent" : "unknown";
+          }
+        }
       } finally {
         clearTimeout(timer);
+        if (activeTools && conversation.session && !failed) conversation.session.setActiveToolsByName(activeTools);
         if (failed && conversation.session) {
           try { await aborting; } finally {
             conversation.session.dispose();
@@ -148,6 +192,7 @@ export class QQAgent {
     // Keep a failed task from poisoning the next turn, while reporting only a controlled diagnostic.
     entry.tail = task.catch(() => { this.log("[agent] 会话处理失败"); });
     await entry.tail;
+    return outcome;
   }
 
   private async deliver(msg: QQBotInboundMessage, reply: string | Reply): Promise<boolean> {

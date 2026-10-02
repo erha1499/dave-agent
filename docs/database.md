@@ -1,8 +1,8 @@
 # 团购券演示数据库
 
-本项目使用 Docker 中的 MySQL `8.4.11`，数据库名 `dave_agent`。数据全部原创合成，不包含真实订单、客户、门店或支付信息，也不复制参考项目的数据。当前数据库支持团购券规则问答、本人订单查询，以及可选的 D1 模拟商家协商和 D2 模拟退款。模型可以准备退款方案与查询结果，执行退款仅由宿主的精确确认入口调用。
+本项目使用 Docker 中的 MySQL `8.4.11`，数据库名 `dave_agent`。订单、客户、门店与支付业务数据全部原创合成，也不复制参考项目的数据；QQ 绑定和 D3 通知路由使用可信平台标识，保存在本机运行数据中，不写入合成 seed 或公开仓库。当前支持团购券规则问答、本人订单查询，以及可选的 D1 模拟商家协商、D2 模拟退款和 D3 原会话通知。模型可以准备退款方案与查询结果，执行退款仅由宿主的精确确认入口调用。
 
-基础业务包含 11 表/8 个只读订单，评测另有四张 `eval_*` 表；D1 增加两张协商表与三张独立订单，D2 增加 `refund_operations`，均复用同一个 MySQL。2026-10-02 基础业务、D1 与 D2 的真实数据库及工程检查通过。CLI 与 QQ 共用 `createCouponSession(identity, store, runtime, model, afterSales?)`，可选第五参数增加协商准备/查询；其中 `refunds` 配置再增加退款方案/查询，共六项工具，宿主确认不是模型工具。真实模型与 QQ 的效果另行验收，数据库通过不能单独证明模型会正确使用工具。
+基础业务包含 11 表/8 个只读订单，评测另有四张 `eval_*` 表；D1 增加两张协商表与三张独立订单，D2 增加 `refund_operations`，D3 增加 `merchant_notifications`，均复用同一个 MySQL。2026-10-02 基础业务、D1 与 D2 的真实数据库及工程检查通过，D3 通知数据层检查也已通过。CLI 与 QQ 共用 `createCouponSession(identity, store, runtime, model, afterSales?)`，可选第五参数增加协商准备/查询；其中 `refunds` 配置再增加退款方案/查询，共六项工具，宿主确认不是模型工具。真实模型与 QQ 的效果另行验收，数据库通过不能单独证明模型会正确使用工具。
 
 ## 启动与连接
 
@@ -31,7 +31,7 @@ npm run db:stop
 
 SQL 文件保存为 UTF-8，schema 与 seed 开头显式执行 `SET NAMES utf8mb4`，同时设置客户端、连接和结果字符集。服务器的 `--character-set-server=utf8mb4` 不会自动修正导入客户端的字符集；管理员手工导入也应使用 `mysql --default-character-set=utf8mb4`，防止中文标题、正文和 JSON 标签被错误解码。已经导入的乱码不会因更改配置自动恢复，需要明确的数据修复或重建这份合成 seed。
 
-官方镜像只在空数据目录首次启动时按文件名顺序执行 `db/` 中的 SQL；现有文件包括基础结构/seed/只读授权，以及 `04-evaluation.sql`、`05-merchant.sql`、`06-refunds.sql`。修改 SQL 不会自动修改已有数据卷，重新执行 `up` 也不会重新 seed。已有库使用 `npm run eval:init`、`npm run after-sales:init` 分别补充对应结构和独立受限账户；空库首次启动后也需这些命令配置账户密码。`docker compose down` 保留 volume；`docker compose down -v` 会删除本项目的所有演示数据与身份绑定，只在明确需要重建时使用。
+官方镜像只在空数据目录首次启动时按文件名顺序执行 `db/` 中的 SQL；现有文件包括基础结构/seed/只读授权，以及 `04-evaluation.sql`、`05-merchant.sql`、`06-refunds.sql`、`07-merchant-notifications.sql`。修改 SQL 不会自动修改已有数据卷，重新执行 `up` 也不会重新 seed。已有库使用 `npm run eval:init`、`npm run after-sales:init` 分别补充对应结构和独立受限账户；空库首次启动后也需这些命令配置账户密码。`docker compose down` 保留 volume；`docker compose down -v` 会删除本项目的所有演示数据与身份绑定，只在明确需要重建时使用。
 
 ## 表关系与约束
 
@@ -53,6 +53,7 @@ SQL 文件保存为 UTF-8，schema 与 seed 开头显式执行 `SET NAMES utf8mb
 | `merchant_demo_scenarios` | D1 模拟配置：订单、固定 approve/reject/timeout 结果、延迟；模型不可读取或修改配置 |
 | `merchant_requests` | D1 持久任务：唯一订单、taskId、客户与原会话哈希、原始原因、金额、pending/approved/rejected/timed_out 状态及时间 |
 | `refund_operations` | D2 当前方案：唯一订单、操作编号、审批任务、可信身份/原会话、金额、prepared/awaiting_confirmation/succeeded、有效期与展示/确认时间、唯一退款记录 |
+| `merchant_notifications` | D3 通知：taskId 唯一、原确认的 AppID/发送者/群/消息 ID/时间、pending/claimed/sent/deferred/unknown、领取与结束时间；不保存用户正文 |
 
 ```text
 QQ AppID + senderId → qq_identities → customers → orders
@@ -103,11 +104,11 @@ GRANT SELECT ON `dave\_agent`.* TO 'dave_agent_read'@'%';
 
 ## D1 协商账户与事务
 
-运行 `npm run after-sales:init`，脚本通过本机 Docker 管理员连接补充 `05-merchant.sql`，创建默认账号 `dave_agent_after_sales`，并在本机 `.env` 生成 `AFTER_SALES_DB_PASSWORD`；文件权限为 `0600`。账号只能 SELECT 订单、身份、券、支付、退款和模拟配置等所需表，以及 SELECT/INSERT/UPDATE `merchant_requests`，不能修改订单、支付、退款、身份绑定或模拟场景配置。初始化会按本机配置同步该专用账号密码和权限，不清空业务表或 QQ 绑定。
+运行 `npm run after-sales:init`，脚本通过本机 Docker 管理员连接补充 `05-merchant.sql`，创建默认账号 `dave_agent_after_sales`，并在本机 `.env` 生成 `AFTER_SALES_DB_PASSWORD`；文件权限为 `0600`。账号只能 SELECT 订单、身份、券、支付、退款和模拟配置等所需表，以及 SELECT/INSERT/UPDATE `merchant_requests` 与 D3 的 `merchant_notifications`，不能修改订单、支付、退款、身份绑定或模拟场景配置，也不能删除通知记录。初始化会按本机配置同步该专用账号密码和权限，不清空业务表或 QQ 绑定。
 
 宿主根据可信 AppID、用户与原会话生成 `source_key`，模型参数不能提供这些值。准备建议只读；宿主收到精确单行确认后，在事务中重新校验当前归属、单券未核销/未过期、全额支付且未退款等事实。`order_id` 唯一约束保证每个演示订单一个任务，重复确认保留原任务和原原因；另一用户或会话不能读取或接管它。任务结果检查 taskId、订单、状态与金额上限，重复或过期结果不覆盖终态。
 
-QQ/CLI 的同进程 worker 默认每 500 毫秒检查数据库中的到期任务，模拟结果约 5 秒、超时约 8 秒，并非精确定时承诺。停止进程后不会推进状态；重启会继续扫描，超过截止时间的任务进入超时。持久化任务不等于持久化 Pi 对话。D1 不写退款事实、不通知真实商家、不公开网络商家回调；D2 退款使用独立账户，原会话主动通知留 D3。运行与验证见 [模拟协商说明](./after-sales.md)。
+QQ/CLI 的同进程 worker 默认每 500 毫秒检查数据库中的到期任务，模拟结果约 5 秒、超时约 8 秒，并非精确定时承诺。停止进程后不会推进状态；重启会继续扫描，超过截止时间的任务进入超时。持久化任务不等于持久化 Pi 对话。D1 不写退款事实、不通知真实商家、不公开网络商家回调；D2 退款使用独立账户，D3 在原 worker 中继续处理 QQ 通知。运行与验证见 [模拟售后说明](./after-sales.md)。
 
 当前不提供通用 SQL 执行工具或数据库迁移框架；D2 仅支持演示单的整笔模拟退款。
 
@@ -118,6 +119,18 @@ QQ/CLI 的同进程 worker 默认每 500 毫秒检查数据库中的到期任务
 `prepare_refund` 校验原会话的商家批准和整笔资格后登记 15 分钟有效方案。QQ API 成功接受摘要后，宿主才将其标记为 `awaiting_confirmation`；真实用户精确发送操作编号才进入确认。过期或审批/金额改变时，重新准备轮换编号，旧确认失效。
 
 所有 D2 修改先锁定同一订单，事务内核对归属、审批、当前券/付款/退款事实与金额，取得必要锁后再次按数据库时间检查方案及券有效期。确认将退款记录、订单已退金额、券状态和操作结果一同提交；同一操作重复或并发确认返回同一退款记录。准备与确认权限均在业务边界检查，不依赖模型话术或内存会话。
+
+## D3 通知路由与领取
+
+`after-sales:init` 同时补充可重复执行的 `07-merchant-notifications.sql`，仅给现有 D1 账户增加通知表 SELECT/INSERT/UPDATE。D2 账户无通知表访问授权；基础只读账户保留原全库 SELECT，不能写通知。模型没有通用 SQL 工具，也没有通知路由查询工具。
+
+宿主收到 QQ 精确协商确认后，在创建任务的同一事务中插入一条 `merchant_notifications`。任务外键和主键 `task_id` 保证一个任务最多一条通知；`app_id / sender_id / group_openid` 必须计算出该任务的 `source_key`。记录保存原确认的 `message_id / message_at`，不保存确认正文。重复确认保留原路由和状态；旧任务与 CLI 创建的任务没有路由，不在之后补建通知。
+
+原商家 worker 先更新结果，再在没有通知批次进行中时扫描当前 AppID 下已终态、通知仍 `pending` 的记录，每批最多 20 条。事件进入原 QQ 会话串行队列，出队后通过条件 UPDATE 将 `pending` 原子改成 `claimed`，并重新核实客户、原会话和任务结果。同一任务并发领取只有一次成功；Pi 通过普通 prompt 续接且本轮只有 `get_merchant_request`，不会把商家事件送进用户确认入口。队列满时保留 pending，下一轮再检查。商家状态推进和通知各保持单个进行中的 Promise，慢模型通知不会阻塞商家轮询；停机先关闭 Agent，再等待两者收尾。
+
+通知状态为 `pending → claimed → sent / deferred / unknown`，数据库 CHECK 要求领取、结束时间与状态一致。过了原消息的本地 4 分 30 秒窗口或目标群不再允许时记为 `deferred`，仍可按原订单查询。QQ API 明确接受才记为 `sent`；发送失败或结果未知记为 `unknown`，不自动重发。领取后进程崩溃保留 `claimed`，重启仅恢复未领取的 pending；因此是至多一次主动尝试，不能保证每个结果都主动送达。业务终态不依赖通知成功，用户查询仍可读取持久结果。
+
+迁移不清空表、不刷新消息时间、不重置通知状态；没有新增独立数据库、账户、定时器或消息中间件。真实商家通信与支付退款仍不在本项目范围。
 
 ## 验收范围
 
@@ -134,6 +147,8 @@ QQ/CLI 的同进程 worker 默认每 500 毫秒检查数据库中的到期任务
 
 
 `npm run check:refund` 已覆盖真实 MySQL 权限、成功展示后确认、15 分钟有效期、旧编号失效、身份/原群限制、审批/金额/券/付款/历史退款复核、并发幂等及重启查询。检查使用带随机归属标记的临时订单并清理，保持原 100x 基线。
+
+`node --env-file-if-exists=.env scripts/merchant-notification-db-check.ts` 已通过：原路由持久化、重复确认不重定向、不为 CLI/旧任务补路由、身份与来源校验、同意/拒绝/超时均可领取、跨 App 拒绝、并发唯一领取、pending/claimed 的重启行为、商家轮询不被慢通知阻塞、通知不重入及停机等待、最小写权限。使用带随机标记的临时订单，清理时先删除通知再删除任务；订单与退款事实未变化。`npm run check:merchant-notifications` 将此脚本与离线 Agent 检查一起运行。D3 真实模型与真实 QQ 三终态通知也已另行通过，证据及验证范围见 [QQ 接入记录](./qq-integration.md)；数据层检查本身不代表平台送达。
 
 `npm run check:refund-model` 保存独立真实模型套件 `after-sales-refund-v1`：已记录通过 run `6349a275-946c-44bc-aac2-a8b9987f55d4` 为 3/3 场景、12/12 轮、67/67 检查通过，覆盖批准退款、重复确认、重启查询和拒绝/超时不生成方案。它经过真实模型、MySQL 和 QQAgent，发送在本地替代；实际 QQ 群验收也已单独通过，不包含真实资金操作。
 

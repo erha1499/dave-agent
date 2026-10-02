@@ -25,7 +25,7 @@ async function main() {
   }
   if (updated !== original) await writeFile(envPath, updated, { mode: 0o600 });
   await chmod(envPath, 0o600);
-  const schema = (await Promise.all(["05-merchant.sql", "06-refunds.sql"].map(file =>
+  const schema = (await Promise.all(["05-merchant.sql", "06-refunds.sql", "07-merchant-notifications.sql"].map(file =>
     readFile(new URL(`../db/${file}`, import.meta.url), "utf8")))).join("\n").replaceAll("USE dave_agent;", `USE \`${database}\`;`);
   const quote = (value: string) => `'${value.replaceAll("'", "''")}'`;
   const account = `${quote(user)}@'%'`;
@@ -42,13 +42,13 @@ GRANT SELECT, INSERT, UPDATE ON \`${database}\`.refund_operations TO ${refundAcc
 GRANT INSERT ON \`${database}\`.refunds TO ${refundAccount};
 GRANT UPDATE (status, refunded_cents) ON \`${database}\`.orders TO ${refundAccount};
 GRANT UPDATE (status) ON \`${database}\`.coupons TO ${refundAccount};`;
-  const sql = `${schema}\nSET SESSION sql_mode = 'NO_BACKSLASH_ESCAPES';\nCREATE USER IF NOT EXISTS ${account} IDENTIFIED BY ${quote(password)};\nALTER USER ${account} IDENTIFIED BY ${quote(password)};\nREVOKE ALL PRIVILEGES, GRANT OPTION FROM ${account};\n${reads}\nGRANT SELECT, INSERT, UPDATE ON \`${database}\`.merchant_requests TO ${account};\n${refundGrants}\n`;
+  const sql = `${schema}\nSET SESSION sql_mode = 'NO_BACKSLASH_ESCAPES';\nCREATE USER IF NOT EXISTS ${account} IDENTIFIED BY ${quote(password)};\nALTER USER ${account} IDENTIFIED BY ${quote(password)};\nREVOKE ALL PRIVILEGES, GRANT OPTION FROM ${account};\n${reads}\nGRANT SELECT, INSERT, UPDATE ON \`${database}\`.merchant_requests TO ${account};\nGRANT SELECT, INSERT, UPDATE ON \`${database}\`.merchant_notifications TO ${account};\n${refundGrants}\n`;
   const result = spawnSync("docker", ["compose", "exec", "-T", "mysql", "sh", "-c",
     'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql -uroot --default-character-set=utf8mb4'], {
     cwd: root, input: sql, encoding: "utf8", timeout: 20_000,
   });
   if (result.error || result.status !== 0) throw new Error("售后初始化失败，请检查 Docker MySQL 和本机配置。");
-  console.log("演示协商、退款操作表及两个独立受限账号已就绪；现有订单与 QQ 绑定已保留。");
+  console.log("演示协商、退款和原会话通知表及两个独立受限账号已就绪；现有订单与 QQ 绑定已保留。");
 }
 
 main().catch(() => { console.error("售后初始化失败：检查本机 .env、独立售后账号和 Docker MySQL；没有重置业务数据库。"); process.exitCode = 1; });

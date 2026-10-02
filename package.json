@@ -17,6 +17,8 @@
     "after-sales:init": "node --env-file-if-exists=.env scripts/init-after-sales.ts",
     "check:merchant": "node --env-file-if-exists=.env scripts/merchant-db-check.ts && node --env-file-if-exists=.env scripts/merchant-agent-check.ts",
     "check:merchant-model": "node --env-file-if-exists=.env scripts/merchant-model-check.ts",
+    "check:merchant-notifications": "node --env-file-if-exists=.env scripts/merchant-notification-db-check.ts && node scripts/merchant-notification-agent-check.ts",
+    "check:notification-model": "node --env-file-if-exists=.env scripts/merchant-notification-model-check.ts",
     "check:refund": "node --env-file-if-exists=.env scripts/refund-db-check.ts && node scripts/refund-agent-check.ts",
     "check:refund-model": "node --env-file-if-exists=.env scripts/refund-model-check.ts",
     "eval:init": "node --env-file-if-exists=.env scripts/init-evaluation.ts",
@@ -30,7 +32,7 @@
     "check:qq-agent": "node scripts/qq-agent-check.ts",
     "check:reply": "node scripts/reply-check.ts && node scripts/qq-reply-check.ts",
     "typecheck": "tsc --noEmit",
-    "validate": "npm run typecheck && npm run check && npm run check:qq && npm run check:qq-agent && npm run check:reply && npm run check:eval && node scripts/refund-agent-check.ts"
+    "validate": "npm run typecheck && npm run check && npm run check:qq && npm run check:qq-agent && npm run check:reply && npm run check:eval && node scripts/refund-agent-check.ts && node scripts/merchant-notification-agent-check.ts"
   },
   "dependencies": {
     "@earendil-works/pi-ai": "1.0.0",

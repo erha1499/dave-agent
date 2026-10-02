@@ -121,6 +121,7 @@ COMMIT;`);
       admin(`START TRANSACTION;
 CREATE TEMPORARY TABLE cleanup_merchant_orders (id VARCHAR(64) CHARACTER SET ascii COLLATE ascii_bin PRIMARY KEY);
 INSERT INTO cleanup_merchant_orders ${owned};
+DELETE n FROM merchant_notifications n JOIN merchant_requests r ON r.task_id = n.task_id JOIN cleanup_merchant_orders t ON t.id = r.order_id;
 DELETE r FROM refund_operations r JOIN cleanup_merchant_orders t ON t.id = r.order_id;
 DELETE r FROM merchant_requests r JOIN cleanup_merchant_orders t ON t.id = r.order_id;
 DELETE s FROM merchant_demo_scenarios s JOIN cleanup_merchant_orders t ON t.id = s.order_id;

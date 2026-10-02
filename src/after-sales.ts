@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import type { Pool, PoolConnection, PoolOptions, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { readDatabaseConfig, type QQIdentity } from "./coupon-store.ts";
 
@@ -14,6 +14,21 @@ export type MerchantTask = {
   amountCents: number; approvedAmountCents: number | null;
   createdAt: string; dueAt: string; completedAt: string | null; simulation: true;
 };
+export type MerchantReplyRoute = { groupOpenid: string; messageId: string; timestamp: string };
+export type MerchantNotification = MerchantReplyRoute & {
+  taskId: string; orderId: string; sourceKey: string; appId: string; senderId: string;
+};
+
+export function merchantSourceKey(identity: QQIdentity, conversationId: string): string {
+  if (!/^[A-Za-z0-9_-]{1,32}$/.test(identity.appId) || !/^[A-Za-z0-9_-]{1,128}$/.test(identity.senderId)
+    || !conversationId || conversationId.length > 256) throw new Error("模拟协商会话标识无效。");
+  return createHash("sha256").update(JSON.stringify([identity.appId, identity.senderId, conversationId])).digest("hex");
+}
+
+function notificationKey(taskId: string, appId: string) {
+  if (!/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(taskId)
+    || !/^[A-Za-z0-9_-]{1,32}$/.test(appId)) throw new BusinessError("模拟商家通知标识无效。");
+}
 
 export function readAfterSalesDatabaseConfig(env: NodeJS.ProcessEnv = process.env): PoolOptions {
   if (!env.AFTER_SALES_DB_PASSWORD) throw new Error("请先运行售后数据库初始化，设置本机 AFTER_SALES_DB_PASSWORD。");
@@ -101,20 +116,67 @@ export class AfterSalesStore {
   }
 
   // Called only after the trusted QQ entry point parses the user's literal confirmation.
-  async request(identity: QQIdentity, sourceKey: string, orderId: string, reason: string): Promise<MerchantTask> {
+  async request(identity: QQIdentity, sourceKey: string, orderId: string, reason: string, route?: MerchantReplyRoute): Promise<MerchantTask> {
     validate(identity, sourceKey, orderId, reason);
+    if (route && (typeof route.groupOpenid !== "string" || !/^[A-Za-z0-9_-]{1,128}$/.test(route.groupOpenid)
+      || typeof route.messageId !== "string" || !/^[\x21-\x7e]{1,512}$/.test(route.messageId) || typeof route.timestamp !== "string"
+      || !Number.isFinite(Date.parse(route.timestamp)) || !/^\d{4}-/.test(new Date(route.timestamp).toISOString())
+      || new Date(route.timestamp).getUTCFullYear() < 1000
+      || merchantSourceKey(identity, route.groupOpenid) !== sourceKey)) throw new BusinessError("模拟商家通知路由无效。");
     return this.transaction(async connection => {
       const order = await this.eligible(connection, identity, orderId);
+      const taskId = randomUUID();
       // ponytail: one persistent request per demo order; add explicit attempt IDs when retries become a product requirement.
       await connection.execute(`INSERT INTO merchant_requests
         (task_id, order_id, customer_id, source_key, reason, amount_cents, mock_outcome, due_at, deadline_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, TIMESTAMPADD(MICROSECOND, ?, UTC_TIMESTAMP(3)), UTC_TIMESTAMP(3) + INTERVAL 8 SECOND)
         ON DUPLICATE KEY UPDATE task_id = task_id`,
-      [randomUUID(), orderId, order.customer_id, sourceKey, reason.trim(), order.paid_cents, order.outcome, Number(order.delay_ms) * 1000]);
+      [taskId, orderId, order.customer_id, sourceKey, reason.trim(), order.paid_cents, order.outcome, Number(order.delay_ms) * 1000]);
       const [rows] = await connection.execute<RowDataPacket[]>("SELECT * FROM merchant_requests WHERE order_id = ? FOR SHARE", [orderId]);
       const existing = rows[0]!;
       if (existing.source_key !== sourceKey || existing.customer_id !== order.customer_id) throw new BusinessError(unavailable);
+      // Only the original QQ confirmation establishes a route; replay cannot redirect or revive a notification.
+      if (route && existing.task_id === taskId) await connection.execute(`INSERT INTO merchant_notifications
+        (task_id, app_id, sender_id, group_openid, message_id, message_at) VALUES (?, ?, ?, ?, ?, ?)`,
+      [taskId, identity.appId, identity.senderId, route.groupOpenid, route.messageId, new Date(route.timestamp)]);
       return task(existing);
+    });
+  }
+
+  async listNotifications(appId: string): Promise<MerchantNotification[]> {
+    if (!/^[A-Za-z0-9_-]{1,32}$/.test(appId)) throw new BusinessError("模拟商家通知标识无效。");
+    return this.controlled(async () => {
+      const [rows] = await this.pool.execute<RowDataPacket[]>(`SELECT n.*, r.order_id, r.source_key
+        FROM merchant_notifications n JOIN merchant_requests r ON r.task_id = n.task_id
+        WHERE n.app_id = ? AND n.status = 'pending' AND r.status <> 'pending'
+        ORDER BY r.completed_at, n.task_id LIMIT 20`, [appId]);
+      return rows.map(row => ({ taskId: row.task_id as string, orderId: row.order_id as string,
+        sourceKey: row.source_key as string, appId: row.app_id as string, senderId: row.sender_id as string,
+        groupOpenid: row.group_openid as string, messageId: row.message_id as string,
+        timestamp: (row.message_at as Date).toISOString() }));
+    });
+  }
+
+  async claimNotification(taskId: string, appId: string): Promise<boolean> {
+    notificationKey(taskId, appId);
+    return this.controlled(async () => {
+      // ponytail: one attempt per notification; a crash after claim falls back to user queries rather than risking duplicate sends.
+      const [changed] = await this.pool.execute<ResultSetHeader>(`UPDATE merchant_notifications n
+        JOIN merchant_requests r ON r.task_id = n.task_id
+        SET n.status = 'claimed', n.claimed_at = UTC_TIMESTAMP(3)
+        WHERE n.task_id = ? AND n.app_id = ? AND n.status = 'pending' AND r.status <> 'pending'`, [taskId, appId]);
+      return changed.affectedRows === 1;
+    });
+  }
+
+  async finishNotification(taskId: string, appId: string, status: "sent" | "deferred" | "unknown"): Promise<void> {
+    notificationKey(taskId, appId);
+    if (!["sent", "deferred", "unknown"].includes(status)) throw new BusinessError("模拟商家通知状态无效。");
+    await this.controlled(async () => {
+      const [changed] = await this.pool.execute<ResultSetHeader>(`UPDATE merchant_notifications
+        SET status = ?, finished_at = UTC_TIMESTAMP(3)
+        WHERE task_id = ? AND app_id = ? AND status = 'claimed'`, [status, taskId, appId]);
+      if (changed.affectedRows !== 1) throw new BusinessError("模拟商家通知尚未领取或已经结束。");
     });
   }
 
@@ -164,18 +226,24 @@ export class AfterSalesStore {
   }
 }
 
-export function startMockMerchant(store: AfterSalesStore, options: { intervalMs?: number } = {}): () => Promise<void> {
+export function startMockMerchant(store: AfterSalesStore, options: { intervalMs?: number; afterProcess?: () => Promise<void> } = {}): () => Promise<void> {
   const intervalMs = options.intervalMs ?? 500;
   if (!Number.isInteger(intervalMs) || intervalMs < 10 || intervalMs > 5000) throw new Error("模拟商家轮询间隔应为 10–5000 毫秒。");
   let active: Promise<void> | undefined;
+  let notifying: Promise<void> | undefined;
   let stopped = false;
   const tick = () => {
     if (active || stopped) return;
-    active = store.processDue().then(() => {}, () => { console.error("[merchant] 模拟商家处理暂时失败，将在下轮重试。"); })
+    active = store.processDue().then(() => {
+      // Model-backed notifications may be slow; merchant deadlines must keep advancing independently.
+      if (!stopped && !notifying && options.afterProcess) notifying = Promise.resolve().then(options.afterProcess)
+        .catch(() => { console.error("[merchant] 模拟商家通知处理失败，可按订单号查询结果。"); })
+        .finally(() => { notifying = undefined; });
+    }).catch(() => { console.error("[merchant] 模拟商家处理暂时失败，将在下轮重试。"); })
       .finally(() => { active = undefined; });
   };
   const timer = setInterval(tick, intervalMs);
   timer.unref();
   tick();
-  return async () => { stopped = true; clearInterval(timer); await active; };
+  return async () => { stopped = true; clearInterval(timer); await Promise.all([active, notifying]); };
 }
