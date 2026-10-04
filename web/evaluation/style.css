@@ -342,3 +342,118 @@ footer{padding:0 16px 20px;flex-direction:column;gap:5px}
 
 @media(prefers-reduced-motion:no-preference){.run-button,.quiet-button,.tab,.filter-button{transition:background-color .13s,color .13s,border-color .13s}
 }
+
+/* ===== 客观评测扩充 ===== */
+
+/* 口径徽章 */
+.verdict-side{display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0}
+.scope-badge{font-size:10px;font-weight:600;padding:3px 11px;border-radius:999px;letter-spacing:.06em;white-space:nowrap}
+.scope-badge.objective{color:#3e7c59;background:rgba(76,146,106,.15)}
+.scope-badge.legacy{color:#8a8270;background:rgba(163,154,134,.2)}
+.scope-badge.invalid{color:#b04a3f;background:rgba(198,93,81,.14)}
+.verdict-note{padding:0 20px 15px;font-size:11px;color:var(--muted)}
+.verdict-mark.flat{color:var(--muted);background:var(--panel-soft)}
+.batch-tag{font:10px var(--mono);color:#5b7cab;background:rgba(110,143,192,.13);padding:2px 8px;border-radius:999px;white-space:nowrap}
+.run-row .batch-tag{margin-left:4px}
+
+/* 口径问题 */
+.issues-panel{padding-bottom:14px}
+.issues-list{margin:12px 18px 10px;padding-left:18px;font-size:12px;color:#937029}
+.issues-list li{margin-bottom:4px;overflow-wrap:anywhere}
+.issues-panel .metric-note{padding:0 18px}
+.batch-panel.warning .issues-list{color:#937029}
+
+/* 批次稳定性 */
+.batch-note{margin:13px 18px;font-size:12px;color:var(--muted)}
+.batch-caution{margin:0 18px 10px;color:#937029;background:#f7f1e4;border:1px solid #e7d9ba;border-radius:var(--radius);padding:8px 11px;font-size:11px}
+.batch-body{padding:13px 18px 15px}
+.batch-summary{font:11px var(--mono);color:var(--muted);margin-bottom:10px;font-variant-numeric:tabular-nums}
+.batch-runs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:13px}
+.run-id-chip{font:10px var(--mono);padding:3px 9px;border-radius:999px;background:var(--panel);color:var(--muted)}
+.run-id-chip:hover{border-color:var(--sage);color:var(--sage-deep)}
+.run-id-chip.current{background:var(--sage-tint);border-color:#d3e0d0;color:var(--sage-deep);font-weight:600}
+.batch-cases{border-top:1px solid var(--line);margin-bottom:10px}
+.batch-case-head,.batch-case{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1.6fr) auto;gap:10px;align-items:center;padding:8px 0}
+.batch-case-head{font-size:10px;color:var(--muted);letter-spacing:.08em}
+.batch-case{border-top:1px dashed var(--line);font-size:11px}
+.batch-case-id{overflow-wrap:anywhere;font-size:10px}
+.batch-case-counts{font:10px var(--mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.status.always_passed{color:#3e7c59;background:rgba(76,146,106,.13)}
+.status.always_failed{color:#b04a3f;background:rgba(198,93,81,.12)}
+.status.mixed{color:#937029;background:rgba(196,159,61,.16)}
+.status.incomplete{color:#8a8270;background:rgba(163,154,134,.16)}
+.batch-usage{border-top:1px solid var(--line);padding:11px 18px}
+
+/* 覆盖标签与比例分段条 */
+.coverage-body{padding:13px 18px 6px}
+.coverage-body .category-summary{padding-top:0;padding-bottom:12px}
+.category-chip em{font-style:normal;color:#b04a3f;margin-left:7px;font-family:var(--mono);font-size:9px}
+.coverage-list{border-top:1px solid var(--line)}
+.coverage-row{display:grid;grid-template-columns:minmax(90px,.9fr) minmax(80px,1fr) minmax(0,2fr);gap:12px;align-items:center;padding:9px 0;border-bottom:1px dashed var(--line)}
+.coverage-row:last-child{border-bottom:0}
+.coverage-tag{font-size:11px;font-weight:600;overflow-wrap:anywhere}
+.coverage-counts{font:10px var(--mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.coverage-foot{padding:0 18px 13px}
+.segment-bar{display:flex;height:8px;border-radius:999px;overflow:hidden;background:#ecefe7;min-width:60px}
+.segment{display:block;height:100%}
+.segment.passed{background:#8fbe9f}
+.segment.failed{background:#dd9a90}
+.segment.skipped{background:#c9c2b0}
+.segment.missing,.segment.pending,.segment.running{background:repeating-linear-gradient(45deg,#e2e6dc 0 3px,#f2f4ee 3px 6px)}
+
+/* 缺失状态标记（计划存在但没有记录） */
+.mark.missing{color:#8a8270;background:rgba(163,154,134,.18)}
+.case-block.missing{background:repeating-linear-gradient(45deg,#e6eae0 0 3px,#f5f7f0 3px 6px)}
+.mini-block.missing{background:repeating-linear-gradient(45deg,#e2e6dc 0 2px,#f2f4ee 2px 4px)}
+
+/* 场景标签 */
+.tag-chip{font:9px var(--mono);color:var(--sage-deep);background:var(--sage-tint);border-radius:999px;padding:2px 8px;white-space:nowrap;flex-shrink:0}
+.paired-heading .tag-chip,.case>summary .tag-chip{max-width:120px;overflow:hidden;text-overflow:ellipsis}
+
+/* 检索指标表 */
+.retrieval-scroll{overflow-x:auto}
+.retrieval-table{width:100%;border-collapse:collapse;font-size:11px;min-width:560px}
+.retrieval-table th{font-size:10px;color:var(--muted);font-weight:500;text-align:left;padding:10px 18px 6px;letter-spacing:.06em}
+.retrieval-table td{padding:7px 18px;border-top:1px dashed var(--line);font-variant-numeric:tabular-nums}
+.retrieval-table td.mono{font-family:var(--mono)}
+.retrieval-table tbody tr:hover{background:var(--panel-soft)}
+.retrieval-foot{padding:11px 18px 14px;display:grid;gap:5px;font-size:11px;color:var(--muted)}
+
+/* 对比条件 */
+.condition-tag.equal{opacity:.6}
+.condition-tag.different{color:#b04a3f;border-color:#dd9a90;opacity:1}
+.condition-tag.unknown{color:#937029;border-color:#d9c48a;opacity:1}
+.condition-issue{font-size:11px;margin-top:4px;opacity:.9}
+.compare-limited{padding:15px 18px;font-size:12px;color:#937029}
+
+@media(max-width:760px){
+.verdict-side{flex-direction:row;align-items:center;flex-wrap:wrap}
+.verdict-note{padding:0 15px 13px}
+.coverage-row{grid-template-columns:1fr;gap:5px;padding:10px 0}
+.coverage-body{padding:11px 14px 4px}
+.coverage-foot{padding:0 14px 11px}
+.batch-body{padding:11px 14px 13px}
+.batch-case-head{display:none}
+.batch-case{grid-template-columns:1fr;gap:4px;padding:10px 0}
+.batch-case .status{justify-self:start}
+.batch-note{margin:11px 14px}
+.batch-caution{margin:0 14px 10px}
+.batch-usage{padding:10px 14px}
+.issues-list{margin:10px 14px 8px}
+.issues-panel .metric-note{padding:0 14px}
+.retrieval-table th,.retrieval-table td{padding-left:14px;padding-right:14px}
+.retrieval-foot{padding:10px 14px 12px}
+.compare-limited{padding:13px 14px}
+}
+
+/* 批次稳定性概览（逐场景明细默认折叠） */
+.batch-overview{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+.batch-stat{display:inline-flex;align-items:baseline;gap:7px;padding:5px 13px;border-radius:999px;font-size:11px;background:var(--panel-soft);border:1px solid var(--line);color:var(--muted)}
+.batch-stat strong{font:600 14px var(--mono);font-variant-numeric:tabular-nums;color:inherit}
+.batch-stat.always_passed{color:#3e7c59;background:rgba(76,146,106,.12);border-color:#d3e0d0}
+.batch-stat.always_failed{color:#b04a3f;background:rgba(198,93,81,.1);border-color:#eed0ca}
+.batch-stat.mixed{color:#937029;background:rgba(196,159,61,.12);border-color:#e7d9ba}
+.batch-case-list{margin-bottom:10px}
+.batch-case-list>summary{font-size:11px;color:var(--sage-deep);cursor:pointer}
+.batch-case-list>summary:hover{color:var(--sage)}
+.batch-case-list .batch-cases{margin-top:10px}

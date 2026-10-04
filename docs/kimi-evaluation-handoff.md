@@ -2,6 +2,8 @@
 
 用户已要求扩充已完成业务的客观评测系统，由 Kimi 负责前端，Codex 负责后端与评测集；本轮不评自然语言回答质量，不使用 LLM judge，不优化生产业务逻辑。
 
+协作使用本机 `kimi` CLI：以 `--model kimi-code/k3 --prompt` 启动，后续用 `--session <已有会话ID>` 继续同一任务。K3 的模型配置设为 `default_effort = "max"`，实际请求日志应为 `model=k3`、`thinkingEffort=max`。本机 CLI 2.1.1 的 `--prompt` 不能与 `--auto` 或 `--yolo` 合用；通过进程输出取得进度，不再操作桌面 Kimi 窗口。模型/登录配置和会话日志留在本机，不加入仓库。
+
 请阅读 `docs/evaluation-api.md` 的完整合同及 `plan.md` 第 8.1 节。继续维护现有明亮柔和、简洁的工作台。旧 GET 运行列表与详情兼容；新 GET 提供单运行 analysis、两次 compare 与 batches 稳定性，HTTP 保持只读。
 
 前端交付：

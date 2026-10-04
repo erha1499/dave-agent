@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="color-scheme" content="dark">
+  <meta name="color-scheme" content="light">
   <title>Dave Agent · 评测工作台</title>
   <link rel="stylesheet" href="/style.css">
   <script src="/app.js" defer></script>
@@ -19,6 +19,6 @@
     <section id="overview" class="overview-layout" aria-label="评测运行总览"><aside class="run-sidebar"><div class="section-label"><h2>运行记录</h2><span id="record-count" aria-live="polite" title="最多显示最新 50 次运行"></span></div><div id="run-list" class="run-list"></div></aside><div id="run-detail" class="detail-pane"></div></section>
     <section id="comparison" aria-label="版本对比" hidden><div class="compare-picker"><div class="picker-fields"><label>基线 A<select id="baseline"><option value="">选择运行</option></select></label><span class="versus" aria-hidden="true">→</span><label>候选 B<select id="candidate"><option value="">选择运行</option></select></label><button id="compare-button" class="primary-button" type="button">开始对比</button></div></div><div id="compare-detail"></div></section>
   </main>
-  <footer><span>仅代表当前评测集 · 缺失数据不计为 0</span><span>Dave Agent · Local Eval Console</span></footer>
+  <footer><span>仅代表当前评测集 · 缺失数据不计为 0 · 回答效果本轮不评测</span><span>Dave Agent · Local Eval Console</span></footer>
 </body>
 </html>
