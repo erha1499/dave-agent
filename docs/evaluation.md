@@ -1,6 +1,38 @@
 # 内置评测工作台
 
-工作台和 Agent 使用同一个 MySQL `dave_agent`，由本项目的 Node 原生 HTTP 服务展示历史，不依赖外部评测平台。首版网页只读；真实模型评测由 CLI 手动执行，复用现有 Pi 会话和业务工具，分别记录只读咨询、D1/D2 模拟售后、历史 D3 通知与当前 D2/D3 联合套件。
+工作台和 Agent 使用同一个 MySQL `dave_agent`，由本项目的 Node 原生 HTTP 服务展示历史，不依赖外部评测平台。网页只读；评测通过 CLI 执行，复用现有 Pi 会话和业务工具。当前入口使用独立客观套件，下面的 D1/D2、D3 与 P1 记录保留为历史混合口径。
+
+## 当前客观评测
+
+三次真实模型重复与检索基线、失败定位见 [2026-10-05 结果记录](./objective-evaluation-results.md)。
+
+本轮只检查工具选择、输入与顺序、数据库状态、固定卡片协议及运行指标。回复正文保留作诊断，不做正则措辞评分或 LLM judge。工程 gate、模型行为和离线检索分别展示，不能合成客服总分。
+
+| CLI suite | 固定场景 / 轮次 / 检查 | 覆盖与边界 |
+| --- | --- | --- |
+| `readonly` | 20 / 26 / 218 | 八类订单、身份与作用域、澄清切单、未知政策取证；真实模型和 MySQL，只暴露两个只读工具 |
+| `workflow` | 5 / 30 / 293 | 协商三终态、普通同意、伪称批准、等待期间 FAQ、通知、方案过期重建、确认幂等、重启及同用户跨单；六个工具，QQ 发信本地替代 |
+| `engineering` | 15 / 15 / 15 | 既有数据库、脚本模型、QQ、并发恢复与评测完整性 gate；每 gate 一个检查单元，不把内部断言伪装成独立成绩 |
+| `retrieval` | 290 / 290 / 854 | 选集 70 题、全量 212 题、范围隔离 4 题、无答案 4 题；原始排名计算 Recall/MRR，不调用模型 |
+
+```sh
+node scripts/objective-eval-check.ts
+node --env-file-if-exists=.env scripts/evaluate.ts --suite engineering --label "工程基线"
+node --env-file-if-exists=.env scripts/evaluate.ts --suite retrieval --label "检索基线"
+node --env-file-if-exists=.env scripts/evaluate.ts --suite readonly --repeat 3 --label "只读客观基线"
+node --env-file-if-exists=.env scripts/evaluate.ts --suite workflow --repeat 3 --label "售后客观基线"
+npm run eval:serve
+```
+
+后两项调用已配置的真实模型，会产生费用。CLI 串行运行，每次使用独立 UUID，并保存批次和预定重复次数；不要并行运行会修改同一演示库的工程与售后套件。`--help` 不访问数据库。案例失败仍保存并继续计划内重复，最终命令返回非零；这与评测执行异常不同，不能因非零就删掉失败运行。开发题集不是盲测，重复成功也不证明所有问法都可靠。
+
+新运行在开始前固定 `snapshot.content.evaluation` 的案例、轮次、检查 ID、客观依据与标签。分析始终使用计划分母，分别呈现失败、跳过与缺失；无模型请求属不适用，用量缺失和部分报告不补零。旧运行没有客观计划时标记为 `legacy`，不反推客观分数。
+
+新增只读接口为单次 `/api/runs/<UUID>/analysis`、版本 `/api/compare?baseline=<UUID>&candidate=<UUID>` 和重复 `/api/batches/<UUID>`，保留原列表与详情。题集、检查器、业务初始条件或测量口径变化时禁止直接宣称提升；批次稳定性还要求模型、Prompt/Skill、工具、实现文件、运行环境和执行设置一致。完整契约见 [API 说明](./evaluation-api.md)。
+
+售后评测的等待阶段由 fixture 控制：在耗时的 pending 咨询前，只把本次临时任务的 due/deadline 延后 180 秒；正式通知及确认入口照常执行。这验证等待状态下的行为，不证明生产 8 秒截止期限或 QQ 网络送达。具体状态与协议证据保存在每轮 `observations`，不参与自然语言评分。
+
+检索 Recall@K 是该题相关文档进入 Top K 的比例，MRR 是第一篇相关文档的倒数排名；分别展示选集/全量及常规/难题。无答案非空仅是召回诊断，不是幻觉率。检索未命中和模型行为失败照实入库，本轮不据此改生产 Prompt、Skill 或检索策略；后续优化登记在 [计划](../plan.md#81-当前迭代全面客观评测与系统增强)。
 
 ## 开始使用
 
@@ -8,7 +40,7 @@
 npm run db:up
 npm run eval:init
 npm run check:eval-db
-npm run check:model -- --label "团购券基线"
+node --env-file-if-exists=.env scripts/evaluate.ts --suite readonly --label "团购券客观基线"
 npm run eval:serve
 ```
 
@@ -142,7 +174,7 @@ npm run check:model -- --label "未知政策说明调整"
 
 网页 GET API：`/api/runs?kind=model&limit=50`、`/api/runs/<UUID>`。列表不携带大段快照正文；详情提供完整合成快照。HTTP 输入有范围检查、只读方法限制、Host/Origin 校验和 CSP，正文按文本展示。网页不运行 Shell、不绑定 QQ 身份、不持有管理员操作入口。
 
-前后端协作：Kimi 负责 `web/evaluation/`，后端保持上述接口。前端使用响应的计划数、实际状态及 usage 报告比例，不写死某个套件的分母；D3 事件沿用 turn 结构并在 question 标识，完整口径位于快照 `content.measurement`。本轮没有新增前端接口或评测表。
+前后端协作：Kimi 通过本机 CLI（K3 + Max）负责 `web/evaluation/`，Codex 负责后端、题集和联调。前端使用后端分析的固定分母、比较条件与完整性，不重算或写死成绩；详见 [API 合同](./evaluation-api.md) 与 [前端任务范围](./kimi-evaluation-handoff.md)。继续复用四张 JSON 表。
 
 ## 独立离线检索对比（P0 与 P1）
 
@@ -155,7 +187,7 @@ node scripts/retrieval-baseline.ts
 
 检查由 `scripts/check.ts` 纳入 `npm run validate`。报告输出 `.runtime/retrieval-baseline.json` 和 `.md`；schema 2 的 `algorithms` 保留冻结 tags-only 基线与当前同义归一、query 词项/完整标签、tags/title/body 加权排序，`comparison` 记录同题差值及改善/退步。第二轮仅补回已定义的同义规范词项，不改词典或权重。输入不用 ctx 或 gold 改写，SQL 作用域不变。
 
-Recall@5 按 standard / hard：选集从 P0 的 **59.09% / 3.85%**，经 P1 第一轮 **84.09% / 30.77%**，到当前 **86.36% / 34.62%**；全量从 **55.88% / 11.84%**，经 **79.41% / 43.42%**，到 **80.15% / 44.74%**。第二轮仅两道外带题从未召回变为第一，其他排名不变；相对 P0 仍有 1 个 MRR 退步、无 Recall@5 退步。两算法均为未知问题 2/4 空返回、范围检查 4/4。固定集用于开发调优，没有独立留出集，不宣称泛化提升；MRR、逐题退步和限制见 [检索说明](./retrieval.md)。工作台现有指标不支持 Recall/MRR，报告仍用独立文件，未改前端或评测表。
+Recall@5 按 standard / hard：选集从 P0 的 **59.09% / 3.85%**，经 P1 第一轮 **84.09% / 30.77%**，到当前 **86.36% / 34.62%**；全量从 **55.88% / 11.84%**，经 **79.41% / 43.42%**，到 **80.15% / 44.74%**。第二轮仅两道外带题从未召回变为第一，其他排名不变；相对 P0 仍有 1 个 MRR 退步、无 Recall@5 退步。两算法均为未知问题 2/4 空返回、范围检查 4/4。固定集用于开发调优，没有独立留出集，不宣称泛化提升；MRR、逐题退步和限制见 [检索说明](./retrieval.md)。当时报告使用独立文件；本轮新增客观检索套件与 API 展示 Recall/MRR，原离线报告仍保留。
 
 第二轮另在修复前固定了 5 篇无标签合成文档与 8 个新问法，8/8 问法及 18/18 已有规范词标题/正文工程检查通过。数据 SHA-256 为 `efc72bb3cc6587f4ddcbe5330666c0aafa93282229d4544dfa9cf59460b0d9ba`；已向实现者披露，不是盲测，不并入参考集分母。详见 [固定新问法验证](./retrieval.md#第二轮固定新问法验证)。
 
@@ -169,4 +201,4 @@ npm run check:business # 既有真实 MySQL + Pi/faux 工程回放
 
 工作台精简版本 `5d29347` 已完成桌面/窄屏、运行切换、失败筛选、A/B 对比及未知指标展示验收；此前浏览器访问受阻记录已由这次实际验收补齐。本轮浏览器已核对最终 D1/D2 运行的 3/3 场景、21/21 usage、80,971 Tokens，并保留可见的失败历史。
 
-P1 两轮检索改进已实现；继续补充多轮指代、未知政策和退款状态查询等业务场景，是否修改 Prompt/Skill 由实际失败决定，整个 P1 不标记完成。公网 Webhook 与完整手机验收保留为 P2；人工/Judge 标注、线上 QQ 抽样、页面启动任务与长期趋势分析仍待后续建立口径，不能用工程检查、检索评分或小样例通过率代替完整业务效果。
+P1 核心 MVP 已收尾；当前迭代扩充客观评测覆盖与系统，不改生产业务来追求满分，真实失败进入后续优化计划。公网 Webhook 与完整手机验收保留为 P2；人工/Judge 标注、线上 QQ 抽样、页面启动任务与长期趋势分析仍待后续建立口径，不能用工程检查、检索评分或小样例通过率代替完整业务效果。

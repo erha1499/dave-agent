@@ -1,6 +1,7 @@
 import type { Pool, PoolOptions, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { readDatabaseConfig } from "./coupon-store.ts";
 import type { EvalCase, EvalMetrics, EvalRun, EvalRunDetail, EvalRunSummary, EvalStep, EvalTurn } from "./evaluation.ts";
+import { analyzeEvaluation, objectivePlan, validEvalBatch } from "./eval-analysis.ts";
 
 const databaseFailure = "评测数据库操作失败，请检查本机数据库和 eval:init 配置。";
 const validRunId = (id: string) => /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(id);
@@ -30,6 +31,9 @@ export class EvalStore {
     if (!validRunId(run.id) || run.status !== "running" || run.finishedAt !== null || !Number.isFinite(Date.parse(run.startedAt))) {
       throw new Error("评测运行标识或初始状态无效。");
     }
+    if (objectivePlan(run).scope === "invalid" || (run.batch !== undefined && !validEvalBatch(run.batch))) {
+      throw new Error("客观评测计划或批次元数据无效。");
+    }
     try {
       await this.pool.execute("INSERT INTO eval_runs (id, kind, started_at, record) VALUES (?, ?, ?, ?)",
         [run.id, run.kind, new Date(run.startedAt), JSON.stringify(run)]);
@@ -41,8 +45,10 @@ export class EvalStore {
     const connection = await this.pool.getConnection().catch(() => { throw new Error(databaseFailure); });
     try {
       await connection.beginTransaction();
-      const [run] = await connection.execute<RowDataPacket[]>("SELECT JSON_UNQUOTE(JSON_EXTRACT(record, '$.status')) AS status FROM eval_runs WHERE id = ? FOR UPDATE", [runId]);
-      if (run[0]?.status !== "running") throw new Error("运行已结束或不存在。");
+      const [rows] = await connection.execute<RowDataPacket[]>("SELECT record FROM eval_runs WHERE id = ? FOR UPDATE", [runId]);
+      const run = rows[0] ? decode<EvalRun>(rows[0].record) : undefined;
+      if (run?.status !== "running") throw new Error("运行已结束或不存在。");
+      if (analyzeEvaluation({ run, cases: [item] }).scope === "invalid") throw new Error("结果与客观评测计划不一致。");
       const { turns, ...caseRecord } = item;
       await connection.execute("INSERT INTO eval_case_results (run_id, case_id, record) VALUES (?, ?, ?)", [runId, item.id, JSON.stringify(caseRecord)]);
       for (const turn of turns) {
@@ -96,7 +102,7 @@ export class EvalStore {
       await connection.commit();
       return {
         run: decode<EvalRun>(runs[0]!.record),
-        // ponytail: the bounded nine-case suite needs no assembly index; use maps if suites become large.
+        // ponytail: suites are bounded to 500 cases; add assembly maps if history-detail profiling warrants it.
         cases: cases.map(row => ({ ...decode<Omit<EvalCase, "turns">>(row.record), turns: turns
           .filter(turn => turn.case_id === row.case_id).map(turn => ({ ...decode<Omit<EvalTurn, "steps">>(turn.record),
             steps: steps.filter(step => step.case_id === row.case_id && step.turn_index === turn.turn_index).map(step => decode<EvalStep>(step.record)),
@@ -107,5 +113,18 @@ export class EvalStore {
       await connection.rollback().catch(() => {});
       throw new Error(databaseFailure);
     } finally { connection.release(); }
+  }
+
+  async getBatch(id: string): Promise<EvalRunDetail[]> {
+    if (!validRunId(id)) throw new Error("评测批次标识无效。");
+    try {
+      // Batches contain at most 20 runs; query the batch directly, never infer it from the recent-runs page.
+      const [rows] = await this.pool.execute<RowDataPacket[]>(`SELECT id FROM eval_runs
+        WHERE JSON_UNQUOTE(JSON_EXTRACT(record, '$.batch.id')) = ? ORDER BY started_at, id LIMIT 21`, [id]);
+      if (rows.length > 20) throw new Error("批次运行数量超限。");
+      const runs = await Promise.all(rows.map(row => this.getRun(row.id as string)));
+      if (runs.some(run => !run)) throw new Error("批次记录不完整。");
+      return runs as EvalRunDetail[];
+    } catch { throw new Error(databaseFailure); }
   }
 }

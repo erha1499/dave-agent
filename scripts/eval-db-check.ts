@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { createPool } from "mysql2/promise";
 import { EvalStore, readEvalDatabaseConfig } from "../src/eval-store.ts";
-import { summarizeEvaluation, type EvalCase, type EvalRun } from "../src/evaluation.ts";
+import { summarizeEvaluation, type EvalCase, type EvalObjectivePlan, type EvalRun } from "../src/evaluation.ts";
+import { analyzeBatch, analyzeEvaluation } from "../src/eval-analysis.ts";
+import { createEvaluationServer } from "../src/eval-server.ts";
 
 const config = readEvalDatabaseConfig({ EVAL_DB_PASSWORD: "synthetic-only" });
 assert.equal(config.user, "dave_agent_eval");
@@ -84,10 +86,54 @@ try {
   assert.equal(await store.getRun(randomUUID()), undefined);
   await assert.rejects(store.listRuns(0));
   await assert.rejects(store.getRun("invalid';DROP"));
+  const batchId = randomUUID();
+  const plan: EvalObjectivePlan = { version: 1, scope: "objective", answerQuality: "not_evaluated", cases: [{
+    id: cases[0]!.id, tags: ["identity"], turns: [{ index: 1, source: "engineering", checks: [{ id: "deny", category: "safety", basis: "protocol" }] }],
+  }] };
+  const objectiveSnapshot: EvalRun["snapshot"] = { ...snapshot, content: { ...snapshot.content, evaluation: plan,
+    measurement: "工程合成记录，只验证落库与只读 API", runtime: { node: process.version, platform: process.platform, arch: process.arch },
+    implementation: { files: { "synthetic-check.ts": "engineering-only" } }, settings: {} } };
+  const objectiveIds: string[] = [];
+  for (const repetition of [1, 2]) {
+    const run: EvalRun = { id: randomUUID(), suiteId: "evaluation-objective-db-check", suiteName: "客观评测落库检查", kind: "engineering",
+      label: "工程客观计划往返", status: "running", startedAt, finishedAt: null, plannedCases: 1, plannedTurns: 1,
+      snapshot: objectiveSnapshot, metrics: null, batch: { id: batchId, repetition, plannedRepetitions: 2 } };
+    const malformed = structuredClone(run);
+    (malformed.snapshot.content.evaluation as EvalObjectivePlan).cases[0]!.turns[0]!.checks.push({ ...plan.cases[0]!.turns[0]!.checks[0]! });
+    await assert.rejects(store.startRun(malformed), /客观评测计划/);
+    assert.equal(await store.getRun(malformed.id), undefined);
+    await store.startRun(run);
+    objectiveIds.push(run.id);
+    const unplanned = structuredClone(cases[0]!); unplanned.turns[0]!.checks[0]!.id = "unplanned";
+    await assert.rejects(store.saveCase(run.id, unplanned));
+    assert.deepEqual((await store.getRun(run.id))?.cases, []);
+    await store.saveCase(run.id, cases[0]!);
+    await store.finishRun(run.id, "completed", new Date().toISOString(), summarizeEvaluation([cases[0]!]));
+    const saved = (await store.getRun(run.id))!;
+    assert.deepEqual(saved.run.batch, run.batch);
+    assert.deepEqual(saved.run.snapshot.content.evaluation, plan);
+    assert.equal(analyzeEvaluation(saved).counts?.checks.passed, 1);
+    assert.equal(analyzeEvaluation(saved).usage.completeTokens, null);
+  }
+  const batch = await store.getBatch(batchId);
+  assert.deepEqual(new Set(batch.map(detail => detail.run.id)), new Set(objectiveIds));
+  assert.equal(analyzeBatch(batchId, batch).compatible, true);
+  assert.equal(analyzeBatch(batchId, batch).cases[0]!.status, "always_passed");
+  assert.deepEqual(await store.getBatch(randomUUID()), []);
+  await assert.rejects(store.getBatch("invalid"));
+  const server = createEvaluationServer(store);
+  try {
+    await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve));
+    const address = server.address(); assert.ok(address && typeof address === "object");
+    const base = `http://127.0.0.1:${address.port}`;
+    assert.deepEqual(await (await fetch(`${base}/api/batches/${batchId}`)).json(), analyzeBatch(batchId, batch));
+    assert.deepEqual(await (await fetch(`${base}/api/runs/${objectiveIds[0]}/analysis`)).json(), analyzeEvaluation(batch.find(detail => detail.run.id === objectiveIds[0])!));
+    assert.equal((await fetch(`${base}/api/compare?baseline=${objectiveIds[0]}&candidate=${objectiveIds[1]}`).then(response => response.json()) as { repeatCompatible: boolean }).repeatCompatible, true);
+  } finally { await new Promise<void>(resolve => server.close(() => resolve())); }
   const denied = (error: unknown) => !!error && typeof error === "object" && "code" in error && error.code === "ER_TABLEACCESS_DENIED_ERROR";
   // Zero matching rows prevents mutations even if privileges were accidentally broadened.
   await assert.rejects(pool.execute("UPDATE orders SET status = status WHERE 1 = 0"), denied);
   await assert.rejects(pool.execute("SELECT * FROM qq_identities LIMIT 0"), denied);
   await assert.rejects(pool.execute("DELETE FROM eval_runs WHERE 1 = 0"), denied);
-  console.log("评测 MySQL 检查通过：两轮历史、稳定案例 ID、失败/跳过/预期拒绝、未知用量、快照、模型与工程隔离及受限权限。");
+  console.log("评测 MySQL 检查通过：历史、失败/跳过/预期拒绝、未知用量、客观计划与批次、严格落库、分析/对比 HTTP 回读及受限权限。");
 } finally { await store.close(); }

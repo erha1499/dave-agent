@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
 import { createPool } from "mysql2/promise";
 import { EvalStore, readEvalDatabaseConfig } from "./eval-store.ts";
+import { analyzeBatch, analyzeEvaluation, compareEvaluations } from "./eval-analysis.ts";
 
 const pages = new Map([
   ["/", ["index.html", "text/html; charset=utf-8"]],
@@ -11,7 +12,7 @@ const pages = new Map([
 ]);
 const uuid = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
 
-export function createEvaluationServer(store: Pick<EvalStore, "listRuns" | "getRun" | "ping">) {
+export function createEvaluationServer(store: Pick<EvalStore, "listRuns" | "getRun" | "getBatch" | "ping">) {
   return createServer({ requestTimeout: 10_000, headersTimeout: 10_000, maxHeaderSize: 8192 }, async (req, res) => {
     const allowedHosts = [`127.0.0.1:${req.socket.localPort}`, `localhost:${req.socket.localPort}`];
     const json = (status: number, body: unknown) => res.writeHead(status, { "Content-Type": "application/json; charset=utf-8" }).end(JSON.stringify(body));
@@ -56,14 +57,31 @@ export function createEvaluationServer(store: Pick<EvalStore, "listRuns" | "getR
         json(200, { runs: await store.listRuns(Number(limit), kind as "model" | "engineering") });
         return;
       }
+      if (url.pathname === "/api/compare") {
+        const baseline = url.searchParams.get("baseline"), candidate = url.searchParams.get("candidate");
+        if (!baseline || !candidate || !uuid.test(baseline) || !uuid.test(candidate) || baseline === candidate
+          || [...url.searchParams.keys()].some(key => !["baseline", "candidate"].includes(key))
+          || url.searchParams.getAll("baseline").length !== 1 || url.searchParams.getAll("candidate").length !== 1) {
+          json(400, { error: "对比运行参数无效。" }); return;
+        }
+        const [a, b] = await Promise.all([store.getRun(baseline), store.getRun(candidate)]);
+        json(a && b ? 200 : 404, a && b ? compareEvaluations(a, b) : { error: "没有找到对比运行。" }); return;
+      }
+      if (url.pathname.startsWith("/api/batches/")) {
+        const id = url.pathname.slice("/api/batches/".length);
+        if (!uuid.test(id) || url.search) { json(400, { error: "批次 ID 无效。" }); return; }
+        const runs = await store.getBatch(id);
+        json(runs.length ? 200 : 404, runs.length ? analyzeBatch(id, runs) : { error: "没有找到该评测批次。" }); return;
+      }
       if (url.pathname.startsWith("/api/runs/")) {
-        const id = url.pathname.slice("/api/runs/".length);
+        const analysis = url.pathname.endsWith("/analysis");
+        const id = url.pathname.slice("/api/runs/".length, analysis ? -"/analysis".length : undefined);
         if (!uuid.test(id) || url.search) {
           json(400, { error: "运行 ID 无效。" });
           return;
         }
         const detail = await store.getRun(id);
-        json(detail ? 200 : 404, detail ?? { error: "没有找到该评测运行。" });
+        json(detail ? 200 : 404, detail ? analysis ? analyzeEvaluation(detail) : detail : { error: "没有找到该评测运行。" });
         return;
       }
       json(404, { error: "页面不存在。" });

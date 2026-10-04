@@ -69,6 +69,14 @@ WHERE o.id IN (${orderList}) AND p.id = CONCAT('${marker}-payment-', RIGHT(o.id,
       admin(`UPDATE merchant_demo_scenarios SET delay_ms = ${delay}
 WHERE order_id = '${orderId}' AND order_id IN (${owned});`);
     },
+    async holdMerchant(orderId: string, milliseconds = 180_000) {
+      if (!orders.includes(orderId) || cleaned || !Number.isInteger(milliseconds) || milliseconds < 1 || milliseconds > 180_000) {
+        throw new Error("只能在本次测试订单上顺延1–180000毫秒的商家等待窗口。");
+      }
+      admin(`UPDATE merchant_requests SET due_at = TIMESTAMPADD(MICROSECOND, ${milliseconds * 1000}, due_at),
+        deadline_at = TIMESTAMPADD(MICROSECOND, ${milliseconds * 1000}, deadline_at)
+        WHERE order_id = '${orderId}' AND status = 'pending' AND order_id IN (${owned});`);
+    },
     async expire(orderId: string) {
       if (!orders.includes(orderId) || cleaned) throw new Error("只能调整本次测试创建的订单。");
       admin(`UPDATE merchant_requests SET due_at = created_at, deadline_at = UTC_TIMESTAMP(3)

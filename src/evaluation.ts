@@ -6,7 +6,23 @@ export type EvalCheck = {
   category: "business" | "safety" | "evidence" | "execution";
   status: EvalStatus;
   reason?: string;
+  basis?: "trace" | "state" | "protocol" | "execution";
 };
+export type EvalObjectivePlan = {
+  version: 1;
+  scope: "objective";
+  answerQuality: "not_evaluated";
+  cases: Array<{
+    id: string;
+    tags: string[];
+    turns: Array<{
+      index: number;
+      source: "user" | "host" | "event" | "engineering";
+      checks: Array<{ id: string; category: EvalCheck["category"]; basis: NonNullable<EvalCheck["basis"]> }>;
+    }>;
+  }>;
+};
+export type EvalBatch = { id: string; repetition: number; plannedRepetitions: number };
 export type EvalUsage = {
   input: number; output: number; cacheRead: number; cacheWrite: number; totalTokens: number;
   estimatedCostUsd: number | null;
@@ -33,6 +49,7 @@ export type EvalTurn = {
   evidenceIds: string[];
   checks: EvalCheck[];
   steps: EvalStep[];
+  observations?: { before?: unknown; after?: unknown; protocol?: unknown };
   error?: string;
 };
 export type EvalCase = {
@@ -62,6 +79,7 @@ export type EvalRun = {
   startedAt: string; finishedAt: string | null;
   plannedCases: number; plannedTurns: number;
   snapshot: EvalSnapshot; metrics: EvalMetrics | null; error?: string;
+  batch?: EvalBatch;
 };
 export type EvalRunDetail = { run: EvalRun; cases: EvalCase[] };
 export type EvalRunSummary = Omit<EvalRun, "snapshot"> & { snapshot: Omit<EvalSnapshot, "content"> };

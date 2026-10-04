@@ -64,7 +64,7 @@ malformed.receive({ type: "tool_execution_start", toolName: "get_order", toolCal
 assert.doesNotThrow(() => malformed.receive({ type: "tool_execution_end", toolName: "get_order", toolCallId: "malformed", isError: true, result: { content: 1 } }));
 assert.equal(malformed.finish().failed, true);
 
-const server = createEvaluationServer({ ping: async () => {}, listRuns: async () => [], getRun: async () => undefined });
+const server = createEvaluationServer({ ping: async () => {}, listRuns: async () => [], getRun: async () => undefined, getBatch: async () => [] });
 try {
   await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve));
   const address = server.address();
@@ -93,3 +93,6 @@ try {
 } finally {
   await new Promise<void>(resolve => server.close(() => resolve()));
 }
+
+await import("./eval-analysis-check.ts");
+await import("./objective-eval-check.ts");
