@@ -196,3 +196,6 @@ try {
   await Promise.allSettled([store.close(), merchant.close(), business.end()]);
   await fixture.cleanup();
 }
+
+// Read-side consistency must hold while the same real refund transaction commits.
+await import("./coupon-snapshot-check.ts");

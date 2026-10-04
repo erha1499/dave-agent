@@ -1,4 +1,4 @@
-import type { Pool, PoolOptions, RowDataPacket } from "mysql2/promise";
+import type { Pool, PoolConnection, PoolOptions, RowDataPacket } from "mysql2/promise";
 import { rankKnowledge } from "./knowledge-retrieval.ts";
 
 export type QQIdentity = { appId: string; senderId: string };
@@ -38,9 +38,9 @@ export class CouponStore {
     this.pool = pool;
   }
 
-  private async select(sql: string, values: Array<string | null> = []) {
+  private async select(sql: string, values: Array<string | null> = [], connection: Pool | PoolConnection = this.pool) {
     try {
-      const [rows] = await this.pool.execute<RowDataPacket[]>({ sql, timeout: 5000 }, values);
+      const [rows] = await connection.execute<RowDataPacket[]>({ sql, timeout: 5000 }, values);
       return rows;
     } catch {
       // Do not expose SQL, credentials, connection addresses or driver diagnostics to the model.
@@ -65,46 +65,67 @@ export class CouponStore {
   async getOrder(identity: QQIdentity, orderId: string) {
     if (!/^COUPON-\d{4}$/.test(orderId)) throw new Error("演示订单号格式为 COUPON-1001。");
     if (!validIdentity(identity)) throw new Error(unavailableOrder);
-    // Re-resolve the trusted sender on every call; never accept a customer ID from model arguments.
-    const rows = await this.select(`SELECT /*+ MAX_EXECUTION_TIME(3000) */
-      o.id, o.status, o.total_cents, o.paid_cents, o.refunded_cents, o.created_at, o.paid_at,
-      s.id AS shop_id, s.name AS shop_name, s.address, m.name AS merchant_name
-      FROM orders o JOIN qq_identities q ON q.customer_id = o.customer_id
-      JOIN shops s ON s.id = o.shop_id JOIN merchants m ON m.id = s.merchant_id
-      WHERE o.id = ? AND q.app_id = ? AND q.sender_id = ? LIMIT 1`, [orderId, identity.appId, identity.senderId]);
-    const order = rows[0];
-    if (!order) throw new Error(unavailableOrder);
-    // ponytail: bounded read-only demo orders; exceed these limits only after adding pagination.
-    const [items, coupons, payments, refunds] = await Promise.all([
-      this.select(`SELECT /*+ MAX_EXECUTION_TIME(3000) */ i.id, i.product_id, p.name AS product_name,
-        i.quantity, i.unit_price_cents, i.total_cents FROM order_items i JOIN products p ON p.id = i.product_id
-        WHERE i.order_id = ? ORDER BY i.id LIMIT 101`, [orderId]),
-      this.select(`SELECT /*+ MAX_EXECUTION_TIME(3000) */ c.id, c.order_item_id, c.status,
-        c.expires_at, c.redeemed_at, c.redeemed_shop_id FROM coupons c
-        JOIN order_items i ON i.id = c.order_item_id WHERE i.order_id = ? ORDER BY c.id LIMIT 101`, [orderId]),
-      this.select(`SELECT /*+ MAX_EXECUTION_TIME(3000) */ status, amount_cents, paid_at
-        FROM payments WHERE order_id = ? ORDER BY created_at, id LIMIT 21`, [orderId]),
-      this.select(`SELECT /*+ MAX_EXECUTION_TIME(3000) */ status, amount_cents, completed_at
-        FROM refunds WHERE order_id = ? ORDER BY created_at, id LIMIT 21`, [orderId]),
-    ]);
-    if (items.length > 100 || coupons.length > 100 || payments.length > 20 || refunds.length > 20) throw new Error(databaseFailure);
-    return {
-      source: "demo-database" as const, id: order.id as string, status: order.status as string,
-      asOf: new Date().toISOString(),
-      amounts: { totalCents: order.total_cents as number, paidCents: order.paid_cents as number, refundedCents: order.refunded_cents as number },
-      createdAt: date(order.created_at), paidAt: date(order.paid_at),
-      shop: { id: order.shop_id as string, name: order.shop_name as string, merchantName: order.merchant_name as string, address: order.address as string },
-      items: items.map((item) => ({
-        id: item.id as string, productId: item.product_id as string, productName: item.product_name as string,
-        quantity: item.quantity as number, unitPriceCents: item.unit_price_cents as number, totalCents: item.total_cents as number,
-      })),
-      coupons: coupons.map((coupon) => ({
-        id: coupon.id as string, orderItemId: coupon.order_item_id as string, status: coupon.status as string,
-        expiresAt: date(coupon.expires_at), redeemedAt: date(coupon.redeemed_at), redeemedShopId: coupon.redeemed_shop_id as string | null,
-      })),
-      payments: payments.map((payment) => ({ status: payment.status as string, amountCents: payment.amount_cents as number, paidAt: date(payment.paid_at) })),
-      refunds: refunds.map((refund) => ({ status: refund.status as string, amountCents: refund.amount_cents as number, completedAt: date(refund.completed_at) })),
-    };
+    const notFound = new Error(unavailableOrder);
+    let connection: PoolConnection | undefined;
+    let started = false;
+    try {
+      connection = await this.pool.getConnection();
+      // One-shot transaction settings cannot change the next borrower's session defaults.
+      await connection.query("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY");
+      await connection.beginTransaction();
+      started = true;
+      const asOf = new Date().toISOString();
+      // Re-resolve the trusted sender on every call; never accept a customer ID from model arguments.
+      // The authorization row and all business facts share the first SELECT's consistent snapshot.
+      const rows = await this.select(`SELECT /*+ MAX_EXECUTION_TIME(3000) */
+        o.id, o.status, o.total_cents, o.paid_cents, o.refunded_cents, o.created_at, o.paid_at,
+        s.id AS shop_id, s.name AS shop_name, s.address, m.name AS merchant_name
+        FROM orders o JOIN qq_identities q ON q.customer_id = o.customer_id
+        JOIN shops s ON s.id = o.shop_id JOIN merchants m ON m.id = s.merchant_id
+        WHERE o.id = ? AND q.app_id = ? AND q.sender_id = ? LIMIT 1`, [orderId, identity.appId, identity.senderId], connection);
+      const order = rows[0];
+      if (!order) throw notFound;
+      // ponytail: bounded read-only demo orders; exceed these limits only after adding pagination.
+      const [items, coupons, payments, refunds] = await Promise.all([
+        this.select(`SELECT /*+ MAX_EXECUTION_TIME(3000) */ i.id, i.product_id, p.name AS product_name,
+          i.quantity, i.unit_price_cents, i.total_cents FROM order_items i JOIN products p ON p.id = i.product_id
+          WHERE i.order_id = ? ORDER BY i.id LIMIT 101`, [orderId], connection),
+        this.select(`SELECT /*+ MAX_EXECUTION_TIME(3000) */ c.id, c.order_item_id, c.status,
+          c.expires_at, c.redeemed_at, c.redeemed_shop_id FROM coupons c
+          JOIN order_items i ON i.id = c.order_item_id WHERE i.order_id = ? ORDER BY c.id LIMIT 101`, [orderId], connection),
+        this.select(`SELECT /*+ MAX_EXECUTION_TIME(3000) */ status, amount_cents, paid_at
+          FROM payments WHERE order_id = ? ORDER BY created_at, id LIMIT 21`, [orderId], connection),
+        this.select(`SELECT /*+ MAX_EXECUTION_TIME(3000) */ status, amount_cents, completed_at
+          FROM refunds WHERE order_id = ? ORDER BY created_at, id LIMIT 21`, [orderId], connection),
+      ]);
+      if (items.length > 100 || coupons.length > 100 || payments.length > 20 || refunds.length > 20) throw new Error(databaseFailure);
+      const result = {
+        source: "demo-database" as const, id: order.id as string, status: order.status as string,
+        asOf,
+        amounts: { totalCents: order.total_cents as number, paidCents: order.paid_cents as number, refundedCents: order.refunded_cents as number },
+        createdAt: date(order.created_at), paidAt: date(order.paid_at),
+        shop: { id: order.shop_id as string, name: order.shop_name as string, merchantName: order.merchant_name as string, address: order.address as string },
+        items: items.map((item) => ({
+          id: item.id as string, productId: item.product_id as string, productName: item.product_name as string,
+          quantity: item.quantity as number, unitPriceCents: item.unit_price_cents as number, totalCents: item.total_cents as number,
+        })),
+        coupons: coupons.map((coupon) => ({
+          id: coupon.id as string, orderItemId: coupon.order_item_id as string, status: coupon.status as string,
+          expiresAt: date(coupon.expires_at), redeemedAt: date(coupon.redeemed_at), redeemedShopId: coupon.redeemed_shop_id as string | null,
+        })),
+        payments: payments.map((payment) => ({ status: payment.status as string, amountCents: payment.amount_cents as number, paidAt: date(payment.paid_at) })),
+        refunds: refunds.map((refund) => ({ status: refund.status as string, amountCents: refund.amount_cents as number, completedAt: date(refund.completed_at) })),
+      };
+      await connection.commit();
+      return result;
+    } catch (error) {
+      if (connection) {
+        // A failed BEGIN may leave pending one-shot settings; never return that connection to the pool.
+        if (!started) connection.destroy();
+        else await connection.rollback().catch(() => connection!.destroy());
+      }
+      throw error === notFound ? notFound : new Error(databaseFailure);
+    } finally { connection?.release(); }
   }
 
   async searchKnowledge(query: string, shopId?: string, productId?: string) {

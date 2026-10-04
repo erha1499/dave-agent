@@ -1,6 +1,6 @@
 # dave-agent 实现计划
 
-更新：2026-10-04。业务方向为本地生活服务售后，参考 [kefu-harness](https://github.com/wanglongze123/kefu-harness/tree/305590129ea020a5a362e07b294fd1587b8f53fd)，核对版本为 `305590129ea020a5a362e07b294fd1587b8f53fd`。QQ 基座与团购券只读业务已接通：Docker MySQL → 本人订单和规则工具 → Pi/DeepSeek → QQ。本文分别记录当前实现、实际验收和后续业务计划。
+更新：2026-10-05。业务方向为本地生活服务售后，参考 [kefu-harness](https://github.com/wanglongze123/kefu-harness/tree/305590129ea020a5a362e07b294fd1587b8f53fd)，核对版本为 `305590129ea020a5a362e07b294fd1587b8f53fd`。QQ 基座与团购券只读业务已接通：Docker MySQL → 本人订单和规则工具 → Pi/DeepSeek → QQ。本文分别记录当前实现、实际验收和后续业务计划。
 
 当前优先级：核心业务优先。D1 持久协商、D2 确认与幂等模拟退款、D3 原会话通知及真实双用户验收已完成。P0 基线与 P1 两轮检索改进已实现，第二轮固定新问法、工程检查、多轮客服及退款状态回归均通过；据失败加强了 Prompt、Skill 和工具描述。P1 其余业务场景与上下文检索继续验证。继续使用本地 WebSocket 联调；公网 Webhook 与完整手机端显示验收按 P2 后置，工作台增强也暂缓。具体顺序见第 8 节。
 
@@ -302,6 +302,13 @@ MVP 范围先限于单门店、单张未核销券的整笔模拟退款。使用�
 细节来源：[focus](https://github.com/wanglongze123/kefu-harness/blob/305590129ea020a5a362e07b294fd1587b8f53fd/harness/core/focus.py)、[loop 回调](https://github.com/wanglongze123/kefu-harness/blob/305590129ea020a5a362e07b294fd1587b8f53fd/harness/core/loop.py)、[模拟总线](https://github.com/wanglongze123/kefu-harness/blob/305590129ea020a5a362e07b294fd1587b8f53fd/harness/tools/async_bus.py)、[难题构建](https://github.com/wanglongze123/kefu-harness/blob/305590129ea020a5a362e07b294fd1587b8f53fd/scripts/build_hard_evalset.py)。
 
 ## 8. 暂缓事项与下一步
+
+2026-10-05 起持续完善核心 MVP，每个大步测试、提交并推送：
+
+- [x] 查询一致性：真实退款提交与订单读取交错时，订单头、券和退款历史来自同一只读快照；覆盖下一次读取新结果、连接池隔离设置及异常恢复，纳入 `check:refund`。
+- [ ] 退款恢复：在真实模型联合链路验证方案过期、重新展示新编号、旧编号拒绝及新编号幂等执行；检查状态查询不会擅自重建方案。
+- [ ] 上下文检索比较：保留 query-only 基准，独立记录上下文带来的收益、退步和无答案非空返回；不凭开发集分数自动接入线上。
+- [ ] 完成审计：逐项复核只读咨询、身份与作用域、协商三终态、通知恢复、退款确认及评测证据，记录仍属 P2 或明确暂缓的范围。前端仍由 Kimi 维护。
 
 2026-10-04 调整后的执行顺序：
 
