@@ -135,6 +135,18 @@ try {
       assert.ok(knowledge.every(document => document.source === "demo-knowledge"));
       assert.ok(knowledge.some(document => document.body.includes("不能申请")));
     });
+  await toolRound(one, "还没去过店，钱能返还吗", "search_faq", { query: "还没去过店，钱能返还吗" }, false, text => {
+    const knowledge = JSON.parse(text) as Knowledge;
+    assert.ok(knowledge.some(document => document.sourceId === "KB-REFUND-UNUSED"));
+    assert.ok(knowledge.every(document => document.scope.shopId === null && document.scope.productId === null));
+  });
+  await toolRound(one, "COUPON-1001 这个午餐套餐过敏原有哪些", "search_faq",
+    { query: "这个午餐套餐过敏原有哪些", shopId: "shop-demo-1", productId: "product-demo-1" }, false, text => {
+      const knowledge = JSON.parse(text) as Knowledge;
+      assert.ok(knowledge.some(document => document.sourceId === "KB-PRODUCT-LUNCH" && /过敏原[^。]*未录入/.test(document.body)));
+      assert.ok(knowledge.every(document => (!document.scope.shopId || document.scope.shopId === "shop-demo-1")
+        && (!document.scope.productId || document.scope.productId === "product-demo-1")));
+    });
   await toolRound(one, "火星宠物运输许可证", "search_faq", { query: "火星宠物运输许可证" }, false,
     text => assert.deepEqual(JSON.parse(text), []));
 

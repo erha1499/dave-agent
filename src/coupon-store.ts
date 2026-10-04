@@ -128,7 +128,7 @@ export class CouponStore {
       let tags: unknown;
       try { tags = typeof row.tags === "string" ? JSON.parse(row.tags) : row.tags; } catch { throw new Error(databaseFailure); }
       if (!Array.isArray(tags) || tags.some((tag) => typeof tag !== "string")) throw new Error(databaseFailure);
-      return { id: String(row.id), tags: tags as string[], row };
+      return { id: String(row.id), tags: tags as string[], title: row.title as string, body: row.body as string, row };
     });
     return rankKnowledge(query, documents).slice(0, 5).map(({ row }) => ({
       source: "demo-knowledge" as const, sourceId: row.id as string, title: row.title as string, body: row.body as string,

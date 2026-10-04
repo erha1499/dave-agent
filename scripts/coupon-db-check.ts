@@ -87,9 +87,16 @@ try {
   const publicRules = await store.searchKnowledge("我那个还没用的能退不");
   assert.ok(publicRules.some((rule) => rule.sourceId === "KB-REFUND-UNUSED"));
   assert.ok(publicRules.every((rule) => rule.scope.shopId === null && rule.scope.productId === null));
+  const colloquialRefund = await store.searchKnowledge("还没去过店，钱能返还吗");
+  assert.ok(colloquialRefund.some(rule => rule.sourceId === "KB-REFUND-UNUSED"));
+  assert.ok(colloquialRefund.every(rule => rule.scope.shopId === null && rule.scope.productId === null));
   const lunch = await store.searchKnowledge("双人午餐套餐价格", "shop-demo-1", "product-demo-1");
   assert.ok(lunch.some((rule) => rule.sourceId === "KB-PRODUCT-LUNCH"));
   assert.ok(!lunch.some((rule) => rule.sourceId === "KB-PRODUCT-DINNER"));
+  const allergens = await store.searchKnowledge("这个午餐套餐过敏原有哪些", "shop-demo-1", "product-demo-1");
+  assert.ok(allergens.some(rule => rule.sourceId === "KB-PRODUCT-LUNCH" && /过敏原[^。]*未录入/.test(rule.body)));
+  assert.ok(allergens.every(rule => (!rule.scope.shopId || rule.scope.shopId === "shop-demo-1")
+    && (!rule.scope.productId || rule.scope.productId === "product-demo-1")));
   const privateHoliday = await store.searchKnowledge("私享套餐五一能用吗", "shop-demo-1", "product-demo-3");
   assert.ok(privateHoliday.some((rule) => rule.sourceId === "KB-SHOP-DEMO-1" && rule.body.includes("没有录入")));
   assert.ok(privateHoliday.every((rule) => !["KB-PRODUCT-LUNCH", "KB-PRODUCT-DINNER"].includes(rule.sourceId)));
@@ -103,7 +110,7 @@ try {
   await assert.rejects(store.searchKnowledge("套餐", undefined, "product-demo-1"), /门店和套餐/);
   await assert.rejects(store.searchKnowledge("套餐", "shop-demo-1' OR 1=1 --"), /门店和套餐/);
   const [documents] = await pool.execute<RowDataPacket[]>("SELECT id, shop_id, product_id, status FROM knowledge_documents");
-  for (const rule of [...publicRules, ...lunch, ...privateHoliday]) {
+  for (const rule of [...publicRules, ...colloquialRefund, ...lunch, ...allergens, ...privateHoliday]) {
     const document = documents.find((item) => item.id === rule.sourceId);
     assert.ok(document && document.status === "active");
     assert.equal(rule.scope.shopId, document.shop_id);
