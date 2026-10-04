@@ -22,5 +22,8 @@ export async function confirmRefundReply(
 export async function markRefundReplyPresented(
   store: RefundStore, identity: QQIdentity, sourceKey: string, reply: Reply,
 ): Promise<void> {
-  if (reply.kind === "refund_confirmation") await store.markPresented(identity, sourceKey, reply.operation.operationId);
+  // Expired summaries contain no confirmation action; delivery must not try to reopen them.
+  if (reply.kind === "refund_confirmation" && Date.parse(reply.operation.expiresAt) > Date.now()) {
+    await store.markPresented(identity, sourceKey, reply.operation.operationId);
+  }
 }

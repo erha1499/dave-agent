@@ -165,6 +165,19 @@ try {
     assert.equal(faux.state.callCount, beforeCalls);
   }
 
+  // An expired card is an informational receipt, not a new offer to confirm.
+  operation = { ...initial, status: "awaiting_confirmation", presentedAt: "2000-01-01T00:00:00.000Z", expiresAt: "2000-01-01T00:15:00.000Z" };
+  const expired = { ...operation }, beforeExpiredMarks = marks, beforeExpiredWrites = writes, beforeExpiredLogs = logs.length;
+  mode = "mark_failure";
+  modelTool("get_refund"); await qq.handle(message("expired-query", "钱退了吗"));
+  assert.equal(attempts.at(-1)!.reply.kind, "refund_confirmation");
+  assert.match(attempts.at(-1)!.reply.text, /方案已过期/);
+  assert.equal(attempts.at(-1)!.reply.button, undefined);
+  assert.equal(marks, beforeExpiredMarks, "an expired information card must not try to reopen confirmation");
+  assert.deepEqual(operation, expired); assert.equal(writes, beforeExpiredWrites);
+  assert.ok(!logs.slice(beforeExpiredLogs).some(log => /回复发送或确认登记失败/.test(log)), "a delivered expired card is not a failed delivery");
+  mode = "normal";
+
   operation = { ...initial }; modelTool("prepare_refund");
   await qq.handle(message("loss-proposal", "生成退款方案"));
   mode = "receipt_failure";
@@ -201,7 +214,7 @@ try {
   assert.equal(confirms, beforeMalformed + 8, "only exact commands with outer ASCII space/tab padding are accepted");
   assert.ok(!logs.join("\n").includes("synthetic private"));
   assert.equal(faux.getPendingResponseCount(), 0);
-  console.log("模拟退款 Agent 离线检查通过：真实 Pi 六工具、固定方案、发送后登记、排队确认、失败不重发、用户原文边界、宿主幂等确认、丢失回执后查询。业务事务另由 MySQL 检查覆盖。");
+  console.log("模拟退款 Agent 离线检查通过：真实 Pi 六工具、固定方案、发送后登记、排队确认、失败不重发、过期卡只读、用户原文边界、宿主幂等确认、丢失回执后查询。业务事务另由 MySQL 检查覆盖。");
 } finally {
   sendRelease.resolve(); markRelease.resolve(); await qq.close();
 }

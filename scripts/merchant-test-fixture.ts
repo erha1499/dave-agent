@@ -76,8 +76,8 @@ WHERE order_id = '${orderId}' AND status = 'pending' AND order_id IN (${owned});
     },
     async expireRefund(orderId: string) {
       if (!orders.includes(orderId) || cleaned) throw new Error("只能调整本次测试创建的订单。");
-      admin(`UPDATE refund_operations SET created_at = UTC_TIMESTAMP(3) - INTERVAL 16 MINUTE,
-        expires_at = UTC_TIMESTAMP(3) - INTERVAL 1 MINUTE
+      admin(`UPDATE refund_operations SET created_at = created_at - INTERVAL 16 MINUTE,
+        expires_at = expires_at - INTERVAL 16 MINUTE, presented_at = presented_at - INTERVAL 16 MINUTE
         WHERE order_id = '${orderId}' AND status <> 'succeeded' AND order_id IN (${owned});`);
     },
     async expireRefundSoon(orderId: string, delay: number) {
