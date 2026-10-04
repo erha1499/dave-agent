@@ -63,7 +63,7 @@ function inbound(content: string, senderId: string, groupOpenid: string): QQBotI
 }
 
 async function snapshot(session: Session, fixture: Awaited<ReturnType<typeof createMerchantFixture>>, store: CouponStore): Promise<EvalSnapshot> {
-  const paths = ["src/agent.ts", "src/coupon-store.ts", "src/after-sales.ts", "src/after-sales-entry.ts", "src/refunds.ts",
+  const paths = ["src/agent.ts", "src/coupon-store.ts", "src/knowledge-retrieval.ts", "src/after-sales.ts", "src/after-sales-entry.ts", "src/refunds.ts",
     "src/refund-entry.ts", "src/qq-agent.ts", "src/qq.ts", "src/reply.ts", "src/reply-from-tools.ts", "src/eval-capture.ts",
     "db/06-refunds.sql", "scripts/refund-model-check.ts", "scripts/merchant-test-fixture.ts", "package-lock.json"];
   const [prompt, skill, git, changes, files, orders, knowledge] = await Promise.all([

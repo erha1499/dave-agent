@@ -1,0 +1,76 @@
+{"ctx": {"industry": "酒旅", "sku_name": "高级大床房1晚"}, "kind": "口语省略", "query": "下午两点能进房间吗", "relevant": ["JL001"]}
+{"ctx": {}, "kind": "同义替换", "query": "把权益让给他人", "relevant": ["VF003"]}
+{"ctx": {"industry": "通用", "sku_name": "双人自助烤肉套餐"}, "kind": "口语省略", "query": "车子放哪儿要钱吗", "relevant": ["ET002"]}
+{"ctx": {"industry": "通用", "sku_name": "双人自助烤肉套餐", "verified": true}, "kind": "场景描述", "query": "老板说这个价格不包含服务费要再加50", "relevant": ["ET005"]}
+{"ctx": {}, "kind": "同义替换", "query": "款项回流周期多长", "relevant": ["RF005"]}
+{"ctx": {"industry": "通用", "sku_name": "双人自助烤肉套餐"}, "kind": "口语省略", "query": "同一笔付了两遍", "relevant": ["PY002"]}
+{"ctx": {"industry": "通用", "sku_name": "双人自助烤肉套餐", "verified": false}, "kind": "口语省略", "query": "还没用的能退不", "relevant": ["RF001"]}
+{"ctx": {"industry": "餐饮", "sku_name": "双人自助烤肉套餐"}, "kind": "口语省略", "query": "去了要不要干等着", "relevant": ["CY003"]}
+{"ctx": {"industry": "通用", "sku_name": "双人自助烤肉套餐"}, "kind": "口语省略", "query": "报销凭证找谁要", "relevant": ["PY001"]}
+{"ctx": {}, "kind": "同义替换", "query": "非本人操作导致凭证失效", "relevant": ["VF002"]}
+{"ctx": {}, "kind": "同义替换", "query": "车辆停放费用政策", "relevant": ["ET002"]}
+{"ctx": {}, "kind": "同义替换", "query": "经营者暂停营业的处理", "relevant": ["MC002"]}
+{"ctx": {}, "kind": "同义替换", "query": "变更已确认的到访安排", "relevant": ["RS003"]}
+{"ctx": {"industry": "通用", "sku_name": "双人自助烤肉套餐"}, "kind": "场景描述", "query": "我妈想用我的号买的东西", "relevant": ["ET007"]}
+{"ctx": {}, "kind": "同义替换", "query": "现场候位时长", "relevant": ["CY003"]}
+{"ctx": {"industry": "通用", "sku_name": "双人自助烤肉套餐", "verified": false}, "kind": "口语省略", "query": "那个数字串在哪", "relevant": ["VF001"]}
+{"ctx": {"industry": "通用", "sku_name": "双人自助烤肉套餐", "verified": false}, "kind": "口语省略", "query": "一桌子人能不能多用几张", "relevant": ["VF004"]}
+{"ctx": {}, "kind": "同义替换", "query": "携带动物入场规定", "relevant": ["ET001"]}
+{"ctx": {}, "kind": "同义替换", "query": "重复划扣资金处理", "relevant": ["PY002"]}
+{"ctx": {"industry": "通用", "sku_name": "双人自助烤肉套餐"}, "kind": "口语省略", "query": "十六岁的孩子能去吗", "relevant": ["ET007"]}
+{"ctx": {"industry": "通用", "sku_name": "双人自助烤肉套餐", "verified": false}, "kind": "口语省略", "query": "我那张一直没去用能拿回钱吗", "relevant": ["RF001"]}
+{"ctx": {"industry": "通用", "sku_name": "双人自助烤肉套餐", "verified": true}, "kind": "口语省略", "query": "我包忘在座位上了", "relevant": ["ET003"]}
+{"ctx": {"industry": "通用", "sku_name": "双人自助烤肉套餐", "verified": true}, "kind": "场景描述", "query": "走的时候把外套落椅子上了", "relevant": ["ET003"]}
+{"ctx": {"industry": "酒旅", "sku_name": "高级大床房1晚"}, "kind": "口语省略", "query": "定了三天想少住一晚", "relevant": ["JL002"]}
+{"ctx": {"industry": "丽人", "sku_name": "洗剪吹套餐"}, "kind": "口语省略", "query": "想让手艺好的师傅做", "relevant": ["LR001"]}
+{"ctx": {}, "kind": "同义替换", "query": "凭证验证的具体操作流程", "relevant": ["VF001"]}
+{"ctx": {"industry": "通用", "sku_name": "双人自助烤肉套餐"}, "kind": "口语省略", "query": "眼看就要作废了", "relevant": ["ET006"]}
+{"ctx": {"industry": "通用", "sku_name": "双人自助烤肉套餐", "verified": true}, "kind": "口语省略", "query": "到了说网上的价格不算", "relevant": ["ET005"]}
+{"ctx": {"industry": "休娱", "sku_name": "密室逃脱双人票"}, "kind": "口语省略", "query": "进去前要先押一笔钱吗", "relevant": ["XY002"]}
+{"ctx": {"industry": "通用", "sku_name": "双人自助烤肉套餐", "verified": true}, "kind": "口语省略", "query": "对他们家很不满想找说法", "relevant": ["ET004"]}
+{"ctx": {}, "kind": "同义替换", "query": "撤销部分数量优惠是否返还", "relevant": ["RF004"]}
+{"ctx": {"industry": "通用", "sku_name": "双人自助烤肉套餐"}, "kind": "场景描述", "query": "孩子说想去但网上写限成人", "relevant": ["ET007"]}
+{"ctx": {}, "kind": "同义替换", "query": "线上价格与现场价格不符", "relevant": ["ET005"]}
+{"ctx": {"industry": "通用", "sku_name": "双人自助烤肉套餐"}, "kind": "场景描述", "query": "停车两小时被收了20块", "relevant": ["ET002"]}
+{"ctx": {}, "kind": "同义替换", "query": "住宿订单的撤销条款", "relevant": ["JL002"]}
+{"ctx": {"industry": "通用", "sku_name": "双人自助烤肉套餐"}, "kind": "口语省略", "query": "用了这个还算不算我在他家花的钱", "relevant": ["ET008"]}
+{"ctx": {"industry": "通用", "sku_name": "双人自助烤肉套餐"}, "kind": "场景描述", "query": "店里说今天设备坏了不能做", "relevant": ["MC002"]}
+{"ctx": {}, "kind": "同义替换", "query": "物品遗留的找回途径", "relevant": ["ET003"]}
+{"ctx": {"industry": "丽人", "sku_name": "洗剪吹套餐"}, "kind": "口语省略", "query": "我头发长会不会多收", "relevant": ["LR002"]}
+{"ctx": {"industry": "通用", "sku_name": "双人自助烤肉套餐", "verified": false}, "kind": "口语省略", "query": "直接去会不会白跑一趟", "relevant": ["RS001"]}
+{"ctx": {}, "kind": "同义替换", "query": "获取经营者联络方式", "relevant": ["MC001"]}
+{"ctx": {"industry": "通用", "sku_name": "双人自助烤肉套餐", "verified": true}, "kind": "口语省略", "query": "已经去吃过了还能要回钱吗", "relevant": ["RF002"]}
+{"ctx": {}, "kind": "同义替换", "query": "非工作日场次限制", "relevant": ["XY001"]}
+{"ctx": {}, "kind": "同义替换", "query": "独立空间费用是否包含在内", "relevant": ["CY001"]}
+{"ctx": {"industry": "通用", "sku_name": "双人自助烤肉套餐"}, "kind": "口语省略", "query": "怎么直接跟老板说话", "relevant": ["MC001"]}
+{"ctx": {}, "kind": "同义替换", "query": "外带打包与自备饮品", "relevant": ["CY002"]}
+{"ctx": {}, "kind": "同义替换", "query": "办理入住与离店时间规定", "relevant": ["JL001"]}
+{"ctx": {}, "kind": "同义替换", "query": "税务凭据开具主体", "relevant": ["PY001"]}
+{"ctx": {}, "kind": "同义替换", "query": "已确认到访时间的单子要撤销", "relevant": ["RF003"]}
+{"ctx": {"industry": "通用", "sku_name": "双人自助烤肉套餐"}, "kind": "场景描述", "query": "我在他家充过卡这次用团购算不算消费", "relevant": ["ET008"]}
+{"ctx": {}, "kind": "同义替换", "query": "需要事先确认到访时间吗", "relevant": ["RS001"]}
+{"ctx": {"industry": "餐饮", "sku_name": "双人自助烤肉套餐"}, "kind": "口语省略", "query": "单独的小房间要另外掏钱吗", "relevant": ["CY001"]}
+{"ctx": {"industry": "通用", "sku_name": "双人自助烤肉套餐", "verified": false}, "kind": "场景描述", "query": "我买了个双人餐结果只有我一个人去", "relevant": ["VF004"]}
+{"ctx": {}, "kind": "同义替换", "query": "消费凭证已验证后申请撤销", "relevant": ["RF002"]}
+{"ctx": {}, "kind": "同义替换", "query": "保证金与器材租用", "relevant": ["XY002"]}
+{"ctx": {"industry": "通用", "sku_name": "双人自助烤肉套餐", "verified": true}, "kind": "口语省略", "query": "扫过码之后想反悔", "relevant": ["RF002"]}
+{"ctx": {}, "kind": "同义替换", "query": "服务不达标的申诉渠道", "relevant": ["ET004"]}
+{"ctx": {}, "kind": "同义替换", "query": "优惠票据尚未验证可以撤销交易吗", "relevant": ["RF001"]}
+{"ctx": {"industry": "通用", "sku_name": "双人自助烤肉套餐", "verified": false}, "kind": "口语省略", "query": "买了两张只想留一张", "relevant": ["RF004"]}
+{"ctx": {"industry": "餐饮", "sku_name": "双人自助烤肉套餐"}, "kind": "口语省略", "query": "吃不完能带回家吗", "relevant": ["CY002"]}
+{"ctx": {}, "kind": "同义替换", "query": "权益与商家会籍的关系", "relevant": ["ET008"]}
+{"ctx": {"industry": "通用", "sku_name": "双人自助烤肉套餐"}, "kind": "口语省略", "query": "跑过去发现铁门锁着", "relevant": ["MC002"]}
+{"ctx": {}, "kind": "同义替换", "query": "年龄限制与代为购买", "relevant": ["ET007"]}
+{"ctx": {"industry": "通用", "sku_name": "双人自助烤肉套餐", "verified": true}, "kind": "口语省略", "query": "我人没到怎么就用掉了", "relevant": ["VF002"]}
+{"ctx": {"industry": "通用", "sku_name": "双人自助烤肉套餐", "verified": false}, "kind": "口语省略", "query": "约好了突然去不了", "relevant": ["RF003"]}
+{"ctx": {"industry": "通用", "sku_name": "双人自助烤肉套餐"}, "kind": "口语省略", "query": "能不能带毛孩子进去", "relevant": ["ET001"]}
+{"ctx": {}, "kind": "同义替换", "query": "凭证时限与展期", "relevant": ["ET006"]}
+{"ctx": {"industry": "通用", "sku_name": "双人自助烤肉套餐", "verified": true}, "kind": "口语省略", "query": "我的钱去哪了都过一星期了", "relevant": ["RF005"]}
+{"ctx": {}, "kind": "同义替换", "query": "单次可使用凭证数量上限", "relevant": ["VF004"]}
+{"ctx": {"industry": "通用", "sku_name": "双人自助烤肉套餐", "verified": false}, "kind": "口语省略", "query": "能给我朋友用吗", "relevant": ["VF003"]}
+{"ctx": {"industry": "通用", "sku_name": "双人自助烤肉套餐", "verified": false}, "kind": "场景描述", "query": "说好了六点到结果堵车七点才到还能用吗", "relevant": ["RS002"]}
+{"ctx": {"industry": "通用", "sku_name": "双人自助烤肉套餐", "verified": false}, "kind": "口语省略", "query": "中午的能晚上去吗", "relevant": ["RS002"]}
+{"ctx": {"industry": "通用", "sku_name": "双人自助烤肉套餐", "verified": true}, "kind": "口语省略", "query": "钱什么时候能回到我卡上", "relevant": ["RF005"]}
+{"ctx": {}, "kind": "同义替换", "query": "指定服务人员的额外费用", "relevant": ["LR001"]}
+{"ctx": {"industry": "休娱", "sku_name": "密室逃脱双人票"}, "kind": "口语省略", "query": "周六周日能不能用平时的", "relevant": ["XY001"]}
+{"ctx": {}, "kind": "同义替换", "query": "限定时间段的凭证跨时段使用", "relevant": ["RS002"]}

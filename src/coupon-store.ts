@@ -1,4 +1,5 @@
 import type { Pool, PoolOptions, RowDataPacket } from "mysql2/promise";
+import { rankKnowledge } from "./knowledge-retrieval.ts";
 
 export type QQIdentity = { appId: string; senderId: string };
 const unavailableOrder = "未找到当前客户可查询的订单，请核对订单号或联系人工客服。";
@@ -123,19 +124,15 @@ export class CouponStore {
       AND (shop_id IS NULL OR shop_id = ?) AND (product_id IS NULL OR product_id = ?)
       ORDER BY id LIMIT 201`, [shopId ?? null, productId ?? null]);
     if (rows.length > 200) throw new Error(databaseFailure);
-    const normalized = query.toLocaleLowerCase();
-    // ponytail: keyword retrieval covers the small synthetic corpus; measure recall before adding BM25 or vectors.
-    return rows.map((row) => {
+    const documents = rows.map((row) => {
       let tags: unknown;
       try { tags = typeof row.tags === "string" ? JSON.parse(row.tags) : row.tags; } catch { throw new Error(databaseFailure); }
       if (!Array.isArray(tags) || tags.some((tag) => typeof tag !== "string")) throw new Error(databaseFailure);
-      const score = tags.filter((tag: string) => tag && normalized.includes(tag.toLocaleLowerCase())).length;
-      return { row, score };
-    }).filter(({ score }) => score > 0)
-      .sort((a, b) => b.score - a.score || String(a.row.id).localeCompare(String(b.row.id)))
-      .slice(0, 5).map(({ row }) => ({
-        source: "demo-knowledge" as const, sourceId: row.id as string, title: row.title as string, body: row.body as string,
-        scope: { shopId: row.shop_id as string | null, productId: row.product_id as string | null },
-      }));
+      return { id: String(row.id), tags: tags as string[], row };
+    });
+    return rankKnowledge(query, documents).slice(0, 5).map(({ row }) => ({
+      source: "demo-knowledge" as const, sourceId: row.id as string, title: row.title as string, body: row.body as string,
+      scope: { shopId: row.shop_id as string | null, productId: row.product_id as string | null },
+    }));
   }
 }

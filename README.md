@@ -41,7 +41,7 @@ npm run check:business
 npm start
 ```
 
-`npm run validate` 是不需要数据库或 API key 的类型与离线工程检查，包含可单独运行的 `npm run check:reply` 模板检查。`npm run check:business` 使用真实 MySQL 和 Pi 的离线 faux 模型，检查数据关系、工具循环、归属、作用域、证据和拒绝路径，不证明真实模型的语义效果。`npm run check:model` 使用真实数据库与配置的真实模型，验证固定业务样例并保存评测历史；先执行下方 `eval:init`，真实运行可能产生模型费用。数据库结构、案例、只读授权和初始化限制见 [数据库说明](./docs/database.md)。
+`npm run validate` 是不需要数据库或 API key 的类型与离线工程检查，包含可单独运行的 `npm run check:reply` 模板检查与 `node scripts/retrieval-check.ts` 检索检查。`npm run check:business` 使用真实 MySQL 和 Pi 的离线 faux 模型，检查数据关系、工具循环、归属、作用域、证据和拒绝路径，不证明真实模型的语义效果。`npm run check:model` 使用真实数据库与配置的真实模型，验证固定业务样例并保存评测历史；先执行下方 `eval:init`，真实运行可能产生模型费用。数据库结构、案例、只读授权和初始化限制见 [数据库说明](./docs/database.md)。
 
 双用户工程检查运行 `node --env-file-if-exists=.env scripts/qq-isolation-check.ts`：真实 MySQL、Pi 脚本模型与单个 QQAgent，QQ 发信由本地记录替代，验证同群两个客户的并发、上下文、原路通知、异额方案、越权确认及各自幂等；不调用真实模型或 QQ 平台。检查发现并修复了不同订单并发准备方案时的空范围锁死锁，详见 [模拟售后说明](./docs/after-sales.md#确认与持久化边界)。
 
@@ -81,6 +81,8 @@ npm run eval:serve
 ```
 
 打开 [http://127.0.0.1:3001](http://127.0.0.1:3001)，查看运行记录、逐轮回答、检查结果、证据和工具轨迹，或选择两个运行逐例对比。工作台使用现有 MySQL 的四张 `eval_*` 表和专用账户，不重置业务数据、不修改 Pi 核心、不增加依赖。服务仅监听本机，网页只读，命令行启动真实评测。快照保留模型、Git、Prompt/Skill、工具、题集/检查器和合成业务数据，token 缺失不记成零，SDK 估算费用与安全拒绝单独说明。使用方式与指标限制见 [评测说明](./docs/evaluation.md)。
+
+P0 参考知识与检索基线已完成：固定版本原文、许可证、NOTICE 和文件哈希归档于 `data/reference/kefu-harness/`，作为独立离线 corpus，不写入 MySQL 业务规则，也未复制上游 Python 或运行其 CI。选集为 11 篇文档、44 道 standard / 26 道 hard；全量对照为 35 篇、136 / 76 道。运行 `node scripts/retrieval-baseline.ts` 生成 `.runtime/retrieval-baseline.json` 和 `.md`；第一版 Recall@5 选集为 59.09% / 3.85%，全量为 55.88% / 11.84%（均按 standard / hard）。MRR、失败样例与口径见 [检索基线](./docs/retrieval.md)。评分不调用模型或 QQ；工作台现有指标不支持 Recall/MRR，报告暂存独立文件，本轮未改前端或评测表。
 
 ## QQ → Pi 联调
 
@@ -123,9 +125,9 @@ QQ 使用本地 `Reply` 类型和固定策略模板控制格式，订单、金�
 
 1. 基座联调：QQ → 嵌入式 Pi SDK → DeepSeek/echo → QQ 的 WebSocket 真实群回复已验证；部署用 Webhook 另行验收。
 2. 会话验证：隔离、串行、超时和生命周期离线检查已通过；同群双用户真实身份、订单、原路通知和确认边界已联调，阻塞并发与上下文标记隔离由工程集成覆盖。
-3. 团购券只读业务：MySQL、身份映射、Prompt/Skill 与两个业务工具已接通；现用 8 篇原创演示规则，参考项目评测集导入与常规/难题检索基线留后续。
-4. 内置评测：将现有真实模型脚本持久化并提供只读工作台，支持逐例查看和版本对比，后续补检索集与更大样本。
-5. 售后闭环：D1 持久协商、D2 确认与幂等模拟退款、D3 原会话通知已实现；联合真实模型与真实 QQ 已验证“自动通知 → 用户追问退款 → 精确确认 → 幂等 → 重启查询”。双用户业务边界已另行联调；下一步补完整手机端与公网 Webhook 验收。
+3. 团购券只读业务：MySQL、身份映射、Prompt/Skill 与两个业务工具已接通；运行时仍用 8 篇原创演示规则。P0 独立参考 corpus 与常规/难题检索基线已完成，下一步 P1 按失败案例调整检索、Prompt、Skill 与业务样例。
+4. 内置评测：真实模型运行持久化到只读工作台，支持逐例查看和版本对比；离线检索报告单独保存，后续再扩充样本与展示。
+5. 售后闭环：D1 持久协商、D2 确认与幂等模拟退款、D3 原会话通知已实现；联合真实模型与真实 QQ 已验证“自动通知 → 用户追问退款 → 精确确认 → 幂等 → 重启查询”。双用户业务边界已另行联调；2026-10-04 起核心业务优先，公网 Webhook 与完整手机端验收降为 P2，本地继续使用 WebSocket。
 6. 回放与端到端验证：扩展已有检查，分别记录工程、真实模型和 QQ 验收，不使用参考项目的指标作为自己的成绩。
 
 QQ 阶段准备：开放平台机器人 AppID/AppSecret、具备群聊权限的测试账号和群；配置服务器 IP 列表时核对 API 出口 IP。Webhook 模式另需公网 HTTPS 回调地址，并在后台订阅 `GROUP_AT_MESSAGE_CREATE`。密钥保存在本地环境中。API 使用事件里的 `group_openid`，不是界面显示的 QQ 群号。

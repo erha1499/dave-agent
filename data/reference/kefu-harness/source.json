@@ -1,0 +1,51 @@
+{
+  "repo": "https://github.com/wanglongze123/kefu-harness",
+  "revision": "305590129ea020a5a362e07b294fd1587b8f53fd",
+  "files": {
+    "LICENSE": {
+      "sha256": "efe1fa056ce66cbfe5e58be33af2b733944698af71965d041eb69bcd056ed5a2",
+      "bytes": 1070
+    },
+    "NOTICE.md": {
+      "sha256": "d5626af7424d996ef6f427269f07785b0349da192304c6e3992b998378495015",
+      "bytes": 1534
+    },
+    "data/knowledge/docs.jsonl": {
+      "sha256": "d3cd80ba76fdc82e57c1eefdc66a20987f09bc9b3dd0fbd1287c709146217fae",
+      "bytes": 14267
+    },
+    "data/evalsets/retrieval.jsonl": {
+      "sha256": "40562c67e93e44fa515ab617c1634701d0211d92f1dfba95470332ceb74519ab",
+      "bytes": 13949
+    },
+    "data/evalsets/retrieval_hard.jsonl": {
+      "sha256": "471ee23837cd74a1e8d21fcdba6e73456548310cd00b4ecee0d3bda6da11f06a",
+      "bytes": 10766
+    }
+  },
+  "counts": {
+    "documents": 35,
+    "standard": 136,
+    "hard": 76
+  },
+  "selection": {
+    "documentIds": [
+      "CY001",
+      "CY002",
+      "CY003",
+      "RF001",
+      "RF002",
+      "RF003",
+      "RF004",
+      "RF005",
+      "VF001",
+      "VF002",
+      "MC002"
+    ],
+    "counts": {
+      "documents": 11,
+      "standard": 44,
+      "hard": 26
+    }
+  }
+}

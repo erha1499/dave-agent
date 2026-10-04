@@ -1,0 +1,15 @@
+{
+  "source": "dave-agent original synthetic cases; reference-corpus diagnostics only",
+  "noAnswer": [
+    { "id": "unknown-wifi", "query": "店里的 Wi-Fi 密码是什么", "shopId": null, "reason": "参考语料没有任何门店的 Wi-Fi 密码。" },
+    { "id": "unknown-refund-interest", "query": "退款利息按多少年利率计算", "shopId": null, "reason": "参考语料没有退款利息或年利率；退款标签命中不代表能回答具体问题。" },
+    { "id": "unknown-charging", "query": "停车场有几个电动车充电桩", "shopId": null, "reason": "停车文档不包含充电桩数量。" },
+    { "id": "unknown-nutrition", "query": "这个套餐含多少毫克钠", "shopId": null, "reason": "参考语料没有套餐营养成分。" }
+  ],
+  "scope": [
+    { "id": "missing-shop", "query": "本店暑期活动", "shopId": null, "required": [], "forbidden": ["SH001", "SH002"] },
+    { "id": "other-shop", "query": "本店暑期活动", "shopId": "shop_other", "required": [], "forbidden": ["SH001", "SH002"] },
+    { "id": "matching-shop", "query": "本店暑期活动", "shopId": "shop_1001", "required": ["SH001"], "forbidden": ["SH002"] },
+    { "id": "global-parking", "query": "停车", "shopId": null, "required": ["ET002"], "forbidden": ["SH001", "SH002"] }
+  ]
+}

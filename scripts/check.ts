@@ -19,3 +19,5 @@ assert.equal(configured.modelRuntime.getProviderAuthStatus("deepseek").source, "
 await assert.rejects(createConfiguredModelRuntime({ DEEPSEEK_API_KEY: "synthetic-key", MODEL_ID: "does-not-exist" }), /模型目录未找到/);
 
 console.log("模型配置检查通过：DeepSeek 默认配置、显式覆盖、运行时密钥与无效模型拒绝。");
+
+await import("./retrieval-check.ts");

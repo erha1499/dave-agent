@@ -185,7 +185,7 @@ async function businessSnapshot(pool: Pool) {
 }
 
 async function snapshot(session: Session, pool: Pool): Promise<EvalSnapshot> {
-  const implementationPaths = ["src/agent.ts", "src/coupon-store.ts", "src/eval-capture.ts", "scripts/coupon-model-check.ts", "package-lock.json"];
+  const implementationPaths = ["src/agent.ts", "src/coupon-store.ts", "src/knowledge-retrieval.ts", "src/eval-capture.ts", "scripts/coupon-model-check.ts", "package-lock.json"];
   const [prompt, skill, checker, capture, git, changes, business, implementationFiles] = await Promise.all([
     readFile(new URL("../prompts/customer-service.md", import.meta.url), "utf8"),
     readFile(new URL("../skills/shop-support/SKILL.md", import.meta.url), "utf8"),

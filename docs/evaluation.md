@@ -91,14 +91,25 @@ npm run check:model -- --label "未知政策说明调整"
 
 前后端协作：Kimi 负责 `web/evaluation/`，后端保持上述接口。前端使用响应的计划数、实际状态及 usage 报告比例，不写死某个套件的分母；D3 事件沿用 turn 结构并在 question 标识，完整口径位于快照 `content.measurement`。本轮没有新增前端接口或评测表。
 
+## 独立离线检索基线（P0 已完成）
+
+参考项目固定版本的原始 JSONL、许可证、NOTICE 与文件哈希已归档，未复制上游 Python 或运行其 CI。corpus 独立于 MySQL 业务规则：选集 11 篇文档、44 道 standard / 26 道 hard，全量对照 35 篇、136 / 76 道。检索评分不调用模型或 QQ，不能作为真实模型回答或业务闭环的通过率。
+
+```sh
+node scripts/retrieval-check.ts
+node scripts/retrieval-baseline.ts
+```
+
+检查已通过，并由 `scripts/check.ts` 纳入 `npm run validate`。基线输出 `.runtime/retrieval-baseline.json` 和 `.md`，第一版 Recall@5 按 standard / hard 分别为：选集 **59.09% / 3.85%**，全量 **55.88% / 11.84%**。MRR、失败样例和限制见 [检索基线](./retrieval.md)。工作台现有指标不支持 Recall/MRR，当前报告使用独立文件，未改前端或评测表。
+
 ## 检查与后续
 
 ```sh
-npm run validate       # 不需数据库/API key：类型、工程检查、评测口径、HTTP 边界与前端异步回归
+npm run validate       # 不需数据库/API key：类型、工程/检索检查、评测口径、HTTP 边界与前端异步回归
 npm run check:eval-db  # 真实 MySQL：持久化、失败/跳过、受限权限、历史与类型隔离
 npm run check:business # 既有真实 MySQL + Pi/faux 工程回放
 ```
 
 工作台精简版本 `5d29347` 已完成桌面/窄屏、运行切换、失败筛选、A/B 对比及未知指标展示验收；此前浏览器访问受阻记录已由这次实际验收补齐。本轮浏览器已核对最终 D1/D2 运行的 3/3 场景、21/21 usage、80,971 Tokens，并保留可见的失败历史。
 
-首版先提供可复测的本项目小样例基线。参考项目的 212 题检索集、人工/Judge 标注、线上 QQ 抽样、页面启动任务与长期趋势分析留后续；分别建立数据口径后再接入，不能用工程检查或小样例通过率代替完整业务效果。
+下一步 P1 按失败案例调整检索、Prompt/Skill 与业务样例，用固定题集复测并回归授权与幂等边界。公网 Webhook 与完整手机验收保留为 P2；人工/Judge 标注、线上 QQ 抽样、页面启动任务与长期趋势分析仍待后续建立口径，不能用工程检查、检索评分或小样例通过率代替完整业务效果。
