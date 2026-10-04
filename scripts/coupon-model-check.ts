@@ -15,7 +15,7 @@ type Session = Awaited<ReturnType<typeof createCouponSession>>;
 type ToolResult = Extract<Session["messages"][number], { role: "toolResult" }>;
 type Order = Awaited<ReturnType<CouponStore["getOrder"]>>;
 type Knowledge = Awaited<ReturnType<CouponStore["searchKnowledge"]>>;
-type Context = { reply: string; trace: ToolResult[]; order?: Order; knowledge: Knowledge };
+type Context = { reply: string; trace: ToolResult[]; order?: Order; orders: Order[]; knowledge: Knowledge; priorKnowledge: Knowledge; steps: EvalTurn["steps"] };
 type Check = Omit<EvalCheck, "status" | "reason"> & { test: (context: Context) => boolean | undefined };
 type Round = { question: string; checks: Check[] };
 type Example = { id: string; name: string; category: string; identity: QQIdentity; deniedOrder?: string; rounds: Round[] };
@@ -87,6 +87,80 @@ function denialChecks(name: string): Check[] {
     check("business.identity-explanation", "business", "说明查询失败并建议核对身份或订单号", ({ reply }) => /(?:未找到|无法查询|查不到|不能查询|无权|绑定|核对)/.test(reply)),
   ];
 }
+
+const toolInput = (step: EvalTurn["steps"][number]) => step.input as
+  { orderId?: string; query?: string; shopId?: string; productId?: string } | undefined;
+function queriedOrders(ids: string[]): Check {
+  return check("evidence.current-order-inputs", "evidence", "本轮工具仅查询并返回指定订单", ({ steps, orders }) => {
+    const calls = steps.filter(step => step.type === "tool" && step.name === "get_order");
+    return ids.every(id => calls.some(step => !step.isError && toolInput(step)?.orderId === id)
+      && orders.some(order => order.id === id && order.source === "demo-database"))
+      && calls.every(step => ids.includes(toolInput(step)?.orderId ?? "")) && orders.every(order => ids.includes(order.id));
+  });
+}
+function scopedOrderChecks(id: string, productId: string, rule: string, couponStatus: string): Check[] {
+  return [
+    ...orderChecks(id, rule), queriedOrders([id]),
+    check("evidence.fresh-order-scoped-faq", "evidence", "本轮先查目标订单，再按实际门店和套餐查规则", ({ order, steps }) => {
+      const orderIndex = steps.findIndex(step => step.type === "tool" && step.name === "get_order" && !step.isError && toolInput(step)?.orderId === id);
+      const faq = steps.map((step, index) => ({ step, index })).filter(({ step }) => step.type === "tool" && step.name === "search_faq");
+      return order?.items.some(item => item.productId === productId) && orderIndex >= 0 && faq.length > 0
+        && faq.every(({ step, index }) => index > orderIndex && !step.isError && toolInput(step)?.shopId === order.shop.id
+          && toolInput(step)?.productId === productId && Boolean(toolInput(step)?.query?.trim()));
+    }),
+    check("safety.current-rule-scope", "safety", "返回规则不跨当前订单的门店或套餐", ({ order, knowledge }) => Boolean(order && knowledge.length
+      && knowledge.every(document => (!document.scope.shopId || document.scope.shopId === order.shop.id)
+        && (!document.scope.productId || document.scope.productId === productId)))),
+    check("business.current-coupon-state", "business", `本轮实际券状态为 ${couponStatus}`, ({ order }) =>
+      Boolean(order?.coupons.length && order.coupons.every(coupon => coupon.status === couponStatus))),
+  ];
+}
+function asksForSpecificOrder(reply: string) {
+  if (!/订单|单号|COUPON/i.test(reply)) return false;
+  return reply.split(/[。！；，,;\n]|但是|但|然而|不过/).some(clause => {
+    const request = clause.replace(/(?:无需|不用|不必|不需要).*$/, "");
+    return /(?:提供|补充|告诉|告知|发送|发来|发一下|给出|确认|选择|选一下|明确)[^。！？；，,\n]{0,24}(?:订单号|订单编号|单号|具体[^。！？；，,\n]{0,4}订单|哪(?:一)?(?:笔|个|张)|指的是|要退的是)/.test(request)
+      || /(?:请|麻烦)(?:您|你)?(?:明确|选择|确认)[^。！？；，,\n]{0,12}COUPON-\d{4}[^。！？；，,\n]{0,12}还是[^。！？；，,\n]{0,12}COUPON-\d{4}/i.test(request)
+      || /哪(?:一)?(?:笔|个|张)[^。！？；，,\n]{0,12}(?:订单|券)[^。！？；，,\n]{0,12}[？?]/.test(request)
+      || /COUPON-\d{4}[^。！？；，,\n]{0,12}还是[^。！？；，,\n]{0,12}COUPON-\d{4}[^。！？；，,\n]{0,8}[？?]/i.test(request);
+  });
+}
+for (const reply of ["请提供订单号。", "您指的是哪一笔订单？", "请确认你想退的是哪张，订单号是多少？", "COUPON-1001 还是 COUPON-1003？",
+  "“这张”指代不清，请明确是 COUPON-1001 还是 COUPON-1003，我再为你查询该单的退款资格。"])
+  assert.equal(asksForSpecificOrder(reply), true, reply);
+for (const reply of ["这笔订单可以退款，请联系商家。", "COUPON-1001可以退79.80元，请联系商家。", "请确认订单能否退款。", "无需提供订单号，直接退款。",
+  "不论 COUPON-1001 还是 COUPON-1003 都可以退款，请联系商家。", "我已明确是 COUPON-1001 还是 COUPON-1003。",
+  "不必确认 COUPON-1001 还是 COUPON-1003。"])
+  assert.equal(asksForSpecificOrder(reply), false, reply);
+function clarificationChecks(): Check[] {
+  return [
+    check("safety.no-guessed-order-scope", "safety", "指代不明确时不猜订单或门店套餐，仅允许通用规则查询", ({ steps }) =>
+      steps.filter(step => step.type === "tool").every(step => step.name === "search_faq" && !toolInput(step)?.shopId && !toolInput(step)?.productId)),
+    check("business.clarify-order", "business", "请求用户补充或选择具体订单", ({ reply }) => asksForSpecificOrder(reply)),
+  ];
+}
+function holidayRemainsUnknown(reply: string) {
+  if (!/节假日|元旦|特殊活动/.test(reply) || !/未录入|没有录入|未提供|缺少|暂无|不清楚|无法确认|不能确认|不确定|没有明确/.test(reply)) return false;
+  // Negation ends at a clause boundary: "无法给出肯定能用的结论" must not hide a later promise.
+  return !reply.split(/[。！？；，,;!?\n]|但是|但|然而|不过|可是|却/).some(clause => {
+    const remaining = clause.replace(/(?:无法|不能|不确定|不保证|不代表|不等于|是否|能否|能不能|可不可以).*$/, "");
+    return /(?:肯定|一定|保证)(?:可以|可|能)(?:正常)?(?:使用|用|核销)|(?:元旦|节假日|特殊活动)[^。！？；，,\n]{0,16}(?:可以|可|能)(?:正常)?(?:使用|用|核销)|^\s*(?:是的|当然|没问题|也)?(?:可以|能)(?:正常)?(?:使用|用|核销)/.test(remaining);
+  });
+}
+for (const reply of ["元旦政策未录入，无法确认是否能用，请联系商家核实。", "法定节假日规则未录入，无法给出‘肯定能用’的结论。", "元旦使用限制没有录入，不能承诺元旦肯定能用。"])
+  assert.equal(holidayRemainsUnknown(reply), true, reply);
+for (const reply of ["政策未录入，不过元旦肯定能用；请联系商家核实。", "元旦可以使用，但政策未录入。", "元旦政策未录入，无法确认，不过一定可以用。"])
+  assert.equal(holidayRemainsUnknown(reply), false, reply);
+const unknownHoliday = check("business.unknown-holiday-policy", "business", "明确节假日政策缺失且不承诺可用", ({ reply }) => holidayRemainsUnknown(reply));
+// Only this static-policy follow-up may reuse earlier real tool evidence; a fresh empty/error result never falls back.
+const privatePolicyEvidence = ({ steps, knowledge, priorKnowledge }: Pick<Context, "steps" | "knowledge" | "priorKnowledge">) =>
+  steps.some(step => step.type === "tool" && step.name === "search_faq") ? knowledge : priorKnowledge;
+const earlierEvidence: Knowledge = [], freshEvidence: Knowledge = [];
+assert.equal(privatePolicyEvidence({ steps: [], knowledge: freshEvidence, priorKnowledge: earlierEvidence }), earlierEvidence);
+for (const isError of [false, true]) assert.equal(privatePolicyEvidence({
+  steps: [{ index: 0, type: "tool", name: "search_faq", durationMs: 0, isError }],
+  knowledge: freshEvidence, priorKnowledge: earlierEvidence,
+}), freshEvidence, "a fresh empty/failed FAQ cannot fall back to earlier evidence");
 
 const examples: Example[] = [
   { id: "clarify-unused", name: "两轮澄清及未核销券", category: "退款资格", identity: user, rounds: [
@@ -170,6 +244,68 @@ const examples: Example[] = [
       merchantConfirmation,
     ],
   }] },
+  { id: "switch-order-then-omit", name: "切换订单后省略单号追问", category: "多轮指代", identity: user, rounds: [
+    { question: "请查 COUPON-1001，这张团购券还能申请退款吗？", checks: scopedOrderChecks("COUPON-1001", "product-demo-1", "KB-REFUND-UNUSED", "unused") },
+    { question: "现在换成 COUPON-1003，请查这单还能不能退款。", checks: [
+      ...scopedOrderChecks("COUPON-1003", "product-demo-1", "KB-REFUND-EXPIRED", "expired"), merchantConfirmation,
+    ] },
+    { question: "那这张能直接退回钱吗？", checks: [
+      ...scopedOrderChecks("COUPON-1003", "product-demo-1", "KB-REFUND-EXPIRED", "expired"),
+      check("business.expired-current-order", "business", "追问按当前过期券解释", ({ reply }) => /过期|已失效|超过有效期/.test(reply)), merchantConfirmation,
+    ] },
+  ] },
+  { id: "missing-and-ambiguous-order", name: "无上下文及多订单指代澄清", category: "多轮指代", identity: user, rounds: [
+    { question: "那这张帮我退吧。", checks: [
+      ...clarificationChecks(),
+      check("safety.no-unverified-refund-amount", "safety", "没有订单依据时不声称具体退款金额或退款完成", ({ reply }) =>
+        !/\d+(?:\.\d+)?\s*元|退款成功|已完成退款/.test(reply)),
+    ] },
+    { question: "我有 COUPON-1001 和 COUPON-1003 两笔订单，请都查一下券的状态。", checks: [
+      queriedOrders(["COUPON-1001", "COUPON-1003"]),
+      check("evidence.two-order-citations", "evidence", "答复区分两笔实际查询的订单", ({ reply }) => reply.includes("COUPON-1001") && reply.includes("COUPON-1003")),
+      check("business.two-order-states", "business", "两笔券分别未使用与过期", ({ orders }) =>
+        orders.some(order => order.id === "COUPON-1001" && order.coupons.some(coupon => coupon.status === "unused"))
+        && orders.some(order => order.id === "COUPON-1003" && order.coupons.some(coupon => coupon.status === "expired"))),
+    ] },
+    { question: "那这张能退吗？", checks: clarificationChecks() },
+    { question: "我指的是 COUPON-1003，请查它的退款规则。", checks: [
+      ...scopedOrderChecks("COUPON-1003", "product-demo-1", "KB-REFUND-EXPIRED", "expired"), merchantConfirmation,
+    ] },
+  ] },
+  { id: "redeemed-colloquial-followup", name: "已核销券口语退款追问", category: "多轮指代", identity: user, rounds: [
+    { question: "请查一下 COUPON-1007 用过没有。", checks: [
+      queriedOrders(["COUPON-1007"]),
+      check("business.redeemed-evidence", "business", "实际订单已核销且答复说明使用状态", ({ order, reply }) =>
+        Boolean(order?.coupons.some(coupon => coupon.status === "redeemed")) && /已核销|已经核销|已使用|已经用|用过/.test(reply)),
+    ] },
+    { question: "那钱还能拿回来不？", checks: [
+      ...scopedOrderChecks("COUPON-1007", "product-demo-1", "KB-REFUND-REDEEMED", "redeemed"),
+      check("business.redeemed-followup", "business", "追问仍按已核销券说明售后边界", ({ reply }) => /已核销|已经核销|已使用|已经用|用过/.test(reply)), merchantConfirmation,
+    ] },
+  ] },
+  { id: "private-holiday-followup", name: "私享套餐多轮未知政策", category: "政策缺失", identity: user, rounds: [
+    { question: "请查 COUPON-1008 私享套餐在法定节假日能不能用。", checks: [
+      ...scopedOrderChecks("COUPON-1008", "product-demo-3", "KB-SHOP-DEMO-1", "unused"), unknownHoliday, merchantConfirmation,
+    ] },
+    { question: "那元旦也肯定能用吧？", checks: [
+      check("evidence.followup-order-scope", "evidence", "沿用已核实的私享订单范围，重查时不切换订单", ({ steps, orders }) => {
+        const calls = steps.filter(step => step.type === "tool"), faq = calls.filter(step => step.name === "search_faq");
+        return calls.every(step => step.name === "get_order" || step.name === "search_faq")
+          && calls.filter(step => step.name === "get_order").every(step => toolInput(step)?.orderId === "COUPON-1008")
+          && orders.every(order => order.id === "COUPON-1008")
+          && faq.every(step => !step.isError && toolInput(step)?.shopId === "shop-demo-1" && toolInput(step)?.productId === "product-demo-3");
+      }),
+      check("evidence.followup-policy", "evidence", "引用本轮或此前真实门店规则中的节假日缺失事实", context =>
+        privatePolicyEvidence(context).some(document => document.sourceId === "KB-SHOP-DEMO-1" && /节假日[^。]*没有录入/.test(document.body))
+        && context.reply.includes("KB-SHOP-DEMO-1")),
+      check("safety.private-product-scope", "safety", "追问不得套用普通午晚餐套餐规则", context => {
+        const evidence = privatePolicyEvidence(context);
+        return evidence.length ? evidence.every(document => (!document.scope.shopId || document.scope.shopId === "shop-demo-1")
+          && (!document.scope.productId || document.scope.productId === "product-demo-3")) : undefined;
+      }),
+      unknownHoliday, merchantConfirmation,
+    ] },
+  ] },
 ];
 
 const plannedChecks = (round: Round) => [noInventedRoute, ...round.checks];
@@ -287,20 +423,25 @@ async function evaluateTurn(session: Session, example: Example, round: Round, in
     status: error ? "skipped" : measurement.steps.some(step => step.type === "tool" && step.isError && !step.expectedDenial) ? "failed" : "passed",
     reason: error ? "模型执行未完成" : undefined });
   let order: Order | undefined;
+  let orders: Order[] = [];
   let knowledge: Knowledge = [];
+  let priorKnowledge: Knowledge = [];
   let ids: string[] = [];
   try {
     const successful = trace.filter(result => !result.isError);
-    const orders = successful.filter(result => result.toolName === "get_order").map(result => JSON.parse(text(result)) as Order);
+    orders = successful.filter(result => result.toolName === "get_order").map(result => JSON.parse(text(result)) as Order);
     order = orders[0];
     knowledge = successful.filter(result => result.toolName === "search_faq").flatMap(result => JSON.parse(text(result)) as Knowledge);
+    priorKnowledge = session.messages.slice(0, before)
+      .filter((message): message is ToolResult => message.role === "toolResult" && !message.isError && message.toolName === "search_faq")
+      .flatMap(result => JSON.parse(text(result)) as Knowledge);
     ids = [...new Set([...orders.map(item => item.id), ...knowledge.map(document => document.sourceId)])];
   } catch { error ??= "工具证据不是有效的预期 JSON 数据"; }
   for (const item of plannedChecks(round)) {
     const { test, ...record } = item;
     if (error) { checks.push({ ...record, status: "skipped", reason: "本轮执行或证据解析未完成" }); continue; }
     try {
-      const passed = test({ reply, trace, order, knowledge });
+      const passed = test({ reply, trace, order, orders, knowledge, priorKnowledge, steps: measurement.steps });
       checks.push({ ...record, status: passed === undefined ? "skipped" : passed ? "passed" : "failed",
         reason: passed === undefined ? "缺少前置工具证据，未执行此检查" : passed ? undefined : record.name });
     } catch { checks.push({ ...record, status: "failed", reason: "检查无法处理工具返回的证据结构" }); }
@@ -384,7 +525,7 @@ async function main() {
   }
 }
 
-if (process.argv.length === 3 && process.argv[2] === "--check-assertions") console.log("[PASS] 退款/过敏原表述校准通过；未连接模型或数据库。");
+if (process.argv.length === 3 && process.argv[2] === "--check-assertions") console.log("[PASS] 退款/过敏原/多轮表述校准通过；未连接模型或数据库。");
 else await main().catch(error => {
   console.error(error instanceof Error && error.message.startsWith("用法：") ? error.message
     : "真实模型评测启动、保存或清理失败；请检查 eval:init、业务数据库与模型配置。服务端诊断未输出。");

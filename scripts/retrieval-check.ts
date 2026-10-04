@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { rankKnowledge, rankKnowledgeBaseline } from "../src/knowledge-retrieval.ts";
-import { loadRetrievalData, validateRetrievalData, type RetrievalQuestion } from "./retrieval-data.ts";
+import { loadRetrievalData, validateRetrievalData, type KnowledgeDocument, type RetrievalQuestion } from "./retrieval-data.ts";
 import { compareCorpora, evaluateBoundaries, evaluateCorpus, retrieve, scoreQuestion, summarize } from "./retrieval-baseline.ts";
 
 const data = await loadRetrievalData();
@@ -63,6 +64,39 @@ assert.deepEqual(rankKnowledge("退款", duplicateTags).map(doc => doc.id), ["A"
 assert.deepEqual(rankKnowledgeBaseline("退款", duplicateTags).map(doc => doc.id), ["B", "A"], "baseline preserves its original duplicate-tag scoring");
 assert.deepEqual(duplicateTags, originalDuplicates);
 assert.deepEqual(rankKnowledge("开票", [{ id: "invoice", tags: ["开票"] }]).map(doc => doc.id), ["invoice"], "preserve domain tags even when ICU splits them");
+
+const validationBytes = await readFile(new URL("../data/retrieval-validation.json", import.meta.url));
+const validation = JSON.parse(validationBytes.toString("utf8")) as {
+  source: string; canonicalTerms: string[]; documents: KnowledgeDocument[];
+  cases: { id: string; query: string; shopId: string | null; required: string[]; forbidden: string[]; empty?: boolean; baselineEmpty?: boolean }[];
+};
+assert.equal(validation.documents.length, 5);
+assert.equal(new Set(validation.documents.map(doc => doc.id)).size, validation.documents.length);
+assert.equal(validation.cases.length, 8);
+assert.ok(validation.documents.every(doc => doc.tags.length === 0), "new title/body cases must not be rescued by tags");
+const originalValidation = structuredClone(validation.documents);
+const validationResults = evaluateBoundaries(validation.documents, {
+  source: validation.source,
+  noAnswer: validation.cases.filter(item => item.empty).map(item => ({ ...item, reason: "原创小语料不含该事实。" })),
+  scope: validation.cases.filter(item => !item.empty),
+});
+assert.equal(validationResults.noAnswer.questions, 1);
+assert.equal(validationResults.noAnswer.emptyResponses, 1);
+assert.equal(validationResults.scope.passed, validationResults.scope.questions,
+  JSON.stringify(validationResults.scope.cases.filter(item => !item.passed)));
+for (const item of validation.cases) {
+  if (item.baselineEmpty) assert.deepEqual(retrieve(validation.documents, item, "baseline"), [], `${item.id}: preserve the known tags-only miss`);
+  assert.ok(retrieve(validation.documents, item).every(doc => validation.documents.includes(doc)), `${item.id}: return original evidence objects`);
+}
+assert.deepEqual(validation.documents, originalValidation, "do not rewrite fixture evidence");
+assert.equal(validation.canonicalTerms.length, 9);
+assert.equal(new Set(validation.canonicalTerms).size, 9);
+for (const word of validation.canonicalTerms) for (const field of ["title", "body"] as const) {
+  const document = { id: `${field}-${word}`, tags: [], [field]: word };
+  assert.equal(rankKnowledge(word, [document])[0], document, `${word}: retain canonical terms in ${field} without tags`);
+}
+console.log(`PASS 预先固定新问法验证（非盲测）：8/8 问法，18/18 canonical 工程检查；SHA256 ${createHash("sha256").update(validationBytes).digest("hex")}`);
+
 const question: RetrievalQuestion = { id: "synthetic", suite: "standard", query: "退款", relevant: ["A", "F"], shopId: null };
 const sixth = scoreQuestion(question, ["A", "B", "C", "D", "E", "F"]);
 assert.equal(sixth.recallAt1, .5); assert.equal(sixth.recallAt5, .5); assert.equal(sixth.reciprocalRank, 1);

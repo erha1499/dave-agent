@@ -66,7 +66,7 @@ export async function createCouponSession(
     defineTool({
       name: "search_faq",
       label: "查询模拟团购券规则",
-      description: "检索公开团购券规则并返回证据ID及适用门店/套餐。具体订单应先get_order，再使用结果中的shopId/productId查询适用规则；不传范围只查询通用规则，空结果表示未知。",
+      description: "检索公开团购券规则并返回证据ID及适用门店/套餐。参数仅为query、shopId、productId；不接受orderId。具体退款资格问题每轮先get_order，再使用该结果中的shopId/productId查询，即使重复追问或结论是不能直接退也要重查；不传范围只查询通用规则，空结果表示未知。",
       parameters: Type.Object({
         query: Type.String({ minLength: 1, maxLength: 500 }),
         shopId: Type.Optional(Type.String({ minLength: 1, maxLength: 64 })),
@@ -77,7 +77,7 @@ export async function createCouponSession(
     defineTool({
       name: "get_order",
       label: "查询本人模拟券单",
-      description: "按COUPON-1001格式订单号查询当前QQ身份的模拟团购券订单、核销、付款和历史退款事实。身份由宿主绑定并在每次执行时校验；不能查询他人或修改数据。金额单位为分。",
+      description: "按COUPON-1001格式订单号查询当前QQ身份的模拟团购券订单、核销、付款和历史退款事实。每次用户询问退款资格或金额都重新调用本工具，历史结果只帮助定位订单，不能代替最新用户消息之后的调用；随后查询适用FAQ。指代不清先询问，不猜单。身份由宿主绑定并在每次执行时校验；不能查询他人或修改数据。金额单位为分。",
       parameters: Type.Object({ orderId: Type.String({ pattern: "^COUPON-\\d{4}$" }) }, { additionalProperties: false }),
       execute: async (_id, { orderId }) => ({ content: [{ type: "text", text: JSON.stringify(await store.getOrder(identity, orderId)) }], details: {} }),
     }),

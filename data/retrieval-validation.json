@@ -1,0 +1,21 @@
+{
+  "source": "dave-agent 原创合成文档与预先固定的新问法验证；已向实现者披露，不是盲测或真实客服数据。",
+  "canonicalTerms": ["退款", "未核销", "已核销", "到账", "过期", "改期", "预约", "排队", "外带"],
+  "documents": [
+    { "id": "NEW-BODY-TAKEOUT", "title": "打包限制", "body": "外带需使用密封餐盒。", "tags": [], "shopId": null, "industry": "餐饮" },
+    { "id": "NEW-TITLE-RESCHEDULE", "title": "改期说明", "body": "请至少提前一天告知门店。", "tags": [], "shopId": null, "industry": "餐饮" },
+    { "id": "NEW-REFUND", "title": "售后办理", "body": "未核销券可以申请退款，需由门店核实。", "tags": [], "shopId": null, "industry": "餐饮" },
+    { "id": "NEW-EXPIRED", "title": "过期券说明", "body": "交由人工核实有效期，不自动恢复。", "tags": [], "shopId": null, "industry": "餐饮" },
+    { "id": "NEW-SHOP-TAKEOUT", "title": "外带须知", "body": "请领取专用包装盒。", "tags": [], "shopId": "validation-shop", "industry": "餐饮" }
+  ],
+  "cases": [
+    { "id": "new-body-takeout", "query": "我吃不完想带回家，行吗", "shopId": null, "required": ["NEW-BODY-TAKEOUT"], "forbidden": ["NEW-SHOP-TAKEOUT"], "baselineEmpty": true },
+    { "id": "new-title-reschedule", "query": "我能换时间吗", "shopId": null, "required": ["NEW-TITLE-RESCHEDULE"], "forbidden": [] },
+    { "id": "new-unused-refund", "query": "一次也没用过，能退费吗", "shopId": null, "required": ["NEW-REFUND"], "forbidden": [] },
+    { "id": "new-expired", "query": "这张券到期以后该找谁处理", "shopId": null, "required": ["NEW-EXPIRED"], "forbidden": [] },
+    { "id": "new-unknown-nutrition", "query": "营养表上有多少维生素C", "shopId": null, "required": [], "forbidden": [], "empty": true },
+    { "id": "new-scope-missing", "query": "这个套餐能带走吗", "shopId": null, "required": ["NEW-BODY-TAKEOUT"], "forbidden": ["NEW-SHOP-TAKEOUT"] },
+    { "id": "new-scope-other", "query": "外带需要什么包装", "shopId": "another-validation-shop", "required": ["NEW-BODY-TAKEOUT"], "forbidden": ["NEW-SHOP-TAKEOUT"] },
+    { "id": "new-scope-matching", "query": "这个套餐外带要用什么容器", "shopId": "validation-shop", "required": ["NEW-BODY-TAKEOUT", "NEW-SHOP-TAKEOUT"], "forbidden": [] }
+  ]
+}

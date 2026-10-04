@@ -128,7 +128,7 @@ async function main() {
   const boundaryData = JSON.parse(boundaryBytes.toString("utf8")) as BoundaryData;
   const algorithms = (["baseline", "current"] as const).map(id => ({ id,
     description: id === "baseline" ? "tags 子串命中计数；零分排除；分数降序、ID 同分排序。"
-      : "NFKC/小写与业务同义归一；zh-CN 分词去通用词/单字，并补完整命中标签；词权重 1+ln((N+1)/(df+1))，标签全等5/包含2、标题2、正文1；零分排除，分数降序、ID 同分排序。",
+      : "NFKC/小写与业务同义归一；zh-CN 分词去通用词/单字，保留同义规范词项与完整命中标签；词权重 1+ln((N+1)/(df+1))，标签全等5/包含2、标题2、正文1；零分排除，分数降序、ID 同分排序。",
     corpora: datasets.map(corpus => evaluateCorpus(corpus.id, corpus.documents, corpus.questions, id)),
     boundaries: evaluateBoundaries(data.documents, boundaryData, id),
   }));

@@ -34,6 +34,8 @@ const words = (value: string) => new Set([...segmenter.segment(value)]
 // ponytail: bounded in-memory lexical ranking; evaluate semantic misses before adding embeddings or a service.
 export function rankKnowledge<T extends Document>(query: string, documents: readonly T[]): T[] {
   const normalized = normalize(query), terms = words(normalized);
+  // Synonym targets must survive ICU splitting even when they appear only in title/body.
+  for (const term of Object.keys(synonyms)) if (normalized.includes(term)) terms.add(term);
   const candidates = documents.map(document => {
     const tags = [...new Set(document.tags.map(normalize))];
     // Keep explicit domain tags intact even when ICU splits them into single characters.
