@@ -1,6 +1,6 @@
 # C1：可信上下文与可配置知识服务
 
-更新：2026-10-06。v2.2、逐候选隔离、typed v5、已声明必要前提门控及 Pi 原生动作工具选择已实现。最新真实 Pi Session 开发为 **10/10 对话、20/20 轮**，MySQL **14/14、24/24、172/172**，见 [Session 结果](./c1-session-results.md) 与 [业务结果](./c1-business-results.md)。**首次新固定验证15/24对话、36/45轮，C1未准入**，见[新验证结果](./c1-session-validation-results.md)与[下一轮方案](./c1-next-iteration.md)。语言诊断为7/8，商品类别映射歧义也未消失。旧失败与评分修订分别保留，见 [首次审计](./c1-context-results.md)、[评分合同](./c1-runner-contract.md)。默认仍为 atomic + lexical，没有自动切换 QQ。
+更新：2026-10-06。v2.2、逐候选隔离、typed v5、已声明必要前提门控及 Pi 原生动作工具选择已实现。早期开发记录为真实 Pi Session **10/10 对话、20/20 轮**、MySQL **14/14、24/24、172/172**，见 [Session 结果](./c1-session-results.md) 与 [业务结果](./c1-business-results.md)。**首次新固定验证15/24对话、36/45轮，C1未准入**；后续已曝光 Flash 开发为 **14/24、35/45**，Pro 单变量对照为 **17/24、36/45，另2轮未执行**，仍保留 Flash，见[新验证结果](./c1-session-validation-results.md)、[迭代结果](./c1-next-iteration-results.md)、[模型对照](./c1-agent-model-ablation.md)。竞争引用与精确选择恢复已完成[工程候选](./c1-reference-selection.md#已实现与可复现演示)，不能用工程通过更新上述真实模型成绩。语言诊断7/8、商品类别映射歧义、旧失败与评分修订保留，见 [首次审计](./c1-context-results.md)、[评分合同](./c1-runner-contract.md)。默认仍为 atomic + lexical，没有自动切换 QQ。
 
 ## 要解决的问题
 
@@ -29,11 +29,11 @@ flowchart LR
 | 部分 | 本项目实现 | 复用或限制 |
 | --- | --- | --- |
 | Agent 循环 | Controller 动作协议、前置校验与有限修复、确定性确认路径 | Pi SDK 提供模型调用、工具循环和生命周期；没有 fork Pi。 |
-| 可信上下文 | 有界已授权订单候选、宿主实际展示的实付金额引用、成功取证的单一政策话题；每次使用重新取证 | 当前在会话内有效。跨重启持久恢复仍属于 O4。模型话术不是金额、范围或批准依据。 |
+| 可信上下文 | 有界已授权订单候选、宿主实际展示的实付金额引用；当前工程候选另保留最多3个成功政策话题，歧义经实际展示与用户精确选择恢复，每次使用重新取证 | 当前在会话内有效。合法 token 只证明选择来源，不能证明任意自然语言理解正确；跨重启持久恢复仍属于 O4。模型话术不是金额、范围或批准依据。 |
 | 知识服务 | 词项/M4 策略、阈值、binary/typed 判别、来源复检、超时及配置快照 | 复用现有百炼客户端和 Pi 模型客户端；不新建向量平台。线上仍使用 8 篇原创政策，参考 corpus 隔离。 |
 | 审计和评测 | 原问/实际查询/可信范围、证据版本、逐篇判别、调用归因、失败与成本 | 工作台 UI 由 Kimi K3 Max 实现，Codex 负责后端契约、集成和审查；历史缺失字段不补造。 |
 
-关键入口：[`support-context.ts`](../src/support-context.ts)、[`support-controller.ts`](../src/support-controller.ts)、[`support-session.ts`](../src/support-session.ts)、[`knowledge-service.ts`](../src/knowledge-service.ts)、[`evidence-support.ts`](../src/evidence-support.ts)、[`knowledge-evaluation.ts`](../src/knowledge-evaluation.ts)。
+关键入口：[`support-context.ts`](../src/support-context.ts)、[`support-reference-selection.ts`](../src/support-reference-selection.ts)、[`support-controller.ts`](../src/support-controller.ts)、[`support-session.ts`](../src/support-session.ts)、[`knowledge-service.ts`](../src/knowledge-service.ts)、[`evidence-support.ts`](../src/evidence-support.ts)、[`knowledge-evaluation.ts`](../src/knowledge-evaluation.ts)。
 
 ## 为什么这样设计
 
@@ -52,6 +52,18 @@ flowchart LR
 **取消阻止晚结果发布。** 实际 Session + faux 检查复现了取消后订单结果仍写入焦点的问题。修复在服务返回和异步焦点写入后核对取消与轮次身份，延后发布会话结果；旧轮失败不会清除新轮引用。已经完成的操作审计和固定收据保留，已开始的存储写入不能宣称被取消回滚。
 
 ## 验证与面试演示
+
+面试主线先从已验证的[售后演示路线](./after-sales.md#面试演示路线)开始，串起成功、澄清、越权与失败恢复，再解释 C1 正在解决的多轮引用问题。售后平台结果属于历史默认架构，本页 Controller/检索候选另有合同和失败记录；2026-10-06 补材料时只静态核对命令、源码与记录，没有重验真实 QQ，也没有给历史结果追加当前通过标记。
+
+| 讲解入口 | 调用链、取舍与证据 |
+| --- | --- |
+| 谁负责循环，谁负责业务安全？ | [`createSupportSession`](../src/support-session.ts) 复用 [`createSession`](../src/agent.ts) 的 Pi 工具循环和请求生命周期，只暴露 `support_action`；`SupportController.createTurn → validate/execute → getOrder/searchKnowledge` 负责有界协议和本轮证据。确认与幂等在[售后 Store 边界](./after-sales.md#面试讲解的源码入口)，不是 Prompt 保证，也没有自行重写 Pi 核心。 |
+| 多轮上下文如何被使用？ | `rememberReferenceChoice → 实际候选展示 → 用户单行选择 → host receipt → 下一轮重新授权取证`，见[竞争引用合同及演示](./c1-reference-selection.md)。成功 previous 更新同一分支和真实原问链；完整新问题可以查询，但不会清掉尚未解决的选择。保留自然只读续问的代价是 `focus/standalone` 仍有模型语义误选可能。 |
+| 为什么检索命中还不能答？ | [`buildSupportEvidenceBinding`](../src/support-evidence-context.ts) 绑定真实原问、fresh 订单事实和范围，`KnowledgeService.search` 再执行候选排序、必要前提、支持判别和来源复检。与仅按分数接收相比，增加判别费用、延迟及人工标注维护；[A1 支持性结果](./a1-support-results.md)是离线结果，[C1 首次验证](./c1-session-validation-results.md)保留在线语境的误拒和引用失败。 |
+| 为什么不直接换更大的 Agent？ | [Flash/Pro 单变量开发对照](./c1-agent-model-ablation.md#实际结果与选型)记录通过对话14/24→17/24，但两组仍未准入，Pro另有2轮未执行。批次估算从 USD 0.050437296 + CNY 0.032034 到 USD 0.131307264 + CNY 0.0352745；币种不换算，不能由一次开发对照宣称泛化提升。 |
+| 证明了什么，还有什么没做？ | [首次固定验证](./c1-session-validation-results.md)、[后续迭代失败](./c1-next-iteration-results.md)与[工程选择恢复](./c1-reference-selection.md#已实现与可复现演示)分开。样例通过、实际回复审阅、QQ 平台验收和商业运行是不同层级；当前没有真实商家外呼或资金接口，O4/O5及新题准入继续待做。 |
+
+无需真实模型或数据库的候选展示可运行 `node scripts/support-reference-selection-check.ts`、`node scripts/support-reference-session-check.ts`：前者检查绑定/版本/有效期，后者通过实际 Pi/faux 检查展示回执、连续恢复、错误选择和 fresh 读取。它们是确定性工程演示，不评价模型理解自然语言的正确率。主业务演示、真实模型脚本的准备条件和历史指标复用[售后说明](./after-sales.md#面试演示路线)，无需另建一套面试应用。
 
 当前工程验证包括 `npm run validate`、真实 MySQL 的 business/refund/merchant-notifications 检查；它们验证所列工程合同，不抵销陌生问法上的失败。此前 typed v2 / 旧协议业务 run 为 `990dac49-10c3-46ab-a6dd-fdcb6e0c8f69`，24 轮 P50/P95 为 1767/4069 ms，估算 $0.015789492 + ¥0.0030625。它是单组最终候选，历史 lexical 结果不能充当同代码配对。
 

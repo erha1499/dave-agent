@@ -1,0 +1,1451 @@
+{
+  "version": 1,
+  "suiteId": "c1-reference-selection-development-v1",
+  "stage": "exposed-development",
+  "scope": "独立隔离语料及内存合成订单；无线上写入、QQ发送或真实退款。固定开发对话，不是独立C1准入验证。",
+  "provenance": {
+    "baseFiles": {
+      "data/c1-session-exposed-development-setup.json": "fda8cb8415d7029d8a8544125fb54297e404db6b34e07d20015d55e1bf9f7121",
+      "data/reference/kefu-harness/data/knowledge/docs.jsonl": "d3cd80ba76fdc82e57c1eefdc66a20987f09bc9b3dd0fbd1287c709146217fae"
+    },
+    "referenceRepository": "https://github.com/wanglongze123/kefu-harness",
+    "revision": "305590129ea020a5a362e07b294fd1587b8f53fd",
+    "corpusHashes": {
+      "online": "84294287d3ca7585379fa9965fa0a9d8c7f4886011c22119372d36dd32298a5e",
+      "reference": "4e35976e88104de37f38502a336b0186136826ba3444fcf13ac2346bed2190d5"
+    }
+  },
+  "corpora": {
+    "online": [
+      {
+        "id": "KB-REFUND-UNUSED",
+        "shopId": null,
+        "productId": null,
+        "title": "未核销且未过期团购券退款规则",
+        "body": "【演示规则】已支付、未核销且尚未过期的团购券可以申请退款。必须先查本人订单确认支付、核销和有效期；可申请金额不超过尚未消费且未退款的实付金额。退款申请资格不等于商家已经批准或资金已经退回。当前助手只能查询与说明，不能申请、联系商家或执行退款。",
+        "tags": [
+          "退款",
+          "能退",
+          "可以退",
+          "未核销",
+          "没用",
+          "没使用",
+          "未使用",
+          "有效期",
+          "退钱",
+          "退款金额"
+        ],
+        "status": "active"
+      },
+      {
+        "id": "KB-REFUND-REDEEMED",
+        "shopId": null,
+        "productId": null,
+        "title": "已核销团购券售后规则",
+        "body": "【演示规则】已经核销的团购券不适用未核销自动退款规则，需由商家核实实际消费与售后原因后决定。没有商家核实结果时不能承诺可退、不可退或具体金额。当前助手无法联系商家或提交退款，只能解释规则并建议用户自行咨询商家。",
+        "tags": [
+          "退款",
+          "已经用",
+          "已使用",
+          "已核销",
+          "消费",
+          "吃过",
+          "售后",
+          "商家确认"
+        ],
+        "status": "active"
+      },
+      {
+        "id": "KB-REFUND-EXPIRED",
+        "shopId": null,
+        "productId": null,
+        "title": "过期团购券售后规则",
+        "body": "【演示规则】已过期但未核销的券需要商家确认能否退款、延期以及金额。知识库未提供过期自动退款或自动延期政策。不得把未过期券的规则套用到过期券，也不能自行编造门店承诺。当前助手只提供查询和说明。",
+        "tags": [
+          "退款",
+          "过期",
+          "失效",
+          "到期",
+          "延期",
+          "有效期",
+          "没用",
+          "未核销"
+        ],
+        "status": "active"
+      },
+      {
+        "id": "KB-REFUND-PARTIAL",
+        "shopId": null,
+        "productId": null,
+        "title": "部分核销订单退款规则",
+        "body": "【演示规则】同一订单有多张券时必须逐券核对。未核销、未过期、未退款部分可申请的金额按对应券的实付单价计算；已核销部分需商家另行核实，不能按整单实付金额承诺退款。查询工具提供的金额只是演示规则下的申请上限，尚未提交或完成退款。",
+        "tags": [
+          "退款",
+          "部分核销",
+          "用了一张",
+          "剩余",
+          "两张",
+          "退款金额",
+          "退一张"
+        ],
+        "status": "active"
+      },
+      {
+        "id": "KB-REFUND-PAYMENT",
+        "shopId": null,
+        "productId": null,
+        "title": "未支付订单和已退款订单",
+        "body": "【演示规则】未支付订单没有到账资金，因此没有可退金额；不能把订单标价当作实付金额。已完成退款的订单需以支付和退款历史为准，不得重复退款；展示已退金额时说明这是已有历史记录，并非本轮执行。当前查询助手不会取消订单或发起退款。",
+        "tags": [
+          "退款",
+          "未付款",
+          "未支付",
+          "待支付",
+          "已经退",
+          "已退款",
+          "重复退款",
+          "支付金额"
+        ],
+        "status": "active"
+      },
+      {
+        "id": "KB-SHOP-DEMO-1",
+        "shopId": "shop-demo-1",
+        "productId": null,
+        "title": "演示门店使用与预约说明",
+        "body": "【演示规则】云味餐厅演示店为虚构餐饮门店，演示地址为虚拟市演示路1号。常规午餐与晚餐套餐允许普通周末使用，到店前需用户自行与商家确认接待情况；助手目前不能预约、外呼、查询实时库存或安排接待。法定节假日、特殊活动和私享套餐使用限制没有录入，遇到这些问题应明确规则缺失并建议向商家核实。",
+        "tags": [
+          "门店",
+          "地址",
+          "周末",
+          "预约",
+          "营业",
+          "套餐",
+          "接待",
+          "节假日",
+          "五一",
+          "十一",
+          "私享"
+        ],
+        "status": "active"
+      },
+      {
+        "id": "KB-PRODUCT-LUNCH",
+        "shopId": "shop-demo-1",
+        "productId": "product-demo-1",
+        "title": "双人午餐套餐说明",
+        "body": "【演示规则】双人午餐团购券标价79.80元，一张券对应两人午餐套餐，核销一次即视为整张券已使用。每张券具体截止时间以订单返回的 expiresAt 为准，不能从标价推断实付金额。菜品明细、过敏原和特殊节假日可用性未录入。",
+        "tags": [
+          "午餐",
+          "双人",
+          "套餐",
+          "价格",
+          "两人",
+          "核销",
+          "有效期"
+        ],
+        "status": "active"
+      },
+      {
+        "id": "KB-PRODUCT-DINNER",
+        "shopId": "shop-demo-1",
+        "productId": "product-demo-2",
+        "title": "单人晚餐套餐说明",
+        "body": "【演示规则】单人晚餐团购券标价59.90元，一张券对应一人晚餐，核销一次即视为整张券已使用。订单购买两张券时可以分别核销，剩余券状态以订单查询为准。菜品明细、过敏原和特殊节假日可用性未录入。",
+        "tags": [
+          "晚餐",
+          "单人",
+          "套餐",
+          "价格",
+          "一人",
+          "两张",
+          "分别核销",
+          "剩余"
+        ],
+        "status": "active"
+      },
+      {
+        "id": "FIX-INACTIVE-SHOP",
+        "shopId": "shop-fixture-retired",
+        "productId": null,
+        "title": "演示门店使用与预约说明",
+        "body": "【演示规则】云味餐厅演示店为虚构餐饮门店，演示地址为虚拟市演示路1号。常规午餐与晚餐套餐允许普通周末使用，到店前需用户自行与商家确认接待情况；助手目前不能预约、外呼、查询实时库存或安排接待。法定节假日、特殊活动和私享套餐使用限制没有录入，遇到这些问题应明确规则缺失并建议向商家核实。",
+        "tags": [
+          "门店",
+          "地址",
+          "周末",
+          "预约",
+          "营业",
+          "套餐",
+          "接待",
+          "节假日",
+          "五一",
+          "十一",
+          "私享"
+        ],
+        "status": "inactive"
+      }
+    ],
+    "reference": [
+      {
+        "id": "RF001",
+        "title": "未核销团购券退款规则",
+        "body": "未核销且在有效期内的团购券,支持随时申请退款,退款金额为实际支付金额,无需商家同意。退款将原路退回至原支付账户,一般1-3个工作日到账,具体到账时间以支付渠道为准。若券已过有效期但未核销,同样支持过期退。",
+        "tags": [
+          "退款",
+          "未核销",
+          "随时退"
+        ],
+        "industry": "通用",
+        "shopId": null
+      },
+      {
+        "id": "RF002",
+        "title": "已核销订单退款规则",
+        "body": "订单一旦核销,视为服务已开始或已完成,原则上不支持退款。如确有特殊情况需要退款,须经商家同意后方可办理。平台会协助联系商家协商,商家同意与否由商家自主决定,平台不能代替商家决策。",
+        "tags": [
+          "退款",
+          "已核销",
+          "商家同意"
+        ],
+        "industry": "通用",
+        "shopId": null
+      },
+      {
+        "id": "RF003",
+        "title": "已预约订单的退款与改期",
+        "body": "已成功预约但尚未到店消费的订单,若需退款,需先取消预约。部分商家对临近预约时间的取消设有限制,例如24小时内取消不支持退款。建议优先选择改期而非退款,改期通常不受此限制,且需在预约时间前操作。",
+        "tags": [
+          "退款",
+          "预约",
+          "改期"
+        ],
+        "industry": "通用",
+        "shopId": null
+      },
+      {
+        "id": "RF004",
+        "title": "部分退款与差价处理",
+        "body": "多份购买的团购券支持部分退款,已核销的部分不可退,未核销的部分按未核销规则处理。使用优惠券或红包下单的订单,退款时优惠不予返还,仅退还实际支付金额。若下单时使用了满减,部分退款后不满足满减门槛,平台会按比例扣减优惠。",
+        "tags": [
+          "退款",
+          "部分退款",
+          "差价"
+        ],
+        "industry": "通用",
+        "shopId": null
+      },
+      {
+        "id": "RF005",
+        "title": "退款到账时间与查询",
+        "body": "退款审核通过后即发起退回,资金到账时间取决于支付渠道:余额与零钱通常实时到账,银行卡1-3个工作日,信用卡3-7个工作日。可在订单详情页的退款进度中查看当前状态。若超过7个工作日未到账,建议先核对支付渠道账单,再联系平台协助查询。",
+        "tags": [
+          "退款",
+          "到账",
+          "时效"
+        ],
+        "industry": "通用",
+        "shopId": null
+      },
+      {
+        "id": "RS001",
+        "title": "需提前预约的商品规则",
+        "body": "标注需提前预约的商品,须在到店前完成预约,未预约直接到店商家可能无法接待。常见预约提前量为1天或2天,具体以商品详情页的预约规则为准。节假日与周末预约较紧张,建议尽早预约。预约成功后会收到确认通知。",
+        "tags": [
+          "预约",
+          "提前",
+          "到店"
+        ],
+        "industry": "通用",
+        "shopId": null
+      },
+      {
+        "id": "RS002",
+        "title": "预约时段与营业时间",
+        "body": "预约时段须落在商家营业时间内,且部分商品限定可用时段,例如午市券仅限11:00-14:00使用,晚市券仅限17:00-21:00。法定节假日营业时间可能调整,以商家实际公告为准。超出可用时段到店,商家有权拒绝使用该券。",
+        "tags": [
+          "预约",
+          "时段",
+          "营业时间"
+        ],
+        "industry": "通用",
+        "shopId": null
+      },
+      {
+        "id": "RS003",
+        "title": "预约变更与取消",
+        "body": "预约成功后可在预约时间前申请变更或取消,通常允许在预约时间24小时前自由改期。距预约时间不足24小时的变更需商家同意。无故未到店(no-show)可能被商家标记,影响后续预约。如临时有事,建议尽早取消以便商家安排其他客人。",
+        "tags": [
+          "预约",
+          "改期",
+          "取消"
+        ],
+        "industry": "通用",
+        "shopId": null
+      },
+      {
+        "id": "VF001",
+        "title": "团购券核销方式",
+        "body": "到店后向商家出示订单中的券码或二维码,由商家扫码或输入码号完成核销。券码可在订单详情页查看。核销即代表本次消费开始,核销后不可撤销。请确认商家核销的是本次要使用的券,避免误核销其他订单。",
+        "tags": [
+          "核销",
+          "券码",
+          "使用"
+        ],
+        "industry": "通用",
+        "shopId": null
+      },
+      {
+        "id": "VF002",
+        "title": "误核销的处理",
+        "body": "若券在不知情的情况下被核销,或商家误核销了错误的订单,可通过平台发起申诉。需提供未实际消费的说明,平台会介入核实。核实确为误核销的,平台会协助恢复券状态或办理退款。建议在发现后尽快申诉,时间过久会增加核实难度。",
+        "tags": [
+          "核销",
+          "误核销",
+          "申诉"
+        ],
+        "industry": "通用",
+        "shopId": null
+      },
+      {
+        "id": "VF003",
+        "title": "团购券转赠规则",
+        "body": "多数团购券支持转赠给他人使用,可在订单详情页找到转赠入口,生成转赠链接分享给对方,对方领取后券归其所有。部分限定使用人的商品不支持转赠,例如注明限本人使用、限女士使用的商品。已核销或已预约的券不支持转赠。",
+        "tags": [
+          "转赠",
+          "赠送",
+          "使用人"
+        ],
+        "industry": "通用",
+        "shopId": null
+      },
+      {
+        "id": "VF004",
+        "title": "限购与叠加使用规则",
+        "body": "商品可能设有限购数量,如每人限购2份、每桌限用1张。多张券能否叠加使用以商品详情页的使用规则为准,通常不同商品的券可以同时使用,同一商品的多张券可能限制单次使用数量。如不确定,建议到店前与商家确认。",
+        "tags": [
+          "限购",
+          "叠加",
+          "同时使用"
+        ],
+        "industry": "通用",
+        "shopId": null
+      },
+      {
+        "id": "CY001",
+        "title": "餐饮团购券使用须知",
+        "body": "餐饮团购券一般不含包间费、餐位费、酒水与调料费,具体以商品详情为准。部分商家规定团购券不与店内其他优惠同享。如需包间,通常需另付包间费或达到最低消费。使用团购券时请先告知商家,再点单。",
+        "tags": [
+          "餐饮",
+          "包间",
+          "餐位费"
+        ],
+        "industry": "餐饮",
+        "shopId": null
+      },
+      {
+        "id": "CY002",
+        "title": "餐饮自带酒水与外带规则",
+        "body": "能否自带酒水由商家决定,部分商家允许自带但收取开瓶费。团购套餐通常限堂食,是否可打包外带需与商家确认。自助类团购一般不支持外带,且不可打包剩余食物。如对此有要求,建议到店前联系商家确认。",
+        "tags": [
+          "餐饮",
+          "自带酒水",
+          "打包"
+        ],
+        "industry": "餐饮",
+        "shopId": null
+      },
+      {
+        "id": "CY003",
+        "title": "餐饮排队与等位",
+        "body": "使用团购券不享受优先入座,与到店顾客一同排队等位。热门时段(周末、节假日、饭点)等位时间较长,建议提前预约或错峰前往。部分商家支持线上取号,可在到店前取号减少等待。当前实时排队情况需联系商家确认,平台无法查询。",
+        "tags": [
+          "餐饮",
+          "排队",
+          "等位"
+        ],
+        "industry": "餐饮",
+        "shopId": null
+      },
+      {
+        "id": "LR001",
+        "title": "丽人服务预约与技师选择",
+        "body": "丽人类服务通常需提前预约,指定技师可能需额外加价,以商家规定为准。团购价一般对应普通技师,总监或资深技师需补差价。服务时长以实际项目为准,预约时建议预留充足时间。如需指定技师,请在预约时明确告知。",
+        "tags": [
+          "丽人",
+          "技师",
+          "预约"
+        ],
+        "industry": "丽人",
+        "shopId": null
+      },
+      {
+        "id": "LR002",
+        "title": "美业团购券的项目范围",
+        "body": "美业团购券对应固定项目内容,超出部分需另行付费。例如染发券通常按短发计价,长发、发量多需补差价;美甲券的款式与款数有限定,加钻、延长等增项另收费。到店后建议先确认项目范围与可能的加价项。",
+        "tags": [
+          "丽人",
+          "项目",
+          "加价"
+        ],
+        "industry": "丽人",
+        "shopId": null
+      },
+      {
+        "id": "XY001",
+        "title": "休娱场次与时段限制",
+        "body": "休闲娱乐类团购常限定场次或时段,如平日场、周末场、夜场价格不同。购买时请确认所选场次,平日场不可用于周末。部分场馆对身高、年龄有限制,儿童可能需成人陪同。节假日可能不可用或需补差价,以商品详情为准。",
+        "tags": [
+          "休娱",
+          "场次",
+          "时段"
+        ],
+        "industry": "休娱",
+        "shopId": null
+      },
+      {
+        "id": "XY002",
+        "title": "休娱场馆的押金与装备",
+        "body": "部分场馆需缴纳押金,离场时无损坏可全额退还。团购价通常不含专业装备租赁与储物柜费用。如需自带装备,须符合场馆安全规定。具体收费项目建议到场后先向前台确认。",
+        "tags": [
+          "休娱",
+          "押金",
+          "装备"
+        ],
+        "industry": "休娱",
+        "shopId": null
+      },
+      {
+        "id": "JL001",
+        "title": "酒店预订与入住规则",
+        "body": "酒店团购需提前预约确认房态,未预约不保证有房。标准入住时间通常为14:00后,退房时间为12:00前,提前入住或延迟退房需另付费。入住需出示本人有效身份证件,入住人数不得超过房型限制。如需加床或加早,需在预约时说明并可能收费。",
+        "tags": [
+          "酒旅",
+          "入住",
+          "退房"
+        ],
+        "industry": "酒旅",
+        "shopId": null
+      },
+      {
+        "id": "JL002",
+        "title": "酒店订单的退订规则",
+        "body": "酒店订单退订规则按预约状态区分:未发起预约的部分支持退款;已确认预约的房晚,临近入住日期取消可能收取违约金或不可退。多晚连住订单可申请退订其中某一晚,需注明具体日期。旺季与特殊房型可能标注不可取消,下单前请留意。",
+        "tags": [
+          "酒旅",
+          "退订",
+          "多晚"
+        ],
+        "industry": "酒旅",
+        "shopId": null
+      },
+      {
+        "id": "PY001",
+        "title": "发票开具规则",
+        "body": "团购订单的发票一般由商家开具,需在消费时向商家索取,部分商家支持事后开票但有时限。平台仅提供交易凭证,不代开发票。如需专用发票,请在消费前与商家确认可否开具及所需信息。已退款的订单不可开票。",
+        "tags": [
+          "发票",
+          "开票"
+        ],
+        "industry": "通用",
+        "shopId": null
+      },
+      {
+        "id": "PY002",
+        "title": "重复支付与多扣款处理",
+        "body": "若出现重复支付或多扣款,多扣部分会自动退回原支付账户,通常1-3个工作日到账。如超时未退回,可提供支付凭证联系平台核查。页面显示金额与实付不一致时,请查看订单详情的支付明细,优惠券与红包抵扣会在明细中列出。",
+        "tags": [
+          "支付",
+          "重复扣款",
+          "退回"
+        ],
+        "industry": "通用",
+        "shopId": null
+      },
+      {
+        "id": "MC001",
+        "title": "联系商家的方式",
+        "body": "可在门店页面或订单详情页找到商家电话,直接致电咨询实时问题,例如当前是否有位、能否接待、临时闭店等。商家营业时间外可能无人接听。平台客服无法查询商家的实时经营状态,此类问题建议直接联系商家确认最准确。",
+        "tags": [
+          "联系商家",
+          "电话"
+        ],
+        "industry": "通用",
+        "shopId": null
+      },
+      {
+        "id": "MC002",
+        "title": "商家临时闭店与停业",
+        "body": "商家临时闭店或已停业导致无法消费的,支持全额退款,已核销但未实际消费的也可申诉退款。如到店发现闭店,建议拍摄现场照片作为凭证。商家长期停业的,平台会下架其商品并为已购用户办理退款。",
+        "tags": [
+          "闭店",
+          "停业",
+          "退款"
+        ],
+        "industry": "通用",
+        "shopId": null
+      },
+      {
+        "id": "ET001",
+        "title": "宠物与无障碍相关",
+        "body": "能否携带宠物由商家规定,多数餐饮场所不允许携带宠物入内,导盲犬等工作犬按相关规定可入内。是否有无障碍通道、电梯,需向商家确认。此类信息平台不一定完整收录,建议到店前电话咨询商家最准确。",
+        "tags": [
+          "宠物",
+          "无障碍"
+        ],
+        "industry": "通用",
+        "shopId": null
+      },
+      {
+        "id": "ET002",
+        "title": "停车与交通",
+        "body": "是否提供免费停车以商家说明为准,部分商家提供限时免费停车或消费抵扣停车费。商场内店铺通常使用商场停车场,需按商场规则收费。具体车位情况与优惠政策建议到店前联系商家确认,平台无法查询实时车位。",
+        "tags": [
+          "停车",
+          "交通"
+        ],
+        "industry": "通用",
+        "shopId": null
+      },
+      {
+        "id": "ET003",
+        "title": "遗失物品的处理",
+        "body": "在门店遗失物品,建议第一时间联系商家协助查找,商家通常会在店内保管一段时间。平台无法直接查询门店内的失物情况,需由商家核实。如涉及贵重物品,建议同时报警备案。",
+        "tags": [
+          "遗失",
+          "失物"
+        ],
+        "industry": "通用",
+        "shopId": null
+      },
+      {
+        "id": "ET004",
+        "title": "服务质量与投诉途径",
+        "body": "对服务质量不满意,可先与商家沟通协商解决。协商不成可通过平台发起投诉,提供订单信息与具体情况说明,平台会介入核实并协助处理。涉及食品安全、人身伤害等严重问题,建议同时向市场监管部门反映并保留证据。",
+        "tags": [
+          "投诉",
+          "服务质量"
+        ],
+        "industry": "通用",
+        "shopId": null
+      },
+      {
+        "id": "ET005",
+        "title": "团购价与到店价差异",
+        "body": "团购价为线上促销价,可能与到店挂牌价不同,以团购页面标示为准。商家不得要求使用团购券的顾客补足到店价差价,如遇要求加价才能使用,可拒绝并向平台反馈。但商品详情中已明示的加价项(如指定技师、加料)属正常收费。",
+        "tags": [
+          "价格",
+          "差价"
+        ],
+        "industry": "通用",
+        "shopId": null
+      },
+      {
+        "id": "ET006",
+        "title": "有效期与延期",
+        "body": "团购券有明确有效期,过期未使用可申请过期退。部分商家支持延期,需在有效期内联系商家或平台申请,过期后一般不可延期。节假日期间购买的券有效期可能较短,请注意查看。建议在有效期到期前尽早使用或处理。",
+        "tags": [
+          "有效期",
+          "过期",
+          "延期"
+        ],
+        "industry": "通用",
+        "shopId": null
+      },
+      {
+        "id": "ET007",
+        "title": "未成年人与代下单",
+        "body": "部分服务限成年人使用,未成年人需成人陪同或不可使用,以商品说明为准。代他人下单的,到店由实际使用人出示券码即可,但限本人使用的商品需与下单人一致。涉及酒精类商品不向未成年人销售。",
+        "tags": [
+          "未成年",
+          "代下单"
+        ],
+        "industry": "通用",
+        "shopId": null
+      },
+      {
+        "id": "ET008",
+        "title": "团购券与会员权益",
+        "body": "使用团购券消费通常不累积商家会员积分,也可能不享受会员折扣,具体以商家规定为准。团购券一般不与商家自有会员优惠叠加使用。如已是商家会员,建议比较会员价与团购价后选择更优方案。",
+        "tags": [
+          "会员",
+          "权益",
+          "叠加"
+        ],
+        "industry": "通用",
+        "shopId": null
+      },
+      {
+        "id": "SH001",
+        "title": "本店暑期活动说明",
+        "body": "本店2026年7-8月暑期活动:团购套餐加赠一份果盘,凭订单向服务员说明即可。活动期间包间免最低消费。活动不与其他优惠同享。",
+        "tags": [
+          "活动",
+          "暑期"
+        ],
+        "industry": "餐饮",
+        "shopId": "shop_1001"
+      },
+      {
+        "id": "SH002",
+        "title": "本店停车说明",
+        "body": "本店位于万达广场三层,可使用商场地下停车场,消费满100元可抵2小时停车费,凭小票到前台盖章。周末车位紧张建议乘坐公共交通。",
+        "tags": [
+          "停车"
+        ],
+        "industry": "餐饮",
+        "shopId": "shop_1001"
+      },
+      {
+        "id": "FIX-INACTIVE-PARKING",
+        "title": "本店停车说明",
+        "body": "本店位于万达广场三层,可使用商场地下停车场,消费满100元可抵2小时停车费,凭小票到前台盖章。周末车位紧张建议乘坐公共交通。",
+        "tags": [
+          "停车"
+        ],
+        "industry": "餐饮",
+        "shopId": "shop-fixture-retired",
+        "productId": null,
+        "status": "inactive"
+      }
+    ]
+  },
+  "actor": {
+    "appId": "REFERENCE_DEVELOPMENT_APP",
+    "senderId": "REFERENCE_DEVELOPMENT_OWNER"
+  },
+  "groupOpenid": "REFERENCE_DEVELOPMENT_GROUP",
+  "orders": [
+    {
+      "owner": {
+        "appId": "REFERENCE_DEVELOPMENT_APP",
+        "senderId": "REFERENCE_DEVELOPMENT_OWNER"
+      },
+      "order": {
+        "source": "demo-database",
+        "id": "COUPON-6401",
+        "status": "paid",
+        "asOf": "2026-10-06T00:00:00.000Z",
+        "amounts": {
+          "totalCents": 7980,
+          "paidCents": 7980,
+          "refundedCents": 0
+        },
+        "createdAt": "2026-10-05T00:00:00.000Z",
+        "paidAt": "2026-10-05T00:00:00.000Z",
+        "shop": {
+          "id": "shop-demo-1",
+          "name": "云味餐厅",
+          "merchantName": "演示商家",
+          "address": "演示地址"
+        },
+        "items": [
+          {
+            "productId": "product-demo-1",
+            "quantity": 1,
+            "unitPriceCents": 7980,
+            "totalCents": 7980,
+            "id": "COUPON-6401-item",
+            "productName": "双人午餐团购券"
+          }
+        ],
+        "coupons": [
+          {
+            "id": "COUPON-6401-coupon",
+            "orderItemId": "COUPON-6401-item",
+            "status": "unused",
+            "expiresAt": "2026-11-04T00:00:00.000Z",
+            "redeemedAt": null,
+            "redeemedShopId": null
+          }
+        ],
+        "payments": [
+          {
+            "status": "succeeded",
+            "amountCents": 7980,
+            "paidAt": "2026-10-05T00:00:00.000Z"
+          }
+        ],
+        "refunds": []
+      }
+    },
+    {
+      "owner": {
+        "appId": "REFERENCE_DEVELOPMENT_APP",
+        "senderId": "REFERENCE_DEVELOPMENT_OWNER"
+      },
+      "order": {
+        "source": "demo-database",
+        "id": "COUPON-6402",
+        "status": "redeemed",
+        "asOf": "2026-10-06T00:00:00.000Z",
+        "amounts": {
+          "totalCents": 7980,
+          "paidCents": 7980,
+          "refundedCents": 0
+        },
+        "createdAt": "2026-10-05T00:00:00.000Z",
+        "paidAt": "2026-10-05T00:00:00.000Z",
+        "shop": {
+          "id": "shop-demo-1",
+          "name": "云味餐厅",
+          "merchantName": "演示商家",
+          "address": "演示地址"
+        },
+        "items": [
+          {
+            "productId": "product-demo-1",
+            "quantity": 1,
+            "unitPriceCents": 7980,
+            "totalCents": 7980,
+            "id": "COUPON-6402-item",
+            "productName": "双人午餐团购券"
+          }
+        ],
+        "coupons": [
+          {
+            "id": "COUPON-6402-coupon",
+            "orderItemId": "COUPON-6402-item",
+            "status": "redeemed",
+            "expiresAt": "2026-11-04T00:00:00.000Z",
+            "redeemedAt": "2026-10-05T12:00:00.000Z",
+            "redeemedShopId": "shop-demo-1"
+          }
+        ],
+        "payments": [
+          {
+            "status": "succeeded",
+            "amountCents": 7980,
+            "paidAt": "2026-10-05T00:00:00.000Z"
+          }
+        ],
+        "refunds": []
+      }
+    },
+    {
+      "owner": {
+        "appId": "REFERENCE_DEVELOPMENT_APP",
+        "senderId": "REFERENCE_DEVELOPMENT_OWNER"
+      },
+      "order": {
+        "source": "demo-database",
+        "id": "COUPON-6403",
+        "status": "redeemed",
+        "asOf": "2026-10-06T00:00:00.000Z",
+        "amounts": {
+          "totalCents": 7980,
+          "paidCents": 7980,
+          "refundedCents": 0
+        },
+        "createdAt": "2026-10-05T00:00:00.000Z",
+        "paidAt": "2026-10-05T00:00:00.000Z",
+        "shop": {
+          "id": "shop-demo-1",
+          "name": "云味餐厅",
+          "merchantName": "演示商家",
+          "address": "演示地址"
+        },
+        "items": [
+          {
+            "productId": "product-demo-1",
+            "quantity": 1,
+            "unitPriceCents": 7980,
+            "totalCents": 7980,
+            "id": "COUPON-6403-item",
+            "productName": "双人午餐团购券"
+          }
+        ],
+        "coupons": [
+          {
+            "id": "COUPON-6403-coupon",
+            "orderItemId": "COUPON-6403-item",
+            "status": "redeemed",
+            "expiresAt": "2026-11-04T00:00:00.000Z",
+            "redeemedAt": "2026-10-05T12:00:00.000Z",
+            "redeemedShopId": "shop-demo-1"
+          }
+        ],
+        "payments": [
+          {
+            "status": "succeeded",
+            "amountCents": 7980,
+            "paidAt": "2026-10-05T00:00:00.000Z"
+          }
+        ],
+        "refunds": []
+      }
+    }
+  ],
+  "cases": [
+    {
+      "id": "single-policy",
+      "corpus": "reference",
+      "turns": [
+        {
+          "question": "信用卡支付的团购券退款审核通过后，通常多久能到账？",
+          "expected": {
+            "kind": "business",
+            "allowedKinds": [
+              "policy"
+            ],
+            "outcome": "ready",
+            "calls": [
+              "search_faq"
+            ],
+            "knowledge": "evidence",
+            "gold": [
+              {
+                "sourceId": "RF005",
+                "quote": "退款审核通过后即发起退回,资金到账时间取决于支付渠道:余额与零钱通常实时到账,银行卡1-3个工作日,信用卡3-7个工作日。可在订单详情页的退款进度中查看当前状态。若超过7个工作日未到账,建议先核对支付渠道账单,再联系平台协助查询。"
+              }
+            ],
+            "orderId": null,
+            "questionContext": "standalone",
+            "answerCriteria": [
+              {
+                "id": "channel_time",
+                "kind": "required_fact",
+                "statement": "说明信用卡在退款审核通过后的通常到账时限为3–7个工作日；不把工作日换成自然日。",
+                "basis": "RF005"
+              },
+              {
+                "id": "no_executed_claim",
+                "kind": "forbidden_claim",
+                "statement": "不得声称本轮已退款、联系平台或商家、核实账单或改变订单状态。",
+                "basis": "探针仅提供只读订单/知识服务和精确引用选择。"
+              }
+            ]
+          }
+        },
+        {
+          "question": "如果过了刚才说的最长等待时间还没到账，接下来怎么办？",
+          "expected": {
+            "kind": "business",
+            "allowedKinds": [
+              "policy"
+            ],
+            "outcome": "ready",
+            "calls": [
+              "search_faq"
+            ],
+            "knowledge": "evidence",
+            "gold": [
+              {
+                "sourceId": "RF005",
+                "quote": "退款审核通过后即发起退回,资金到账时间取决于支付渠道:余额与零钱通常实时到账,银行卡1-3个工作日,信用卡3-7个工作日。可在订单详情页的退款进度中查看当前状态。若超过7个工作日未到账,建议先核对支付渠道账单,再联系平台协助查询。"
+              }
+            ],
+            "orderId": null,
+            "questionContext": "previous",
+            "sourceTurn": 1,
+            "answerCriteria": [
+              {
+                "id": "overdue_sequence",
+                "kind": "required_fact",
+                "statement": "超过7个工作日未到账时，先核对该支付渠道账单，再联系平台协助查询；不承诺退款已到账。",
+                "basis": "RF005"
+              },
+              {
+                "id": "no_executed_claim",
+                "kind": "forbidden_claim",
+                "statement": "不得声称本轮已退款、联系平台或商家、核实账单或改变订单状态。",
+                "basis": "探针仅提供只读订单/知识服务和精确引用选择。"
+              }
+            ]
+          }
+        },
+        {
+          "question": "那核对之后还没解决，该找谁协助查询？",
+          "expected": {
+            "kind": "business",
+            "allowedKinds": [
+              "policy"
+            ],
+            "outcome": "ready",
+            "calls": [
+              "search_faq"
+            ],
+            "knowledge": "evidence",
+            "gold": [
+              {
+                "sourceId": "RF005",
+                "quote": "退款审核通过后即发起退回,资金到账时间取决于支付渠道:余额与零钱通常实时到账,银行卡1-3个工作日,信用卡3-7个工作日。可在订单详情页的退款进度中查看当前状态。若超过7个工作日未到账,建议先核对支付渠道账单,再联系平台协助查询。"
+              }
+            ],
+            "orderId": null,
+            "questionContext": "previous",
+            "sourceTurn": 2,
+            "answerCriteria": [
+              {
+                "id": "followup_actor",
+                "kind": "required_fact",
+                "statement": "续接已选支付渠道及核账流程，说明应联系平台协助查询，而非直接重新发起退款或声称已联系。",
+                "basis": "RF005"
+              },
+              {
+                "id": "no_executed_claim",
+                "kind": "forbidden_claim",
+                "statement": "不得声称本轮已退款、联系平台或商家、核实账单或改变订单状态。",
+                "basis": "探针仅提供只读订单/知识服务和精确引用选择。"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "competing-policy",
+      "corpus": "reference",
+      "turns": [
+        {
+          "question": "银行卡支付的团购券退款审核通过后，通常需要多久到账？",
+          "expected": {
+            "kind": "business",
+            "allowedKinds": [
+              "policy"
+            ],
+            "outcome": "ready",
+            "calls": [
+              "search_faq"
+            ],
+            "knowledge": "evidence",
+            "gold": [
+              {
+                "sourceId": "RF005",
+                "quote": "退款审核通过后即发起退回,资金到账时间取决于支付渠道:余额与零钱通常实时到账,银行卡1-3个工作日,信用卡3-7个工作日。可在订单详情页的退款进度中查看当前状态。若超过7个工作日未到账,建议先核对支付渠道账单,再联系平台协助查询。"
+              }
+            ],
+            "orderId": null,
+            "questionContext": "standalone",
+            "answerCriteria": [
+              {
+                "id": "channel_time",
+                "kind": "required_fact",
+                "statement": "说明银行卡在退款审核通过后的通常到账时限为1–3个工作日。",
+                "basis": "RF005"
+              },
+              {
+                "id": "no_executed_claim",
+                "kind": "forbidden_claim",
+                "statement": "不得声称本轮已退款、联系平台或商家、核实账单或改变订单状态。",
+                "basis": "探针仅提供只读订单/知识服务和精确引用选择。"
+              }
+            ]
+          }
+        },
+        {
+          "question": "另一个问题：信用卡支付的团购券退款审核通过后，通常多久到账？",
+          "expected": {
+            "kind": "business",
+            "allowedKinds": [
+              "policy"
+            ],
+            "outcome": "ready",
+            "calls": [
+              "search_faq"
+            ],
+            "knowledge": "evidence",
+            "gold": [
+              {
+                "sourceId": "RF005",
+                "quote": "退款审核通过后即发起退回,资金到账时间取决于支付渠道:余额与零钱通常实时到账,银行卡1-3个工作日,信用卡3-7个工作日。可在订单详情页的退款进度中查看当前状态。若超过7个工作日未到账,建议先核对支付渠道账单,再联系平台协助查询。"
+              }
+            ],
+            "orderId": null,
+            "questionContext": "standalone",
+            "answerCriteria": [
+              {
+                "id": "channel_time",
+                "kind": "required_fact",
+                "statement": "说明信用卡在退款审核通过后的通常到账时限为3–7个工作日；不把工作日换成自然日。",
+                "basis": "RF005"
+              },
+              {
+                "id": "no_executed_claim",
+                "kind": "forbidden_claim",
+                "statement": "不得声称本轮已退款、联系平台或商家、核实账单或改变订单状态。",
+                "basis": "探针仅提供只读订单/知识服务和精确引用选择。"
+              }
+            ]
+          }
+        },
+        {
+          "question": "前面两种渠道里，那个期限过了还没到账，该怎么办？",
+          "expected": {
+            "kind": "business",
+            "allowedKinds": [
+              "clarify",
+              "policy",
+              "refund_eligibility",
+              "order"
+            ],
+            "outcome": "clarification",
+            "calls": [],
+            "knowledge": "none",
+            "gold": [],
+            "orderId": null,
+            "pending": "policy",
+            "presentation": "policy",
+            "answerCriteria": [
+              {
+                "id": "targeted_choice",
+                "kind": "required_fact",
+                "statement": "指出当前有银行卡、信用卡两个渠道/时限竞争，要求明确选择，并展示两个真实话题候选。",
+                "basis": "已成功宿主查询/政策问题候选"
+              },
+              {
+                "id": "no_executed_claim",
+                "kind": "forbidden_claim",
+                "statement": "不得声称本轮已退款、联系平台或商家、核实账单或改变订单状态。",
+                "basis": "探针仅提供只读订单/知识服务和精确引用选择。"
+              }
+            ]
+          }
+        },
+        {
+          "question": "我另外完整问个预约规则：团购券预约距到店时间不足24小时，改期需要谁同意？",
+          "expected": {
+            "kind": "business",
+            "allowedKinds": [
+              "policy"
+            ],
+            "outcome": "ready",
+            "calls": [
+              "search_faq"
+            ],
+            "knowledge": "evidence",
+            "gold": [
+              {
+                "sourceId": "RS003",
+                "quote": "预约成功后可在预约时间前申请变更或取消,通常允许在预约时间24小时前自由改期。距预约时间不足24小时的变更需商家同意。无故未到店(no-show)可能被商家标记,影响后续预约。如临时有事,建议尽早取消以便商家安排其他客人。"
+              }
+            ],
+            "orderId": null,
+            "questionContext": "standalone",
+            "answerCriteria": [
+              {
+                "id": "merchant_permission",
+                "kind": "required_fact",
+                "statement": "说明距预约不足24小时的变更需要商家同意；不得把一般24小时前可自由改期套到本次。",
+                "basis": "RS003"
+              },
+              {
+                "id": "no_executed_claim",
+                "kind": "forbidden_claim",
+                "statement": "不得声称本轮已退款、联系平台或商家、核实账单或改变订单状态。",
+                "basis": "探针仅提供只读订单/知识服务和精确引用选择。"
+              }
+            ],
+            "pending": "policy"
+          }
+        },
+        {
+          "selection": {
+            "kind": "policy",
+            "presentationTurn": 3,
+            "sourceTurn": 1
+          },
+          "expected": {
+            "kind": "selection",
+            "calls": [],
+            "knowledge": "none",
+            "gold": [],
+            "orderId": null,
+            "answerCriteria": [
+              {
+                "id": "selected_reference",
+                "kind": "required_fact",
+                "statement": "明确说明已选择话题，下一轮继续询问；不声称完成任何退款或批准。",
+                "basis": "实际用户单行选择与宿主回执"
+              },
+              {
+                "id": "no_executed_claim",
+                "kind": "forbidden_claim",
+                "statement": "不得声称本轮已退款、联系平台或商家、核实账单或改变订单状态。",
+                "basis": "探针仅提供只读订单/知识服务和精确引用选择。"
+              }
+            ]
+          }
+        },
+        {
+          "question": "按我刚选的那个渠道，如果超过七个工作日还没到账，该怎么办？",
+          "expected": {
+            "kind": "business",
+            "allowedKinds": [
+              "policy"
+            ],
+            "outcome": "ready",
+            "calls": [
+              "search_faq"
+            ],
+            "knowledge": "evidence",
+            "gold": [
+              {
+                "sourceId": "RF005",
+                "quote": "退款审核通过后即发起退回,资金到账时间取决于支付渠道:余额与零钱通常实时到账,银行卡1-3个工作日,信用卡3-7个工作日。可在订单详情页的退款进度中查看当前状态。若超过7个工作日未到账,建议先核对支付渠道账单,再联系平台协助查询。"
+              }
+            ],
+            "orderId": null,
+            "questionContext": "previous",
+            "sourceTurn": 1,
+            "answerCriteria": [
+              {
+                "id": "overdue_sequence",
+                "kind": "required_fact",
+                "statement": "超过7个工作日未到账时，先核对该支付渠道账单，再联系平台协助查询；不承诺退款已到账。",
+                "basis": "RF005"
+              },
+              {
+                "id": "no_executed_claim",
+                "kind": "forbidden_claim",
+                "statement": "不得声称本轮已退款、联系平台或商家、核实账单或改变订单状态。",
+                "basis": "探针仅提供只读订单/知识服务和精确引用选择。"
+              }
+            ]
+          }
+        },
+        {
+          "question": "那我应先核对账单，还是重新申请一次退款？",
+          "expected": {
+            "kind": "business",
+            "allowedKinds": [
+              "policy"
+            ],
+            "outcome": "ready",
+            "calls": [
+              "search_faq"
+            ],
+            "knowledge": "evidence",
+            "gold": [
+              {
+                "sourceId": "RF005",
+                "quote": "退款审核通过后即发起退回,资金到账时间取决于支付渠道:余额与零钱通常实时到账,银行卡1-3个工作日,信用卡3-7个工作日。可在订单详情页的退款进度中查看当前状态。若超过7个工作日未到账,建议先核对支付渠道账单,再联系平台协助查询。"
+              }
+            ],
+            "orderId": null,
+            "questionContext": "previous",
+            "sourceTurn": 6,
+            "answerCriteria": [
+              {
+                "id": "no_duplicate_action",
+                "kind": "required_fact",
+                "statement": "先核对已选渠道账单，再联系平台查询；原文没有要求重新申请退款，不建议自行重复退款。",
+                "basis": "RF005"
+              },
+              {
+                "id": "no_executed_claim",
+                "kind": "forbidden_claim",
+                "statement": "不得声称本轮已退款、联系平台或商家、核实账单或改变订单状态。",
+                "basis": "探针仅提供只读订单/知识服务和精确引用选择。"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "orders",
+      "corpus": "online",
+      "turns": [
+        {
+          "question": "查询 COUPON-6401 的当前订单状态。",
+          "expected": {
+            "kind": "business",
+            "allowedKinds": [
+              "order"
+            ],
+            "outcome": "ready",
+            "calls": [
+              "get_order"
+            ],
+            "knowledge": "none",
+            "gold": [],
+            "orderId": "COUPON-6401",
+            "orderRef": "explicit",
+            "answerCriteria": [
+              {
+                "id": "actual_order",
+                "kind": "required_fact",
+                "statement": "展示COUPON-6401本轮真实状态、实付和券状态，不展示另一单。",
+                "basis": "本轮授权订单快照"
+              },
+              {
+                "id": "no_executed_claim",
+                "kind": "forbidden_claim",
+                "statement": "不得声称本轮已退款、联系平台或商家、核实账单或改变订单状态。",
+                "basis": "探针仅提供只读订单/知识服务和精确引用选择。"
+              }
+            ]
+          }
+        },
+        {
+          "question": "查询 COUPON-6402 的当前订单状态。",
+          "expected": {
+            "kind": "business",
+            "allowedKinds": [
+              "order"
+            ],
+            "outcome": "ready",
+            "calls": [
+              "get_order"
+            ],
+            "knowledge": "none",
+            "gold": [],
+            "orderId": "COUPON-6402",
+            "orderRef": "explicit",
+            "answerCriteria": [
+              {
+                "id": "actual_order",
+                "kind": "required_fact",
+                "statement": "展示COUPON-6402本轮真实状态、实付和券状态，不展示另一单。",
+                "basis": "本轮授权订单快照"
+              },
+              {
+                "id": "no_executed_claim",
+                "kind": "forbidden_claim",
+                "statement": "不得声称本轮已退款、联系平台或商家、核实账单或改变订单状态。",
+                "basis": "探针仅提供只读订单/知识服务和精确引用选择。"
+              }
+            ]
+          }
+        },
+        {
+          "question": "查询 COUPON-6403 的当前订单状态。",
+          "expected": {
+            "kind": "business",
+            "allowedKinds": [
+              "order"
+            ],
+            "outcome": "ready",
+            "calls": [
+              "get_order"
+            ],
+            "knowledge": "none",
+            "gold": [],
+            "orderId": "COUPON-6403",
+            "orderRef": "explicit",
+            "answerCriteria": [
+              {
+                "id": "actual_order",
+                "kind": "required_fact",
+                "statement": "展示COUPON-6403本轮真实状态、实付和券状态，不展示另一单。",
+                "basis": "本轮授权订单快照"
+              },
+              {
+                "id": "no_executed_claim",
+                "kind": "forbidden_claim",
+                "statement": "不得声称本轮已退款、联系平台或商家、核实账单或改变订单状态。",
+                "basis": "探针仅提供只读订单/知识服务和精确引用选择。"
+              }
+            ]
+          }
+        },
+        {
+          "question": "那另一笔订单现在是什么状态？",
+          "expected": {
+            "kind": "business",
+            "allowedKinds": [
+              "clarify",
+              "policy",
+              "refund_eligibility",
+              "order"
+            ],
+            "outcome": "clarification",
+            "calls": [],
+            "knowledge": "none",
+            "gold": [],
+            "orderId": null,
+            "pending": "order",
+            "presentation": "order",
+            "answerCriteria": [
+              {
+                "id": "targeted_choice",
+                "kind": "required_fact",
+                "statement": "说明无法唯一确定另一笔，展示真实本人订单候选并要求选择，不自动排除已使用订单。",
+                "basis": "已成功宿主查询/政策问题候选"
+              },
+              {
+                "id": "no_executed_claim",
+                "kind": "forbidden_claim",
+                "statement": "不得声称本轮已退款、联系平台或商家、核实账单或改变订单状态。",
+                "basis": "探针仅提供只读订单/知识服务和精确引用选择。"
+              }
+            ]
+          }
+        },
+        {
+          "selection": {
+            "kind": "order",
+            "presentationTurn": 4,
+            "sourceTurn": 1
+          },
+          "expected": {
+            "kind": "selection",
+            "calls": [],
+            "knowledge": "none",
+            "gold": [],
+            "orderId": null,
+            "answerCriteria": [
+              {
+                "id": "selected_reference",
+                "kind": "required_fact",
+                "statement": "明确说明已选择订单，下一轮继续询问；不声称完成任何退款或批准。",
+                "basis": "实际用户单行选择与宿主回执"
+              },
+              {
+                "id": "no_executed_claim",
+                "kind": "forbidden_claim",
+                "statement": "不得声称本轮已退款、联系平台或商家、核实账单或改变订单状态。",
+                "basis": "探针仅提供只读订单/知识服务和精确引用选择。"
+              }
+            ]
+          }
+        },
+        {
+          "question": "我刚选的这笔，现在是什么状态？",
+          "expected": {
+            "kind": "business",
+            "allowedKinds": [
+              "order"
+            ],
+            "outcome": "ready",
+            "calls": [
+              "get_order"
+            ],
+            "knowledge": "none",
+            "gold": [],
+            "orderId": "COUPON-6401",
+            "orderRef": "focus",
+            "answerCriteria": [
+              {
+                "id": "actual_order",
+                "kind": "required_fact",
+                "statement": "展示COUPON-6401本轮真实状态、实付和券状态，不展示另一单。",
+                "basis": "本轮授权订单快照"
+              },
+              {
+                "id": "no_executed_claim",
+                "kind": "forbidden_claim",
+                "statement": "不得声称本轮已退款、联系平台或商家、核实账单或改变订单状态。",
+                "basis": "探针仅提供只读订单/知识服务和精确引用选择。"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "two-orders",
+      "corpus": "online",
+      "turns": [
+        {
+          "question": "查询 COUPON-6401 的当前订单状态。",
+          "expected": {
+            "kind": "business",
+            "allowedKinds": [
+              "order"
+            ],
+            "outcome": "ready",
+            "calls": [
+              "get_order"
+            ],
+            "knowledge": "none",
+            "gold": [],
+            "orderId": "COUPON-6401",
+            "orderRef": "explicit",
+            "answerCriteria": [
+              {
+                "id": "actual_order",
+                "kind": "required_fact",
+                "statement": "展示COUPON-6401本轮真实状态、实付和券状态，不展示另一单。",
+                "basis": "本轮授权订单快照"
+              },
+              {
+                "id": "no_executed_claim",
+                "kind": "forbidden_claim",
+                "statement": "不得声称本轮已退款、联系平台或商家、核实账单或改变订单状态。",
+                "basis": "探针仅提供只读订单/知识服务和精确引用选择。"
+              }
+            ]
+          }
+        },
+        {
+          "question": "查询 COUPON-6402 的当前订单状态。",
+          "expected": {
+            "kind": "business",
+            "allowedKinds": [
+              "order"
+            ],
+            "outcome": "ready",
+            "calls": [
+              "get_order"
+            ],
+            "knowledge": "none",
+            "gold": [],
+            "orderId": "COUPON-6402",
+            "orderRef": "explicit",
+            "answerCriteria": [
+              {
+                "id": "actual_order",
+                "kind": "required_fact",
+                "statement": "展示COUPON-6402本轮真实状态、实付和券状态，不展示另一单。",
+                "basis": "本轮授权订单快照"
+              },
+              {
+                "id": "no_executed_claim",
+                "kind": "forbidden_claim",
+                "statement": "不得声称本轮已退款、联系平台或商家、核实账单或改变订单状态。",
+                "basis": "探针仅提供只读订单/知识服务和精确引用选择。"
+              }
+            ]
+          }
+        },
+        {
+          "question": "另一笔订单如果申请退款，需要满足哪些条件？请按它目前的支付、核销和有效期说明，只咨询，不提交申请。",
+          "expected": {
+            "kind": "business",
+            "allowedKinds": [
+              "policy",
+              "refund_eligibility"
+            ],
+            "outcome": "ready",
+            "calls": [
+              "get_order",
+              "search_faq"
+            ],
+            "knowledge": "evidence",
+            "gold": [
+              {
+                "sourceId": "KB-REFUND-UNUSED",
+                "quote": "【演示规则】已支付、未核销且尚未过期的团购券可以申请退款。必须先查本人订单确认支付、核销和有效期；可申请金额不超过尚未消费且未退款的实付金额。退款申请资格不等于商家已经批准或资金已经退回。当前助手只能查询与说明，不能申请、联系商家或执行退款。"
+              }
+            ],
+            "orderId": "COUPON-6401",
+            "orderRef": "alternative",
+            "questionContext": "standalone",
+            "answerCriteria": [
+              {
+                "id": "fresh_other_order",
+                "kind": "required_fact",
+                "statement": "明确以COUPON-6401本轮支付、未核销、未过期事实说明资格，不沿用COUPON-6402已核销状态。",
+                "basis": "授权A订单+KB-REFUND-UNUSED"
+              },
+              {
+                "id": "eligibility_not_approval",
+                "kind": "required_fact",
+                "statement": "可申请退款资格不等于商家已批准或资金已经退回。",
+                "basis": "KB-REFUND-UNUSED"
+              },
+              {
+                "id": "no_executed_claim",
+                "kind": "forbidden_claim",
+                "statement": "不得声称本轮已退款、联系平台或商家、核实账单或改变订单状态。",
+                "basis": "探针仅提供只读订单/知识服务和精确引用选择。"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -24,12 +24,14 @@ type Operation = "agent" | "rerank" | "support";
 const operations: Operation[] = ["agent", "rerank", "support"];
 export const c1ValidationLimits = { requests: { agent: 120, rerank: 60, support: 60 }, deadlineMs: 45 * 60_000,
   turnTimeoutMs: 60_000, estimatedUsd: 1, estimatedCny: .15 } as const;
+export type C1ValidationLimits = { requests: Record<Operation, number>; deadlineMs: number; turnTimeoutMs: number;
+  estimatedUsd: number; estimatedCny: number };
 type ModelSnapshot = { provider: string; id: string; api: string; baseUrl: string; maxTokens: number;
   cost: { input: number; output: number; cacheRead: number; cacheWrite: number } };
 export type C1ValidationSetup = {
   version: 1;
   configuration: { architecture: "controller"; parameters: SupportExperimentParameters; model: ModelSnapshot;
-    evidenceBindingVersion: "order-evidence-binding-v2";
+    evidenceBindingVersion: "order-evidence-binding-v2"; referenceEvidenceRequired: true;
     dataUse: "fixed-validation-not-blind" | "exposed-development";
     support: EvidenceSupportSettings; rerank: BailianClient["settings"];
     pricing: { estimated: true; asOf: string; source: "Pi catalog and Bailian published estimate"; rerankCnyPerMillionTokens: number | null };
@@ -48,11 +50,15 @@ type Actual = C1ValidationActual & { reason: string | null; replyHash: string | 
   ingressIntegrityPassed: boolean | null;
   sdkRetryEvents: Array<{ type: string; attempt: number }>; storeReads: StoreRead[];
   stateChange: { applied: boolean; beforeHash: string; afterHash: string | null } | null };
-type StoreRead = { requestId: string; identity: QQIdentity; orderId: string; owner: QQIdentity | null; allowed: boolean; outputHash: string | null };
+export type StoreRead = { requestId: string; identity: QQIdentity; orderId: string; owner: QQIdentity | null; allowed: boolean; outputHash: string | null };
 
 // Counters sit at fetch(), so automatic retries and failed HTTP requests count too.
 // Prices only aggregate reported usage; an unknown request never becomes zero cost.
-export function createC1ValidationGuard(fetcher: typeof fetch = fetch, now = Date.now) {
+export function createC1ValidationGuard(fetcher: typeof fetch = fetch, now = Date.now, requestedLimits: C1ValidationLimits = c1ValidationLimits) {
+  const limits = structuredClone(requestedLimits);
+  assert.ok([...operations.map(operation => limits.requests[operation]), limits.deadlineMs, limits.turnTimeoutMs]
+    .every(value => Number.isSafeInteger(value) && value > 0), "Request and time limits must be positive safe integers");
+  assert.ok([limits.estimatedUsd, limits.estimatedCny].every(value => Number.isFinite(value) && value > 0), "Cost limits must be positive and finite");
   const started = now(), requests: Request[] = [];
   let active: Active | undefined, stopReason: string | null = null, sealed = false;
   const usage = () => Object.fromEntries(operations.map(operation => {
@@ -65,13 +71,13 @@ export function createC1ValidationGuard(fetcher: typeof fetch = fetch, now = Dat
   const stopped = () => {
     if (stopReason) return stopReason;
     const costs = usage();
-    if (now() - started >= c1ValidationLimits.deadlineMs) stopReason = "run_deadline";
-    else if (costs.agent.knownEstimatedCost + costs.support.knownEstimatedCost >= c1ValidationLimits.estimatedUsd) stopReason = "usd_soft_stop";
-    else if (costs.rerank.knownEstimatedCost >= c1ValidationLimits.estimatedCny) stopReason = "cny_soft_stop";
-    else if (operations.some(operation => costs[operation].requests >= c1ValidationLimits.requests[operation])) stopReason = "operation_request_limit";
+    if (now() - started >= limits.deadlineMs) stopReason = "run_deadline";
+    else if (costs.agent.knownEstimatedCost + costs.support.knownEstimatedCost >= limits.estimatedUsd) stopReason = "usd_soft_stop";
+    else if (costs.rerank.knownEstimatedCost >= limits.estimatedCny) stopReason = "cny_soft_stop";
+    else if (operations.some(operation => costs[operation].requests >= limits.requests[operation])) stopReason = "operation_request_limit";
     return stopReason;
   };
-  return { requests, usage, stopped, remainingMs: () => Math.max(0, c1ValidationLimits.deadlineMs - (now() - started)),
+  return { requests, usage, stopped, remainingMs: () => Math.max(0, limits.deadlineMs - (now() - started)),
     setActive(value: Active | undefined) { active = value; }, seal() { sealed = true; active = undefined; },
     record(index: number, tokens: number | null, cost: number | null) {
       if (sealed) return; // A late completion cannot rewrite the saved accounting after teardown.
@@ -95,7 +101,7 @@ export function createC1ValidationGuard(fetcher: typeof fetch = fetch, now = Dat
     }; } };
 }
 
-function controlledStore(fixture: C1ValidationSetup["fixtures"][number]) {
+export function controlledStore(fixture: C1ValidationSetup["fixtures"][number]) {
   const orders = new Map(fixture.orders.map(value => [value.order.id, structuredClone(value)]));
   let active: { ingress: Active; reads: StoreRead[] } | undefined;
   return { orders, setActive(value: typeof active) { active = value; },
@@ -117,7 +123,7 @@ function controlledStore(fixture: C1ValidationSetup["fixtures"][number]) {
 
 export async function c1ValidationCodeFiles() {
   // Freeze all local production modules, including transitive authorization/reply helpers.
-  return ["scripts/c1-session-validation-live.ts", "scripts/c1-session-validation-check.ts",
+  return ["scripts/c1-session-validation-live.ts", "scripts/c1-session-validation-check.ts", "scripts/c1-reference-evidence.ts",
     ...(await readdir(new URL("src/", root))).filter(file => file.endsWith(".ts")).map(file => `src/${file}`),
     "prompts/customer-service-v2.md", "skills/shop-support-v2/SKILL.md"].sort();
 }
@@ -149,6 +155,7 @@ export async function loadC1ValidationExecution(planPath: string, manifestPath: 
   assert.equal(setup.version, 1); assert.equal(setup.configuration.architecture, "controller");
   const configuration = setup.configuration, parameters = configuration.parameters;
   assert.equal(configuration.evidenceBindingVersion, "order-evidence-binding-v2", "Freeze the current evidence binding contract explicitly");
+  assert.equal(configuration.referenceEvidenceRequired, true, "New Session runs must freeze mandatory reference provenance checks");
   assert.ok(["fixed-validation-not-blind", "exposed-development"].includes(configuration.dataUse), "Declare whether the questions were exposed");
   assert.deepEqual(configuration.dependencySnapshot, await readC1ValidationDependencies(), "Actual runtime dependencies differ from frozen candidate");
   assert.deepEqual(configuration.limits, c1ValidationLimits);
@@ -224,7 +231,7 @@ function reviewInputs(plan: C1ValidationPlan, rows: Actual[]) {
   });
 }
 
-async function withinTurnDeadline(work: Promise<unknown>, milliseconds: number, cancel: () => void) {
+export async function withinTurnDeadline(work: Promise<unknown>, milliseconds: number, cancel: () => void) {
   let timer: NodeJS.Timeout | undefined;
   try { return await Promise.race([work, new Promise<never>((_resolve, reject) => { timer = setTimeout(() => {
     cancel(); reject(new Error("turn_timeout"));
@@ -250,7 +257,7 @@ export async function runC1SessionValidation(planPath: string, manifestPath: str
   const save = () => writeFile(path, `${JSON.stringify(artifact, null, 2)}\n`);
   const knowledgeConfiguration = { applicability: p.knowledgeApplicability, applicabilitySnapshot: setup.applicabilitySnapshot,
     evidenceBindingVersion: config.evidenceBindingVersion, queryMode: p.knowledgeQueryMode,
-    supportPrompt: p.knowledgeSupportPrompt, supportSettings: config.support };
+    supportPrompt: p.knowledgeSupportPrompt, supportSettings: config.support, referenceEvidenceRequired: config.referenceEvidenceRequired };
   await save();
   let restoreStream: (() => void) | undefined;
   try {
@@ -422,6 +429,27 @@ export async function checkC1ValidationExecutor() {
   await combined.fetchFor("agent")("https://example.invalid"); combined.record(0, 1, .6);
   await combined.fetchFor("support")("https://example.invalid"); combined.record(1, 1, .4);
   await assert.rejects(combined.fetchFor("agent")("https://example.invalid"), /usd_soft_stop/);
+  const small: C1ValidationLimits = { requests: { agent: 2, rerank: 1, support: 1 }, deadlineMs: 100,
+    turnTimeoutMs: 50, estimatedUsd: .02, estimatedCny: .01 };
+  const isolatedLimits = structuredClone(small), bounded = createC1ValidationGuard(fake, () => 0, isolatedLimits);
+  bounded.setActive(active); isolatedLimits.requests.agent = 999;
+  await bounded.fetchFor("agent")("https://example.invalid"); await bounded.fetchFor("agent")("https://example.invalid");
+  await assert.rejects(bounded.fetchFor("agent")("https://example.invalid"), /operation_request_limit/);
+  assert.equal(bounded.requests.length, 2); assert.equal(bounded.usage().agent.estimatedCost, null);
+  for (const [operation, cost, reason] of [["support", .02, "usd_soft_stop"], ["rerank", .01, "cny_soft_stop"]] as const) {
+    const own = createC1ValidationGuard(fake, () => 0, small); own.setActive(active);
+    await own.fetchFor(operation)("https://example.invalid"); own.record(0, 10, cost);
+    await assert.rejects(own.fetchFor("agent")("https://example.invalid"), new RegExp(reason));
+  }
+  let smallNow = 0;
+  const shortDeadline = createC1ValidationGuard(fake, () => smallNow, small); shortDeadline.setActive(active);
+  smallNow = 100; assert.equal(shortDeadline.remainingMs(), 0);
+  await assert.rejects(shortDeadline.fetchFor("agent")("https://example.invalid"), /run_deadline/);
+  assert.equal(shortDeadline.requests.length, 0);
+  for (const invalid of [{ ...small, deadlineMs: 0 }, { ...small, turnTimeoutMs: 1.5 }, { ...small, estimatedUsd: NaN },
+    { ...small, estimatedCny: Infinity }, { ...small, requests: { ...small.requests, agent: -1 } }]) {
+    assert.throws(() => createC1ValidationGuard(fake, () => 0, invalid), /limits must be/);
+  }
   const actor = { appId: "unit-app", senderId: "unit-owner" }, order = { source: "demo-database", id: "COUPON-9999", status: "paid" } as Order;
   const store = controlledStore({ caseId: active.caseId, actor, groupOpenid: "unit-group", orders: [{ owner: actor, order }] }), reads: StoreRead[] = [];
   store.setActive({ ingress: active, reads }); assert.deepEqual(await store.store.getOrder(actor, order.id), order);

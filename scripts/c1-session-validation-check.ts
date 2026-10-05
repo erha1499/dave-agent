@@ -19,9 +19,10 @@ import { buildKnowledgeApplicabilityContext, gateKnowledgeApplicability, knowled
   type KnowledgeApplicabilityMode, type KnowledgeApplicabilitySnapshot } from "../src/knowledge-applicability.ts";
 import { rankLexical, scopeDocuments, serializeRetrievalDocument, type RetrievalDocument, type RetrievalScope } from "../src/retrieval-ranking.ts";
 import type { SessionTurnActual } from "./c1-session-live.ts";
+import { scoreC1ReferenceEvidence } from "./c1-reference-evidence.ts";
 
 // Pure contracts/scoring only. No executor, generated validation questions, I/O or model judge.
-export const c1ValidationScoringVersion = "c1-session-validation-v7";
+export const c1ValidationScoringVersion = "c1-session-validation-v8";
 export const c1Families = ["order_state", "paid_amount", "alternative_order", "policy_followup", "refund_time", "appointment_actor"] as const;
 export const c1Strata = ["known", "missing", "competing", "direct_missing_fact", "boundary"] as const;
 type Family = typeof c1Families[number];
@@ -59,6 +60,7 @@ export type C1AnswerReview = { caseId: string; turn: number; reviewer: "codex"; 
 type Corpora = Record<C1ValidationCase["corpus"], readonly RetrievalDocument[]>;
 // Supplied by the frozen run configuration, never inferred from the report being scored.
 export type C1ValidationKnowledgeConfiguration = { applicability?: KnowledgeApplicabilityMode; applicabilitySnapshot?: KnowledgeApplicabilitySnapshot;
+  referenceEvidenceRequired?: boolean;
   queryMode?: "combined" | "separated";
   supportPrompt?: "v5" | "v6";
   supportSettings?: EvidenceSupportSettings;
@@ -293,7 +295,7 @@ function prepareKnowledgeEvidence(actual: C1ValidationActual, call: SupportCall,
 }
 
 // Reuse the production acceptance/binding checks against the frozen corpus; IDs alone are not evidence.
-function knowledgeProofPassed(actual: C1ValidationActual | undefined, corpus: readonly RetrievalDocument[], configuration: C1ValidationKnowledgeConfiguration = {},
+export function knowledgeProofPassed(actual: C1ValidationActual | undefined, corpus: readonly RetrievalDocument[], configuration: C1ValidationKnowledgeConfiguration = {},
   originalQuery?: string, history: C1ValidationHistory = []): boolean {
   if (!actual) return false;
   try {
@@ -475,12 +477,17 @@ export function scoreC1ValidationTurn(turn: C1ValidationTurn, actual: C1Validati
     : e.knowledge === "rejected" ? evidenceProofPassed && traces.length === 1 && traces[0]!.status === "rejected" && !accepted.length && !invalid.length && !unavailable
     : evidenceProofPassed && traces.length === 1 && !unavailable && accepted.some(id => gold.includes(id)) && !extra.length;
   const amountEvidenceProofPassed = amountProofPassed(actual, turn.question, history, configuration);
+  const referenceEvidence = actual ? scoreC1ReferenceEvidence(actual, turn.question, history, {
+    required: configuration.referenceEvidenceRequired,
+    verifyPolicyTopic: (value, question, before) => knowledgeProofPassed(value, corpus, configuration, question, before),
+  }) : { passed: false, issues: ["Missing actual turn"] };
+  const referenceEvidenceProofPassed = referenceEvidence.passed;
   const amount = amountEvidenceProofPassed && (!e.amount || Boolean(result?.evidence.amountComparison && result.evidence.amountComparison.remainingCouponCount === 1
     && result.evidence.amountComparison.refundApproved === false && result.needsAnswer === false && noKnowledge
     && Object.entries(e.amount).every(([key, value]) => equal(result.evidence.amountComparison![key as keyof RemainingAmountComparison], value))));
   // Host-safe refusal and model classification are different measures.
   const actionGate = e.outcome === "clarification" || e.outcome === "business_denial" ? true : actionCorrect;
-  const engineeringPassed = Boolean(complete && evidenceProofPassed && outcome && actionGate && fresh && noSideEffects && scoped && !scopeViolations.length && amount);
+  const engineeringPassed = Boolean(complete && evidenceProofPassed && referenceEvidenceProofPassed && outcome && actionGate && fresh && noSideEffects && scoped && !scopeViolations.length && amount);
   const answerPassed = reviewPassed(turn, actual, review);
   const supportIntegrityPassed = !unavailable && evidenceProofPassed && invalid.length === 0;
   return { engineeringPassed, knowledgePassed: knowledge, supportIntegrityPassed, applicabilityIntegrityPassed,
@@ -488,7 +495,8 @@ export function scoreC1ValidationTurn(turn: C1ValidationTurn, actual: C1Validati
     answerPassed, passed: engineeringPassed && knowledge && supportIntegrityPassed && applicabilityIntegrityPassed && answerPassed,
     actionCorrect, firstActionKindCorrect, safeStopped: engineeringPassed && e.outcome !== "ready" && knowledge,
     observedStop: result?.action.kind === "clarify" ? "model_clarify" : outcome && e.outcome !== "ready" ? "host_denial" : null,
-    fresh, reference, amount, amountEvidenceProofPassed, requestBound: bound, evidenceProofPassed, scopeMatched: scoped, extraAcceptedIds: extra, scopeViolationIds: scopeViolations, invalidDecisionIds: invalid,
+    fresh, reference, referenceEvidenceProofPassed, referenceEvidenceIssues: referenceEvidence.issues,
+    amount, amountEvidenceProofPassed, requestBound: bound, evidenceProofPassed, scopeMatched: scoped, extraAcceptedIds: extra, scopeViolationIds: scopeViolations, invalidDecisionIds: invalid,
     applicabilityExcludedIds: applicabilityDecisions.filter(row => row.status === "mismatched").map(row => row.id),
     applicabilityUnknownIds: applicabilityDecisions.filter(row => row.status === "unknown").map(row => row.id),
     applicabilityUncheckedIds: applicabilityDecisions.filter(row => row.status === "not_checked").map(row => row.id),
