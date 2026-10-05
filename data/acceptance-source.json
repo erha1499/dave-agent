@@ -1,0 +1,516 @@
+{
+  "version": 1,
+  "createdDate": "2026-10-05",
+  "name": "A1 evidence acceptance original synthetic dataset",
+  "validationPolicy": "fixed-validation-not-blind",
+  "validationDisclosure": "Questions fixed before threshold calibration and validation calls. All authors and agents share the workspace. Validation shares policies and some intents with development; reviewed differences are requested facts, negated boundaries and combined constraints, documented per case. This is neither blinded nor intent-disjoint holdout, and does not prove generalization. Never select thresholds on validation results.",
+  "files": {
+    "data/acceptance-online.json": {
+      "sha256": "5f97b7f4e77cd1695a38ef9b0c42e53f52f40f7ae869a39fcdcdae5ae8971b72",
+      "bytes": 5787
+    },
+    "data/acceptance-development.json": {
+      "sha256": "fe9916b888f73401312e2f2aa6c43687716aa0eef86556b8731abbf7a414ae95",
+      "bytes": 26833
+    },
+    "data/acceptance-validation.json": {
+      "sha256": "0ead08f6c37cf43be8d84b47557692e3ac2cc264fe37994f2f030cddf7d50592",
+      "bytes": 34893
+    }
+  },
+  "online": {
+    "seedPath": "db/02-seed.sql",
+    "seedSha256": "82c7143840ac30d166207dcf92c227b3368b98af899412a4f669f04bfb976560",
+    "documents": 8,
+    "policy": "Title/body/tags/shop/product copied verbatim from seed; preserve online policy independently from reference corpus."
+  },
+  "reference": {
+    "repo": "https://github.com/wanglongze123/kefu-harness",
+    "revision": "305590129ea020a5a362e07b294fd1587b8f53fd",
+    "sourceManifest": "data/reference/kefu-harness/source.json",
+    "sourceManifestSha256": "42c6791ca2edfabcb98d9c49c2cd063c81e7705c29e94a6c1858357000c1d5cf",
+    "documents": 35,
+    "policy": "Existing frozen MIT reference corpus; not imported into online business policy."
+  },
+  "fixtures": [
+    {
+      "corpus": "online",
+      "id": "FIX-INACTIVE-SHOP",
+      "copyOf": "KB-SHOP-DEMO-1",
+      "shopId": "shop-fixture-retired",
+      "productId": null,
+      "status": "inactive",
+      "purpose": "Inactive scope test only; exact original title/body/tags; not a real shop or new policy."
+    },
+    {
+      "corpus": "reference",
+      "id": "FIX-INACTIVE-PARKING",
+      "copyOf": "SH002",
+      "shopId": "shop-fixture-retired",
+      "productId": null,
+      "status": "inactive",
+      "purpose": "Inactive scope test only; exact original title/body/tags; not a real shop or new policy."
+    }
+  ],
+  "counts": {
+    "development": {
+      "total": 48,
+      "standard": 24,
+      "no_answer": 12,
+      "scope": 12,
+      "context": 0
+    },
+    "validation": {
+      "total": 60,
+      "standard": 30,
+      "no_answer": 12,
+      "scope": 12,
+      "context": 6
+    }
+  },
+  "deferred": {
+    "C1": "Six validation context cases require trusted prior order/product focus; retain planned rows, mark not_applicable until C1 and do not count as accepted/rejected evidence trials."
+  },
+  "semanticReview": {
+    "revision": 2,
+    "date": "2026-10-05",
+    "stage": "before-threshold-calibration-and-validation-calls",
+    "previousRawDevelopmentRunPrefix": "d1d3d14e",
+    "previousFiles": {
+      "data/acceptance-online.json": {
+        "sha256": "5f97b7f4e77cd1695a38ef9b0c42e53f52f40f7ae869a39fcdcdae5ae8971b72",
+        "bytes": 5787
+      },
+      "data/acceptance-development.json": {
+        "sha256": "031c070a545559711ab0102d038d1b1ab8795a29f7112ca47894abfce27ab212",
+        "bytes": 26586
+      },
+      "data/acceptance-validation.json": {
+        "sha256": "21cee6375f3cb2b1e2577021bc05b1fa8e364d285431c021fa29433ae2a8e5f3",
+        "bytes": 33017
+      }
+    },
+    "corrections": [
+      "Add ET006 as equivalent evidence for development case a1-dev-013 before calibration; preserve old raw run with its original gold.",
+      "Replace validation direct paraphrases with reviewed alternative fact facets, negation boundaries and condition combinations; keep total 30/12/12/6 and 8 online positive cases.",
+      "Add KB-REFUND-PAYMENT as equivalent evidence for validation case a1-val-008 during pre-calibration semantic review; generic payment policy directly forbids treating list price as paid amount."
+    ],
+    "splitBasis": "Requested fact or decision boundary and expression contrast, not merely different IDs. Shared policy topics and some intents are intentional for online business coverage; no claim of intent-disjoint holdout.",
+    "validationCases": [
+      {
+        "id": "a1-val-001",
+        "focus": "申请前的可信订单核验项",
+        "relatedDevelopmentCases": [
+          "a1-dev-001"
+        ],
+        "distinction": "共享政策主题，改为这里列明的事实侧面、条件组合或否定边界；不主张语义主题完全隔离。"
+      },
+      {
+        "id": "a1-val-002",
+        "focus": "已核销售后的事实核验责任",
+        "relatedDevelopmentCases": [
+          "a1-dev-003",
+          "a1-dev-004"
+        ],
+        "distinction": "共享政策主题，改为这里列明的事实侧面、条件组合或否定边界；不主张语义主题完全隔离。"
+      },
+      {
+        "id": "a1-val-003",
+        "focus": "过期与未过期政策的适用边界",
+        "relatedDevelopmentCases": [
+          "a1-dev-005"
+        ],
+        "distinction": "共享政策主题，改为这里列明的事实侧面、条件组合或否定边界；不主张语义主题完全隔离。"
+      },
+      {
+        "id": "a1-val-004",
+        "focus": "普通周末不能推出节假日可用",
+        "relatedDevelopmentCases": [
+          "a1-dev-009"
+        ],
+        "distinction": "共享政策主题，改为这里列明的事实侧面、条件组合或否定边界；不主张语义主题完全隔离。"
+      },
+      {
+        "id": "a1-val-005",
+        "focus": "申请资格与实际到账的证据边界",
+        "relatedDevelopmentCases": [
+          "a1-dev-002"
+        ],
+        "distinction": "共享政策主题，改为这里列明的事实侧面、条件组合或否定边界；不主张语义主题完全隔离。"
+      },
+      {
+        "id": "a1-val-006",
+        "focus": "已退款历史约束重复执行",
+        "relatedDevelopmentCases": [
+          "a1-dev-008"
+        ],
+        "distinction": "共享政策主题，改为这里列明的事实侧面、条件组合或否定边界；不主张语义主题完全隔离。"
+      },
+      {
+        "id": "a1-val-007",
+        "focus": "套餐有效期必须取订单字段",
+        "relatedDevelopmentCases": [
+          "a1-dev-011"
+        ],
+        "distinction": "共享政策主题，改为这里列明的事实侧面、条件组合或否定边界；不主张语义主题完全隔离。"
+      },
+      {
+        "id": "a1-val-008",
+        "focus": "商品标价与订单实付的类型区分",
+        "relatedDevelopmentCases": [
+          "a1-dev-011"
+        ],
+        "distinction": "共享政策主题，改为这里列明的事实侧面、条件组合或否定边界；不主张语义主题完全隔离。"
+      },
+      {
+        "id": "a1-val-009",
+        "focus": "有效未核销退款的商家批准前置条件",
+        "relatedDevelopmentCases": [
+          "a1-dev-013",
+          "a1-dev-014"
+        ],
+        "distinction": "共享政策主题，改为这里列明的事实侧面、条件组合或否定边界；不主张语义主题完全隔离。"
+      },
+      {
+        "id": "a1-val-010",
+        "focus": "午市时段边界辨析",
+        "relatedDevelopmentCases": [],
+        "distinction": "开发集没有直接询问该事实侧面；仍共享语料与业务领域。"
+      },
+      {
+        "id": "a1-val-011",
+        "focus": "爽约记录对后续预约的影响",
+        "relatedDevelopmentCases": [
+          "a1-dev-019"
+        ],
+        "distinction": "共享政策主题，改为这里列明的事实侧面、条件组合或否定边界；不主张语义主题完全隔离。"
+      },
+      {
+        "id": "a1-val-012",
+        "focus": "券码入口位置",
+        "relatedDevelopmentCases": [],
+        "distinction": "开发集没有直接询问该事实侧面；仍共享语料与业务领域。"
+      },
+      {
+        "id": "a1-val-013",
+        "focus": "正常核销的不可撤销边界",
+        "relatedDevelopmentCases": [
+          "a1-dev-020"
+        ],
+        "distinction": "共享政策主题，改为这里列明的事实侧面、条件组合或否定边界；不主张语义主题完全隔离。"
+      },
+      {
+        "id": "a1-val-014",
+        "focus": "叠加使用与单次限用边界",
+        "relatedDevelopmentCases": [],
+        "distinction": "开发集没有直接询问该事实侧面；仍共享语料与业务领域。"
+      },
+      {
+        "id": "a1-val-015",
+        "focus": "团购基础价的费用包含范围",
+        "relatedDevelopmentCases": [],
+        "distinction": "开发集没有直接询问该事实侧面；仍共享语料与业务领域。"
+      },
+      {
+        "id": "a1-val-016",
+        "focus": "自助剩余食物外带限制",
+        "relatedDevelopmentCases": [],
+        "distinction": "开发集没有直接询问该事实侧面；仍共享语料与业务领域。"
+      },
+      {
+        "id": "a1-val-017",
+        "focus": "指定技师等级的附加费用条件",
+        "relatedDevelopmentCases": [],
+        "distinction": "开发集没有直接询问该事实侧面；仍共享语料与业务领域。"
+      },
+      {
+        "id": "a1-val-018",
+        "focus": "增项前的范围与价格确认流程",
+        "relatedDevelopmentCases": [
+          "a1-dev-034"
+        ],
+        "distinction": "共享政策主题，改为这里列明的事实侧面、条件组合或否定边界；不主张语义主题完全隔离。"
+      },
+      {
+        "id": "a1-val-019",
+        "focus": "娱乐票场次日期适用边界",
+        "relatedDevelopmentCases": [],
+        "distinction": "开发集没有直接询问该事实侧面；仍共享语料与业务领域。"
+      },
+      {
+        "id": "a1-val-020",
+        "focus": "场馆押金返还条件",
+        "relatedDevelopmentCases": [],
+        "distinction": "开发集没有直接询问该事实侧面；仍共享语料与业务领域。"
+      },
+      {
+        "id": "a1-val-021",
+        "focus": "娱乐附加设备与储物费用范围",
+        "relatedDevelopmentCases": [],
+        "distinction": "开发集没有直接询问该事实侧面；仍共享语料与业务领域。"
+      },
+      {
+        "id": "a1-val-022",
+        "focus": "酒店入住身份与人数约束",
+        "relatedDevelopmentCases": [
+          "a1-dev-035"
+        ],
+        "distinction": "共享政策主题，改为这里列明的事实侧面、条件组合或否定边界；不主张语义主题完全隔离。"
+      },
+      {
+        "id": "a1-val-023",
+        "focus": "多房晚部分退订的日期定位",
+        "relatedDevelopmentCases": [],
+        "distinction": "开发集没有直接询问该事实侧面；仍共享语料与业务领域。"
+      },
+      {
+        "id": "a1-val-024",
+        "focus": "不可取消房型的下单提示",
+        "relatedDevelopmentCases": [],
+        "distinction": "开发集没有直接询问该事实侧面；仍共享语料与业务领域。"
+      },
+      {
+        "id": "a1-val-025",
+        "focus": "退款状态对发票资格的约束",
+        "relatedDevelopmentCases": [
+          "a1-dev-023"
+        ],
+        "distinction": "共享政策主题，改为这里列明的事实侧面、条件组合或否定边界；不主张语义主题完全隔离。"
+      },
+      {
+        "id": "a1-val-026",
+        "focus": "账单差异与优惠抵扣的核查入口",
+        "relatedDevelopmentCases": [],
+        "distinction": "开发集没有直接询问该事实侧面；仍共享语料与业务领域。"
+      },
+      {
+        "id": "a1-val-027",
+        "focus": "门店实时信息的联系方式入口",
+        "relatedDevelopmentCases": [],
+        "distinction": "开发集没有直接询问该事实侧面；仍共享语料与业务领域。"
+      },
+      {
+        "id": "a1-val-028",
+        "focus": "闭店事件的取证动作",
+        "relatedDevelopmentCases": [],
+        "distinction": "开发集没有直接询问该事实侧面；仍共享语料与业务领域。"
+      },
+      {
+        "id": "a1-val-029",
+        "focus": "严重安全投诉的外部反映渠道",
+        "relatedDevelopmentCases": [],
+        "distinction": "开发集没有直接询问该事实侧面；仍共享语料与业务领域。"
+      },
+      {
+        "id": "a1-val-030",
+        "focus": "团购与会员折扣叠加关系",
+        "relatedDevelopmentCases": [],
+        "distinction": "开发集没有直接询问该事实侧面；仍共享语料与业务领域。"
+      },
+      {
+        "id": "a1-val-031",
+        "focus": "门店最后接单时刻",
+        "relatedDevelopmentCases": [],
+        "distinction": "开发集没有直接询问该事实侧面；仍共享语料与业务领域。"
+      },
+      {
+        "id": "a1-val-032",
+        "focus": "儿童设施的具体收费",
+        "relatedDevelopmentCases": [],
+        "distinction": "开发集没有直接询问该事实侧面；仍共享语料与业务领域。"
+      },
+      {
+        "id": "a1-val-033",
+        "focus": "线上门店停车优惠存在性",
+        "relatedDevelopmentCases": [],
+        "distinction": "开发集没有直接询问该事实侧面；仍共享语料与业务领域。"
+      },
+      {
+        "id": "a1-val-034",
+        "focus": "门店纳税人识别号",
+        "relatedDevelopmentCases": [],
+        "distinction": "开发集没有直接询问该事实侧面；仍共享语料与业务领域。"
+      },
+      {
+        "id": "a1-val-035",
+        "focus": "退款专线电话号码",
+        "relatedDevelopmentCases": [],
+        "distinction": "开发集没有直接询问该事实侧面；仍共享语料与业务领域。"
+      },
+      {
+        "id": "a1-val-036",
+        "focus": "无订单输入时的具体截止日期",
+        "relatedDevelopmentCases": [],
+        "distinction": "开发集没有直接询问该事实侧面；仍共享语料与业务领域。"
+      },
+      {
+        "id": "a1-val-037",
+        "focus": "天气触发的自动取消和补偿",
+        "relatedDevelopmentCases": [],
+        "distinction": "开发集没有直接询问该事实侧面；仍共享语料与业务领域。"
+      },
+      {
+        "id": "a1-val-038",
+        "focus": "预约订金比例",
+        "relatedDevelopmentCases": [],
+        "distinction": "开发集没有直接询问该事实侧面；仍共享语料与业务领域。"
+      },
+      {
+        "id": "a1-val-039",
+        "focus": "宠物清洁费金额",
+        "relatedDevelopmentCases": [],
+        "distinction": "开发集没有直接询问该事实侧面；仍共享语料与业务领域。"
+      },
+      {
+        "id": "a1-val-040",
+        "focus": "失物保管期限",
+        "relatedDevelopmentCases": [],
+        "distinction": "开发集没有直接询问该事实侧面；仍共享语料与业务领域。"
+      },
+      {
+        "id": "a1-val-041",
+        "focus": "事后开票具体期限",
+        "relatedDevelopmentCases": [],
+        "distinction": "开发集没有直接询问该事实侧面；仍共享语料与业务领域。"
+      },
+      {
+        "id": "a1-val-042",
+        "focus": "安全投诉的自动退款时限承诺",
+        "relatedDevelopmentCases": [],
+        "distinction": "开发集没有直接询问该事实侧面；仍共享语料与业务领域。"
+      },
+      {
+        "id": "a1-val-043",
+        "focus": "跨门店引用地址的归属辨析",
+        "relatedDevelopmentCases": [
+          "a1-dev-037"
+        ],
+        "distinction": "共享政策主题，改为这里列明的事实侧面、条件组合或否定边界；不主张语义主题完全隔离。"
+      },
+      {
+        "id": "a1-val-044",
+        "focus": "商品焦点冲突下的有效期来源",
+        "relatedDevelopmentCases": [
+          "a1-dev-040"
+        ],
+        "distinction": "共享政策主题，改为这里列明的事实侧面、条件组合或否定边界；不主张语义主题完全隔离。"
+      },
+      {
+        "id": "a1-val-045",
+        "focus": "跨门店且特殊日期的组合限制",
+        "relatedDevelopmentCases": [
+          "a1-dev-038"
+        ],
+        "distinction": "共享政策主题，改为这里列明的事实侧面、条件组合或否定边界；不主张语义主题完全隔离。"
+      },
+      {
+        "id": "a1-val-046",
+        "focus": "缺失商品绑定时的分券核销承诺",
+        "relatedDevelopmentCases": [
+          "a1-dev-039"
+        ],
+        "distinction": "共享政策主题，改为这里列明的事实侧面、条件组合或否定边界；不主张语义主题完全隔离。"
+      },
+      {
+        "id": "a1-val-047",
+        "focus": "失效资料中的门店主体性质",
+        "relatedDevelopmentCases": [
+          "a1-dev-042"
+        ],
+        "distinction": "共享政策主题，改为这里列明的事实侧面、条件组合或否定边界；不主张语义主题完全隔离。"
+      },
+      {
+        "id": "a1-val-048",
+        "focus": "失效资料不能证明当前政策完整性",
+        "relatedDevelopmentCases": [
+          "a1-dev-043"
+        ],
+        "distinction": "共享政策主题，改为这里列明的事实侧面、条件组合或否定边界；不主张语义主题完全隔离。"
+      },
+      {
+        "id": "a1-val-049",
+        "focus": "跨店活动叠加条件",
+        "relatedDevelopmentCases": [
+          "a1-dev-046"
+        ],
+        "distinction": "共享政策主题，改为这里列明的事实侧面、条件组合或否定边界；不主张语义主题完全隔离。"
+      },
+      {
+        "id": "a1-val-050",
+        "focus": "跨店赠品领取步骤",
+        "relatedDevelopmentCases": [
+          "a1-dev-046"
+        ],
+        "distinction": "共享政策主题，改为这里列明的事实侧面、条件组合或否定边界；不主张语义主题完全隔离。"
+      },
+      {
+        "id": "a1-val-051",
+        "focus": "缺失店铺下的活动时限",
+        "relatedDevelopmentCases": [
+          "a1-dev-046"
+        ],
+        "distinction": "共享政策主题，改为这里列明的事实侧面、条件组合或否定边界；不主张语义主题完全隔离。"
+      },
+      {
+        "id": "a1-val-052",
+        "focus": "跨店停车抵扣凭证类型",
+        "relatedDevelopmentCases": [
+          "a1-dev-045"
+        ],
+        "distinction": "共享政策主题，改为这里列明的事实侧面、条件组合或否定边界；不主张语义主题完全隔离。"
+      },
+      {
+        "id": "a1-val-053",
+        "focus": "失效资料中的周末出行建议",
+        "relatedDevelopmentCases": [
+          "a1-dev-047"
+        ],
+        "distinction": "共享政策主题，改为这里列明的事实侧面、条件组合或否定边界；不主张语义主题完全隔离。"
+      },
+      {
+        "id": "a1-val-054",
+        "focus": "失效楼层事实的可用性",
+        "relatedDevelopmentCases": [
+          "a1-dev-048"
+        ],
+        "distinction": "共享政策主题，改为这里列明的事实侧面、条件组合或否定边界；不主张语义主题完全隔离。"
+      },
+      {
+        "id": "a1-val-055",
+        "focus": "“这个”未指向可信订单，不能选未使用、已核销或过期规则。",
+        "relatedDevelopmentCases": [],
+        "distinction": "缺少可信前文的指代题，A1不执行；留在60题计划等待C1。"
+      },
+      {
+        "id": "a1-val-056",
+        "focus": "缺少券焦点和金额来源，不能从通用部分退款规则填金额。",
+        "relatedDevelopmentCases": [],
+        "distinction": "缺少可信前文的指代题，A1不执行；留在60题计划等待C1。"
+      },
+      {
+        "id": "a1-val-057",
+        "focus": "未明确换哪张或问什么规则，需要可信历史焦点。",
+        "relatedDevelopmentCases": [],
+        "distinction": "缺少可信前文的指代题，A1不执行；留在60题计划等待C1。"
+      },
+      {
+        "id": "a1-val-058",
+        "focus": "单轮缺少店铺商品及“这样”指代，不能套常规套餐规则。",
+        "relatedDevelopmentCases": [],
+        "distinction": "缺少可信前文的指代题，A1不执行；留在60题计划等待C1。"
+      },
+      {
+        "id": "a1-val-059",
+        "focus": "多个时间规则都可能相关，query-only无法确定指代。",
+        "relatedDevelopmentCases": [],
+        "distinction": "缺少可信前文的指代题，A1不执行；留在60题计划等待C1。"
+      },
+      {
+        "id": "a1-val-060",
+        "focus": "缺少操作和对象，不应凭相似度选一个商家同意规则。",
+        "relatedDevelopmentCases": [],
+        "distinction": "缺少可信前文的指代题，A1不执行；留在60题计划等待C1。"
+      }
+    ]
+  }
+}

@@ -537,6 +537,10 @@ footer{padding:0 16px 20px;flex-direction:column;gap:5px}
 .exp-result-title{font-weight:600}
 .exp-summary{display:grid;gap:4px}
 .exp-summary-line{font-size:11px;color:var(--muted)}
+.exp-strategy{font-size:11px;font-weight:600;color:var(--sage-deep)}
+.exp-acc{display:grid;gap:4px;margin-top:6px;border-top:1px dashed var(--line);padding-top:8px}
+.exp-acc-title{font-size:11px;font-weight:600}
+.exp-acc-line{display:block;line-height:1.5}
 .exp-table{min-width:900px}
 .exp-table th,.exp-table td{white-space:nowrap}
 .exp-table td:last-child{min-width:150px;white-space:normal;overflow-wrap:anywhere}

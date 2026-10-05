@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { request } from "node:http";
 import { connect } from "node:net";
+import { readFile } from "node:fs/promises";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { experimentCatalog, resolveExperimentConfig, remoteRequired, requireExperimentExecution, ExperimentInputError } from "../src/experiment-config.ts";
@@ -27,6 +28,37 @@ for (const change of [
 ]) assert.throws(() => resolveExperimentConfig({ ...local, ...change }), ExperimentInputError);
 assert.throws(() => resolveExperimentConfig({ ...support, variants: [{ id: "A", architecture: "controller", parameters: { merchantEvents: "model" } }] }));
 assert.deepEqual(resolveExperimentConfig(local), local);
+assert.equal(local.version, 1);
+assert.equal(Object.hasOwn(local.variants[0]!, "dataset"), false, "v1 resolver must not silently migrate historical JSON");
+assert.equal(Object.hasOwn(local.variants[0]!, "acceptance"), false);
+assert.equal(JSON.stringify(resolveExperimentConfig(local)), JSON.stringify(local), "v1 serialized output remains stable");
+const acceptance = catalog.presets.find(p => p.id === "acceptance-development")!.config;
+assert.equal(acceptance.version, 2); assert.equal(acceptance.kind, "retrieval");
+assert.deepEqual(resolveExperimentConfig(acceptance), acceptance);
+assert.equal(remoteRequired(acceptance), true);
+assert.throws(() => requireExperimentExecution(acceptance), /付费模型/);
+assert.equal(catalog.datasets.length, 3);
+assert.deepEqual(catalog.acceptanceFields.map(field => field.key), ["mode", "threshold"]);
+assert.ok(catalog.fields.retrieval.every(field => !["dataset", "acceptance", "threshold"].includes(field.key)));
+const newVariant = { id: "A", modes: ["M4"], dataset: "acceptance-development", acceptance: { mode: "score", threshold: .8 } };
+for (const change of [
+  { dataset: "../.env" }, { dataset: "validation" }, { dataset: ["legacy"] }, { dataset: undefined },
+  { acceptance: undefined }, { acceptance: null }, { acceptance: {} }, { acceptance: { mode: "off", threshold: .8 } },
+  { acceptance: { mode: ["off"] } }, { acceptance: { mode: "score" } }, { acceptance: { mode: "score", threshold: "0.8" } },
+  { acceptance: { mode: "score", threshold: -1 } }, { acceptance: { mode: "score", threshold: 1.01 } },
+  { acceptance: { mode: "score", threshold: NaN } }, { acceptance: { mode: "score", threshold: Infinity } },
+  { acceptance: { mode: "score", threshold: .8, apiKey: "must-not-be-accepted" } },
+  { modes: ["M0"] }, { modes: ["M1", "M4"] }, { modes: ["M3", "M6"] },
+  { parameters: { acceptance: { mode: "off" } } },
+]) assert.throws(() => resolveExperimentConfig({ ...acceptance, variants: [{ ...newVariant, ...change }] }), ExperimentInputError);
+assert.throws(() => resolveExperimentConfig({ ...support, version: 2 }), ExperimentInputError);
+assert.throws(() => resolveExperimentConfig({ ...local, variants: [newVariant] }), ExperimentInputError, "v1 rejects newly meaningful fields");
+for (const threshold of [0, 1]) assert.doesNotThrow(() => resolveExperimentConfig({ ...acceptance,
+  variants: [{ ...newVariant, modes: ["M4", "M5", "M6"], acceptance: { mode: "score", threshold } }] }));
+assert.doesNotThrow(() => resolveExperimentConfig({ ...acceptance, variants: [{ ...newVariant, modes: ["M0"], acceptance: { mode: "off" } }] }));
+const example = resolveExperimentConfig(JSON.parse(await readFile(new URL("../configs/experiments/acceptance-development.json", import.meta.url), "utf8")));
+assert.deepEqual(example.variants, acceptance.variants);
+
 assert.equal(parseExperimentArgs([]).action, "help");
 assert.equal(parseExperimentArgs(["--preset", "retrieval-local"]).action, "preview");
 for (const args of [["--run"], ["--preset", "x", "--config", "x"], ["--preset", "x", "--run", "--dry-run"], ["--preset", "x", "--preset", "y"], ["--shell", "x"]])
@@ -35,6 +67,10 @@ const cli = await promisify(execFile)(process.execPath, ["scripts/experiment.ts"
   env: { PATH: process.env.PATH }, maxBuffer: 100_000,
 });
 assert.equal(JSON.parse(cli.stdout).remoteRequired, true, "dry-run works without DB or model credentials");
+const acceptanceCli = await promisify(execFile)(process.execPath, ["scripts/experiment.ts", "--preset", "acceptance-development", "--dry-run"], {
+  env: { PATH: process.env.PATH }, maxBuffer: 100_000,
+});
+assert.deepEqual(JSON.parse(acceptanceCli.stdout).config, acceptance, "A1 preview resolves without credentials");
 
 let starts = 0, busy = false;
 const job: ExperimentJob = {
@@ -61,6 +97,9 @@ try {
   assert.equal((await post(JSON.stringify(local))).status, 202);
   busy = true; assert.equal((await post(JSON.stringify(local))).status, 409); busy = false;
   assert.equal((await post(JSON.stringify(support))).status, 400, "paid runs require explicit local opt-in");
+  assert.equal((await post(JSON.stringify(acceptance))).status, 400, "A1 rerank requires the same explicit opt-in");
+  assert.equal((await post(JSON.stringify({ ...acceptance, variants: [{ ...newVariant, modes: ["M1"] }], allowRemote: true }))).status, 400);
+  assert.equal((await post(JSON.stringify({ ...acceptance, allowRemote: true }))).status, 202);
   assert.equal((await post(JSON.stringify(local), { "X-Experiment-Request": "" })).status, 400);
   assert.equal((await post(JSON.stringify(local), { "Content-Type": "text/plain" })).status, 400);
   assert.equal((await post("not json")).status, 400);
@@ -81,6 +120,6 @@ try {
   assert.match(malformedUrl, /^HTTP\/1.1 400 /, "malformed URL is rejected without exiting the server");
   assert.equal((await fetch(`${base}/api/experiments`)).status, 200);
   assert.equal((await fetch(`${base}/api/runs`, { method: "POST" })).status, 405);
-  assert.equal(starts, 1, "invalid or cross-origin requests never reach execution");
+  assert.equal(starts, 2, "only valid v1/v2 requests reach execution; invalid or cross-origin requests never do");
 } finally { server.closeAllConnections(); await new Promise<void>(resolve => server.close(() => resolve())); }
 console.log("PASS 实验配置/CLI预览与HTTP执行边界：白名单、组合、远程许可、body上限、同源、串行忙态及历史只读。");

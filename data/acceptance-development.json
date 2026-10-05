@@ -1,0 +1,846 @@
+{
+  "version": 1,
+  "split": "development",
+  "disclosure": "original-synthetic; fixed validation created before calibration in shared workspace, not blind and not a statistical generalization claim",
+  "questions": [
+    {
+      "id": "a1-dev-001",
+      "corpus": "online",
+      "suite": "standard",
+      "query": "已经付过钱，券没刷也没到期，申请退回的钱应按什么上限算？",
+      "shopId": null,
+      "productId": null,
+      "relevant": [
+        "KB-REFUND-UNUSED"
+      ],
+      "expectedBehavior": "answer",
+      "goldRationale": "证据原文明确说明所问规则；只解释该规则，不证明某个真实订单的状态或完成操作。",
+      "evidence": [
+        {
+          "docId": "KB-REFUND-UNUSED",
+          "quote": "可申请金额不超过尚未消费且未退款的实付金额"
+        }
+      ]
+    },
+    {
+      "id": "a1-dev-002",
+      "corpus": "online",
+      "suite": "standard",
+      "query": "只查出有退款资格，就代表店家答应退款了吗？",
+      "shopId": null,
+      "productId": null,
+      "relevant": [
+        "KB-REFUND-UNUSED"
+      ],
+      "expectedBehavior": "answer",
+      "goldRationale": "证据原文明确说明所问规则；只解释该规则，不证明某个真实订单的状态或完成操作。",
+      "evidence": [
+        {
+          "docId": "KB-REFUND-UNUSED",
+          "quote": "退款申请资格不等于商家已经批准或资金已经退回"
+        }
+      ]
+    },
+    {
+      "id": "a1-dev-003",
+      "corpus": "online",
+      "suite": "standard",
+      "query": "券已被店里使用过，能照搬未使用券的自动退款办法吗？",
+      "shopId": null,
+      "productId": null,
+      "relevant": [
+        "KB-REFUND-REDEEMED"
+      ],
+      "expectedBehavior": "answer",
+      "goldRationale": "证据原文明确说明所问规则；只解释该规则，不证明某个真实订单的状态或完成操作。",
+      "evidence": [
+        {
+          "docId": "KB-REFUND-REDEEMED",
+          "quote": "已经核销的团购券不适用未核销自动退款规则"
+        }
+      ]
+    },
+    {
+      "id": "a1-dev-004",
+      "corpus": "online",
+      "suite": "standard",
+      "query": "消费完以后要求售后，店家还未核实，客服能直接说一定不退吗？",
+      "shopId": null,
+      "productId": null,
+      "relevant": [
+        "KB-REFUND-REDEEMED"
+      ],
+      "expectedBehavior": "answer",
+      "goldRationale": "证据原文明确说明所问规则；只解释该规则，不证明某个真实订单的状态或完成操作。",
+      "evidence": [
+        {
+          "docId": "KB-REFUND-REDEEMED",
+          "quote": "没有商家核实结果时不能承诺可退、不可退或具体金额"
+        }
+      ]
+    },
+    {
+      "id": "a1-dev-005",
+      "corpus": "online",
+      "suite": "standard",
+      "query": "券放到过期但没去吃过，可以自动延长吗？",
+      "shopId": null,
+      "productId": null,
+      "relevant": [
+        "KB-REFUND-EXPIRED"
+      ],
+      "expectedBehavior": "answer",
+      "goldRationale": "证据原文明确说明所问规则；只解释该规则，不证明某个真实订单的状态或完成操作。",
+      "evidence": [
+        {
+          "docId": "KB-REFUND-EXPIRED",
+          "quote": "知识库未提供过期自动退款或自动延期政策"
+        }
+      ]
+    },
+    {
+      "id": "a1-dev-006",
+      "corpus": "online",
+      "suite": "standard",
+      "query": "一单买了几张，有一张用了，退费可以直接按照整单实付款算吗？",
+      "shopId": null,
+      "productId": null,
+      "relevant": [
+        "KB-REFUND-PARTIAL"
+      ],
+      "expectedBehavior": "answer",
+      "goldRationale": "证据原文明确说明所问规则；只解释该规则，不证明某个真实订单的状态或完成操作。",
+      "evidence": [
+        {
+          "docId": "KB-REFUND-PARTIAL",
+          "quote": "不能按整单实付金额承诺退款"
+        }
+      ]
+    },
+    {
+      "id": "a1-dev-007",
+      "corpus": "online",
+      "suite": "standard",
+      "query": "购物车下单还没付钱，我可退的钱是多少？",
+      "shopId": null,
+      "productId": null,
+      "relevant": [
+        "KB-REFUND-PAYMENT"
+      ],
+      "expectedBehavior": "answer",
+      "goldRationale": "证据原文明确说明所问规则；只解释该规则，不证明某个真实订单的状态或完成操作。",
+      "evidence": [
+        {
+          "docId": "KB-REFUND-PAYMENT",
+          "quote": "未支付订单没有到账资金，因此没有可退金额"
+        }
+      ]
+    },
+    {
+      "id": "a1-dev-008",
+      "corpus": "online",
+      "suite": "standard",
+      "query": "已退过的那筆金额，在查询结果里应说成刚刚退款成功吗？",
+      "shopId": null,
+      "productId": null,
+      "relevant": [
+        "KB-REFUND-PAYMENT"
+      ],
+      "expectedBehavior": "answer",
+      "goldRationale": "证据原文明确说明所问规则；只解释该规则，不证明某个真实订单的状态或完成操作。",
+      "evidence": [
+        {
+          "docId": "KB-REFUND-PAYMENT",
+          "quote": "展示已退金额时说明这是已有历史记录，并非本轮执行"
+        }
+      ]
+    },
+    {
+      "id": "a1-dev-009",
+      "corpus": "online",
+      "suite": "standard",
+      "query": "云味餐厅演示店的常规套餐普通周日能去吃吗？",
+      "shopId": "shop-demo-1",
+      "productId": null,
+      "relevant": [
+        "KB-SHOP-DEMO-1"
+      ],
+      "expectedBehavior": "answer",
+      "goldRationale": "证据原文明确说明所问规则；只解释该规则，不证明某个真实订单的状态或完成操作。",
+      "evidence": [
+        {
+          "docId": "KB-SHOP-DEMO-1",
+          "quote": "常规午餐与晚餐套餐允许普通周末使用"
+        }
+      ]
+    },
+    {
+      "id": "a1-dev-010",
+      "corpus": "online",
+      "suite": "standard",
+      "query": "云味演示店地址写在哪里？",
+      "shopId": "shop-demo-1",
+      "productId": null,
+      "relevant": [
+        "KB-SHOP-DEMO-1"
+      ],
+      "expectedBehavior": "answer",
+      "goldRationale": "证据原文明确说明所问规则；只解释该规则，不证明某个真实订单的状态或完成操作。",
+      "evidence": [
+        {
+          "docId": "KB-SHOP-DEMO-1",
+          "quote": "演示地址为虚拟市演示路1号"
+        }
+      ]
+    },
+    {
+      "id": "a1-dev-011",
+      "corpus": "online",
+      "suite": "standard",
+      "query": "双人午餐买一张券是几个人吃，标价是多少？",
+      "shopId": "shop-demo-1",
+      "productId": "product-demo-1",
+      "relevant": [
+        "KB-PRODUCT-LUNCH"
+      ],
+      "expectedBehavior": "answer",
+      "goldRationale": "证据原文明确说明所问规则；只解释该规则，不证明某个真实订单的状态或完成操作。",
+      "evidence": [
+        {
+          "docId": "KB-PRODUCT-LUNCH",
+          "quote": "双人午餐团购券标价79.80元，一张券对应两人午餐套餐"
+        }
+      ]
+    },
+    {
+      "id": "a1-dev-012",
+      "corpus": "online",
+      "suite": "standard",
+      "query": "同一订单有两张单人晚餐券，能分两次扫吗？",
+      "shopId": "shop-demo-1",
+      "productId": "product-demo-2",
+      "relevant": [
+        "KB-PRODUCT-DINNER"
+      ],
+      "expectedBehavior": "answer",
+      "goldRationale": "证据原文明确说明所问规则；只解释该规则，不证明某个真实订单的状态或完成操作。",
+      "evidence": [
+        {
+          "docId": "KB-PRODUCT-DINNER",
+          "quote": "订单购买两张券时可以分别核销"
+        }
+      ]
+    },
+    {
+      "id": "a1-dev-013",
+      "corpus": "reference",
+      "suite": "standard",
+      "query": "未使用但已经到期的团购券，参考规则允许过期退吗？",
+      "shopId": null,
+      "productId": null,
+      "relevant": [
+        "RF001",
+        "ET006"
+      ],
+      "expectedBehavior": "answer",
+      "goldRationale": "RF001 与 ET006 都直接支持过期未使用可申请退款；两篇均是有效替代证据，不能因仅接收到 ET006 而误计有效证据全拒。Recall 是相关文档覆盖率，任一有效证据留存另由误拒指标衡量。",
+      "evidence": [
+        {
+          "docId": "RF001",
+          "quote": "若券已过有效期但未核销,同样支持过期退"
+        },
+        {
+          "docId": "ET006",
+          "quote": "过期未使用可申请过期退"
+        }
+      ]
+    },
+    {
+      "id": "a1-dev-014",
+      "corpus": "reference",
+      "suite": "standard",
+      "query": "刷过券之后有特殊原因想退，谁能决定是否同意？",
+      "shopId": null,
+      "productId": null,
+      "relevant": [
+        "RF002"
+      ],
+      "expectedBehavior": "answer",
+      "goldRationale": "证据原文明确说明所问规则；只解释该规则，不证明某个真实订单的状态或完成操作。",
+      "evidence": [
+        {
+          "docId": "RF002",
+          "quote": "商家同意与否由商家自主决定"
+        }
+      ]
+    },
+    {
+      "id": "a1-dev-015",
+      "corpus": "reference",
+      "suite": "standard",
+      "query": "还没到店的已预约订单要退，应该先处理哪一步？",
+      "shopId": null,
+      "productId": null,
+      "relevant": [
+        "RF003"
+      ],
+      "expectedBehavior": "answer",
+      "goldRationale": "证据原文明确说明所问规则；只解释该规则，不证明某个真实订单的状态或完成操作。",
+      "evidence": [
+        {
+          "docId": "RF003",
+          "quote": "若需退款,需先取消预约"
+        }
+      ]
+    },
+    {
+      "id": "a1-dev-016",
+      "corpus": "reference",
+      "suite": "standard",
+      "query": "付钱用了红包，退单能把优惠也拿回来吗？",
+      "shopId": null,
+      "productId": null,
+      "relevant": [
+        "RF004"
+      ],
+      "expectedBehavior": "answer",
+      "goldRationale": "证据原文明确说明所问规则；只解释该规则，不证明某个真实订单的状态或完成操作。",
+      "evidence": [
+        {
+          "docId": "RF004",
+          "quote": "退款时优惠不予返还,仅退还实际支付金额"
+        }
+      ]
+    },
+    {
+      "id": "a1-dev-017",
+      "corpus": "reference",
+      "suite": "standard",
+      "query": "退到信用卡通常要等几个工作日？",
+      "shopId": null,
+      "productId": null,
+      "relevant": [
+        "RF005"
+      ],
+      "expectedBehavior": "answer",
+      "goldRationale": "证据原文明确说明所问规则；只解释该规则，不证明某个真实订单的状态或完成操作。",
+      "evidence": [
+        {
+          "docId": "RF005",
+          "quote": "信用卡3-7个工作日"
+        }
+      ]
+    },
+    {
+      "id": "a1-dev-018",
+      "corpus": "reference",
+      "suite": "standard",
+      "query": "没预约的客人直接到店，店里一定接待吗？",
+      "shopId": null,
+      "productId": null,
+      "relevant": [
+        "RS001"
+      ],
+      "expectedBehavior": "answer",
+      "goldRationale": "证据原文明确说明所问规则；只解释该规则，不证明某个真实订单的状态或完成操作。",
+      "evidence": [
+        {
+          "docId": "RS001",
+          "quote": "未预约直接到店商家可能无法接待"
+        }
+      ]
+    },
+    {
+      "id": "a1-dev-019",
+      "corpus": "reference",
+      "suite": "standard",
+      "query": "距离预约还有十个小时，改时间需要谁同意？",
+      "shopId": null,
+      "productId": null,
+      "relevant": [
+        "RS003"
+      ],
+      "expectedBehavior": "answer",
+      "goldRationale": "证据原文明确说明所问规则；只解释该规则，不证明某个真实订单的状态或完成操作。",
+      "evidence": [
+        {
+          "docId": "RS003",
+          "quote": "距预约时间不足24小时的变更需商家同意"
+        }
+      ]
+    },
+    {
+      "id": "a1-dev-020",
+      "corpus": "reference",
+      "suite": "standard",
+      "query": "商家把另一张券刷错了，申诉需要说明什么？",
+      "shopId": null,
+      "productId": null,
+      "relevant": [
+        "VF002"
+      ],
+      "expectedBehavior": "answer",
+      "goldRationale": "证据原文明确说明所问规则；只解释该规则，不证明某个真实订单的状态或完成操作。",
+      "evidence": [
+        {
+          "docId": "VF002",
+          "quote": "需提供未实际消费的说明"
+        }
+      ]
+    },
+    {
+      "id": "a1-dev-021",
+      "corpus": "reference",
+      "suite": "standard",
+      "query": "已经预约的券能通过转赠入口给朋友吗？",
+      "shopId": null,
+      "productId": null,
+      "relevant": [
+        "VF003"
+      ],
+      "expectedBehavior": "answer",
+      "goldRationale": "证据原文明确说明所问规则；只解释该规则，不证明某个真实订单的状态或完成操作。",
+      "evidence": [
+        {
+          "docId": "VF003",
+          "quote": "已核销或已预约的券不支持转赠"
+        }
+      ]
+    },
+    {
+      "id": "a1-dev-022",
+      "corpus": "reference",
+      "suite": "standard",
+      "query": "餐饮团购客人可以免排队先进去吗？",
+      "shopId": null,
+      "productId": null,
+      "relevant": [
+        "CY003"
+      ],
+      "expectedBehavior": "answer",
+      "goldRationale": "证据原文明确说明所问规则；只解释该规则，不证明某个真实订单的状态或完成操作。",
+      "evidence": [
+        {
+          "docId": "CY003",
+          "quote": "使用团购券不享受优先入座"
+        }
+      ]
+    },
+    {
+      "id": "a1-dev-023",
+      "corpus": "reference",
+      "suite": "standard",
+      "query": "想开发票应由平台还是商家负责？",
+      "shopId": null,
+      "productId": null,
+      "relevant": [
+        "PY001"
+      ],
+      "expectedBehavior": "answer",
+      "goldRationale": "证据原文明确说明所问规则；只解释该规则，不证明某个真实订单的状态或完成操作。",
+      "evidence": [
+        {
+          "docId": "PY001",
+          "quote": "平台仅提供交易凭证,不代开发票"
+        }
+      ]
+    },
+    {
+      "id": "a1-dev-024",
+      "corpus": "reference",
+      "suite": "standard",
+      "query": "店里因为买的是线上团购就要求补到挂牌价，合理吗？",
+      "shopId": null,
+      "productId": null,
+      "relevant": [
+        "ET005"
+      ],
+      "expectedBehavior": "answer",
+      "goldRationale": "证据原文明确说明所问规则；只解释该规则，不证明某个真实订单的状态或完成操作。",
+      "evidence": [
+        {
+          "docId": "ET005",
+          "quote": "商家不得要求使用团购券的顾客补足到店价差价"
+        }
+      ]
+    },
+    {
+      "id": "a1-dev-025",
+      "corpus": "online",
+      "suite": "no_answer",
+      "query": "双人午餐中的米饭净含量是多少克？",
+      "shopId": "shop-demo-1",
+      "productId": "product-demo-1",
+      "relevant": [],
+      "expectedBehavior": "abstain",
+      "goldRationale": "午餐规则只有人数和价格，未提供菜品明细或食物克数，不能从套餐名称推断。",
+      "evidence": [],
+      "relatedButInsufficient": [
+        "KB-PRODUCT-LUNCH"
+      ]
+    },
+    {
+      "id": "a1-dev-026",
+      "corpus": "online",
+      "suite": "no_answer",
+      "query": "单人晚餐一份含多少毫克钠？",
+      "shopId": "shop-demo-1",
+      "productId": "product-demo-2",
+      "relevant": [],
+      "expectedBehavior": "abstain",
+      "goldRationale": "晚餐规则没有营养成分，人数和标价不能支持钠含量。",
+      "evidence": [],
+      "relatedButInsufficient": [
+        "KB-PRODUCT-DINNER"
+      ]
+    },
+    {
+      "id": "a1-dev-027",
+      "corpus": "online",
+      "suite": "no_answer",
+      "query": "双人午餐具体用了哪一种花生油？",
+      "shopId": "shop-demo-1",
+      "productId": "product-demo-1",
+      "relevant": [],
+      "expectedBehavior": "abstain",
+      "goldRationale": "菜品明细及过敏原未录入，不能从餐饮类型推定食材或用油。",
+      "evidence": [],
+      "relatedButInsufficient": [
+        "KB-PRODUCT-LUNCH"
+      ]
+    },
+    {
+      "id": "a1-dev-028",
+      "corpus": "online",
+      "suite": "no_answer",
+      "query": "云味店办理退款要收多少元手续费？",
+      "shopId": "shop-demo-1",
+      "productId": null,
+      "relevant": [],
+      "expectedBehavior": "abstain",
+      "goldRationale": "退款上限规则未约定手续费金额，不能把实付上限推成零手续费。",
+      "evidence": [],
+      "relatedButInsufficient": [
+        "KB-REFUND-UNUSED",
+        "KB-REFUND-PARTIAL"
+      ]
+    },
+    {
+      "id": "a1-dev-029",
+      "corpus": "online",
+      "suite": "no_answer",
+      "query": "退款发起后银行到账精确需要多少小时？",
+      "shopId": null,
+      "productId": null,
+      "relevant": [],
+      "expectedBehavior": "abstain",
+      "goldRationale": "线上八篇规则没有支付渠道到账时效；不得套用参考语料里的1至3日。",
+      "evidence": [],
+      "relatedButInsufficient": [
+        "KB-REFUND-UNUSED",
+        "KB-REFUND-PAYMENT"
+      ]
+    },
+    {
+      "id": "a1-dev-030",
+      "corpus": "online",
+      "suite": "no_answer",
+      "query": "云味餐厅的包间最低消费具体多少元？",
+      "shopId": "shop-demo-1",
+      "productId": null,
+      "relevant": [],
+      "expectedBehavior": "abstain",
+      "goldRationale": "门店地址和周末使用规则没有包间收费或最低消费。",
+      "evidence": [],
+      "relatedButInsufficient": [
+        "KB-SHOP-DEMO-1"
+      ]
+    },
+    {
+      "id": "a1-dev-031",
+      "corpus": "online",
+      "suite": "no_answer",
+      "query": "午餐券现在的实际库存还剩几张？",
+      "shopId": "shop-demo-1",
+      "productId": "product-demo-1",
+      "relevant": [],
+      "expectedBehavior": "abstain",
+      "goldRationale": "套餐售价和人数不提供库存，门店规则明确无法查询实时库存。",
+      "evidence": [],
+      "relatedButInsufficient": [
+        "KB-PRODUCT-LUNCH",
+        "KB-SHOP-DEMO-1"
+      ]
+    },
+    {
+      "id": "a1-dev-032",
+      "corpus": "online",
+      "suite": "no_answer",
+      "query": "在这家店消费积分一元能积几分？",
+      "shopId": "shop-demo-1",
+      "productId": null,
+      "relevant": [],
+      "expectedBehavior": "abstain",
+      "goldRationale": "线上知识未记录积分比例；不能用不存在的会员政策补全。",
+      "evidence": [],
+      "relatedButInsufficient": [
+        "KB-SHOP-DEMO-1"
+      ]
+    },
+    {
+      "id": "a1-dev-033",
+      "corpus": "reference",
+      "suite": "no_answer",
+      "query": "信用卡退款成功后平台赔付等待期间利息的比例是多少？",
+      "shopId": null,
+      "productId": null,
+      "relevant": [],
+      "expectedBehavior": "abstain",
+      "goldRationale": "退款时效文档没有退款等待利息赔付政策，时间范围不能支持赔付比例。",
+      "evidence": [],
+      "relatedButInsufficient": [
+        "RF005"
+      ]
+    },
+    {
+      "id": "a1-dev-034",
+      "corpus": "reference",
+      "suite": "no_answer",
+      "query": "美甲团购加钻每一颗的统一价格是多少元？",
+      "shopId": null,
+      "productId": null,
+      "relevant": [],
+      "expectedBehavior": "abstain",
+      "goldRationale": "只说明加钻另收费，未给任何统一单价。",
+      "evidence": [],
+      "relatedButInsufficient": [
+        "LR002"
+      ]
+    },
+    {
+      "id": "a1-dev-035",
+      "corpus": "reference",
+      "suite": "no_answer",
+      "query": "酒店延迟退房到下午五点必须缴纳多少元？",
+      "shopId": null,
+      "productId": null,
+      "relevant": [],
+      "expectedBehavior": "abstain",
+      "goldRationale": "只说提前入住或延迟退房可能另付费，未给五点的价格。",
+      "evidence": [],
+      "relatedButInsufficient": [
+        "JL001"
+      ]
+    },
+    {
+      "id": "a1-dev-036",
+      "corpus": "reference",
+      "suite": "no_answer",
+      "query": "商家误核销申诉后固定能获赔几倍订单金额？",
+      "shopId": null,
+      "productId": null,
+      "relevant": [],
+      "expectedBehavior": "abstain",
+      "goldRationale": "误核销只承诺核实及协助恢复或退款，没有倍数赔偿标准。",
+      "evidence": [],
+      "relatedButInsufficient": [
+        "VF002"
+      ]
+    },
+    {
+      "id": "a1-dev-037",
+      "corpus": "online",
+      "suite": "scope",
+      "query": "云味餐厅演示门店具体地址是什么？",
+      "shopId": null,
+      "productId": null,
+      "relevant": [],
+      "expectedBehavior": "abstain",
+      "goldRationale": "未给可信店铺范围，云味店专属文档不可见，通用售后规则没有地址。",
+      "evidence": [],
+      "forbidden": [
+        "KB-SHOP-DEMO-1"
+      ],
+      "scopeCategory": "missing_shop"
+    },
+    {
+      "id": "a1-dev-038",
+      "corpus": "online",
+      "suite": "scope",
+      "query": "当前这家门店普通周六的午餐券是否允许使用？",
+      "shopId": "shop-other",
+      "productId": null,
+      "relevant": [],
+      "expectedBehavior": "abstain",
+      "goldRationale": "当前范围为另一店铺，不能借云味店周末规则作答。",
+      "evidence": [],
+      "forbidden": [
+        "KB-SHOP-DEMO-1"
+      ],
+      "scopeCategory": "cross_shop"
+    },
+    {
+      "id": "a1-dev-039",
+      "corpus": "online",
+      "suite": "scope",
+      "query": "一张午餐券包含几个人的餐食？",
+      "shopId": "shop-demo-1",
+      "productId": null,
+      "relevant": [],
+      "expectedBehavior": "abstain",
+      "goldRationale": "仅店铺范围无法访问商品专属人数规则，不能猜测午餐就是双人。",
+      "evidence": [],
+      "forbidden": [
+        "KB-PRODUCT-LUNCH"
+      ],
+      "scopeCategory": "missing_product"
+    },
+    {
+      "id": "a1-dev-040",
+      "corpus": "online",
+      "suite": "scope",
+      "query": "这张晚餐券的标价是多少？",
+      "shopId": "shop-demo-1",
+      "productId": "product-demo-1",
+      "relevant": [],
+      "expectedBehavior": "abstain",
+      "goldRationale": "可信焦点为午餐商品，晚餐商品证据不可见。",
+      "evidence": [],
+      "forbidden": [
+        "KB-PRODUCT-DINNER"
+      ],
+      "scopeCategory": "cross_product"
+    },
+    {
+      "id": "a1-dev-041",
+      "corpus": "online",
+      "suite": "scope",
+      "query": "双人午餐一张核销后还能再分一次刷吗？",
+      "shopId": "shop-demo-1",
+      "productId": "product-demo-2",
+      "relevant": [],
+      "expectedBehavior": "abstain",
+      "goldRationale": "可信焦点为晚餐，不能引用另一商品的整券核销规则。",
+      "evidence": [],
+      "forbidden": [
+        "KB-PRODUCT-LUNCH"
+      ],
+      "scopeCategory": "cross_product"
+    },
+    {
+      "id": "a1-dev-042",
+      "corpus": "online",
+      "suite": "scope",
+      "query": "当前商家套餐周末允许用吗？",
+      "shopId": "shop-fixture-retired",
+      "productId": null,
+      "relevant": [],
+      "expectedBehavior": "abstain",
+      "goldRationale": "当前店铺唯一使用规则是标记inactive的原文副本；历史记录不得被接收。",
+      "evidence": [],
+      "forbidden": [
+        "FIX-INACTIVE-SHOP",
+        "KB-SHOP-DEMO-1"
+      ],
+      "scopeCategory": "inactive"
+    },
+    {
+      "id": "a1-dev-043",
+      "corpus": "online",
+      "suite": "scope",
+      "query": "当前门店演示地址是哪里？",
+      "shopId": "shop-fixture-retired",
+      "productId": null,
+      "relevant": [],
+      "expectedBehavior": "abstain",
+      "goldRationale": "当前店铺的地址资料已停用，其他门店地址不能替代。",
+      "evidence": [],
+      "forbidden": [
+        "FIX-INACTIVE-SHOP",
+        "KB-SHOP-DEMO-1"
+      ],
+      "scopeCategory": "inactive"
+    },
+    {
+      "id": "a1-dev-044",
+      "corpus": "online",
+      "suite": "scope",
+      "query": "这家店是否可以帮我确认周日接待安排？",
+      "shopId": "shop-other",
+      "productId": null,
+      "relevant": [],
+      "expectedBehavior": "abstain",
+      "goldRationale": "其他店铺不享有云味门店接待说明；通用退款政策没有接待信息。",
+      "evidence": [],
+      "forbidden": [
+        "KB-SHOP-DEMO-1"
+      ],
+      "scopeCategory": "cross_shop"
+    },
+    {
+      "id": "a1-dev-045",
+      "corpus": "reference",
+      "suite": "scope",
+      "query": "本店消费满100元能抵扣两小时停车费吗？",
+      "shopId": "shop_other",
+      "productId": null,
+      "relevant": [],
+      "expectedBehavior": "abstain",
+      "goldRationale": "具体门槛仅SH002且属于shop_1001，当前其他店铺；ET002仅让向商家核实不能证明门槛。",
+      "evidence": [],
+      "forbidden": [
+        "SH002"
+      ],
+      "scopeCategory": "cross_shop"
+    },
+    {
+      "id": "a1-dev-046",
+      "corpus": "reference",
+      "suite": "scope",
+      "query": "当前店铺暑期是否加赠果盘？",
+      "shopId": null,
+      "productId": null,
+      "relevant": [],
+      "expectedBehavior": "abstain",
+      "goldRationale": "暑期赠品属于店铺专属资料，未指定可信店铺不能引用。",
+      "evidence": [],
+      "forbidden": [
+        "SH001"
+      ],
+      "scopeCategory": "missing_shop"
+    },
+    {
+      "id": "a1-dev-047",
+      "corpus": "reference",
+      "suite": "scope",
+      "query": "这个店的停车抵扣需不需要到前台盖章？",
+      "shopId": "shop-fixture-retired",
+      "productId": null,
+      "relevant": [],
+      "expectedBehavior": "abstain",
+      "goldRationale": "当前店铺唯一盖章资料inactive；通用停车说明无盖章步骤。",
+      "evidence": [],
+      "forbidden": [
+        "FIX-INACTIVE-PARKING",
+        "SH002"
+      ],
+      "scopeCategory": "inactive"
+    },
+    {
+      "id": "a1-dev-048",
+      "corpus": "reference",
+      "suite": "scope",
+      "query": "这里的地下停车场位于哪个商场？",
+      "shopId": "shop_other",
+      "productId": null,
+      "relevant": [],
+      "expectedBehavior": "abstain",
+      "goldRationale": "具体万达信息仅在另一店铺SH002，通用停车政策不提供当前店地址。",
+      "evidence": [],
+      "forbidden": [
+        "SH002"
+      ],
+      "scopeCategory": "cross_shop"
+    }
+  ]
+}

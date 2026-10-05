@@ -12,6 +12,8 @@
 
 后续实验开关迭代新增“实验调试”页签，合同见 `docs/experiment-controls.md`，由同一 Kimi CLI K3 + Max 会话维护；方案预设与参数来自后端 catalog。历史接口继续只读，唯一 POST 启动本机实验；表单不能修改在线 QQ 或接受命令/密钥。结果取关联记录的真实摘要，缺失/失败及缓存复用需显式展示。
 
+A1 增量已接入 version 2 数据集/接收策略/阈值，保持 version 1 配置语义。接收指标与 raw 分表，误接收分别显示无答案与全部预期拒答口径；空分母不适用、旧字段未记录、context 待 C1。模型门槛未通过时，任务 completed 只代表执行结束。11 组实验 UI 检查、15 组既有 UI 检查、完整 validate 及 1440px/390px 实际配置下载/回填/提交/结果验收通过。见 [A1 记录](./a1-implementation-results.md)。
+
 请阅读 `docs/evaluation-api.md` 的完整合同及 `plan.md` 第 8.1 节。继续维护现有明亮柔和、简洁的工作台。旧 GET 运行列表与详情兼容；新 GET 提供单运行 analysis、两次 compare 与 batches 稳定性。
 
 前端交付：

@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "createdDate": "2026-10-05",
+  "validationPolicy": "fixed-validation-not-blind",
+  "dataset": {
+    "path": "data/support-v2-validation.json",
+    "sha256": "7860c21fb98efd4fcbb8158e9dcc9629aad113dc688d280027c14790e6b84969",
+    "bytes": 129822,
+    "cases": 24,
+    "turns": 79
+  },
+  "contracts": {
+    "db/02-seed.sql": "82c7143840ac30d166207dcf92c227b3368b98af899412a4f669f04bfb976560",
+    "db/05-merchant.sql": "9a54205d787e16349891cba7f399ef525c5923110140c991c82def7b8b02db79",
+    "src/support-action.ts": "4d8449d054b730a6d2e0ea32f752ff5f227166b689a7e6e96d955c8d9caec291",
+    "src/support-evaluation.ts": "216410320baf42fe24ce033780885342f486e810033e08c8e2295c1866bcb558",
+    "src/after-sales-entry.ts": "bb2ec9d9a7585efefc4af7fcd87c0e9a4d978315d4fd576d4a1ad76a17ea1162",
+    "src/refund-entry.ts": "ee0047a29cb45b13325ef98b886b6d5aa704b61369a97aa19128940f8d133e7f",
+    "src/refunds.ts": "a00872bf5e20114752fd2fe001b3f9ab3bc3b94895b95fa22b44c64bb047df3d",
+    "src/after-sales.ts": "16f063484cfb9fb381f70b3adc03425ca9e418897787673f0fefbe25a2d26b14",
+    "scripts/merchant-test-fixture.ts": "8a3ca07fb1174a2930e45886b8065f089ba3f3cae4cc75abacebd4acf594ca9d"
+  },
+  "status": "Data and schema only. O5 runner execution not done; 4 recovery cases explicitly deferred to O4."
+}

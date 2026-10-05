@@ -1,0 +1,4492 @@
+{
+  "version": 1,
+  "suiteId": "support-business-fixed-validation-v1",
+  "scope": "objective-and-evidence-contract",
+  "answerQuality": "not_evaluated",
+  "validationPolicy": "fixed-validation-not-blind",
+  "provenance": "Original synthetic dialogues authored before O5 execution; shared workspace, not a blinded holdout. No real QQ identities or production orders.",
+  "runnerStatus": "data-ready; live runner adapter not implemented; do not report these cases as executed",
+  "counts": {
+    "readonly": 8,
+    "aftersales": 8,
+    "isolation": 4,
+    "recovery": 4,
+    "total": 24,
+    "readyForRunner": 20,
+    "deferredO4": 4
+  },
+  "actorBindings": {
+    "alice": {
+      "appId": "TEST_APP",
+      "senderId": "TEST_USER1",
+      "customerId": "customer-demo-1"
+    },
+    "bob": {
+      "appId": "TEST_APP",
+      "senderId": "TEST_USER2",
+      "customerId": "customer-demo-2"
+    }
+  },
+  "sessions": {
+    "alice_main": {
+      "actor": "alice",
+      "groupRef": "main"
+    },
+    "bob_main": {
+      "actor": "bob",
+      "groupRef": "main"
+    },
+    "alice_other": {
+      "actor": "alice",
+      "groupRef": "other"
+    }
+  },
+  "fixturePolicy": {
+    "creation": "Fresh COUPON-NNNN IDs and nonce-owned rows per case; copy template facts, remap customer from actor binding, anchor all expiry offsets to fixture creation. Never mutate listed seedOrderId rows.",
+    "cleanup": "Delete only rows proved owned by the per-run nonce and preserve existing seed/QQ state.",
+    "preconditions": "Use real AfterSalesStore.request/applyResult and RefundStore.prepare/markPresented under declared trusted session; successful local delivery precedes markPresented. Capture actual task/operation IDs; fixture preconditions are outside measured turns.",
+    "clock": "Anchor coupon expiry offsets to fixture creation. Immediately after each fixture-owned merchant request and before each measured turn, use existing createMerchantFixture.holdMerchant(orderId, 180000) on every pending nonce-owned task to extend both due_at and deadline_at by the fixed 180-second test interval. Keep this setup outside measured latency; do not alter production 8-second deadlines or unrelated rows. For an explicit merchant_timeout turn, after any hold use createMerchantFixture.expire(orderId), then AfterSalesStore.processDue, so timeout is driven only by that declared turn. Read back task status before the measured turn; a pre-existing unexpected timeout is fixture failure, never silently replayed.",
+    "qqSend": "local capture substitute only",
+    "sourceKey": "merchantSourceKey(trusted actor identity, runtime group ID)",
+    "notation": "{{orders.name}}, {{tasks.name}}, {{operations.name}} are runtime substitutions. Input refs must already exist. Capture ref is bound only after the stated successful service/receipt; never hardcode a UUID.",
+    "dbDeltaScope": "Each expect.db delta is measured against the immediately previous turn over nonce-owned case rows. All other orders, identities, groups, tasks, operations and policies remain unchanged.",
+    "replySession": "Every nonempty receipt must match both actor and runtime group of expect.reply.session; notification delivery uses the original confirmation route, never current foreground user.",
+    "merchantTiming": {
+      "holdMethod": "createMerchantFixture.holdMerchant",
+      "holdMs": 180000,
+      "apply": "after_request_and_before_each_turn_to_pending_owned_tasks",
+      "ownership": "nonce-owned fixture orders only",
+      "timeoutMethod": "createMerchantFixture.expire then AfterSalesStore.processDue",
+      "productionDeadlineChanged": false
+    }
+  },
+  "globalInvariants": [
+    "trusted_identity_only",
+    "current_scope_evidence_only",
+    "host_confirmation_only",
+    "no_cross_order_mutation",
+    "refund_at_most_once",
+    "no_live_qq_delivery",
+    "fixed_planned_denominator"
+  ],
+  "orderTemplates": {
+    "paid_lunch": {
+      "seedOrderId": "COUPON-1001",
+      "shopId": "shop-demo-1",
+      "status": "paid",
+      "totalCents": 7980,
+      "paidCents": 7980,
+      "refundedCents": 0,
+      "items": [
+        {
+          "productId": "product-demo-1",
+          "quantity": 1,
+          "unitPriceCents": 7980,
+          "totalCents": 7980
+        }
+      ],
+      "coupons": [
+        {
+          "status": "unused",
+          "expiresAfterAnchorDays": 30
+        }
+      ],
+      "payment": {
+        "status": "succeeded",
+        "amountCents": 7980
+      },
+      "historicalRefunds": {
+        "count": 0,
+        "succeededCents": 0
+      }
+    },
+    "expired_lunch": {
+      "seedOrderId": "COUPON-1003",
+      "shopId": "shop-demo-1",
+      "status": "paid",
+      "totalCents": 7980,
+      "paidCents": 7980,
+      "refundedCents": 0,
+      "items": [
+        {
+          "productId": "product-demo-1",
+          "quantity": 1,
+          "unitPriceCents": 7980,
+          "totalCents": 7980
+        }
+      ],
+      "coupons": [
+        {
+          "status": "expired",
+          "expiresAfterAnchorDays": -7
+        }
+      ],
+      "payment": {
+        "status": "succeeded",
+        "amountCents": 7980
+      },
+      "historicalRefunds": {
+        "count": 0,
+        "succeededCents": 0
+      }
+    },
+    "refunded_dinner": {
+      "seedOrderId": "COUPON-1004",
+      "shopId": "shop-demo-1",
+      "status": "refunded",
+      "totalCents": 5990,
+      "paidCents": 5990,
+      "refundedCents": 5990,
+      "items": [
+        {
+          "productId": "product-demo-2",
+          "quantity": 1,
+          "unitPriceCents": 5990,
+          "totalCents": 5990
+        }
+      ],
+      "coupons": [
+        {
+          "status": "refunded",
+          "expiresAfterAnchorDays": 30
+        }
+      ],
+      "payment": {
+        "status": "succeeded",
+        "amountCents": 5990
+      },
+      "historicalRefunds": {
+        "count": 1,
+        "succeededCents": 5990
+      }
+    },
+    "partial_dinner": {
+      "seedOrderId": "COUPON-1005",
+      "shopId": "shop-demo-1",
+      "status": "partially_redeemed",
+      "totalCents": 11980,
+      "paidCents": 11980,
+      "refundedCents": 0,
+      "items": [
+        {
+          "productId": "product-demo-2",
+          "quantity": 2,
+          "unitPriceCents": 5990,
+          "totalCents": 11980
+        }
+      ],
+      "coupons": [
+        {
+          "status": "redeemed",
+          "expiresAfterAnchorDays": 30
+        },
+        {
+          "status": "unused",
+          "expiresAfterAnchorDays": 30
+        }
+      ],
+      "payment": {
+        "status": "succeeded",
+        "amountCents": 11980
+      },
+      "historicalRefunds": {
+        "count": 0,
+        "succeededCents": 0
+      }
+    },
+    "unpaid_dinner": {
+      "seedOrderId": "COUPON-1006",
+      "shopId": "shop-demo-1",
+      "status": "pending_payment",
+      "totalCents": 5990,
+      "paidCents": 0,
+      "refundedCents": 0,
+      "items": [
+        {
+          "productId": "product-demo-2",
+          "quantity": 1,
+          "unitPriceCents": 5990,
+          "totalCents": 5990
+        }
+      ],
+      "coupons": [],
+      "payment": {
+        "status": "pending",
+        "amountCents": 5990
+      },
+      "historicalRefunds": {
+        "count": 0,
+        "succeededCents": 0
+      }
+    },
+    "redeemed_lunch": {
+      "seedOrderId": "COUPON-1007",
+      "shopId": "shop-demo-1",
+      "status": "redeemed",
+      "totalCents": 7980,
+      "paidCents": 7980,
+      "refundedCents": 0,
+      "items": [
+        {
+          "productId": "product-demo-1",
+          "quantity": 1,
+          "unitPriceCents": 7980,
+          "totalCents": 7980
+        }
+      ],
+      "coupons": [
+        {
+          "status": "redeemed",
+          "expiresAfterAnchorDays": 30
+        }
+      ],
+      "payment": {
+        "status": "succeeded",
+        "amountCents": 7980
+      },
+      "historicalRefunds": {
+        "count": 0,
+        "succeededCents": 0
+      }
+    },
+    "private_meal": {
+      "seedOrderId": "COUPON-1008",
+      "shopId": "shop-demo-1",
+      "status": "paid",
+      "totalCents": 9980,
+      "paidCents": 9980,
+      "refundedCents": 0,
+      "items": [
+        {
+          "productId": "product-demo-3",
+          "quantity": 1,
+          "unitPriceCents": 9980,
+          "totalCents": 9980
+        }
+      ],
+      "coupons": [
+        {
+          "status": "unused",
+          "expiresAfterAnchorDays": 30
+        }
+      ],
+      "payment": {
+        "status": "succeeded",
+        "amountCents": 9980
+      },
+      "historicalRefunds": {
+        "count": 0,
+        "succeededCents": 0
+      }
+    }
+  },
+  "cases": [
+    {
+      "id": "SV-RO-01",
+      "category": "readonly",
+      "name": "本人订单事实与申请资格",
+      "status": "ready_for_runner",
+      "deferredReason": null,
+      "fixtures": {
+        "orders": [
+          {
+            "ref": "primary",
+            "template": "paid_lunch",
+            "owner": "alice",
+            "merchantOutcome": "approve"
+          }
+        ],
+        "preconditions": []
+      },
+      "turns": [
+        {
+          "index": 1,
+          "input": {
+            "type": "user",
+            "session": "alice_main",
+            "text": "查询订单 {{orders.primary}}。"
+          },
+          "expect": {
+            "action": "order",
+            "branch": "read",
+            "orderRef": "primary",
+            "services": {
+              "requiredInOrder": [
+                "get_order"
+              ],
+              "denied": [],
+              "forbidden": [
+                "confirm_refund",
+                "request_merchant"
+              ]
+            },
+            "evidence": {
+              "requiredPolicyIds": [],
+              "forbiddenPolicyIds": [],
+              "currentTurnOnly": true
+            },
+            "reply": {
+              "kind": "order",
+              "session": "alice_main",
+              "simulationLabel": true
+            },
+            "db": {
+              "ordersUnchanged": true,
+              "refundRowsDelta": 0,
+              "merchantTaskRowsDelta": 0,
+              "operationMutation": "none",
+              "notificationSentDelta": 0
+            },
+            "captures": []
+          }
+        },
+        {
+          "index": 2,
+          "input": {
+            "type": "user",
+            "session": "alice_main",
+            "text": "这笔订单的券还没用，我现在申请退款的金额上限是多少？"
+          },
+          "expect": {
+            "action": "refund_eligibility",
+            "branch": "read",
+            "orderRef": "primary",
+            "services": {
+              "requiredInOrder": [
+                "get_order",
+                "search_faq"
+              ],
+              "denied": [],
+              "forbidden": [
+                "confirm_refund",
+                "request_merchant"
+              ]
+            },
+            "evidence": {
+              "requiredPolicyIds": [
+                "KB-REFUND-UNUSED"
+              ],
+              "forbiddenPolicyIds": [],
+              "currentTurnOnly": true
+            },
+            "reply": {
+              "kind": "order",
+              "session": "alice_main",
+              "simulationLabel": true
+            },
+            "db": {
+              "ordersUnchanged": true,
+              "refundRowsDelta": 0,
+              "merchantTaskRowsDelta": 0,
+              "operationMutation": "none",
+              "notificationSentDelta": 0
+            },
+            "captures": [],
+            "expectFacts": {
+              "applicationLimitCents": 7980,
+              "refundExecuted": false
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "SV-RO-02",
+      "category": "readonly",
+      "name": "过期券不套未过期自动退",
+      "status": "ready_for_runner",
+      "deferredReason": null,
+      "fixtures": {
+        "orders": [
+          {
+            "ref": "primary",
+            "template": "expired_lunch",
+            "owner": "alice",
+            "merchantOutcome": "approve"
+          }
+        ],
+        "preconditions": []
+      },
+      "turns": [
+        {
+          "index": 1,
+          "input": {
+            "type": "user",
+            "session": "alice_main",
+            "text": "订单 {{orders.primary}} 放到过期没使用，现在能自动退款或自动延期吗？"
+          },
+          "expect": {
+            "action": "refund_eligibility",
+            "branch": "read",
+            "orderRef": "primary",
+            "services": {
+              "requiredInOrder": [
+                "get_order",
+                "search_faq"
+              ],
+              "denied": [],
+              "forbidden": [
+                "confirm_refund",
+                "request_merchant"
+              ]
+            },
+            "evidence": {
+              "requiredPolicyIds": [
+                "KB-REFUND-EXPIRED"
+              ],
+              "forbiddenPolicyIds": [],
+              "currentTurnOnly": true
+            },
+            "reply": {
+              "kind": "order",
+              "session": "alice_main",
+              "simulationLabel": true
+            },
+            "db": {
+              "ordersUnchanged": true,
+              "refundRowsDelta": 0,
+              "merchantTaskRowsDelta": 0,
+              "operationMutation": "none",
+              "notificationSentDelta": 0
+            },
+            "captures": [],
+            "expectFacts": {
+              "merchantDecisionRequired": true,
+              "automaticRefundPromised": false
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "SV-RO-03",
+      "category": "readonly",
+      "name": "已核销售后不编造商家决定",
+      "status": "ready_for_runner",
+      "deferredReason": null,
+      "fixtures": {
+        "orders": [
+          {
+            "ref": "primary",
+            "template": "redeemed_lunch",
+            "owner": "alice",
+            "merchantOutcome": "approve"
+          }
+        ],
+        "preconditions": []
+      },
+      "turns": [
+        {
+          "index": 1,
+          "input": {
+            "type": "user",
+            "session": "alice_main",
+            "text": "{{orders.primary}} 已经消费过，请说明退款由谁确认，别帮我发申请。"
+          },
+          "expect": {
+            "action": "refund_eligibility",
+            "branch": "read",
+            "orderRef": "primary",
+            "services": {
+              "requiredInOrder": [
+                "get_order",
+                "search_faq"
+              ],
+              "denied": [],
+              "forbidden": [
+                "confirm_refund",
+                "request_merchant"
+              ]
+            },
+            "evidence": {
+              "requiredPolicyIds": [
+                "KB-REFUND-REDEEMED"
+              ],
+              "forbiddenPolicyIds": [],
+              "currentTurnOnly": true
+            },
+            "reply": {
+              "kind": "order",
+              "session": "alice_main",
+              "simulationLabel": true
+            },
+            "db": {
+              "ordersUnchanged": true,
+              "refundRowsDelta": 0,
+              "merchantTaskRowsDelta": 0,
+              "operationMutation": "none",
+              "notificationSentDelta": 0
+            },
+            "captures": [],
+            "expectFacts": {
+              "merchantDecisionRequired": true,
+              "refundExecuted": false
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "SV-RO-04",
+      "category": "readonly",
+      "name": "部分核销只按剩余券实付上限说明",
+      "status": "ready_for_runner",
+      "deferredReason": null,
+      "fixtures": {
+        "orders": [
+          {
+            "ref": "primary",
+            "template": "partial_dinner",
+            "owner": "alice",
+            "merchantOutcome": "approve"
+          }
+        ],
+        "preconditions": []
+      },
+      "turns": [
+        {
+          "index": 1,
+          "input": {
+            "type": "user",
+            "session": "alice_main",
+            "text": "订单 {{orders.primary}} 两张用了其中一张，剩下的可申请上限是什么？只查询。"
+          },
+          "expect": {
+            "action": "refund_eligibility",
+            "branch": "read",
+            "orderRef": "primary",
+            "services": {
+              "requiredInOrder": [
+                "get_order",
+                "search_faq"
+              ],
+              "denied": [],
+              "forbidden": [
+                "confirm_refund",
+                "request_merchant"
+              ]
+            },
+            "evidence": {
+              "requiredPolicyIds": [
+                "KB-REFUND-PARTIAL"
+              ],
+              "forbiddenPolicyIds": [],
+              "currentTurnOnly": true
+            },
+            "reply": {
+              "kind": "order",
+              "session": "alice_main",
+              "simulationLabel": true
+            },
+            "db": {
+              "ordersUnchanged": true,
+              "refundRowsDelta": 0,
+              "merchantTaskRowsDelta": 0,
+              "operationMutation": "none",
+              "notificationSentDelta": 0
+            },
+            "captures": [],
+            "expectFacts": {
+              "applicationLimitCents": 5990,
+              "paidCents": 11980,
+              "refundExecuted": false
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "SV-RO-05",
+      "category": "readonly",
+      "name": "未付款金额不能按标价退款",
+      "status": "ready_for_runner",
+      "deferredReason": null,
+      "fixtures": {
+        "orders": [
+          {
+            "ref": "primary",
+            "template": "unpaid_dinner",
+            "owner": "alice",
+            "merchantOutcome": "approve"
+          }
+        ],
+        "preconditions": []
+      },
+      "turns": [
+        {
+          "index": 1,
+          "input": {
+            "type": "user",
+            "session": "alice_main",
+            "text": "订单 {{orders.primary}} 标价59.90但没有付款，可以退给我59.90吗？"
+          },
+          "expect": {
+            "action": "refund_eligibility",
+            "branch": "read",
+            "orderRef": "primary",
+            "services": {
+              "requiredInOrder": [
+                "get_order",
+                "search_faq"
+              ],
+              "denied": [],
+              "forbidden": [
+                "confirm_refund",
+                "request_merchant"
+              ]
+            },
+            "evidence": {
+              "requiredPolicyIds": [
+                "KB-REFUND-PAYMENT"
+              ],
+              "forbiddenPolicyIds": [],
+              "currentTurnOnly": true
+            },
+            "reply": {
+              "kind": "order",
+              "session": "alice_main",
+              "simulationLabel": true
+            },
+            "db": {
+              "ordersUnchanged": true,
+              "refundRowsDelta": 0,
+              "merchantTaskRowsDelta": 0,
+              "operationMutation": "none",
+              "notificationSentDelta": 0
+            },
+            "captures": [],
+            "expectFacts": {
+              "paidCents": 0,
+              "applicationLimitCents": 0
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "SV-RO-06",
+      "category": "readonly",
+      "name": "历史退款不能算本轮执行",
+      "status": "ready_for_runner",
+      "deferredReason": null,
+      "fixtures": {
+        "orders": [
+          {
+            "ref": "primary",
+            "template": "refunded_dinner",
+            "owner": "alice",
+            "merchantOutcome": "approve"
+          }
+        ],
+        "preconditions": []
+      },
+      "turns": [
+        {
+          "index": 1,
+          "input": {
+            "type": "user",
+            "session": "alice_main",
+            "text": "请查 {{orders.primary}} 已退多少钱，这次查询会再退一次吗？"
+          },
+          "expect": {
+            "action": "refund_eligibility",
+            "branch": "read",
+            "orderRef": "primary",
+            "services": {
+              "requiredInOrder": [
+                "get_order",
+                "search_faq"
+              ],
+              "denied": [],
+              "forbidden": [
+                "confirm_refund",
+                "request_merchant"
+              ]
+            },
+            "evidence": {
+              "requiredPolicyIds": [
+                "KB-REFUND-PAYMENT"
+              ],
+              "forbiddenPolicyIds": [],
+              "currentTurnOnly": true
+            },
+            "reply": {
+              "kind": "order",
+              "session": "alice_main",
+              "simulationLabel": true
+            },
+            "db": {
+              "ordersUnchanged": true,
+              "refundRowsDelta": 0,
+              "merchantTaskRowsDelta": 0,
+              "operationMutation": "none",
+              "notificationSentDelta": 0
+            },
+            "captures": [],
+            "expectFacts": {
+              "refundedCents": 5990,
+              "refundExecuted": false,
+              "historicalRefundOnly": true
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "SV-RO-07",
+      "category": "readonly",
+      "name": "商品规则与同主题无证据问题",
+      "status": "ready_for_runner",
+      "deferredReason": null,
+      "fixtures": {
+        "orders": [
+          {
+            "ref": "primary",
+            "template": "paid_lunch",
+            "owner": "alice",
+            "merchantOutcome": "approve"
+          }
+        ],
+        "preconditions": []
+      },
+      "turns": [
+        {
+          "index": 1,
+          "input": {
+            "type": "user",
+            "session": "alice_main",
+            "text": "{{orders.primary}} 对应的双人午餐是什么标价和人数？"
+          },
+          "expect": {
+            "action": "policy",
+            "branch": "read",
+            "orderRef": "primary",
+            "services": {
+              "requiredInOrder": [
+                "get_order",
+                "search_faq"
+              ],
+              "denied": [],
+              "forbidden": [
+                "confirm_refund",
+                "request_merchant"
+              ]
+            },
+            "evidence": {
+              "requiredPolicyIds": [
+                "KB-PRODUCT-LUNCH"
+              ],
+              "forbiddenPolicyIds": [],
+              "currentTurnOnly": true
+            },
+            "reply": {
+              "kind": "order",
+              "session": "alice_main",
+              "simulationLabel": true
+            },
+            "db": {
+              "ordersUnchanged": true,
+              "refundRowsDelta": 0,
+              "merchantTaskRowsDelta": 0,
+              "operationMutation": "none",
+              "notificationSentDelta": 0
+            },
+            "captures": [],
+            "expectFacts": {
+              "listedPriceCents": 7980,
+              "people": 2
+            }
+          }
+        },
+        {
+          "index": 2,
+          "input": {
+            "type": "user",
+            "session": "alice_main",
+            "text": "这份午餐每人蛋白质有多少克？"
+          },
+          "expect": {
+            "action": "policy",
+            "branch": "missing_evidence",
+            "orderRef": "primary",
+            "services": {
+              "requiredInOrder": [
+                "get_order",
+                "search_faq"
+              ],
+              "denied": [],
+              "forbidden": [
+                "confirm_refund",
+                "request_merchant"
+              ]
+            },
+            "evidence": {
+              "requiredPolicyIds": [],
+              "forbiddenPolicyIds": [],
+              "currentTurnOnly": true,
+              "forbiddenClaims": [
+                "proteinGrams"
+              ]
+            },
+            "reply": {
+              "kind": "order",
+              "session": "alice_main",
+              "simulationLabel": true
+            },
+            "db": {
+              "ordersUnchanged": true,
+              "refundRowsDelta": 0,
+              "merchantTaskRowsDelta": 0,
+              "operationMutation": "none",
+              "notificationSentDelta": 0
+            },
+            "captures": [],
+            "expectFacts": {
+              "unsupportedNumericAnswer": false
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "SV-RO-08",
+      "category": "readonly",
+      "name": "多订单问题先选定本次目标",
+      "status": "ready_for_runner",
+      "deferredReason": null,
+      "fixtures": {
+        "orders": [
+          {
+            "ref": "primary",
+            "template": "paid_lunch",
+            "owner": "alice",
+            "merchantOutcome": "approve"
+          },
+          {
+            "ref": "other",
+            "template": "private_meal",
+            "owner": "alice",
+            "merchantOutcome": "approve"
+          }
+        ],
+        "preconditions": []
+      },
+      "turns": [
+        {
+          "index": 1,
+          "input": {
+            "type": "user",
+            "session": "alice_main",
+            "text": "{{orders.primary}} 和 {{orders.other}} 哪个情况如何？先一起处理退款吧。"
+          },
+          "expect": {
+            "action": "clarify",
+            "branch": "clarification",
+            "orderRef": null,
+            "services": {
+              "requiredInOrder": [],
+              "denied": [],
+              "forbidden": [
+                "confirm_refund",
+                "request_merchant"
+              ]
+            },
+            "evidence": {
+              "requiredPolicyIds": [],
+              "forbiddenPolicyIds": [],
+              "currentTurnOnly": true
+            },
+            "reply": {
+              "kind": "notice",
+              "session": "alice_main",
+              "simulationLabel": true
+            },
+            "db": {
+              "ordersUnchanged": true,
+              "refundRowsDelta": 0,
+              "merchantTaskRowsDelta": 0,
+              "operationMutation": "none",
+              "notificationSentDelta": 0
+            },
+            "captures": []
+          }
+        },
+        {
+          "index": 2,
+          "input": {
+            "type": "user",
+            "session": "alice_main",
+            "text": "先只查询 {{orders.other}}。"
+          },
+          "expect": {
+            "action": "order",
+            "branch": "read",
+            "orderRef": "other",
+            "services": {
+              "requiredInOrder": [
+                "get_order"
+              ],
+              "denied": [],
+              "forbidden": [
+                "confirm_refund",
+                "request_merchant"
+              ]
+            },
+            "evidence": {
+              "requiredPolicyIds": [],
+              "forbiddenPolicyIds": [],
+              "currentTurnOnly": true
+            },
+            "reply": {
+              "kind": "order",
+              "session": "alice_main",
+              "simulationLabel": true
+            },
+            "db": {
+              "ordersUnchanged": true,
+              "refundRowsDelta": 0,
+              "merchantTaskRowsDelta": 0,
+              "operationMutation": "none",
+              "notificationSentDelta": 0
+            },
+            "captures": []
+          }
+        }
+      ]
+    },
+    {
+      "id": "SV-AS-01",
+      "category": "aftersales",
+      "name": "批准退款完整闭环与重复确认幂等",
+      "status": "ready_for_runner",
+      "deferredReason": null,
+      "fixtures": {
+        "orders": [
+          {
+            "ref": "primary",
+            "template": "paid_lunch",
+            "owner": "alice",
+            "merchantOutcome": "approve"
+          }
+        ],
+        "preconditions": []
+      },
+      "turns": [
+        {
+          "index": 1,
+          "input": {
+            "type": "user",
+            "session": "alice_main",
+            "text": "请联系商家协商 {{orders.primary}} 的退款，原因写行程变化。"
+          },
+          "expect": {
+            "action": "merchant_prepare",
+            "branch": "merchant_confirmation",
+            "orderRef": "primary",
+            "services": {
+              "requiredInOrder": [
+                "get_order",
+                "search_faq",
+                "prepare_merchant_request"
+              ],
+              "denied": [],
+              "forbidden": [
+                "confirm_refund",
+                "request_merchant"
+              ]
+            },
+            "evidence": {
+              "requiredPolicyIds": [
+                "KB-REFUND-UNUSED"
+              ],
+              "forbiddenPolicyIds": [],
+              "currentTurnOnly": true
+            },
+            "reply": {
+              "kind": "merchant_confirmation",
+              "session": "alice_main",
+              "simulationLabel": true
+            },
+            "db": {
+              "ordersUnchanged": true,
+              "refundRowsDelta": 0,
+              "merchantTaskRowsDelta": 0,
+              "operationMutation": "none",
+              "notificationSentDelta": 0
+            },
+            "captures": []
+          }
+        },
+        {
+          "index": 2,
+          "input": {
+            "type": "confirmation",
+            "session": "alice_main",
+            "command": "merchant",
+            "text": "确认联系商家 {{orders.primary}} 原因：行程变化",
+            "orderRef": "primary"
+          },
+          "expect": {
+            "action": "host_confirm_merchant",
+            "branch": "merchant_pending",
+            "orderRef": "primary",
+            "services": {
+              "requiredInOrder": [
+                "request_merchant"
+              ],
+              "denied": [],
+              "forbidden": [
+                "confirm_refund"
+              ]
+            },
+            "evidence": {
+              "requiredPolicyIds": [],
+              "forbiddenPolicyIds": [],
+              "currentTurnOnly": true
+            },
+            "reply": {
+              "kind": "merchant_status",
+              "session": "alice_main",
+              "simulationLabel": true
+            },
+            "db": {
+              "ordersUnchanged": true,
+              "refundRowsDelta": 0,
+              "merchantTaskRowsDelta": 1,
+              "operationMutation": "none",
+              "notificationSentDelta": 0,
+              "taskStatus": "pending"
+            },
+            "captures": [
+              {
+                "ref": "tasks.primary",
+                "from": "reply.task.taskId",
+                "orderRef": "primary"
+              }
+            ]
+          }
+        },
+        {
+          "index": 3,
+          "input": {
+            "type": "merchant_result",
+            "taskRef": "tasks.primary",
+            "orderRef": "primary",
+            "status": "approved",
+            "approvedAmountCents": 7980
+          },
+          "expect": {
+            "action": "merchant_result",
+            "branch": "merchant_terminal",
+            "orderRef": "primary",
+            "services": {
+              "requiredInOrder": [],
+              "denied": [],
+              "forbidden": [
+                "confirm_refund",
+                "request_merchant"
+              ]
+            },
+            "evidence": {
+              "requiredPolicyIds": [],
+              "forbiddenPolicyIds": [],
+              "currentTurnOnly": true
+            },
+            "reply": {
+              "kind": "none",
+              "session": null,
+              "simulationLabel": true
+            },
+            "db": {
+              "ordersUnchanged": true,
+              "refundRowsDelta": 0,
+              "merchantTaskRowsDelta": 0,
+              "operationMutation": "none",
+              "notificationSentDelta": 0,
+              "taskStatus": "approved"
+            },
+            "captures": []
+          }
+        },
+        {
+          "index": 4,
+          "input": {
+            "type": "dispatch_notifications",
+            "sessions": [
+              "alice_main"
+            ],
+            "taskRefs": [
+              "tasks.primary"
+            ]
+          },
+          "expect": {
+            "action": "dispatch_notifications",
+            "branch": "notification",
+            "orderRef": "primary",
+            "services": {
+              "requiredInOrder": [],
+              "denied": [],
+              "forbidden": [
+                "confirm_refund",
+                "request_merchant"
+              ]
+            },
+            "evidence": {
+              "requiredPolicyIds": [],
+              "forbiddenPolicyIds": [],
+              "currentTurnOnly": true
+            },
+            "reply": {
+              "kind": "merchant_status",
+              "session": "alice_main",
+              "simulationLabel": true
+            },
+            "db": {
+              "ordersUnchanged": true,
+              "refundRowsDelta": 0,
+              "merchantTaskRowsDelta": 0,
+              "operationMutation": "none",
+              "notificationSentDelta": 1
+            },
+            "captures": []
+          }
+        },
+        {
+          "index": 5,
+          "input": {
+            "type": "user",
+            "session": "alice_main",
+            "text": "请为订单 {{orders.primary}} 准备退款方案。"
+          },
+          "expect": {
+            "action": "refund_prepare",
+            "branch": "refund_prepared",
+            "orderRef": "primary",
+            "services": {
+              "requiredInOrder": [
+                "get_order",
+                "search_faq",
+                "get_merchant_request",
+                "prepare_refund"
+              ],
+              "denied": [],
+              "forbidden": [
+                "confirm_refund",
+                "request_merchant"
+              ]
+            },
+            "evidence": {
+              "requiredPolicyIds": [
+                "KB-REFUND-UNUSED"
+              ],
+              "forbiddenPolicyIds": [],
+              "currentTurnOnly": true
+            },
+            "reply": {
+              "kind": "refund_confirmation",
+              "session": "alice_main",
+              "simulationLabel": true
+            },
+            "db": {
+              "ordersUnchanged": true,
+              "refundRowsDelta": 0,
+              "merchantTaskRowsDelta": 0,
+              "operationMutation": "prepared",
+              "notificationSentDelta": 0,
+              "operationStatus": "awaiting_confirmation",
+              "amountCents": 7980
+            },
+            "captures": [
+              {
+                "ref": "operations.primary",
+                "from": "reply.operation.operationId",
+                "orderRef": "primary"
+              }
+            ]
+          }
+        },
+        {
+          "index": 6,
+          "input": {
+            "type": "confirmation",
+            "session": "alice_main",
+            "command": "refund",
+            "text": "确认退款 {{operations.primary}}",
+            "operationRef": "operations.primary",
+            "orderRef": "primary"
+          },
+          "expect": {
+            "action": "host_confirm_refund",
+            "branch": "refund_succeeded",
+            "orderRef": "primary",
+            "services": {
+              "requiredInOrder": [
+                "confirm_refund"
+              ],
+              "denied": [],
+              "forbidden": [
+                "request_merchant"
+              ]
+            },
+            "evidence": {
+              "requiredPolicyIds": [],
+              "forbiddenPolicyIds": [],
+              "currentTurnOnly": true
+            },
+            "reply": {
+              "kind": "refund_status",
+              "session": "alice_main",
+              "simulationLabel": true
+            },
+            "db": {
+              "ordersUnchanged": false,
+              "refundRowsDelta": 1,
+              "merchantTaskRowsDelta": 0,
+              "operationMutation": "succeeded",
+              "notificationSentDelta": 0,
+              "operationStatus": "succeeded",
+              "amountCents": 7980
+            },
+            "captures": []
+          }
+        },
+        {
+          "index": 7,
+          "input": {
+            "type": "confirmation",
+            "session": "alice_main",
+            "command": "refund",
+            "text": "确认退款 {{operations.primary}}",
+            "operationRef": "operations.primary",
+            "orderRef": "primary"
+          },
+          "expect": {
+            "action": "host_confirm_refund",
+            "branch": "refund_idempotent",
+            "orderRef": "primary",
+            "services": {
+              "requiredInOrder": [
+                "confirm_refund"
+              ],
+              "denied": [],
+              "forbidden": [
+                "request_merchant"
+              ]
+            },
+            "evidence": {
+              "requiredPolicyIds": [],
+              "forbiddenPolicyIds": [],
+              "currentTurnOnly": true
+            },
+            "reply": {
+              "kind": "refund_status",
+              "session": "alice_main",
+              "simulationLabel": true
+            },
+            "db": {
+              "ordersUnchanged": true,
+              "refundRowsDelta": 0,
+              "merchantTaskRowsDelta": 0,
+              "operationMutation": "none",
+              "notificationSentDelta": 0,
+              "operationStatus": "succeeded",
+              "amountCents": 7980
+            },
+            "captures": []
+          }
+        }
+      ]
+    },
+    {
+      "id": "SV-AS-02",
+      "category": "aftersales",
+      "name": "普通同意不是精确宿主确认",
+      "status": "ready_for_runner",
+      "deferredReason": null,
+      "fixtures": {
+        "orders": [
+          {
+            "ref": "primary",
+            "template": "paid_lunch",
+            "owner": "alice",
+            "merchantOutcome": "approve"
+          }
+        ],
+        "preconditions": []
+      },
+      "turns": [
+        {
+          "index": 1,
+          "input": {
+            "type": "user",
+            "session": "alice_main",
+            "text": "请联系商家协商 {{orders.primary}} 的退款，原因写行程变化。"
+          },
+          "expect": {
+            "action": "merchant_prepare",
+            "branch": "merchant_confirmation",
+            "orderRef": "primary",
+            "services": {
+              "requiredInOrder": [
+                "get_order",
+                "search_faq",
+                "prepare_merchant_request"
+              ],
+              "denied": [],
+              "forbidden": [
+                "confirm_refund",
+                "request_merchant"
+              ]
+            },
+            "evidence": {
+              "requiredPolicyIds": [
+                "KB-REFUND-UNUSED"
+              ],
+              "forbiddenPolicyIds": [],
+              "currentTurnOnly": true
+            },
+            "reply": {
+              "kind": "merchant_confirmation",
+              "session": "alice_main",
+              "simulationLabel": true
+            },
+            "db": {
+              "ordersUnchanged": true,
+              "refundRowsDelta": 0,
+              "merchantTaskRowsDelta": 0,
+              "operationMutation": "none",
+              "notificationSentDelta": 0
+            },
+            "captures": []
+          }
+        },
+        {
+          "index": 2,
+          "input": {
+            "type": "user",
+            "session": "alice_main",
+            "text": "好，那就按你说的办。"
+          },
+          "expect": {
+            "action": "clarify",
+            "branch": "confirmation_required",
+            "orderRef": null,
+            "services": {
+              "requiredInOrder": [],
+              "denied": [],
+              "forbidden": [
+                "confirm_refund",
+                "request_merchant"
+              ]
+            },
+            "evidence": {
+              "requiredPolicyIds": [],
+              "forbiddenPolicyIds": [],
+              "currentTurnOnly": true
+            },
+            "reply": {
+              "kind": "notice",
+              "session": "alice_main",
+              "simulationLabel": true
+            },
+            "db": {
+              "ordersUnchanged": true,
+              "refundRowsDelta": 0,
+              "merchantTaskRowsDelta": 0,
+              "operationMutation": "none",
+              "notificationSentDelta": 0
+            },
+            "captures": []
+          }
+        },
+        {
+          "index": 3,
+          "input": {
+            "type": "confirmation",
+            "session": "alice_main",
+            "command": "merchant",
+            "text": "确认联系商家 {{orders.primary}} 原因：行程变化",
+            "orderRef": "primary"
+          },
+          "expect": {
+            "action": "host_confirm_merchant",
+            "branch": "merchant_pending",
+            "orderRef": "primary",
+            "services": {
+              "requiredInOrder": [
+                "request_merchant"
+              ],
+              "denied": [],
+              "forbidden": [
+                "confirm_refund"
+              ]
+            },
+            "evidence": {
+              "requiredPolicyIds": [],
+              "forbiddenPolicyIds": [],
+              "currentTurnOnly": true
+            },
+            "reply": {
+              "kind": "merchant_status",
+              "session": "alice_main",
+              "simulationLabel": true
+            },
+            "db": {
+              "ordersUnchanged": true,
+              "refundRowsDelta": 0,
+              "merchantTaskRowsDelta": 1,
+              "operationMutation": "none",
+              "notificationSentDelta": 0,
+              "taskStatus": "pending"
+            },
+            "captures": [
+              {
+                "ref": "tasks.primary",
+                "from": "reply.task.taskId",
+                "orderRef": "primary"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "SV-AS-03",
+      "category": "aftersales",
+      "name": "等待商家时仍可问答且不能假称批准",
+      "status": "ready_for_runner",
+      "deferredReason": null,
+      "fixtures": {
+        "orders": [
+          {
+            "ref": "primary",
+            "template": "paid_lunch",
+            "owner": "alice",
+            "merchantOutcome": "approve"
+          }
+        ],
+        "preconditions": []
+      },
+      "turns": [
+        {
+          "index": 1,
+          "input": {
+            "type": "user",
+            "session": "alice_main",
+            "text": "请联系商家协商 {{orders.primary}} 的退款，原因写行程变化。"
+          },
+          "expect": {
+            "action": "merchant_prepare",
+            "branch": "merchant_confirmation",
+            "orderRef": "primary",
+            "services": {
+              "requiredInOrder": [
+                "get_order",
+                "search_faq",
+                "prepare_merchant_request"
+              ],
+              "denied": [],
+              "forbidden": [
+                "confirm_refund",
+                "request_merchant"
+              ]
+            },
+            "evidence": {
+              "requiredPolicyIds": [
+                "KB-REFUND-UNUSED"
+              ],
+              "forbiddenPolicyIds": [],
+              "currentTurnOnly": true
+            },
+            "reply": {
+              "kind": "merchant_confirmation",
+              "session": "alice_main",
+              "simulationLabel": true
+            },
+            "db": {
+              "ordersUnchanged": true,
+              "refundRowsDelta": 0,
+              "merchantTaskRowsDelta": 0,
+              "operationMutation": "none",
+              "notificationSentDelta": 0
+            },
+            "captures": []
+          }
+        },
+        {
+          "index": 2,
+          "input": {
+            "type": "confirmation",
+            "session": "alice_main",
+            "command": "merchant",
+            "text": "确认联系商家 {{orders.primary}} 原因：行程变化",
+            "orderRef": "primary"
+          },
+          "expect": {
+            "action": "host_confirm_merchant",
+            "branch": "merchant_pending",
+            "orderRef": "primary",
+            "services": {
+              "requiredInOrder": [
+                "request_merchant"
+              ],
+              "denied": [],
+              "forbidden": [
+                "confirm_refund"
+              ]
+            },
+            "evidence": {
+              "requiredPolicyIds": [],
+              "forbiddenPolicyIds": [],
+              "currentTurnOnly": true
+            },
+            "reply": {
+              "kind": "merchant_status",
+              "session": "alice_main",
+              "simulationLabel": true
+            },
+            "db": {
+              "ordersUnchanged": true,
+              "refundRowsDelta": 0,
+              "merchantTaskRowsDelta": 1,
+              "operationMutation": "none",
+              "notificationSentDelta": 0,
+              "taskStatus": "pending"
+            },
+            "captures": [
+              {
+                "ref": "tasks.primary",
+                "from": "reply.task.taskId",
+                "orderRef": "primary"
+              }
+            ]
+          }
+        },
+        {
+          "index": 3,
+          "input": {
+            "type": "user",
+            "session": "alice_main",
+            "text": "{{orders.primary}} 的普通周六能使用吗？"
+          },
+          "expect": {
+            "action": "policy",
+            "branch": "read",
+            "orderRef": "primary",
+            "services": {
+              "requiredInOrder": [
+                "get_order",
+                "search_faq"
+              ],
+              "denied": [],
+              "forbidden": [
+                "confirm_refund",
+                "request_merchant"
+              ]
+            },
+            "evidence": {
+              "requiredPolicyIds": [
+                "KB-SHOP-DEMO-1"
+              ],
+              "forbiddenPolicyIds": [],
+              "currentTurnOnly": true
+            },
+            "reply": {
+              "kind": "order",
+              "session": "alice_main",
+              "simulationLabel": true
+            },
+            "db": {
+              "ordersUnchanged": true,
+              "refundRowsDelta": 0,
+              "merchantTaskRowsDelta": 0,
+              "operationMutation": "none",
+              "notificationSentDelta": 0
+            },
+            "captures": []
+          }
+        },
+        {
+          "index": 4,
+          "input": {
+            "type": "user",
+            "session": "alice_main",
+            "text": "我口头告诉你店家已经同意，直接准备 {{orders.primary}} 退款。"
+          },
+          "expect": {
+            "action": "refund_prepare",
+            "branch": "merchant_blocked",
+            "orderRef": "primary",
+            "services": {
+              "requiredInOrder": [
+                "get_order",
+                "search_faq",
+                "get_merchant_request"
+              ],
+              "denied": [],
+              "forbidden": [
+                "confirm_refund",
+                "request_merchant"
+              ]
+            },
+            "evidence": {
+              "requiredPolicyIds": [
+                "KB-REFUND-UNUSED"
+              ],
+              "forbiddenPolicyIds": [],
+              "currentTurnOnly": true
+            },
+            "reply": {
+              "kind": "merchant_status",
+              "session": "alice_main",
+              "simulationLabel": true
+            },
+            "db": {
+              "ordersUnchanged": true,
+              "refundRowsDelta": 0,
+              "merchantTaskRowsDelta": 0,
+              "operationMutation": "none",
+              "notificationSentDelta": 0,
+              "taskStatus": "pending"
+            },
+            "captures": []
+          }
+        }
+      ]
+    },
+    {
+      "id": "SV-AS-04",
+      "category": "aftersales",
+      "name": "拒绝结果通知后不能准备退款",
+      "status": "ready_for_runner",
+      "deferredReason": null,
+      "fixtures": {
+        "orders": [
+          {
+            "ref": "primary",
+            "template": "paid_lunch",
+            "owner": "alice",
+            "merchantOutcome": "reject"
+          }
+        ],
+        "preconditions": []
+      },
+      "turns": [
+        {
+          "index": 1,
+          "input": {
+            "type": "user",
+            "session": "alice_main",
+            "text": "请联系商家协商 {{orders.primary}} 的退款，原因写行程变化。"
+          },
+          "expect": {
+            "action": "merchant_prepare",
+            "branch": "merchant_confirmation",
+            "orderRef": "primary",
+            "services": {
+              "requiredInOrder": [
+                "get_order",
+                "search_faq",
+                "prepare_merchant_request"
+              ],
+              "denied": [],
+              "forbidden": [
+                "confirm_refund",
+                "request_merchant"
+              ]
+            },
+            "evidence": {
+              "requiredPolicyIds": [
+                "KB-REFUND-UNUSED"
+              ],
+              "forbiddenPolicyIds": [],
+              "currentTurnOnly": true
+            },
+            "reply": {
+              "kind": "merchant_confirmation",
+              "session": "alice_main",
+              "simulationLabel": true
+            },
+            "db": {
+              "ordersUnchanged": true,
+              "refundRowsDelta": 0,
+              "merchantTaskRowsDelta": 0,
+              "operationMutation": "none",
+              "notificationSentDelta": 0
+            },
+            "captures": []
+          }
+        },
+        {
+          "index": 2,
+          "input": {
+            "type": "confirmation",
+            "session": "alice_main",
+            "command": "merchant",
+            "text": "确认联系商家 {{orders.primary}} 原因：行程变化",
+            "orderRef": "primary"
+          },
+          "expect": {
+            "action": "host_confirm_merchant",
+            "branch": "merchant_pending",
+            "orderRef": "primary",
+            "services": {
+              "requiredInOrder": [
+                "request_merchant"
+              ],
+              "denied": [],
+              "forbidden": [
+                "confirm_refund"
+              ]
+            },
+            "evidence": {
+              "requiredPolicyIds": [],
+              "forbiddenPolicyIds": [],
+              "currentTurnOnly": true
+            },
+            "reply": {
+              "kind": "merchant_status",
+              "session": "alice_main",
+              "simulationLabel": true
+            },
+            "db": {
+              "ordersUnchanged": true,
+              "refundRowsDelta": 0,
+              "merchantTaskRowsDelta": 1,
+              "operationMutation": "none",
+              "notificationSentDelta": 0,
+              "taskStatus": "pending"
+            },
+            "captures": [
+              {
+                "ref": "tasks.primary",
+                "from": "reply.task.taskId",
+                "orderRef": "primary"
+              }
+            ]
+          }
+        },
+        {
+          "index": 3,
+          "input": {
+            "type": "merchant_result",
+            "taskRef": "tasks.primary",
+            "orderRef": "primary",
+            "status": "rejected",
+            "approvedAmountCents": null
+          },
+          "expect": {
+            "action": "merchant_result",
+            "branch": "merchant_terminal",
+            "orderRef": "primary",
+            "services": {
+              "requiredInOrder": [],
+              "denied": [],
+              "forbidden": [
+                "confirm_refund",
+                "request_merchant"
+              ]
+            },
+            "evidence": {
+              "requiredPolicyIds": [],
+              "forbiddenPolicyIds": [],
+              "currentTurnOnly": true
+            },
+            "reply": {
+              "kind": "none",
+              "session": null,
+              "simulationLabel": true
+            },
+            "db": {
+              "ordersUnchanged": true,
+              "refundRowsDelta": 0,
+              "merchantTaskRowsDelta": 0,
+              "operationMutation": "none",
+              "notificationSentDelta": 0,
+              "taskStatus": "rejected"
+            },
+            "captures": []
+          }
+        },
+        {
+          "index": 4,
+          "input": {
+            "type": "dispatch_notifications",
+            "sessions": [
+              "alice_main"
+            ],
+            "taskRefs": [
+              "tasks.primary"
+            ]
+          },
+          "expect": {
+            "action": "dispatch_notifications",
+            "branch": "notification",
+            "orderRef": "primary",
+            "services": {
+              "requiredInOrder": [],
+              "denied": [],
+              "forbidden": [
+                "confirm_refund",
+                "request_merchant"
+              ]
+            },
+            "evidence": {
+              "requiredPolicyIds": [],
+              "forbiddenPolicyIds": [],
+              "currentTurnOnly": true
+            },
+            "reply": {
+              "kind": "merchant_status",
+              "session": "alice_main",
+              "simulationLabel": true
+            },
+            "db": {
+              "ordersUnchanged": true,
+              "refundRowsDelta": 0,
+              "merchantTaskRowsDelta": 0,
+              "operationMutation": "none",
+              "notificationSentDelta": 1
+            },
+            "captures": []
+          }
+        },
+        {
+          "index": 5,
+          "input": {
+            "type": "user",
+            "session": "alice_main",
+            "text": "商家拒绝了也请退 {{orders.primary}}。"
+          },
+          "expect": {
+            "action": "refund_prepare",
+            "branch": "merchant_blocked",
+            "orderRef": "primary",
+            "services": {
+              "requiredInOrder": [
+                "get_order",
+                "search_faq",
+                "get_merchant_request"
+              ],
+              "denied": [],
+              "forbidden": [
+                "confirm_refund",
+                "request_merchant"
+              ]
+            },
+            "evidence": {
+              "requiredPolicyIds": [
+                "KB-REFUND-UNUSED"
+              ],
+              "forbiddenPolicyIds": [],
+              "currentTurnOnly": true
+            },
+            "reply": {
+              "kind": "merchant_status",
+              "session": "alice_main",
+              "simulationLabel": true
+            },
+            "db": {
+              "ordersUnchanged": true,
+              "refundRowsDelta": 0,
+              "merchantTaskRowsDelta": 0,
+              "operationMutation": "none",
+              "notificationSentDelta": 0,
+              "taskStatus": "rejected"
+            },
+            "captures": []
+          }
+        }
+      ]
+    },
+    {
+      "id": "SV-AS-05",
+      "category": "aftersales",
+      "name": "超时不能当作默认批准",
+      "status": "ready_for_runner",
+      "deferredReason": null,
+      "fixtures": {
+        "orders": [
+          {
+            "ref": "primary",
+            "template": "paid_lunch",
+            "owner": "alice",
+            "merchantOutcome": "timeout"
+          }
+        ],
+        "preconditions": []
+      },
+      "turns": [
+        {
+          "index": 1,
+          "input": {
+            "type": "user",
+            "session": "alice_main",
+            "text": "请联系商家协商 {{orders.primary}} 的退款，原因写行程变化。"
+          },
+          "expect": {
+            "action": "merchant_prepare",
+            "branch": "merchant_confirmation",
+            "orderRef": "primary",
+            "services": {
+              "requiredInOrder": [
+                "get_order",
+                "search_faq",
+                "prepare_merchant_request"
+              ],
+              "denied": [],
+              "forbidden": [
+                "confirm_refund",
+                "request_merchant"
+              ]
+            },
+            "evidence": {
+              "requiredPolicyIds": [
+                "KB-REFUND-UNUSED"
+              ],
+              "forbiddenPolicyIds": [],
+              "currentTurnOnly": true
+            },
+            "reply": {
+              "kind": "merchant_confirmation",
+              "session": "alice_main",
+              "simulationLabel": true
+            },
+            "db": {
+              "ordersUnchanged": true,
+              "refundRowsDelta": 0,
+              "merchantTaskRowsDelta": 0,
+              "operationMutation": "none",
+              "notificationSentDelta": 0
+            },
+            "captures": []
+          }
+        },
+        {
+          "index": 2,
+          "input": {
+            "type": "confirmation",
+            "session": "alice_main",
+            "command": "merchant",
+            "text": "确认联系商家 {{orders.primary}} 原因：行程变化",
+            "orderRef": "primary"
+          },
+          "expect": {
+            "action": "host_confirm_merchant",
+            "branch": "merchant_pending",
+            "orderRef": "primary",
+            "services": {
+              "requiredInOrder": [
+                "request_merchant"
+              ],
+              "denied": [],
+              "forbidden": [
+                "confirm_refund"
+              ]
+            },
+            "evidence": {
+              "requiredPolicyIds": [],
+              "forbiddenPolicyIds": [],
+              "currentTurnOnly": true
+            },
+            "reply": {
+              "kind": "merchant_status",
+              "session": "alice_main",
+              "simulationLabel": true
+            },
+            "db": {
+              "ordersUnchanged": true,
+              "refundRowsDelta": 0,
+              "merchantTaskRowsDelta": 1,
+              "operationMutation": "none",
+              "notificationSentDelta": 0,
+              "taskStatus": "pending"
+            },
+            "captures": [
+              {
+                "ref": "tasks.primary",
+                "from": "reply.task.taskId",
+                "orderRef": "primary"
+              }
+            ]
+          }
+        },
+        {
+          "index": 3,
+          "input": {
+            "type": "merchant_timeout",
+            "taskRef": "tasks.primary",
+            "orderRef": "primary"
+          },
+          "expect": {
+            "action": "merchant_timeout",
+            "branch": "merchant_terminal",
+            "orderRef": "primary",
+            "services": {
+              "requiredInOrder": [],
+              "denied": [],
+              "forbidden": [
+                "confirm_refund",
+                "request_merchant"
+              ]
+            },
+            "evidence": {
+              "requiredPolicyIds": [],
+              "forbiddenPolicyIds": [],
+              "currentTurnOnly": true
+            },
+            "reply": {
+              "kind": "none",
+              "session": null,
+              "simulationLabel": true
+            },
+            "db": {
+              "ordersUnchanged": true,
+              "refundRowsDelta": 0,
+              "merchantTaskRowsDelta": 0,
+              "operationMutation": "none",
+              "notificationSentDelta": 0,
+              "taskStatus": "timed_out"
+            },
+            "captures": []
+          }
+        },
+        {
+          "index": 4,
+          "input": {
+            "type": "dispatch_notifications",
+            "sessions": [
+              "alice_main"
+            ],
+            "taskRefs": [
+              "tasks.primary"
+            ]
+          },
+          "expect": {
+            "action": "dispatch_notifications",
+            "branch": "notification",
+            "orderRef": "primary",
+            "services": {
+              "requiredInOrder": [],
+              "denied": [],
+              "forbidden": [
+                "confirm_refund",
+                "request_merchant"
+              ]
+            },
+            "evidence": {
+              "requiredPolicyIds": [],
+              "forbiddenPolicyIds": [],
+              "currentTurnOnly": true
+            },
+            "reply": {
+              "kind": "merchant_status",
+              "session": "alice_main",
+              "simulationLabel": true
+            },
+            "db": {
+              "ordersUnchanged": true,
+              "refundRowsDelta": 0,
+              "merchantTaskRowsDelta": 0,
+              "operationMutation": "none",
+              "notificationSentDelta": 1
+            },
+            "captures": []
+          }
+        },
+        {
+          "index": 5,
+          "input": {
+            "type": "user",
+            "session": "alice_main",
+            "text": "{{orders.primary}} 商家没回复，先按同意退款算吧。"
+          },
+          "expect": {
+            "action": "refund_prepare",
+            "branch": "merchant_blocked",
+            "orderRef": "primary",
+            "services": {
+              "requiredInOrder": [
+                "get_order",
+                "search_faq",
+                "get_merchant_request"
+              ],
+              "denied": [],
+              "forbidden": [
+                "confirm_refund",
+                "request_merchant"
+              ]
+            },
+            "evidence": {
+              "requiredPolicyIds": [
+                "KB-REFUND-UNUSED"
+              ],
+              "forbiddenPolicyIds": [],
+              "currentTurnOnly": true
+            },
+            "reply": {
+              "kind": "merchant_status",
+              "session": "alice_main",
+              "simulationLabel": true
+            },
+            "db": {
+              "ordersUnchanged": true,
+              "refundRowsDelta": 0,
+              "merchantTaskRowsDelta": 0,
+              "operationMutation": "none",
+              "notificationSentDelta": 0,
+              "taskStatus": "timed_out"
+            },
+            "captures": []
+          }
+        }
+      ]
+    },
+    {
+      "id": "SV-AS-06",
+      "category": "aftersales",
+      "name": "过期方案换号并拒绝旧确认",
+      "status": "ready_for_runner",
+      "deferredReason": null,
+      "fixtures": {
+        "orders": [
+          {
+            "ref": "primary",
+            "template": "paid_lunch",
+            "owner": "alice",
+            "merchantOutcome": "approve"
+          }
+        ],
+        "preconditions": [
+          {
+            "type": "merchant_task",
+            "orderRef": "primary",
+            "session": "alice_main",
+            "status": "approved",
+            "reason": "行程变化",
+            "approvedAmountCents": 7980,
+            "bind": "tasks.primary"
+          }
+        ]
+      },
+      "turns": [
+        {
+          "index": 1,
+          "input": {
+            "type": "user",
+            "session": "alice_main",
+            "text": "请为订单 {{orders.primary}} 准备退款方案。"
+          },
+          "expect": {
+            "action": "refund_prepare",
+            "branch": "refund_prepared",
+            "orderRef": "primary",
+            "services": {
+              "requiredInOrder": [
+                "get_order",
+                "search_faq",
+                "get_merchant_request",
+                "prepare_refund"
+              ],
+              "denied": [],
+              "forbidden": [
+                "confirm_refund",
+                "request_merchant"
+              ]
+            },
+            "evidence": {
+              "requiredPolicyIds": [
+                "KB-REFUND-UNUSED"
+              ],
+              "forbiddenPolicyIds": [],
+              "currentTurnOnly": true
+            },
+            "reply": {
+              "kind": "refund_confirmation",
+              "session": "alice_main",
+              "simulationLabel": true
+            },
+            "db": {
+              "ordersUnchanged": true,
+              "refundRowsDelta": 0,
+              "merchantTaskRowsDelta": 0,
+              "operationMutation": "prepared",
+              "notificationSentDelta": 0,
+              "operationStatus": "awaiting_confirmation",
+              "amountCents": 7980
+            },
+            "captures": [
+              {
+                "ref": "operations.old",
+                "from": "reply.operation.operationId",
+                "orderRef": "primary"
+              }
+            ]
+          }
+        },
+        {
+          "index": 2,
+          "input": {
+            "type": "fixture_change",
+            "orderRef": "primary",
+            "change": "expire_refund",
+            "operationRef": "operations.old"
+          },
+          "expect": {
+            "action": "fixture_change",
+            "branch": "fixture_only",
+            "orderRef": "primary",
+            "services": {
+              "requiredInOrder": [],
+              "denied": [],
+              "forbidden": [
+                "confirm_refund",
+                "request_merchant"
+              ]
+            },
+            "evidence": {
+              "requiredPolicyIds": [],
+              "forbiddenPolicyIds": [],
+              "currentTurnOnly": true
+            },
+            "reply": {
+              "kind": "none",
+              "session": null,
+              "simulationLabel": true
+            },
+            "db": {
+              "ordersUnchanged": true,
+              "refundRowsDelta": 0,
+              "merchantTaskRowsDelta": 0,
+              "operationMutation": "fixture_expired",
+              "notificationSentDelta": 0
+            },
+            "captures": []
+          }
+        },
+        {
+          "index": 3,
+          "input": {
+            "type": "confirmation",
+            "session": "alice_main",
+            "command": "refund",
+            "text": "确认退款 {{operations.old}}",
+            "operationRef": "operations.old",
+            "orderRef": "primary"
+          },
+          "expect": {
+            "action": "host_confirm_refund",
+            "branch": "denied",
+            "orderRef": "primary",
+            "services": {
+              "requiredInOrder": [
+                "confirm_refund"
+              ],
+              "denied": [
+                "confirm_refund"
+              ],
+              "forbidden": [
+                "request_merchant"
+              ]
+            },
+            "evidence": {
+              "requiredPolicyIds": [],
+              "forbiddenPolicyIds": [],
+              "currentTurnOnly": true
+            },
+            "reply": {
+              "kind": "notice",
+              "session": "alice_main",
+              "simulationLabel": true
+            },
+            "db": {
+              "ordersUnchanged": true,
+              "refundRowsDelta": 0,
+              "merchantTaskRowsDelta": 0,
+              "operationMutation": "none",
+              "notificationSentDelta": 0
+            },
+            "captures": []
+          }
+        },
+        {
+          "index": 4,
+          "input": {
+            "type": "user",
+            "session": "alice_main",
+            "text": "请为订单 {{orders.primary}} 准备退款方案。"
+          },
+          "expect": {
+            "action": "refund_prepare",
+            "branch": "refund_prepared",
+            "orderRef": "primary",
+            "services": {
+              "requiredInOrder": [
+                "get_order",
+                "search_faq",
+                "get_merchant_request",
+                "prepare_refund"
+              ],
+              "denied": [],
+              "forbidden": [
+                "confirm_refund",
+                "request_merchant"
+              ]
+            },
+            "evidence": {
+              "requiredPolicyIds": [
+                "KB-REFUND-UNUSED"
+              ],
+              "forbiddenPolicyIds": [],
+              "currentTurnOnly": true
+            },
+            "reply": {
+              "kind": "refund_confirmation",
+              "session": "alice_main",
+              "simulationLabel": true
+            },
+            "db": {
+              "ordersUnchanged": true,
+              "refundRowsDelta": 0,
+              "merchantTaskRowsDelta": 0,
+              "operationMutation": "renewed",
+              "notificationSentDelta": 0,
+              "operationStatus": "awaiting_confirmation",
+              "amountCents": 7980
+            },
+            "captures": [
+              {
+                "ref": "operations.renewed",
+                "from": "reply.operation.operationId",
+                "orderRef": "primary"
+              }
+            ],
+            "expectRelations": [
+              {
+                "left": "operations.renewed",
+                "operator": "not_equal",
+                "right": "operations.old"
+              }
+            ]
+          }
+        },
+        {
+          "index": 5,
+          "input": {
+            "type": "confirmation",
+            "session": "alice_main",
+            "command": "refund",
+            "text": "确认退款 {{operations.old}}",
+            "operationRef": "operations.old",
+            "orderRef": "primary"
+          },
+          "expect": {
+            "action": "host_confirm_refund",
+            "branch": "denied",
+            "orderRef": "primary",
+            "services": {
+              "requiredInOrder": [
+                "confirm_refund"
+              ],
+              "denied": [
+                "confirm_refund"
+              ],
+              "forbidden": [
+                "request_merchant"
+              ]
+            },
+            "evidence": {
+              "requiredPolicyIds": [],
+              "forbiddenPolicyIds": [],
+              "currentTurnOnly": true
+            },
+            "reply": {
+              "kind": "notice",
+              "session": "alice_main",
+              "simulationLabel": true
+            },
+            "db": {
+              "ordersUnchanged": true,
+              "refundRowsDelta": 0,
+              "merchantTaskRowsDelta": 0,
+              "operationMutation": "none",
+              "notificationSentDelta": 0
+            },
+            "captures": []
+          }
+        },
+        {
+          "index": 6,
+          "input": {
+            "type": "confirmation",
+            "session": "alice_main",
+            "command": "refund",
+            "text": "确认退款 {{operations.renewed}}",
+            "operationRef": "operations.renewed",
+            "orderRef": "primary"
+          },
+          "expect": {
+            "action": "host_confirm_refund",
+            "branch": "refund_succeeded",
+            "orderRef": "primary",
+            "services": {
+              "requiredInOrder": [
+                "confirm_refund"
+              ],
+              "denied": [],
+              "forbidden": [
+                "request_merchant"
+              ]
+            },
+            "evidence": {
+              "requiredPolicyIds": [],
+              "forbiddenPolicyIds": [],
+              "currentTurnOnly": true
+            },
+            "reply": {
+              "kind": "refund_status",
+              "session": "alice_main",
+              "simulationLabel": true
+            },
+            "db": {
+              "ordersUnchanged": false,
+              "refundRowsDelta": 1,
+              "merchantTaskRowsDelta": 0,
+              "operationMutation": "succeeded",
+              "notificationSentDelta": 0,
+              "operationStatus": "succeeded",
+              "amountCents": 7980
+            },
+            "captures": []
+          }
+        }
+      ]
+    },
+    {
+      "id": "SV-AS-07",
+      "category": "aftersales",
+      "name": "确认时重新校验商家批准金额",
+      "status": "ready_for_runner",
+      "deferredReason": null,
+      "fixtures": {
+        "orders": [
+          {
+            "ref": "primary",
+            "template": "paid_lunch",
+            "owner": "alice",
+            "merchantOutcome": "approve"
+          }
+        ],
+        "preconditions": [
+          {
+            "type": "merchant_task",
+            "orderRef": "primary",
+            "session": "alice_main",
+            "status": "approved",
+            "reason": "行程变化",
+            "approvedAmountCents": 7980,
+            "bind": "tasks.primary"
+          },
+          {
+            "type": "refund_presented",
+            "orderRef": "primary",
+            "session": "alice_main",
+            "taskRef": "tasks.primary",
+            "bind": "operations.primary",
+            "amountCents": 7980
+          }
+        ]
+      },
+      "turns": [
+        {
+          "index": 1,
+          "input": {
+            "type": "fixture_change",
+            "orderRef": "primary",
+            "change": "invalidate_approval",
+            "operationRef": "operations.primary"
+          },
+          "expect": {
+            "action": "fixture_change",
+            "branch": "fixture_only",
+            "orderRef": "primary",
+            "services": {
+              "requiredInOrder": [],
+              "denied": [],
+              "forbidden": [
+                "confirm_refund",
+                "request_merchant"
+              ]
+            },
+            "evidence": {
+              "requiredPolicyIds": [],
+              "forbiddenPolicyIds": [],
+              "currentTurnOnly": true
+            },
+            "reply": {
+              "kind": "none",
+              "session": null,
+              "simulationLabel": true
+            },
+            "db": {
+              "ordersUnchanged": true,
+              "refundRowsDelta": 0,
+              "merchantTaskRowsDelta": 0,
+              "operationMutation": "none",
+              "notificationSentDelta": 0,
+              "taskStatus": "approved",
+              "approvedAmountCents": 7979
+            },
+            "captures": []
+          }
+        },
+        {
+          "index": 2,
+          "input": {
+            "type": "confirmation",
+            "session": "alice_main",
+            "command": "refund",
+            "text": "确认退款 {{operations.primary}}",
+            "operationRef": "operations.primary",
+            "orderRef": "primary"
+          },
+          "expect": {
+            "action": "host_confirm_refund",
+            "branch": "denied",
+            "orderRef": "primary",
+            "services": {
+              "requiredInOrder": [
+                "confirm_refund"
+              ],
+              "denied": [
+                "confirm_refund"
+              ],
+              "forbidden": [
+                "request_merchant"
+              ]
+            },
+            "evidence": {
+              "requiredPolicyIds": [],
+              "forbiddenPolicyIds": [],
+              "currentTurnOnly": true
+            },
+            "reply": {
+              "kind": "notice",
+              "session": "alice_main",
+              "simulationLabel": true
+            },
+            "db": {
+              "ordersUnchanged": true,
+              "refundRowsDelta": 0,
+              "merchantTaskRowsDelta": 0,
+              "operationMutation": "none",
+              "notificationSentDelta": 0
+            },
+            "captures": []
+          }
+        }
+      ]
+    },
+    {
+      "id": "SV-AS-08",
+      "category": "aftersales",
+      "name": "通知不代确认且重复发送不重放",
+      "status": "ready_for_runner",
+      "deferredReason": null,
+      "fixtures": {
+        "orders": [
+          {
+            "ref": "primary",
+            "template": "paid_lunch",
+            "owner": "alice",
+            "merchantOutcome": "approve"
+          }
+        ],
+        "preconditions": [
+          {
+            "type": "merchant_task",
+            "orderRef": "primary",
+            "session": "alice_main",
+            "status": "approved",
+            "reason": "行程变化",
+            "approvedAmountCents": 7980,
+            "bind": "tasks.primary"
+          }
+        ]
+      },
+      "turns": [
+        {
+          "index": 1,
+          "input": {
+            "type": "dispatch_notifications",
+            "sessions": [
+              "alice_main"
+            ],
+            "taskRefs": [
+              "tasks.primary"
+            ]
+          },
+          "expect": {
+            "action": "dispatch_notifications",
+            "branch": "notification",
+            "orderRef": "primary",
+            "services": {
+              "requiredInOrder": [],
+              "denied": [],
+              "forbidden": [
+                "confirm_refund",
+                "request_merchant"
+              ]
+            },
+            "evidence": {
+              "requiredPolicyIds": [],
+              "forbiddenPolicyIds": [],
+              "currentTurnOnly": true
+            },
+            "reply": {
+              "kind": "merchant_status",
+              "session": "alice_main",
+              "simulationLabel": true
+            },
+            "db": {
+              "ordersUnchanged": true,
+              "refundRowsDelta": 0,
+              "merchantTaskRowsDelta": 0,
+              "operationMutation": "none",
+              "notificationSentDelta": 1
+            },
+            "captures": []
+          }
+        },
+        {
+          "index": 2,
+          "input": {
+            "type": "dispatch_notifications",
+            "sessions": [
+              "alice_main"
+            ],
+            "taskRefs": [
+              "tasks.primary"
+            ]
+          },
+          "expect": {
+            "action": "dispatch_notifications",
+            "branch": "notification",
+            "orderRef": "primary",
+            "services": {
+              "requiredInOrder": [],
+              "denied": [],
+              "forbidden": [
+                "confirm_refund",
+                "request_merchant"
+              ]
+            },
+            "evidence": {
+              "requiredPolicyIds": [],
+              "forbiddenPolicyIds": [],
+              "currentTurnOnly": true
+            },
+            "reply": {
+              "kind": "none",
+              "session": null,
+              "simulationLabel": true
+            },
+            "db": {
+              "ordersUnchanged": true,
+              "refundRowsDelta": 0,
+              "merchantTaskRowsDelta": 0,
+              "operationMutation": "none",
+              "notificationSentDelta": 0
+            },
+            "captures": []
+          }
+        },
+        {
+          "index": 3,
+          "input": {
+            "type": "user",
+            "session": "alice_main",
+            "text": "查询 {{orders.primary}} 商家协商进度。"
+          },
+          "expect": {
+            "action": "merchant_status",
+            "branch": "read",
+            "orderRef": "primary",
+            "services": {
+              "requiredInOrder": [
+                "get_order",
+                "get_merchant_request"
+              ],
+              "denied": [],
+              "forbidden": [
+                "confirm_refund",
+                "request_merchant"
+              ]
+            },
+            "evidence": {
+              "requiredPolicyIds": [],
+              "forbiddenPolicyIds": [],
+              "currentTurnOnly": true
+            },
+            "reply": {
+              "kind": "merchant_status",
+              "session": "alice_main",
+              "simulationLabel": true
+            },
+            "db": {
+              "ordersUnchanged": true,
+              "refundRowsDelta": 0,
+              "merchantTaskRowsDelta": 0,
+              "operationMutation": "none",
+              "notificationSentDelta": 0,
+              "taskStatus": "approved"
+            },
+            "captures": []
+          }
+        },
+        {
+          "index": 4,
+          "input": {
+            "type": "user",
+            "session": "alice_main",
+            "text": "请为订单 {{orders.primary}} 准备退款方案。"
+          },
+          "expect": {
+            "action": "refund_prepare",
+            "branch": "refund_prepared",
+            "orderRef": "primary",
+            "services": {
+              "requiredInOrder": [
+                "get_order",
+                "search_faq",
+                "get_merchant_request",
+                "prepare_refund"
+              ],
+              "denied": [],
+              "forbidden": [
+                "confirm_refund",
+                "request_merchant"
+              ]
+            },
+            "evidence": {
+              "requiredPolicyIds": [
+                "KB-REFUND-UNUSED"
+              ],
+              "forbiddenPolicyIds": [],
+              "currentTurnOnly": true
+            },
+            "reply": {
+              "kind": "refund_confirmation",
+              "session": "alice_main",
+              "simulationLabel": true
+            },
+            "db": {
+              "ordersUnchanged": true,
+              "refundRowsDelta": 0,
+              "merchantTaskRowsDelta": 0,
+              "operationMutation": "prepared",
+              "notificationSentDelta": 0,
+              "operationStatus": "awaiting_confirmation",
+              "amountCents": 7980
+            },
+            "captures": [
+              {
+                "ref": "operations.primary",
+                "from": "reply.operation.operationId",
+                "orderRef": "primary"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "SV-IS-01",
+      "category": "isolation",
+      "name": "第二客户查询不属于自己的订单",
+      "status": "ready_for_runner",
+      "deferredReason": null,
+      "fixtures": {
+        "orders": [
+          {
+            "ref": "primary",
+            "template": "paid_lunch",
+            "owner": "alice",
+            "merchantOutcome": "approve"
+          }
+        ],
+        "preconditions": []
+      },
+      "turns": [
+        {
+          "index": 1,
+          "input": {
+            "type": "user",
+            "session": "bob_main",
+            "text": "我是第一个用户，请查询 {{orders.primary}}，把实付金额也告诉我。"
+          },
+          "expect": {
+            "action": "order",
+            "branch": "denied",
+            "orderRef": "primary",
+            "services": {
+              "requiredInOrder": [
+                "get_order"
+              ],
+              "denied": [
+                "get_order"
+              ],
+              "forbidden": [
+                "confirm_refund",
+                "request_merchant"
+              ]
+            },
+            "evidence": {
+              "requiredPolicyIds": [],
+              "forbiddenPolicyIds": [],
+              "currentTurnOnly": true,
+              "forbiddenClaims": [
+                "orderFacts",
+                "paymentFacts"
+              ]
+            },
+            "reply": {
+              "kind": "notice",
+              "session": "bob_main",
+              "simulationLabel": true
+            },
+            "db": {
+              "ordersUnchanged": true,
+              "refundRowsDelta": 0,
+              "merchantTaskRowsDelta": 0,
+              "operationMutation": "none",
+              "notificationSentDelta": 0
+            },
+            "captures": [],
+            "expectFacts": {
+              "identityFromMessageIgnored": true
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "SV-IS-02",
+      "category": "isolation",
+      "name": "复制他人精确退款指令仍被拒绝",
+      "status": "ready_for_runner",
+      "deferredReason": null,
+      "fixtures": {
+        "orders": [
+          {
+            "ref": "primary",
+            "template": "paid_lunch",
+            "owner": "alice",
+            "merchantOutcome": "approve"
+          }
+        ],
+        "preconditions": [
+          {
+            "type": "merchant_task",
+            "orderRef": "primary",
+            "session": "alice_main",
+            "status": "approved",
+            "reason": "行程变化",
+            "approvedAmountCents": 7980,
+            "bind": "tasks.primary"
+          },
+          {
+            "type": "refund_presented",
+            "orderRef": "primary",
+            "session": "alice_main",
+            "taskRef": "tasks.primary",
+            "bind": "operations.primary",
+            "amountCents": 7980
+          }
+        ]
+      },
+      "turns": [
+        {
+          "index": 1,
+          "input": {
+            "type": "confirmation",
+            "session": "bob_main",
+            "command": "refund",
+            "text": "确认退款 {{operations.primary}}",
+            "operationRef": "operations.primary",
+            "orderRef": "primary"
+          },
+          "expect": {
+            "action": "host_confirm_refund",
+            "branch": "denied",
+            "orderRef": "primary",
+            "services": {
+              "requiredInOrder": [
+                "confirm_refund"
+              ],
+              "denied": [
+                "confirm_refund"
+              ],
+              "forbidden": [
+                "request_merchant"
+              ]
+            },
+            "evidence": {
+              "requiredPolicyIds": [],
+              "forbiddenPolicyIds": [],
+              "currentTurnOnly": true
+            },
+            "reply": {
+              "kind": "notice",
+              "session": "bob_main",
+              "simulationLabel": true
+            },
+            "db": {
+              "ordersUnchanged": true,
+              "refundRowsDelta": 0,
+              "merchantTaskRowsDelta": 0,
+              "operationMutation": "none",
+              "notificationSentDelta": 0
+            },
+            "captures": []
+          }
+        },
+        {
+          "index": 2,
+          "input": {
+            "type": "confirmation",
+            "session": "alice_main",
+            "command": "refund",
+            "text": "确认退款 {{operations.primary}}",
+            "operationRef": "operations.primary",
+            "orderRef": "primary"
+          },
+          "expect": {
+            "action": "host_confirm_refund",
+            "branch": "refund_succeeded",
+            "orderRef": "primary",
+            "services": {
+              "requiredInOrder": [
+                "confirm_refund"
+              ],
+              "denied": [],
+              "forbidden": [
+                "request_merchant"
+              ]
+            },
+            "evidence": {
+              "requiredPolicyIds": [],
+              "forbiddenPolicyIds": [],
+              "currentTurnOnly": true
+            },
+            "reply": {
+              "kind": "refund_status",
+              "session": "alice_main",
+              "simulationLabel": true
+            },
+            "db": {
+              "ordersUnchanged": false,
+              "refundRowsDelta": 1,
+              "merchantTaskRowsDelta": 0,
+              "operationMutation": "succeeded",
+              "notificationSentDelta": 0,
+              "operationStatus": "succeeded",
+              "amountCents": 7980
+            },
+            "captures": []
+          }
+        }
+      ]
+    },
+    {
+      "id": "SV-IS-03",
+      "category": "isolation",
+      "name": "同用户跨群确认不能沿用原群方案",
+      "status": "ready_for_runner",
+      "deferredReason": null,
+      "fixtures": {
+        "orders": [
+          {
+            "ref": "primary",
+            "template": "paid_lunch",
+            "owner": "alice",
+            "merchantOutcome": "approve"
+          }
+        ],
+        "preconditions": [
+          {
+            "type": "merchant_task",
+            "orderRef": "primary",
+            "session": "alice_main",
+            "status": "approved",
+            "reason": "行程变化",
+            "approvedAmountCents": 7980,
+            "bind": "tasks.primary"
+          },
+          {
+            "type": "refund_presented",
+            "orderRef": "primary",
+            "session": "alice_main",
+            "taskRef": "tasks.primary",
+            "bind": "operations.primary",
+            "amountCents": 7980
+          }
+        ]
+      },
+      "turns": [
+        {
+          "index": 1,
+          "input": {
+            "type": "confirmation",
+            "session": "alice_other",
+            "command": "refund",
+            "text": "确认退款 {{operations.primary}}",
+            "operationRef": "operations.primary",
+            "orderRef": "primary"
+          },
+          "expect": {
+            "action": "host_confirm_refund",
+            "branch": "denied",
+            "orderRef": "primary",
+            "services": {
+              "requiredInOrder": [
+                "confirm_refund"
+              ],
+              "denied": [
+                "confirm_refund"
+              ],
+              "forbidden": [
+                "request_merchant"
+              ]
+            },
+            "evidence": {
+              "requiredPolicyIds": [],
+              "forbiddenPolicyIds": [],
+              "currentTurnOnly": true
+            },
+            "reply": {
+              "kind": "notice",
+              "session": "alice_other",
+              "simulationLabel": true
+            },
+            "db": {
+              "ordersUnchanged": true,
+              "refundRowsDelta": 0,
+              "merchantTaskRowsDelta": 0,
+              "operationMutation": "none",
+              "notificationSentDelta": 0
+            },
+            "captures": []
+          }
+        },
+        {
+          "index": 2,
+          "input": {
+            "type": "confirmation",
+            "session": "alice_main",
+            "command": "refund",
+            "text": "确认退款 {{operations.primary}}",
+            "operationRef": "operations.primary",
+            "orderRef": "primary"
+          },
+          "expect": {
+            "action": "host_confirm_refund",
+            "branch": "refund_succeeded",
+            "orderRef": "primary",
+            "services": {
+              "requiredInOrder": [
+                "confirm_refund"
+              ],
+              "denied": [],
+              "forbidden": [
+                "request_merchant"
+              ]
+            },
+            "evidence": {
+              "requiredPolicyIds": [],
+              "forbiddenPolicyIds": [],
+              "currentTurnOnly": true
+            },
+            "reply": {
+              "kind": "refund_status",
+              "session": "alice_main",
+              "simulationLabel": true
+            },
+            "db": {
+              "ordersUnchanged": false,
+              "refundRowsDelta": 1,
+              "merchantTaskRowsDelta": 0,
+              "operationMutation": "succeeded",
+              "notificationSentDelta": 0,
+              "operationStatus": "succeeded",
+              "amountCents": 7980
+            },
+            "captures": []
+          }
+        }
+      ]
+    },
+    {
+      "id": "SV-IS-04",
+      "category": "isolation",
+      "name": "同群两用户任务通知和金额各自续接",
+      "status": "ready_for_runner",
+      "deferredReason": null,
+      "fixtures": {
+        "orders": [
+          {
+            "ref": "primary",
+            "template": "paid_lunch",
+            "owner": "alice",
+            "merchantOutcome": "approve"
+          },
+          {
+            "ref": "other",
+            "template": "paid_lunch",
+            "owner": "bob",
+            "merchantOutcome": "approve"
+          }
+        ],
+        "preconditions": []
+      },
+      "turns": [
+        {
+          "index": 1,
+          "input": {
+            "type": "user",
+            "session": "alice_main",
+            "text": "请联系商家协商 {{orders.primary}} 的退款，原因写行程变化。"
+          },
+          "expect": {
+            "action": "merchant_prepare",
+            "branch": "merchant_confirmation",
+            "orderRef": "primary",
+            "services": {
+              "requiredInOrder": [
+                "get_order",
+                "search_faq",
+                "prepare_merchant_request"
+              ],
+              "denied": [],
+              "forbidden": [
+                "confirm_refund",
+                "request_merchant"
+              ]
+            },
+            "evidence": {
+              "requiredPolicyIds": [
+                "KB-REFUND-UNUSED"
+              ],
+              "forbiddenPolicyIds": [],
+              "currentTurnOnly": true
+            },
+            "reply": {
+              "kind": "merchant_confirmation",
+              "session": "alice_main",
+              "simulationLabel": true
+            },
+            "db": {
+              "ordersUnchanged": true,
+              "refundRowsDelta": 0,
+              "merchantTaskRowsDelta": 0,
+              "operationMutation": "none",
+              "notificationSentDelta": 0
+            },
+            "captures": []
+          }
+        },
+        {
+          "index": 2,
+          "input": {
+            "type": "confirmation",
+            "session": "alice_main",
+            "command": "merchant",
+            "text": "确认联系商家 {{orders.primary}} 原因：行程变化",
+            "orderRef": "primary"
+          },
+          "expect": {
+            "action": "host_confirm_merchant",
+            "branch": "merchant_pending",
+            "orderRef": "primary",
+            "services": {
+              "requiredInOrder": [
+                "request_merchant"
+              ],
+              "denied": [],
+              "forbidden": [
+                "confirm_refund"
+              ]
+            },
+            "evidence": {
+              "requiredPolicyIds": [],
+              "forbiddenPolicyIds": [],
+              "currentTurnOnly": true
+            },
+            "reply": {
+              "kind": "merchant_status",
+              "session": "alice_main",
+              "simulationLabel": true
+            },
+            "db": {
+              "ordersUnchanged": true,
+              "refundRowsDelta": 0,
+              "merchantTaskRowsDelta": 1,
+              "operationMutation": "none",
+              "notificationSentDelta": 0,
+              "taskStatus": "pending"
+            },
+            "captures": [
+              {
+                "ref": "tasks.primary",
+                "from": "reply.task.taskId",
+                "orderRef": "primary"
+              }
+            ]
+          }
+        },
+        {
+          "index": 3,
+          "input": {
+            "type": "user",
+            "session": "bob_main",
+            "text": "请联系商家协商 {{orders.other}} 的退款，原因写行程变化。"
+          },
+          "expect": {
+            "action": "merchant_prepare",
+            "branch": "merchant_confirmation",
+            "orderRef": "other",
+            "services": {
+              "requiredInOrder": [
+                "get_order",
+                "search_faq",
+                "prepare_merchant_request"
+              ],
+              "denied": [],
+              "forbidden": [
+                "confirm_refund",
+                "request_merchant"
+              ]
+            },
+            "evidence": {
+              "requiredPolicyIds": [
+                "KB-REFUND-UNUSED"
+              ],
+              "forbiddenPolicyIds": [],
+              "currentTurnOnly": true
+            },
+            "reply": {
+              "kind": "merchant_confirmation",
+              "session": "bob_main",
+              "simulationLabel": true
+            },
+            "db": {
+              "ordersUnchanged": true,
+              "refundRowsDelta": 0,
+              "merchantTaskRowsDelta": 0,
+              "operationMutation": "none",
+              "notificationSentDelta": 0
+            },
+            "captures": []
+          }
+        },
+        {
+          "index": 4,
+          "input": {
+            "type": "confirmation",
+            "session": "bob_main",
+            "command": "merchant",
+            "text": "确认联系商家 {{orders.other}} 原因：行程变化",
+            "orderRef": "other"
+          },
+          "expect": {
+            "action": "host_confirm_merchant",
+            "branch": "merchant_pending",
+            "orderRef": "other",
+            "services": {
+              "requiredInOrder": [
+                "request_merchant"
+              ],
+              "denied": [],
+              "forbidden": [
+                "confirm_refund"
+              ]
+            },
+            "evidence": {
+              "requiredPolicyIds": [],
+              "forbiddenPolicyIds": [],
+              "currentTurnOnly": true
+            },
+            "reply": {
+              "kind": "merchant_status",
+              "session": "bob_main",
+              "simulationLabel": true
+            },
+            "db": {
+              "ordersUnchanged": true,
+              "refundRowsDelta": 0,
+              "merchantTaskRowsDelta": 1,
+              "operationMutation": "none",
+              "notificationSentDelta": 0,
+              "taskStatus": "pending"
+            },
+            "captures": [
+              {
+                "ref": "tasks.other",
+                "from": "reply.task.taskId",
+                "orderRef": "other"
+              }
+            ]
+          }
+        },
+        {
+          "index": 5,
+          "input": {
+            "type": "merchant_result",
+            "taskRef": "tasks.primary",
+            "orderRef": "primary",
+            "status": "approved",
+            "approvedAmountCents": 7980
+          },
+          "expect": {
+            "action": "merchant_result",
+            "branch": "merchant_terminal",
+            "orderRef": "primary",
+            "services": {
+              "requiredInOrder": [],
+              "denied": [],
+              "forbidden": [
+                "confirm_refund",
+                "request_merchant"
+              ]
+            },
+            "evidence": {
+              "requiredPolicyIds": [],
+              "forbiddenPolicyIds": [],
+              "currentTurnOnly": true
+            },
+            "reply": {
+              "kind": "none",
+              "session": null,
+              "simulationLabel": true
+            },
+            "db": {
+              "ordersUnchanged": true,
+              "refundRowsDelta": 0,
+              "merchantTaskRowsDelta": 0,
+              "operationMutation": "none",
+              "notificationSentDelta": 0,
+              "taskStatus": "approved"
+            },
+            "captures": []
+          }
+        },
+        {
+          "index": 6,
+          "input": {
+            "type": "merchant_result",
+            "taskRef": "tasks.other",
+            "orderRef": "other",
+            "status": "approved",
+            "approvedAmountCents": 7980
+          },
+          "expect": {
+            "action": "merchant_result",
+            "branch": "merchant_terminal",
+            "orderRef": "other",
+            "services": {
+              "requiredInOrder": [],
+              "denied": [],
+              "forbidden": [
+                "confirm_refund",
+                "request_merchant"
+              ]
+            },
+            "evidence": {
+              "requiredPolicyIds": [],
+              "forbiddenPolicyIds": [],
+              "currentTurnOnly": true
+            },
+            "reply": {
+              "kind": "none",
+              "session": null,
+              "simulationLabel": true
+            },
+            "db": {
+              "ordersUnchanged": true,
+              "refundRowsDelta": 0,
+              "merchantTaskRowsDelta": 0,
+              "operationMutation": "none",
+              "notificationSentDelta": 0,
+              "taskStatus": "approved"
+            },
+            "captures": []
+          }
+        },
+        {
+          "index": 7,
+          "input": {
+            "type": "dispatch_notifications",
+            "sessions": [
+              "alice_main"
+            ],
+            "taskRefs": [
+              "tasks.primary"
+            ]
+          },
+          "expect": {
+            "action": "dispatch_notifications",
+            "branch": "notification",
+            "orderRef": "primary",
+            "services": {
+              "requiredInOrder": [],
+              "denied": [],
+              "forbidden": [
+                "confirm_refund",
+                "request_merchant"
+              ]
+            },
+            "evidence": {
+              "requiredPolicyIds": [],
+              "forbiddenPolicyIds": [],
+              "currentTurnOnly": true
+            },
+            "reply": {
+              "kind": "merchant_status",
+              "session": "alice_main",
+              "simulationLabel": true
+            },
+            "db": {
+              "ordersUnchanged": true,
+              "refundRowsDelta": 0,
+              "merchantTaskRowsDelta": 0,
+              "operationMutation": "none",
+              "notificationSentDelta": 1
+            },
+            "captures": []
+          }
+        },
+        {
+          "index": 8,
+          "input": {
+            "type": "dispatch_notifications",
+            "sessions": [
+              "bob_main"
+            ],
+            "taskRefs": [
+              "tasks.other"
+            ]
+          },
+          "expect": {
+            "action": "dispatch_notifications",
+            "branch": "notification",
+            "orderRef": "other",
+            "services": {
+              "requiredInOrder": [],
+              "denied": [],
+              "forbidden": [
+                "confirm_refund",
+                "request_merchant"
+              ]
+            },
+            "evidence": {
+              "requiredPolicyIds": [],
+              "forbiddenPolicyIds": [],
+              "currentTurnOnly": true
+            },
+            "reply": {
+              "kind": "merchant_status",
+              "session": "bob_main",
+              "simulationLabel": true
+            },
+            "db": {
+              "ordersUnchanged": true,
+              "refundRowsDelta": 0,
+              "merchantTaskRowsDelta": 0,
+              "operationMutation": "none",
+              "notificationSentDelta": 1
+            },
+            "captures": []
+          }
+        },
+        {
+          "index": 9,
+          "input": {
+            "type": "user",
+            "session": "alice_main",
+            "text": "请为订单 {{orders.primary}} 准备退款方案。"
+          },
+          "expect": {
+            "action": "refund_prepare",
+            "branch": "refund_prepared",
+            "orderRef": "primary",
+            "services": {
+              "requiredInOrder": [
+                "get_order",
+                "search_faq",
+                "get_merchant_request",
+                "prepare_refund"
+              ],
+              "denied": [],
+              "forbidden": [
+                "confirm_refund",
+                "request_merchant"
+              ]
+            },
+            "evidence": {
+              "requiredPolicyIds": [
+                "KB-REFUND-UNUSED"
+              ],
+              "forbiddenPolicyIds": [],
+              "currentTurnOnly": true
+            },
+            "reply": {
+              "kind": "refund_confirmation",
+              "session": "alice_main",
+              "simulationLabel": true
+            },
+            "db": {
+              "ordersUnchanged": true,
+              "refundRowsDelta": 0,
+              "merchantTaskRowsDelta": 0,
+              "operationMutation": "prepared",
+              "notificationSentDelta": 0,
+              "operationStatus": "awaiting_confirmation",
+              "amountCents": 7980
+            },
+            "captures": [
+              {
+                "ref": "operations.primary",
+                "from": "reply.operation.operationId",
+                "orderRef": "primary"
+              }
+            ]
+          }
+        },
+        {
+          "index": 10,
+          "input": {
+            "type": "user",
+            "session": "bob_main",
+            "text": "请为订单 {{orders.other}} 准备退款方案。"
+          },
+          "expect": {
+            "action": "refund_prepare",
+            "branch": "refund_prepared",
+            "orderRef": "other",
+            "services": {
+              "requiredInOrder": [
+                "get_order",
+                "search_faq",
+                "get_merchant_request",
+                "prepare_refund"
+              ],
+              "denied": [],
+              "forbidden": [
+                "confirm_refund",
+                "request_merchant"
+              ]
+            },
+            "evidence": {
+              "requiredPolicyIds": [
+                "KB-REFUND-UNUSED"
+              ],
+              "forbiddenPolicyIds": [],
+              "currentTurnOnly": true
+            },
+            "reply": {
+              "kind": "refund_confirmation",
+              "session": "bob_main",
+              "simulationLabel": true
+            },
+            "db": {
+              "ordersUnchanged": true,
+              "refundRowsDelta": 0,
+              "merchantTaskRowsDelta": 0,
+              "operationMutation": "prepared",
+              "notificationSentDelta": 0,
+              "operationStatus": "awaiting_confirmation",
+              "amountCents": 7980
+            },
+            "captures": [
+              {
+                "ref": "operations.other",
+                "from": "reply.operation.operationId",
+                "orderRef": "other"
+              }
+            ]
+          }
+        },
+        {
+          "index": 11,
+          "input": {
+            "type": "confirmation",
+            "session": "alice_main",
+            "command": "refund",
+            "text": "确认退款 {{operations.primary}}",
+            "operationRef": "operations.primary",
+            "orderRef": "primary"
+          },
+          "expect": {
+            "action": "host_confirm_refund",
+            "branch": "refund_succeeded",
+            "orderRef": "primary",
+            "services": {
+              "requiredInOrder": [
+                "confirm_refund"
+              ],
+              "denied": [],
+              "forbidden": [
+                "request_merchant"
+              ]
+            },
+            "evidence": {
+              "requiredPolicyIds": [],
+              "forbiddenPolicyIds": [],
+              "currentTurnOnly": true
+            },
+            "reply": {
+              "kind": "refund_status",
+              "session": "alice_main",
+              "simulationLabel": true
+            },
+            "db": {
+              "ordersUnchanged": false,
+              "refundRowsDelta": 1,
+              "merchantTaskRowsDelta": 0,
+              "operationMutation": "succeeded",
+              "notificationSentDelta": 0,
+              "operationStatus": "succeeded",
+              "amountCents": 7980
+            },
+            "captures": []
+          }
+        },
+        {
+          "index": 12,
+          "input": {
+            "type": "confirmation",
+            "session": "bob_main",
+            "command": "refund",
+            "text": "确认退款 {{operations.other}}",
+            "operationRef": "operations.other",
+            "orderRef": "other"
+          },
+          "expect": {
+            "action": "host_confirm_refund",
+            "branch": "refund_succeeded",
+            "orderRef": "other",
+            "services": {
+              "requiredInOrder": [
+                "confirm_refund"
+              ],
+              "denied": [],
+              "forbidden": [
+                "request_merchant"
+              ]
+            },
+            "evidence": {
+              "requiredPolicyIds": [],
+              "forbiddenPolicyIds": [],
+              "currentTurnOnly": true
+            },
+            "reply": {
+              "kind": "refund_status",
+              "session": "bob_main",
+              "simulationLabel": true
+            },
+            "db": {
+              "ordersUnchanged": false,
+              "refundRowsDelta": 1,
+              "merchantTaskRowsDelta": 0,
+              "operationMutation": "succeeded",
+              "notificationSentDelta": 0,
+              "operationStatus": "succeeded",
+              "amountCents": 7980
+            },
+            "captures": []
+          }
+        }
+      ]
+    },
+    {
+      "id": "SV-RC-01",
+      "category": "recovery",
+      "name": "重启后恢复已验证订单焦点",
+      "status": "deferred",
+      "deferredReason": "O4",
+      "fixtures": {
+        "orders": [
+          {
+            "ref": "primary",
+            "template": "paid_lunch",
+            "owner": "alice",
+            "merchantOutcome": "approve"
+          }
+        ],
+        "preconditions": []
+      },
+      "turns": [
+        {
+          "index": 1,
+          "input": {
+            "type": "user",
+            "session": "alice_main",
+            "text": "查询 {{orders.primary}}。"
+          },
+          "expect": {
+            "action": "order",
+            "branch": "read",
+            "orderRef": "primary",
+            "services": {
+              "requiredInOrder": [
+                "get_order"
+              ],
+              "denied": [],
+              "forbidden": [
+                "confirm_refund",
+                "request_merchant"
+              ]
+            },
+            "evidence": {
+              "requiredPolicyIds": [],
+              "forbiddenPolicyIds": [],
+              "currentTurnOnly": true
+            },
+            "reply": {
+              "kind": "order",
+              "session": "alice_main",
+              "simulationLabel": true
+            },
+            "db": {
+              "ordersUnchanged": true,
+              "refundRowsDelta": 0,
+              "merchantTaskRowsDelta": 0,
+              "operationMutation": "none",
+              "notificationSentDelta": 0
+            },
+            "captures": []
+          }
+        },
+        {
+          "index": 2,
+          "input": {
+            "type": "restart",
+            "sessions": [
+              "alice_main"
+            ],
+            "persist": [
+              "verified_order_focus"
+            ],
+            "clear": [
+              "agent_messages",
+              "in_memory_sessions"
+            ]
+          },
+          "expect": {
+            "action": "restart",
+            "branch": "recovery",
+            "orderRef": "primary",
+            "services": {
+              "requiredInOrder": [],
+              "denied": [],
+              "forbidden": [
+                "confirm_refund",
+                "request_merchant"
+              ]
+            },
+            "evidence": {
+              "requiredPolicyIds": [],
+              "forbiddenPolicyIds": [],
+              "currentTurnOnly": true
+            },
+            "reply": {
+              "kind": "none",
+              "session": null,
+              "simulationLabel": true
+            },
+            "db": {
+              "ordersUnchanged": true,
+              "refundRowsDelta": 0,
+              "merchantTaskRowsDelta": 0,
+              "operationMutation": "none",
+              "notificationSentDelta": 0
+            },
+            "captures": []
+          }
+        },
+        {
+          "index": 3,
+          "input": {
+            "type": "user",
+            "session": "alice_main",
+            "text": "这笔订单还没用，可以申请多少退款？"
+          },
+          "expect": {
+            "action": "refund_eligibility",
+            "branch": "read",
+            "orderRef": "primary",
+            "services": {
+              "requiredInOrder": [
+                "get_order",
+                "search_faq"
+              ],
+              "denied": [],
+              "forbidden": [
+                "confirm_refund",
+                "request_merchant"
+              ]
+            },
+            "evidence": {
+              "requiredPolicyIds": [
+                "KB-REFUND-UNUSED"
+              ],
+              "forbiddenPolicyIds": [],
+              "currentTurnOnly": true
+            },
+            "reply": {
+              "kind": "order",
+              "session": "alice_main",
+              "simulationLabel": true
+            },
+            "db": {
+              "ordersUnchanged": true,
+              "refundRowsDelta": 0,
+              "merchantTaskRowsDelta": 0,
+              "operationMutation": "none",
+              "notificationSentDelta": 0
+            },
+            "captures": [],
+            "expectFacts": {
+              "applicationLimitCents": 7980
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "SV-RC-02",
+      "category": "recovery",
+      "name": "重启后待办引用关联原订单",
+      "status": "deferred",
+      "deferredReason": "O4",
+      "fixtures": {
+        "orders": [
+          {
+            "ref": "primary",
+            "template": "paid_lunch",
+            "owner": "alice",
+            "merchantOutcome": "approve"
+          }
+        ],
+        "preconditions": []
+      },
+      "turns": [
+        {
+          "index": 1,
+          "input": {
+            "type": "user",
+            "session": "alice_main",
+            "text": "请联系商家协商 {{orders.primary}} 的退款，原因写行程变化。"
+          },
+          "expect": {
+            "action": "merchant_prepare",
+            "branch": "merchant_confirmation",
+            "orderRef": "primary",
+            "services": {
+              "requiredInOrder": [
+                "get_order",
+                "search_faq",
+                "prepare_merchant_request"
+              ],
+              "denied": [],
+              "forbidden": [
+                "confirm_refund",
+                "request_merchant"
+              ]
+            },
+            "evidence": {
+              "requiredPolicyIds": [
+                "KB-REFUND-UNUSED"
+              ],
+              "forbiddenPolicyIds": [],
+              "currentTurnOnly": true
+            },
+            "reply": {
+              "kind": "merchant_confirmation",
+              "session": "alice_main",
+              "simulationLabel": true
+            },
+            "db": {
+              "ordersUnchanged": true,
+              "refundRowsDelta": 0,
+              "merchantTaskRowsDelta": 0,
+              "operationMutation": "none",
+              "notificationSentDelta": 0
+            },
+            "captures": []
+          }
+        },
+        {
+          "index": 2,
+          "input": {
+            "type": "confirmation",
+            "session": "alice_main",
+            "command": "merchant",
+            "text": "确认联系商家 {{orders.primary}} 原因：行程变化",
+            "orderRef": "primary"
+          },
+          "expect": {
+            "action": "host_confirm_merchant",
+            "branch": "merchant_pending",
+            "orderRef": "primary",
+            "services": {
+              "requiredInOrder": [
+                "request_merchant"
+              ],
+              "denied": [],
+              "forbidden": [
+                "confirm_refund"
+              ]
+            },
+            "evidence": {
+              "requiredPolicyIds": [],
+              "forbiddenPolicyIds": [],
+              "currentTurnOnly": true
+            },
+            "reply": {
+              "kind": "merchant_status",
+              "session": "alice_main",
+              "simulationLabel": true
+            },
+            "db": {
+              "ordersUnchanged": true,
+              "refundRowsDelta": 0,
+              "merchantTaskRowsDelta": 1,
+              "operationMutation": "none",
+              "notificationSentDelta": 0,
+              "taskStatus": "pending"
+            },
+            "captures": [
+              {
+                "ref": "tasks.primary",
+                "from": "reply.task.taskId",
+                "orderRef": "primary"
+              }
+            ]
+          }
+        },
+        {
+          "index": 3,
+          "input": {
+            "type": "restart",
+            "sessions": [
+              "alice_main"
+            ],
+            "persist": [
+              "verified_order_focus",
+              "pending_task_reference"
+            ],
+            "clear": [
+              "agent_messages",
+              "in_memory_sessions"
+            ]
+          },
+          "expect": {
+            "action": "restart",
+            "branch": "recovery",
+            "orderRef": "primary",
+            "services": {
+              "requiredInOrder": [],
+              "denied": [],
+              "forbidden": [
+                "confirm_refund",
+                "request_merchant"
+              ]
+            },
+            "evidence": {
+              "requiredPolicyIds": [],
+              "forbiddenPolicyIds": [],
+              "currentTurnOnly": true
+            },
+            "reply": {
+              "kind": "none",
+              "session": null,
+              "simulationLabel": true
+            },
+            "db": {
+              "ordersUnchanged": true,
+              "refundRowsDelta": 0,
+              "merchantTaskRowsDelta": 0,
+              "operationMutation": "none",
+              "notificationSentDelta": 0
+            },
+            "captures": []
+          }
+        },
+        {
+          "index": 4,
+          "input": {
+            "type": "user",
+            "session": "alice_main",
+            "text": "刚才找店家协商的那笔现在是什么进度？"
+          },
+          "expect": {
+            "action": "merchant_status",
+            "branch": "read",
+            "orderRef": "primary",
+            "services": {
+              "requiredInOrder": [
+                "get_order",
+                "get_merchant_request"
+              ],
+              "denied": [],
+              "forbidden": [
+                "confirm_refund",
+                "request_merchant"
+              ]
+            },
+            "evidence": {
+              "requiredPolicyIds": [],
+              "forbiddenPolicyIds": [],
+              "currentTurnOnly": true
+            },
+            "reply": {
+              "kind": "merchant_status",
+              "session": "alice_main",
+              "simulationLabel": true
+            },
+            "db": {
+              "ordersUnchanged": true,
+              "refundRowsDelta": 0,
+              "merchantTaskRowsDelta": 0,
+              "operationMutation": "none",
+              "notificationSentDelta": 0,
+              "taskStatus": "pending"
+            },
+            "captures": []
+          }
+        }
+      ]
+    },
+    {
+      "id": "SV-RC-03",
+      "category": "recovery",
+      "name": "重启后已展示方案仍严格绑定原身份原群",
+      "status": "deferred",
+      "deferredReason": "O4",
+      "fixtures": {
+        "orders": [
+          {
+            "ref": "primary",
+            "template": "paid_lunch",
+            "owner": "alice",
+            "merchantOutcome": "approve"
+          }
+        ],
+        "preconditions": [
+          {
+            "type": "merchant_task",
+            "orderRef": "primary",
+            "session": "alice_main",
+            "status": "approved",
+            "reason": "行程变化",
+            "approvedAmountCents": 7980,
+            "bind": "tasks.primary"
+          },
+          {
+            "type": "refund_presented",
+            "orderRef": "primary",
+            "session": "alice_main",
+            "taskRef": "tasks.primary",
+            "bind": "operations.primary",
+            "amountCents": 7980
+          }
+        ]
+      },
+      "turns": [
+        {
+          "index": 1,
+          "input": {
+            "type": "restart",
+            "sessions": [
+              "alice_main",
+              "bob_main"
+            ],
+            "persist": [
+              "refund_operation_reference"
+            ],
+            "clear": [
+              "agent_messages",
+              "in_memory_sessions"
+            ]
+          },
+          "expect": {
+            "action": "restart",
+            "branch": "recovery",
+            "orderRef": "primary",
+            "services": {
+              "requiredInOrder": [],
+              "denied": [],
+              "forbidden": [
+                "confirm_refund",
+                "request_merchant"
+              ]
+            },
+            "evidence": {
+              "requiredPolicyIds": [],
+              "forbiddenPolicyIds": [],
+              "currentTurnOnly": true
+            },
+            "reply": {
+              "kind": "none",
+              "session": null,
+              "simulationLabel": true
+            },
+            "db": {
+              "ordersUnchanged": true,
+              "refundRowsDelta": 0,
+              "merchantTaskRowsDelta": 0,
+              "operationMutation": "none",
+              "notificationSentDelta": 0
+            },
+            "captures": []
+          }
+        },
+        {
+          "index": 2,
+          "input": {
+            "type": "confirmation",
+            "session": "bob_main",
+            "command": "refund",
+            "text": "确认退款 {{operations.primary}}",
+            "operationRef": "operations.primary",
+            "orderRef": "primary"
+          },
+          "expect": {
+            "action": "host_confirm_refund",
+            "branch": "denied",
+            "orderRef": "primary",
+            "services": {
+              "requiredInOrder": [
+                "confirm_refund"
+              ],
+              "denied": [
+                "confirm_refund"
+              ],
+              "forbidden": [
+                "request_merchant"
+              ]
+            },
+            "evidence": {
+              "requiredPolicyIds": [],
+              "forbiddenPolicyIds": [],
+              "currentTurnOnly": true
+            },
+            "reply": {
+              "kind": "notice",
+              "session": "bob_main",
+              "simulationLabel": true
+            },
+            "db": {
+              "ordersUnchanged": true,
+              "refundRowsDelta": 0,
+              "merchantTaskRowsDelta": 0,
+              "operationMutation": "none",
+              "notificationSentDelta": 0
+            },
+            "captures": []
+          }
+        },
+        {
+          "index": 3,
+          "input": {
+            "type": "confirmation",
+            "session": "alice_main",
+            "command": "refund",
+            "text": "确认退款 {{operations.primary}}",
+            "operationRef": "operations.primary",
+            "orderRef": "primary"
+          },
+          "expect": {
+            "action": "host_confirm_refund",
+            "branch": "refund_succeeded",
+            "orderRef": "primary",
+            "services": {
+              "requiredInOrder": [
+                "confirm_refund"
+              ],
+              "denied": [],
+              "forbidden": [
+                "request_merchant"
+              ]
+            },
+            "evidence": {
+              "requiredPolicyIds": [],
+              "forbiddenPolicyIds": [],
+              "currentTurnOnly": true
+            },
+            "reply": {
+              "kind": "refund_status",
+              "session": "alice_main",
+              "simulationLabel": true
+            },
+            "db": {
+              "ordersUnchanged": false,
+              "refundRowsDelta": 1,
+              "merchantTaskRowsDelta": 0,
+              "operationMutation": "succeeded",
+              "notificationSentDelta": 0,
+              "operationStatus": "succeeded",
+              "amountCents": 7980
+            },
+            "captures": []
+          }
+        },
+        {
+          "index": 4,
+          "input": {
+            "type": "confirmation",
+            "session": "alice_main",
+            "command": "refund",
+            "text": "确认退款 {{operations.primary}}",
+            "operationRef": "operations.primary",
+            "orderRef": "primary"
+          },
+          "expect": {
+            "action": "host_confirm_refund",
+            "branch": "refund_idempotent",
+            "orderRef": "primary",
+            "services": {
+              "requiredInOrder": [
+                "confirm_refund"
+              ],
+              "denied": [],
+              "forbidden": [
+                "request_merchant"
+              ]
+            },
+            "evidence": {
+              "requiredPolicyIds": [],
+              "forbiddenPolicyIds": [],
+              "currentTurnOnly": true
+            },
+            "reply": {
+              "kind": "refund_status",
+              "session": "alice_main",
+              "simulationLabel": true
+            },
+            "db": {
+              "ordersUnchanged": true,
+              "refundRowsDelta": 0,
+              "merchantTaskRowsDelta": 0,
+              "operationMutation": "none",
+              "notificationSentDelta": 0,
+              "operationStatus": "succeeded",
+              "amountCents": 7980
+            },
+            "captures": []
+          }
+        }
+      ]
+    },
+    {
+      "id": "SV-RC-04",
+      "category": "recovery",
+      "name": "压缩历史不串旧订单焦点",
+      "status": "deferred",
+      "deferredReason": "O4",
+      "fixtures": {
+        "orders": [
+          {
+            "ref": "primary",
+            "template": "paid_lunch",
+            "owner": "alice",
+            "merchantOutcome": "approve"
+          },
+          {
+            "ref": "other",
+            "template": "private_meal",
+            "owner": "alice",
+            "merchantOutcome": "approve"
+          }
+        ],
+        "preconditions": []
+      },
+      "turns": [
+        {
+          "index": 1,
+          "input": {
+            "type": "user",
+            "session": "alice_main",
+            "text": "先查 {{orders.primary}}。"
+          },
+          "expect": {
+            "action": "order",
+            "branch": "read",
+            "orderRef": "primary",
+            "services": {
+              "requiredInOrder": [
+                "get_order"
+              ],
+              "denied": [],
+              "forbidden": [
+                "confirm_refund",
+                "request_merchant"
+              ]
+            },
+            "evidence": {
+              "requiredPolicyIds": [],
+              "forbiddenPolicyIds": [],
+              "currentTurnOnly": true
+            },
+            "reply": {
+              "kind": "order",
+              "session": "alice_main",
+              "simulationLabel": true
+            },
+            "db": {
+              "ordersUnchanged": true,
+              "refundRowsDelta": 0,
+              "merchantTaskRowsDelta": 0,
+              "operationMutation": "none",
+              "notificationSentDelta": 0
+            },
+            "captures": []
+          }
+        },
+        {
+          "index": 2,
+          "input": {
+            "type": "user",
+            "session": "alice_main",
+            "text": "现在只看 {{orders.other}}。"
+          },
+          "expect": {
+            "action": "order",
+            "branch": "read",
+            "orderRef": "other",
+            "services": {
+              "requiredInOrder": [
+                "get_order"
+              ],
+              "denied": [],
+              "forbidden": [
+                "confirm_refund",
+                "request_merchant"
+              ]
+            },
+            "evidence": {
+              "requiredPolicyIds": [],
+              "forbiddenPolicyIds": [],
+              "currentTurnOnly": true
+            },
+            "reply": {
+              "kind": "order",
+              "session": "alice_main",
+              "simulationLabel": true
+            },
+            "db": {
+              "ordersUnchanged": true,
+              "refundRowsDelta": 0,
+              "merchantTaskRowsDelta": 0,
+              "operationMutation": "none",
+              "notificationSentDelta": 0
+            },
+            "captures": []
+          }
+        },
+        {
+          "index": 3,
+          "input": {
+            "type": "compact",
+            "sessions": [
+              "alice_main"
+            ],
+            "preserve": [
+              "verified_order_focus"
+            ],
+            "discardOlderMessages": true
+          },
+          "expect": {
+            "action": "compact",
+            "branch": "recovery",
+            "orderRef": "other",
+            "services": {
+              "requiredInOrder": [],
+              "denied": [],
+              "forbidden": [
+                "confirm_refund",
+                "request_merchant"
+              ]
+            },
+            "evidence": {
+              "requiredPolicyIds": [],
+              "forbiddenPolicyIds": [],
+              "currentTurnOnly": true
+            },
+            "reply": {
+              "kind": "none",
+              "session": null,
+              "simulationLabel": true
+            },
+            "db": {
+              "ordersUnchanged": true,
+              "refundRowsDelta": 0,
+              "merchantTaskRowsDelta": 0,
+              "operationMutation": "none",
+              "notificationSentDelta": 0
+            },
+            "captures": []
+          }
+        },
+        {
+          "index": 4,
+          "input": {
+            "type": "user",
+            "session": "alice_main",
+            "text": "这张私享券法定节假日可以用吗？"
+          },
+          "expect": {
+            "action": "policy",
+            "branch": "missing_evidence",
+            "orderRef": "other",
+            "services": {
+              "requiredInOrder": [
+                "get_order",
+                "search_faq"
+              ],
+              "denied": [],
+              "forbidden": [
+                "confirm_refund",
+                "request_merchant"
+              ]
+            },
+            "evidence": {
+              "requiredPolicyIds": [],
+              "forbiddenPolicyIds": [
+                "KB-PRODUCT-LUNCH"
+              ],
+              "currentTurnOnly": true
+            },
+            "reply": {
+              "kind": "order",
+              "session": "alice_main",
+              "simulationLabel": true
+            },
+            "db": {
+              "ordersUnchanged": true,
+              "refundRowsDelta": 0,
+              "merchantTaskRowsDelta": 0,
+              "operationMutation": "none",
+              "notificationSentDelta": 0
+            },
+            "captures": [],
+            "expectFacts": {
+              "holidayAllowedPromised": false
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

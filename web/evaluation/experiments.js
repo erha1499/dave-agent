@@ -13,7 +13,7 @@ const expState = {
 const expKindNames = { support: "业务架构", retrieval: "检索实验" };
 const expJobStatus = { running: "运行中", completed: "已完成", completed_with_failures: "部分失败", failed: "失败", interrupted: "已中断" };
 const expJobTone = { running: "running", completed: "passed", completed_with_failures: "mixed", failed: "failed", interrupted: "skipped" };
-const expSuiteNames = { standard: "常规", hard: "难题", no_answer: "无答案", scope: "范围" };
+const expSuiteNames = { standard: "常规", hard: "难题", no_answer: "无答案", scope: "范围", context: "上下文" };
 const expCopy = value => JSON.parse(JSON.stringify(value));
 const expFmt = value => value === undefined || value === null ? "缺省" : String(value);
 // 远程需求镜像后端 remoteRequired：业务实验或检索含 M2–M6 必须显式授权。
@@ -127,6 +127,23 @@ function applyPreset(id) {
   expState.formError = "";
 }
 
+// v2 组合校验：score 仅 M4/M5/M6 且阈值必须显式填写；非法组合只提示禁提交，不偷偷改模式或丢字段。
+function expComboError(config) {
+  if (config.kind !== "retrieval" || config.version !== 2) return "";
+  for (const variant of config.variants) {
+    if (!variant.dataset) return `方案 ${variant.id} 请选择数据集。`;
+    const acceptance = variant.acceptance;
+    if (!acceptance || (acceptance.mode !== "off" && acceptance.mode !== "score")) return `方案 ${variant.id} 的接收策略无效。`;
+    if (acceptance.mode === "score") {
+      if (!variant.modes.length || variant.modes.some(mode => !["M4", "M5", "M6"].includes(mode)))
+        return `方案 ${variant.id}：分数接收仅支持 M4/M5/M6，请调整模式或改用关闭策略。`;
+      if (typeof acceptance.threshold !== "number" || !Number.isFinite(acceptance.threshold) || acceptance.threshold < 0 || acceptance.threshold > 1)
+        return `方案 ${variant.id}：请显式填写 0–1 的接收阈值。`;
+    }
+  }
+  return "";
+}
+
 // 提交前的前端镜像校验；最终判定仍以后端 resolveExperimentConfig 为准。
 function validateDraft(config) {
   if (!config.label || !config.label.trim() || config.label.trim().length > 80) return "请填写 80 字以内的实验名称。";
@@ -137,6 +154,8 @@ function validateDraft(config) {
       return "Controller 不支持“经过模型”的商家通知。";
     if (config.kind === "retrieval" && !variant.modes?.length) return `方案 ${variant.id} 至少选择一个模式。`;
   }
+  const combo = expComboError(config);
+  if (combo) return combo;
   if (expRemoteNeeded(config) && !config.allowRemote) return "该实验调用付费模型，请先勾选允许本次远程模型调用。";
   return "";
 }
@@ -296,8 +315,56 @@ function expVariantCard(draft, variant, index) {
   if (draft.kind === "support") children.push(expLabeled("架构", expArchSelect(variant)));
   else children.push(node("div", { class: "exp-field" }, text("span", "模式（多选）", "exp-field-label"),
     node("div", { class: "exp-modes" }, ...(expState.catalog.modes || []).map(mode => expModeChip(variant, mode)))));
+  if (draft.kind === "retrieval" && draft.version === 2) children.push(...expV2Fields(variant));
   children.push(expAdvancedNode(draft, variant));
   return node("div", { class: "exp-variant", "data-variant-card": variant.id }, ...children);
+}
+
+// version 2 检索方案的 datasets/acceptance 字段：独立于 parameters，编辑只写 draft 并局部刷新差异与门控，不重建卡片。
+function expV2Fields(variant) {
+  const catalog = expState.catalog;
+  const acceptance = variant.acceptance && typeof variant.acceptance === "object" ? variant.acceptance : (variant.acceptance = { mode: "off" });
+  const datasetSelect = node("select", { "data-field": "dataset", "data-variant": variant.id });
+  datasetSelect.append(...(catalog.datasets || []).map(item => node("option", { value: item.value }, item.label)));
+  datasetSelect.value = variant.dataset || "";
+  datasetSelect.addEventListener("change", () => { variant.dataset = datasetSelect.value; renderExpDiff(); renderExpActions(); });
+  const modeField = catalog.acceptanceFields?.find(field => field.key === "mode");
+  const thresholdField = catalog.acceptanceFields?.find(field => field.key === "threshold");
+  const modeSelect = node("select", { "data-field": "acceptance-mode", "data-variant": variant.id });
+  modeSelect.append(...(modeField?.options || []).map(option => node("option", { value: option.value }, option.label)));
+  modeSelect.value = acceptance.mode;
+  const thresholdInput = node("input", { type: "number", min: "0", max: "1", step: "0.01", placeholder: "0–1 显式填写",
+    "data-field": "acceptance-threshold", "data-variant": variant.id });
+  if (typeof acceptance.threshold === "number") thresholdInput.value = String(acceptance.threshold);
+  thresholdInput.disabled = acceptance.mode !== "score";
+  modeSelect.addEventListener("change", () => {
+    if (modeSelect.value === "score") {
+      const value = Number(thresholdInput.value);
+      // off 配置不得携带阈值；切到 score 时只采纳用户已输入的合法值，不偷偷补默认。
+      variant.acceptance = thresholdInput.value !== "" && Number.isFinite(value) && value >= 0 && value <= 1 ? { mode: "score", threshold: value } : { mode: "score" };
+      thresholdInput.disabled = false;
+    } else {
+      variant.acceptance = { mode: "off" };
+      thresholdInput.disabled = true;
+    }
+    renderExpDiff();
+    renderExpActions();
+  });
+  thresholdInput.addEventListener("change", () => {
+    const value = Number(thresholdInput.value);
+    if (variant.acceptance?.mode === "score" && thresholdInput.value !== "" && Number.isFinite(value) && value >= 0 && value <= 1)
+      variant.acceptance.threshold = value;
+    else if (variant.acceptance?.mode === "score") delete variant.acceptance.threshold;
+    renderExpDiff();
+    renderExpActions();
+  });
+  return [
+    expLabeled("数据集", datasetSelect),
+    node("div", { class: "exp-field" }, text("span", modeField?.label || "证据接收策略", "exp-field-label"), modeSelect,
+      modeField?.note ? text("small", modeField.note, "exp-note") : null),
+    node("div", { class: "exp-field" }, text("span", thresholdField?.label || "接收分数阈值", "exp-field-label"), thresholdInput,
+      thresholdField?.note ? text("small", thresholdField.note, "exp-note") : null),
+  ];
 }
 
 function expArchSelect(variant) {
@@ -372,6 +439,12 @@ function expDiffChildren(draft) {
   const diffs = [];
   if (draft.kind === "support" && a.architecture !== b.architecture) diffs.push(["架构", `${a.architecture} → ${b.architecture}`]);
   if (draft.kind === "retrieval" && a.modes.join("+") !== b.modes.join("+")) diffs.push(["模式", `${a.modes.join("+")} → ${b.modes.join("+")}`]);
+  if (draft.kind === "retrieval" && draft.version === 2) {
+    const datasetLabel = value => expState.catalog?.datasets?.find(item => item.value === value)?.label || value || "缺省";
+    if (a.dataset !== b.dataset) diffs.push(["数据集", `${datasetLabel(a.dataset)} → ${datasetLabel(b.dataset)}`]);
+    const accLabel = variant => variant.acceptance?.mode === "score" ? `score ${expFmt(variant.acceptance.threshold)}` : variant.acceptance?.mode || "缺省";
+    if (JSON.stringify(a.acceptance ?? null) !== JSON.stringify(b.acceptance ?? null)) diffs.push(["接收", `${accLabel(a)} → ${accLabel(b)}`]);
+  }
   for (const key of [...new Set([...Object.keys(a.parameters || {}), ...Object.keys(b.parameters || {})])]) {
     const va = a.parameters?.[key], vb = b.parameters?.[key];
     if (JSON.stringify(va ?? null) !== JSON.stringify(vb ?? null)) diffs.push([key, `${expFmt(va)} → ${expFmt(vb)}`]);
@@ -403,12 +476,14 @@ function expRemoteChildren(draft) {
 }
 
 function expActionsChildren(draft) {
-  const submitBlocked = expRemoteNeeded(draft) && !draft.allowRemote;
+  const comboError = expComboError(draft);
+  const submitBlocked = Boolean(comboError) || (expRemoteNeeded(draft) && !draft.allowRemote);
   return [
     node("button", { class: "primary-button", type: "button", disabled: expState.submitting || submitBlocked, onclick: () => submitExperiment() },
       expState.submitting ? "正在提交…" : "提交实验"),
     node("button", { class: "quiet-button", type: "button", onclick: () => downloadExpConfig() }, "下载 JSON 配置"),
-    submitBlocked ? text("span", "该方案调用付费模型，需先勾选允许", "exp-hint") : null,
+    comboError ? text("span", comboError, "exp-hint")
+      : submitBlocked ? text("span", "该方案调用付费模型，需先勾选允许", "exp-hint") : null,
   ].filter(Boolean);
 }
 
@@ -430,7 +505,11 @@ function expJobsPanel() {
 }
 
 const expConfigSummary = config => !config ? "配置未采集。"
-  : `${expKindNames[config.kind] || config.kind} · 重复 ${config.repeat} 次 · ${(config.variants || []).map(variant => config.kind === "support" ? `${variant.id} ${variant.architecture}` : `${variant.id} ${variant.modes.join("+")}`).join(" 对比 ")}`;
+  : `${expKindNames[config.kind] || config.kind}${config.version === 2 ? " v2" : ""} · 重复 ${config.repeat} 次 · ${(config.variants || []).map(variant => {
+    if (config.kind === "support") return `${variant.id} ${variant.architecture}`;
+    const acceptance = config.version === 2 ? ` · ${variant.acceptance?.mode === "score" ? `score ${variant.acceptance.threshold}` : "off"}` : "";
+    return `${variant.id} ${variant.modes.join("+")}${acceptance}`;
+  }).join(" 对比 ")}`;
 
 function expJobPanel() {
   const job = expState.job;
@@ -452,13 +531,14 @@ function expJobPanel() {
       node("div", { class: "exp-job-config" },
         text("p", `配置快照：${expConfigSummary(job.config)}`, "metric-note"),
         node("button", { class: "quiet-button", type: "button", "data-action": "load-config", onclick: () => { expState.draft = expCopy(job.config); expState.presetId = null; expState.formError = ""; renderExperiments(); } }, "载入配置到表单")),
-      ...job.results.map(result => expResultNode(result)),
+      ...job.results.map(result => expResultNode(job, result)),
       comparable.length >= 2
         ? node("div", {}, node("button", { class: "quiet-button", type: "button", "data-action": "compare-btn", onclick: () => expCompare(comparable) }, "带入 A/B 对比"))
         : null));
 }
 
-function expResultNode(result) {
+function expResultNode(job, result) {
+  const variant = job.config?.variants?.find(item => item.id === result.variantId) ?? null;
   return node("div", { class: "exp-result" },
     node("div", { class: "exp-result-head" },
       text("span", `方案 ${result.variantId} · 第 ${result.repetition} 次`, "exp-result-title"),
@@ -467,7 +547,7 @@ function expResultNode(result) {
       result.kind === "support"
         ? node("button", { class: "quiet-button", type: "button", "data-action": "view-run", onclick: () => { setView("overview"); selectRun(result.runId); } }, "查看运行")
         : null),
-    result.kind === "support" ? expSupportSummary(result.summary) : expRetrievalSummary(result.summary),
+    result.kind === "support" ? expSupportSummary(result.summary) : expRetrievalSummary(result.summary, variant),
     node("details", { class: "trace" }, node("summary", {}, "原始 summary JSON"), json(result.summary ?? null)));
 }
 
@@ -489,8 +569,13 @@ function expSupportSummary(summary) {
 
 // retrieval summary 即 runRetrievalV2 报告 summary：按 mode/corpus/suite 分列，不合成单一通过率。
 // Recall 同时给出成功样本均值与计划口径（plannedRecallAt5，分母含调用失败及缺失）；null 显示未采集/不适用，不补零。
-function expRetrievalSummary(summary) {
+function expRetrievalSummary(summary, variant) {
   if (!summary || !Array.isArray(summary.groups)) return text("p", "检索 summary 未采集。", "metric-note");
+  const acceptanceMode = variant?.acceptance?.mode;
+  const datasetLabel = variant?.dataset ? expState.catalog?.datasets?.find(item => item.value === variant.dataset)?.label || variant.dataset : null;
+  const strategy = acceptanceMode === "score"
+    ? `证据接收：${datasetLabel ? `${datasetLabel} · ` : ""}score 实验阈值 ${variant.acceptance.threshold}；是否达标见指标`
+    : acceptanceMode === "off" ? `证据接收：${datasetLabel ? `${datasetLabel} · ` : ""}off 诊断基线（范围内原始 Top5）` : null;
   const diag = group => {
     const parts = [["noAnswerNonempty", "非空召回"], ["scopeViolations", "越界"], ["boundaryFailures", "边界失败"]]
       .filter(([key]) => group[key] !== null && group[key] !== undefined)
@@ -498,6 +583,7 @@ function expRetrievalSummary(summary) {
     return parts.length ? parts.join(" · ") : "不适用";
   };
   return node("div", { class: "exp-summary" },
+    strategy ? text("p", strategy, "exp-strategy") : null,
     node("div", { class: "retrieval-scroll" }, node("table", { class: "retrieval-table exp-table" },
       node("thead", {}, node("tr", {}, ...["模式", "语料", "题集", "成功 / 计划", "失败", "缺失", "Recall@5 成功 / 计划", "MRR@5（成功均值）", "诊断"].map(label => text("th", label)))),
       node("tbody", {}, ...summary.groups.map(group => node("tr", {},
@@ -511,8 +597,55 @@ function expRetrievalSummary(summary) {
         text("td", ratio(group.mrrAt5), "mono"),
         text("td", diag(group))))))),
     text("p", "Recall/MRR 为成功样本均值；计划口径分母含调用失败及缺失。按模式与语料/题集分列，不合成总体分。", "metric-note"),
+    expAcceptanceSection(summary.groups),
     node("details", { class: "metric-details exp-usage" }, node("summary", {}, "检索用量"),
       node("div", { class: "metrics-foot" }, ...expUsageLines(summary.usage))));
+}
+
+// 证据接收指标独立分表：与原始 Recall 分开；误接收/误拒给明确分子/分母，分母 0 显示不适用；
+// context 题为待 C1 计划项；任务完成不等于策略验收通过。
+function expAcceptanceSection(groups) {
+  if (!groups.some(group => group.acceptance)) return text("p", "未记录证据接收指标（旧版原始报告）。", "metric-note");
+  const ratioCell = (cases, denominator, rate) => !denominator ? "不适用" : `${number(cases)} / ${number(denominator)}（${percent(rate)}）`;
+  // 误接收分两行：无答案（仅 no_answer 口径）与预期拒答（no_answer + 期望拒答的 scope）；
+  // 旧报告缺 abstention 字段显示未记录，不得让 0 权限违规掩盖预期拒答误接收。
+  const falseAcceptCell = acc => node("td", { class: "mono" },
+    node("span", { class: "exp-acc-line" }, `无答案 ${ratioCell(acc.noAnswerFalseAcceptCases, acc.noAnswerDenominator, acc.noAnswerFalseAcceptRate)}`),
+    node("span", { class: "exp-acc-line" }, acc.abstentionDenominator === undefined
+      ? "预期拒答 未记录"
+      : `预期拒答 ${ratioCell(acc.abstentionFalseAcceptCases, acc.abstentionDenominator, acc.abstentionFalseAcceptRate)}`));
+  const diag = acc => {
+    const parts = [];
+    if (acc.deferred) parts.push(`待 C1 ${acc.deferred}`);
+    if (acc.failed) parts.push(`失败 ${acc.failed}`);
+    if (acc.missing) parts.push(`缺失 ${acc.missing}`);
+    if (acc.notApplicable) parts.push(`不适用 ${acc.notApplicable}`);
+    if (acc.scopeViolations) parts.push(`越界 ${acc.scopeViolations}`);
+    if (acc.boundaryFailures) parts.push(`边界失败 ${acc.boundaryFailures}`);
+    return parts.length ? parts.join(" · ") : "—";
+  };
+  const hasContext = groups.some(group => group.suite === "context" || group.acceptance?.deferred);
+  return node("div", { class: "exp-acc" },
+    text("p", "证据接收（离线实验）", "exp-acc-title"),
+    node("div", { class: "retrieval-scroll" }, node("table", { class: "retrieval-table exp-table" },
+      node("thead", {}, node("tr", {}, ...["模式", "语料", "题集", "接收后 Recall@5 成功 / 计划", "覆盖率 覆盖/已测", "误接收 无答案 / 预期拒答", "误拒", "诊断"].map(label => text("th", label)))),
+      node("tbody", {}, ...groups.map(group => {
+        const acc = group.acceptance;
+        if (!acc) return node("tr", {},
+          text("td", group.mode, "mono"), text("td", corpusNames[group.corpus] || group.corpus), text("td", expSuiteNames[group.suite] || group.suite),
+          node("td", { colspan: "5" }, "未记录"));
+        return node("tr", {},
+          text("td", group.mode, "mono"),
+          text("td", corpusNames[group.corpus] || group.corpus),
+          text("td", expSuiteNames[group.suite] || group.suite),
+          text("td", `${percent(acc.recallAt5)} / ${percent(acc.plannedRecallAt5)}`, "mono"),
+          text("td", acc.measured === null || acc.measured === undefined ? "未采集" : `${number(acc.coveredCases)} / ${number(acc.measured)}（${percent(acc.coverage)}）`, "mono"),
+          falseAcceptCell(acc),
+          text("td", ratioCell(acc.answerableFalseRejectCases, acc.answerableFalseRejectDenominator, acc.answerableFalseRejectRate), "mono"),
+          text("td", diag(acc)));
+      })))),
+    hasContext ? text("p", "context（上下文）题为待 C1 计划项，不产生调用。", "metric-note") : null,
+    text("p", "离线实验结果，非上线效果；任务完成不等于门槛通过，策略是否达标见以上指标。", "metric-note"));
 }
 
 // 用量按 operation 分列：请求/缓存命中/已知 Tokens 与完整量；USD 与 CNY 各自分行，不合并。

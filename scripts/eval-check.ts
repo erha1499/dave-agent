@@ -99,3 +99,7 @@ await import("./objective-eval-check.ts");
 await import("./experiment-check.ts");
 await import("./experiment-jobs-check.ts");
 await import("./experiment-ui-check.ts");
+await import("./acceptance-data-check.ts");
+await import("./evidence-acceptance-check.ts");
+await import("./acceptance-calibrate-check.ts");
+await import("./support-validation-data-check.ts");

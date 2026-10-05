@@ -90,6 +90,9 @@ const catalog = (): any => ({
       { id: "A", modes: ["M0", "M1"], parameters: retrievalParams() } ] } },
     { id: "retrieval-rerank", name: "词项 / 全候选重排", config: { version: 1, kind: "retrieval", label: "词项 / 全候选重排", repeat: 1, allowRemote: false, variants: [
       { id: "A", modes: ["M0", "M4"], parameters: retrievalParams() } ] } },
+    { id: "acceptance-development", name: "A1 证据接收开发 A/B", config: { version: 2, kind: "retrieval", label: "A1 证据接收开发 A/B", repeat: 1, allowRemote: false, variants: [
+      { id: "A", modes: ["M4"], dataset: "acceptance-development", acceptance: { mode: "off" }, parameters: retrievalParams() },
+      { id: "B", modes: ["M4"], dataset: "acceptance-development", acceptance: { mode: "score", threshold: 0.8 }, parameters: retrievalParams() } ] } },
   ],
   fields: {
     support: [
@@ -106,6 +109,14 @@ const catalog = (): any => ({
   },
   modes: ["M0 词项", "M1 BM25", "M2 向量", "M3 BM25 + 向量 RRF", "M4 全候选重排", "M5 词项候选重排", "M6 RRF 候选重排"]
     .map((label, index) => ({ value: `M${index}`, label })),
+  datasets: [{ value: "legacy", label: "原检索开发集" }, { value: "acceptance-development", label: "A1 开发集（48 题）" },
+    { value: "acceptance-validation", label: "A1 固定验证集（60 题，非盲测）" }],
+  acceptanceFields: [
+    { key: "mode", label: "证据接收策略", type: "select", options: [{ value: "off", label: "关闭（范围内原始 Top5）" }, { value: "score", label: "按重排分数接收" }],
+      note: "分数策略仅支持 M4/M5/M6；不修改原始排名。" },
+    { key: "threshold", label: "接收分数阈值", type: "number", min: 0, max: 1, step: 0.01,
+      note: "仅分数策略启用时填写。0.8 为开发试值，未经校准不代表上线门槛。" },
+  ],
   limits: { variants: 2, repeat: 3, concurrentJobs: 1 },
   notes: ["所有配置仅作用于本次评测。"],
 });
@@ -317,6 +328,7 @@ const openExperiments = async (booted: Awaited<ReturnType<typeof boot>>, jobs: u
   assert.ok(usageFold, "检索用量折叠存在");
   assert.notEqual(usageFold.open, true, "检索用量默认折叠");
   assert.match(html, /原始 summary JSON/);
+  assert.match(html, /未记录证据接收指标（旧版原始报告）/, "纯 raw 旧历史没有 acceptance 显示未记录");
   console.log("PASS 实验调试：检索结果分列、用量默认折叠、CNY 不合并、完整量未知不补零。");
 }
 
@@ -511,4 +523,176 @@ const openExperiments = async (booted: Awaited<ReturnType<typeof boot>>, jobs: u
   assert.equal(refresh().disabled, false);
   assert.equal(pendingCount(), 0);
   console.log("PASS 实验调试：成功/失败刷新后按钮恢复可点，可连续刷新。");
+}
+
+// v2 表单：数据集/接收策略回填、阈值启停、组合校验禁提交不丢字段、编辑不重建、提交体原样。
+{
+  const booted = await boot();
+  const { element, find, flush, pendingCount } = booted;
+  await openExperiments(booted);
+  const root = element("experiments");
+  const preset = findAttr(root, "data-field", "preset")!;
+  preset.value = "acceptance-development";
+  preset.fire("change");
+  await flush();
+  const byField = (field: string, variant: string) => findAllAttr(root, "data-field", field).find(item => item.attrs.get("data-variant") === variant)!;
+  const byMode = (mode: string, variant: string) => findAllAttr(root, "data-mode", mode).find(item => item.attrs.get("data-variant") === variant)!;
+  assert.match(content(root), /数据集/);
+  assert.match(content(root), /证据接收策略/);
+  assert.equal(byField("dataset", "A").value, "acceptance-development");
+  assert.equal(byField("acceptance-mode", "A").value, "off");
+  assert.equal(byField("acceptance-threshold", "A").disabled, true, "off 时阈值禁用");
+  assert.equal(byField("acceptance-mode", "B").value, "score");
+  assert.equal(byField("acceptance-threshold", "B").disabled, false, "score 时阈值启用");
+  assert.equal(byField("acceptance-threshold", "B").value, "0.8");
+  assert.match(content(root), /接收 off → score 0\.8/, "差异含接收策略");
+  // 阈值编辑不重建输入节点。
+  const thB = byField("acceptance-threshold", "B");
+  thB.value = "0.65";
+  thB.fire("change");
+  await flush();
+  assert.equal(byField("acceptance-threshold", "B"), thB, "阈值编辑不重建输入节点");
+  assert.match(content(root), /score 0\.65/, "差异局部更新");
+  // 组合校验：B 加选 M0 → 错误禁提交，且模式不被偷偷改回。
+  const m0B = byMode("M0", "B");
+  m0B.checked = true;
+  m0B.fire("change");
+  await flush();
+  assert.match(content(root), /分数接收仅支持 M4\/M5\/M6/);
+  assert.equal(findClass(root, "primary-button")!.disabled, true, "score 与非 rerank 组合禁提交");
+  assert.equal(byMode("M0", "B").checked, true, "不丢字段、不偷偷改模式");
+  m0B.checked = false;
+  m0B.fire("change");
+  await flush();
+  assert.ok(!content(root).includes("分数接收仅支持"), "恢复合法组合后错误消失");
+  // A 切 score 无阈值 → 提示显式填写；填 0.5 后恢复；再切回 off。
+  const modeA = byField("acceptance-mode", "A");
+  modeA.value = "score";
+  modeA.fire("change");
+  await flush();
+  assert.equal(byField("acceptance-threshold", "A").disabled, false, "切 score 后阈值启用");
+  assert.match(content(root), /请显式填写 0–1 的接收阈值/);
+  assert.equal(findClass(root, "primary-button")!.disabled, true, "缺阈值禁提交");
+  const thA = byField("acceptance-threshold", "A");
+  thA.value = "0.5";
+  thA.fire("change");
+  await flush();
+  assert.ok(!content(root).includes("请显式填写"), "填阈值后错误消失");
+  modeA.value = "off";
+  byField("acceptance-mode", "A").fire("change");
+  await flush();
+  assert.equal(byField("acceptance-threshold", "A").disabled, true, "切回 off 阈值重新禁用");
+  // 提交体：off 方案只含 mode，score 方案带显式阈值，数据集原样。
+  const allow = findAttr(root, "data-field", "allow-remote")!;
+  allow.checked = true;
+  allow.fire("change");
+  await flush();
+  findClass(root, "primary-button")!.fire("click");
+  await flush(1);
+  const post = find(request => request.path === "/api/experiments" && request.options?.method === "POST", "v2 POST");
+  assert.equal(post.options?.headers?.["X-Experiment-Request"], "1");
+  const body = JSON.parse(post.options?.body || "{}");
+  assert.equal(body.version, 2);
+  assert.equal(body.variants[0].dataset, "acceptance-development");
+  assert.deepEqual(body.variants[0].acceptance, { mode: "off" }, "off 方案不得携带阈值");
+  assert.deepEqual(body.variants[1].acceptance, { mode: "score", threshold: 0.65 });
+  respond(post, job("job-v2", { status: "completed", config: body }));
+  await flush();
+  assert.equal(pendingCount(), 0);
+  console.log("PASS 实验调试：v2 表单回填、阈值启停、组合校验、编辑不重建、提交体原样。");
+}
+
+// v2 结果：接收指标分表、分子/分母明示、空分母不适用、context 待 C1、策略标签与口径声明；载入配置完整回填。
+{
+  const booted = await boot();
+  const { element, find, flush } = booted;
+  const accGroup = (suite: string, raw: Record<string, unknown> = {}, acc: Record<string, unknown> = {}) => ({
+    mode: "M4", corpus: "selected", suite, planned: 42, missing: 0, succeeded: 42, failed: 0, notApplicable: 0, measured: 42,
+    recallAt5: 0.9, plannedRecallAt5: 0.88, mrrAt5: 0.85, scopeViolations: 0, boundaryFailures: 0, ...raw,
+    acceptance: {
+      planned: 42, applicablePlanned: 42, measured: 42, missing: 0, failed: 0, notApplicable: 0, deferred: 0,
+      plannedAnswerable: 42, answerableMeasured: 40, recallAt5: 0.7, plannedRecallAt5: 0.6667, mrrAt5: 0.66,
+      coveredCases: 30, coverage: 30 / 42, plannedCoverage: 30 / 42,
+      noAnswerFalseAcceptCases: 0, noAnswerDenominator: 0, noAnswerPlanned: 0, noAnswerFalseAcceptRate: null,
+      abstentionFalseAcceptCases: 0, abstentionDenominator: 0, abstentionPlanned: 0, abstentionFalseAcceptRate: null,
+      answerableFalseRejectCases: 2, answerableFalseRejectDenominator: 38, answerableFalseRejectRate: 2 / 38,
+      scopeViolations: 0, boundaryFailures: 1, ...acc,
+    },
+  });
+  const summaryA = {
+    plannedRows: 59, completedRows: 59, missingRows: 0,
+    groups: [
+      accGroup("standard"),
+      accGroup("no_answer", { planned: 10, succeeded: 10, recallAt5: null, plannedRecallAt5: null, mrrAt5: null, noAnswerNonempty: 4 }, {
+        planned: 10, applicablePlanned: 10, measured: 10, plannedAnswerable: 0, answerableMeasured: 0,
+        recallAt5: null, plannedRecallAt5: null, mrrAt5: null, coveredCases: 1, coverage: 0.1, plannedCoverage: 0.1,
+        noAnswerFalseAcceptCases: 1, noAnswerDenominator: 10, noAnswerPlanned: 10, noAnswerFalseAcceptRate: 0.1,
+        abstentionFalseAcceptCases: 1, abstentionDenominator: 10, abstentionPlanned: 10, abstentionFalseAcceptRate: 0.1,
+        answerableFalseRejectCases: 0, answerableFalseRejectDenominator: 0, answerableFalseRejectRate: null, boundaryFailures: 0,
+      }),
+      accGroup("scope", { planned: 1, succeeded: 1, measured: 1, recallAt5: null, plannedRecallAt5: null, mrrAt5: null }, {
+        planned: 1, applicablePlanned: 1, measured: 1, plannedAnswerable: 0, answerableMeasured: 0,
+        recallAt5: null, plannedRecallAt5: null, mrrAt5: null, coveredCases: 1, coverage: 1, plannedCoverage: 1,
+        abstentionFalseAcceptCases: 1, abstentionDenominator: 1, abstentionPlanned: 1, abstentionFalseAcceptRate: 1,
+        answerableFalseRejectCases: 0, answerableFalseRejectDenominator: 0, answerableFalseRejectRate: null,
+        scopeViolations: 0, boundaryFailures: 0,
+      }),
+      accGroup("context", { planned: 6, succeeded: 0, notApplicable: 6, measured: 0, recallAt5: null, plannedRecallAt5: null, mrrAt5: null }, {
+        planned: 6, applicablePlanned: 0, measured: 0, notApplicable: 6, deferred: 6, plannedAnswerable: 0, answerableMeasured: 0,
+        recallAt5: null, plannedRecallAt5: null, mrrAt5: null, coveredCases: 0, coverage: null, plannedCoverage: null,
+        answerableFalseRejectCases: 0, answerableFalseRejectDenominator: 0, answerableFalseRejectRate: null, boundaryFailures: 0,
+      }),
+    ],
+    usage: [],
+  };
+  const v2Config = { version: 2, kind: "retrieval", label: "A1 开发验收", repeat: 1, allowRemote: true, variants: [
+    { id: "A", modes: ["M4"], dataset: "acceptance-development", acceptance: { mode: "off" }, parameters: retrievalParams() },
+    { id: "B", modes: ["M4"], dataset: "acceptance-development", acceptance: { mode: "score", threshold: 0.8 }, parameters: retrievalParams() }] };
+  const v2Job = job("job-acc", { plannedRuns: 2, config: v2Config,
+    results: [
+      { variantId: "A", repetition: 1, kind: "retrieval", status: "completed", runId: "rt-a", summary: summaryA },
+      { variantId: "B", repetition: 1, kind: "retrieval", status: "completed", runId: "rt-b", summary: {
+        plannedRows: 42, completedRows: 42, missingRows: 0, groups: [accGroup("standard", {}, {
+          recallAt5: 0.72, plannedRecallAt5: 0.68,
+          abstentionFalseAcceptCases: undefined, abstentionDenominator: undefined, abstentionPlanned: undefined, abstentionFalseAcceptRate: undefined,
+        })], usage: [] } },
+    ] });
+  await openExperiments(booted, [v2Job]);
+  const root = element("experiments");
+  walk(root).find(item => item.className.split(" ").includes("exp-job"))!.fire("click");
+  await flush(1);
+  respond(find(request => request.path === "/api/experiments/job-acc", "v2 job detail"), v2Job);
+  await flush();
+  const html = content(root);
+  assert.match(html, /证据接收：A1 开发集（48 题） · off 诊断基线（范围内原始 Top5）/, "off 标诊断基线并区分数据集");
+  assert.match(html, /证据接收：A1 开发集（48 题） · score 实验阈值 0\.8；是否达标见指标/, "score 标实验阈值，不称试值或固定验证");
+  assert.match(html, /接收后 Recall@5/);
+  assert.match(html, /70\.0% \/ 66\.7%/, "接收后 Recall 双口径");
+  assert.match(html, /30 \/ 42（71\.4%）/, "覆盖率分子分母");
+  assert.match(html, /2 \/ 38（5\.3%）/, "误拒分子分母");
+  assert.match(html, /无答案 1 \/ 10（10\.0%）/, "无答案误接收分子分母");
+  assert.match(html, /预期拒答 1 \/ 10（10\.0%）/, "预期拒答误接收含无答案");
+  assert.match(html, /预期拒答 1 \/ 1（100\.0%）/, "scope 违规 0 但预期拒答误接收 1/1 不被掩盖");
+  assert.match(html, /预期拒答 不适用/, "0 分母显示不适用");
+  assert.match(html, /预期拒答 未记录/, "旧报告缺 abstention 字段显示未记录");
+  assert.match(html, /无答案 不适用/, "非无答案行的无答案误接收为不适用，两行明确区分");
+  assert.match(html, /0 \/ 0（不适用）/, "已测为 0 不补零");
+  assert.match(html, /上下文/, "context 显示上下文");
+  assert.match(html, /待 C1 6/, "deferred 显示待 C1");
+  assert.match(html, /context（上下文）题为待 C1 计划项/, "有 context 数据时才说明待 C1");
+  assert.match(html, /离线实验结果，非上线效果/, "口径声明");
+  assert.match(html, /任务完成不等于门槛通过/, "不把执行完成显示为策略验收通过");
+  // 误接收分母 0 与误拒分母 0 均为不适用。
+  const cells = walk(root).filter(item => item.textContent === "不适用");
+  assert.ok(cells.length >= 2, "空分母显示不适用");
+  // 载入配置完整回填 v2 字段，差异含 dataset/acceptance。
+  findAttr(root, "data-action", "load-config")!.fire("click");
+  await flush();
+  const byField = (field: string, variant: string) => findAllAttr(root, "data-field", field).find(item => item.attrs.get("data-variant") === variant)!;
+  assert.equal(byField("dataset", "A").value, "acceptance-development", "历史 v2 数据集回填");
+  assert.equal(byField("acceptance-mode", "A").value, "off");
+  assert.equal(byField("acceptance-mode", "B").value, "score");
+  assert.equal(byField("acceptance-threshold", "B").value, "0.8", "历史阈值回填");
+  assert.match(content(root), /接收 off → score 0\.8/, "回填后差异含接收策略");
+  console.log("PASS 实验调试：v2 接收指标分表、空分母不适用、待 C1 与口径声明、历史 v2 完整回填。");
 }

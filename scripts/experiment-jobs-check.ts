@@ -3,7 +3,10 @@ import { randomUUID } from "node:crypto";
 import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { ExperimentBusyError, ExperimentJobs, type ExperimentExecute, type ExperimentExecution, type ExperimentResult } from "../src/experiment-jobs.ts";
+import { executeExperiment, ExperimentBusyError, ExperimentJobs, type ExperimentExecute, type ExperimentExecution, type ExperimentResult } from "../src/experiment-jobs.ts";
+
+import { experimentCatalog } from "../src/experiment-config.ts";
+import type { runRetrievalV2, V2Dataset } from "./retrieval-v2.ts";
 
 const config = { version: 1, kind: "retrieval", label: "serial synthetic experiment", repeat: 2, allowRemote: false,
   variants: [{ id: "A", modes: ["M0"] }, { id: "B", modes: ["M1"] }] };
@@ -53,6 +56,52 @@ try {
   await assert.rejects(jobs.start(config), /已关闭/);
   const next = await competing.start({ ...config, repeat: 1 }); await competing.close();
   assert.equal((await competing.get(next.id))!.status, "completed", "a released directory can execute another experiment");
+
+  // Exercise the real executor adapter with injected provider-free runner and fixed-enum dataset loader.
+  const seenOptions: Parameters<typeof runRetrievalV2>[0][] = [], loaded: string[] = [];
+  const datasets: Record<string, V2Dataset> = { development: { source: { split: "development" }, corpora: [] }, validation: { source: { split: "validation" }, corpora: [] } };
+  const executeA1: ExperimentExecute = input => executeExperiment(input, {
+    loadAcceptance: async split => { loaded.push(split); return datasets[split]!; },
+    runRetrieval: async options => {
+      seenOptions.push(structuredClone(options));
+      return { path: "mock-only", report: { runId: randomUUID(), status: "completed", summary: {
+        plannedRows: 1, completedRows: 1, missingRows: 0, groups: [], usage: [],
+      } } };
+    },
+  });
+  const a1Config = { ...experimentCatalog().presets.find(p => p.id === "acceptance-development")!.config, repeat: 2, allowRemote: true };
+  const a1 = service("acceptance-adapter", executeA1);
+  await assert.rejects(a1.start({ ...a1Config, variants: [{ id: "A", modes: ["M1"], dataset: "acceptance-development", acceptance: { mode: "score", threshold: .8 } }] }));
+  assert.equal(seenOptions.length, 0, "incompatible acceptance/mode never reaches runner or credentials");
+  assert.equal(loaded.length, 0, "invalid config is rejected before reading any dataset");
+  const a1Started = await a1.start(a1Config); await a1.close();
+  assert.deepEqual(loaded, ["development", "development", "development", "development"]);
+  const expectedConditions = a1Config.variants.map(variant => "acceptance" in variant ? variant.acceptance : undefined);
+  assert.deepEqual(seenOptions.map(options => options.acceptance), [...expectedConditions, ...expectedConditions]);
+  assert.ok(seenOptions.every(options => options.allowRemote === true && JSON.stringify(options.dataset) === JSON.stringify(datasets.development)));
+  const a1Saved = (await a1.get(a1Started.id))!;
+  assert.deepEqual(a1Saved.config, a1Started.config);
+  assert.equal(a1Saved.results.length, 4);
+  assert.deepEqual(JSON.parse(await readFile(join(a1.directory, `${a1Saved.id}.json`), "utf8")).config, a1Saved.config, "manifest keeps actual split and each acceptance condition");
+  const otherDataset = service("acceptance-validation", executeA1);
+  const validationConfig = { ...a1Config, repeat: 1, variants: [{ id: "A", modes: ["M4"], dataset: "acceptance-validation", acceptance: { mode: "score", threshold: .75 } }] };
+  const validationJob = await otherDataset.start(validationConfig); await otherDataset.close();
+  assert.equal(loaded.at(-1), "validation"); assert.deepEqual(seenOptions.at(-1)!.dataset, datasets.validation);
+  const changedThreshold = service("acceptance-threshold", executeA1);
+  const thresholdJob = await changedThreshold.start({ ...validationConfig, variants: [{ ...validationConfig.variants[0], acceptance: { mode: "score", threshold: .9 } }] }); await changedThreshold.close();
+  assert.notEqual(thresholdJob.configHash, validationJob.configHash, "threshold changes are represented by the persisted condition hash");
+  const changedDataset = service("acceptance-dataset", executeA1);
+  const datasetJob = await changedDataset.start({ ...validationConfig, variants: [{ ...validationConfig.variants[0], dataset: "acceptance-development" }] }); await changedDataset.close();
+  assert.notEqual(datasetJob.configHash, validationJob.configHash, "dataset changes are represented by the persisted condition hash");
+  const legacyV2 = service("acceptance-legacy", executeA1), loadedBeforeLegacy = loaded.length;
+  await legacyV2.start({ ...a1Config, repeat: 1, variants: [{ id: "A", modes: ["M0"], dataset: "legacy", acceptance: { mode: "off" } }] }); await legacyV2.close();
+  assert.equal(loaded.length, loadedBeforeLegacy); assert.equal(Object.hasOwn(seenOptions.at(-1)!, "dataset"), false);
+  assert.deepEqual(seenOptions.at(-1)!.acceptance, { mode: "off" });
+  const legacyV1 = service("legacy-adapter", executeA1);
+  await legacyV1.start({ ...config, repeat: 1 }); await legacyV1.close();
+  assert.equal(loaded.length, loadedBeforeLegacy);
+  assert.equal(Object.hasOwn(seenOptions.at(-1)!, "dataset"), false);
+  assert.equal(Object.hasOwn(seenOptions.at(-1)!, "acceptance"), false, "v1 retains the original runner call semantics");
 
   let calls = 0;
   const failures = service("failure", async input => { if (++calls === 2) throw new Error("synthetic-secret-must-not-leak"); return result(input); });

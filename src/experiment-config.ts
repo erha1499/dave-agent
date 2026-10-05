@@ -1,11 +1,16 @@
 import { resolveSupportParameters, resolveSupportRunParameters, type SupportExperimentParameters } from "./support-parameters.ts";
 import { resolveRetrievalParameters, type RetrievalExperimentParameters } from "./retrieval-ranking.ts";
+import { resolveEvidenceAcceptance, type EvidenceAcceptanceConfig } from "./evidence-acceptance.ts";
 
 export const experimentModes = ["M0", "M1", "M2", "M3", "M4", "M5", "M6"] as const;
 export type SupportVariant = { id: string; architecture: "atomic" | "controller"; parameters: SupportExperimentParameters };
-export type RetrievalVariant = { id: string; modes: Array<typeof experimentModes[number]>; parameters: RetrievalExperimentParameters };
-type Common = { version: 1; label: string; repeat: number; allowRemote: boolean };
-export type ExperimentConfig = Common & ({ kind: "support"; variants: SupportVariant[] } | { kind: "retrieval"; variants: RetrievalVariant[] });
+export const experimentDatasets = ["legacy", "acceptance-development", "acceptance-validation"] as const;
+type RetrievalV1Variant = { id: string; modes: Array<typeof experimentModes[number]>; parameters: RetrievalExperimentParameters };
+export type RetrievalV2Variant = RetrievalV1Variant & { dataset: typeof experimentDatasets[number]; acceptance: EvidenceAcceptanceConfig };
+export type RetrievalVariant = RetrievalV1Variant | RetrievalV2Variant;
+type Common = { label: string; repeat: number; allowRemote: boolean };
+export type ExperimentConfig = Common & ({ version: 1; kind: "support"; variants: SupportVariant[] }
+  | { version: 1; kind: "retrieval"; variants: RetrievalV1Variant[] } | { version: 2; kind: "retrieval"; variants: RetrievalV2Variant[] });
 export class ExperimentInputError extends Error {}
 const record = (value: unknown): value is Record<string, unknown> => Boolean(value && typeof value === "object" && !Array.isArray(value));
 function keys(value: unknown, allowed: string[]): asserts value is Record<string, unknown> {
@@ -15,14 +20,16 @@ function keys(value: unknown, allowed: string[]): asserts value is Record<string
 // The same whitelist resolves CLI files and HTTP requests. No arbitrary commands, env, paths or credentials.
 export function resolveExperimentConfig(value: unknown): ExperimentConfig {
   keys(value, ["version", "kind", "label", "repeat", "allowRemote", "variants"]);
-  if (value.version !== 1 || (value.kind !== "support" && value.kind !== "retrieval")
+  if ((value.version !== 1 && value.version !== 2) || (value.kind !== "support" && value.kind !== "retrieval")
+    || (value.version === 2 && value.kind !== "retrieval")
     || typeof value.label !== "string" || !value.label.trim() || value.label.trim().length > 80 || /[\p{Cc}\p{Cf}]/u.test(value.label)
     || !Number.isInteger(value.repeat) || Number(value.repeat) < 1 || Number(value.repeat) > 3 || typeof value.allowRemote !== "boolean"
     || !Array.isArray(value.variants) || value.variants.length < 1 || value.variants.length > 2) throw new ExperimentInputError("请选择实验类型、名称、1–3 次重复和 1–2 个方案。");
-  const common: Common = { version: 1, label: value.label.trim(), repeat: Number(value.repeat), allowRemote: value.allowRemote };
+  const common = { version: value.version, label: value.label.trim(), repeat: Number(value.repeat), allowRemote: value.allowRemote };
   const ids = new Set<string>();
   const variants = value.variants.map(item => {
-    keys(item, value.kind === "support" ? ["id", "architecture", "parameters"] : ["id", "modes", "parameters"]);
+    keys(item, value.kind === "support" ? ["id", "architecture", "parameters"]
+      : value.version === 2 ? ["id", "modes", "parameters", "dataset", "acceptance"] : ["id", "modes", "parameters"]);
     if (typeof item.id !== "string" || !/^[A-Za-z0-9_-]{1,24}$/.test(item.id) || ids.has(item.id)) throw new ExperimentInputError("方案 ID 应为唯一的字母、数字或短横线标识。");
     ids.add(item.id);
     if (item.parameters !== undefined && !record(item.parameters)) throw new ExperimentInputError("参数必须为对象。");
@@ -35,11 +42,15 @@ export function resolveExperimentConfig(value: unknown): ExperimentConfig {
       }
       if (!Array.isArray(item.modes) || !item.modes.length || item.modes.length > 7 || new Set(item.modes).size !== item.modes.length
         || item.modes.some(mode => !experimentModes.includes(mode))) throw new Error();
-      return { id: item.id, modes: [...item.modes], parameters: resolveRetrievalParameters(item.parameters) };
+      const variant: RetrievalV1Variant = { id: item.id, modes: [...item.modes], parameters: resolveRetrievalParameters(item.parameters) };
+      if (value.version === 1) return variant;
+      if (!experimentDatasets.includes(item.dataset as typeof experimentDatasets[number]) || !record(item.acceptance)) throw new Error();
+      return { ...variant, dataset: item.dataset, acceptance: resolveEvidenceAcceptance(item.acceptance, variant.modes) };
     } catch { throw new ExperimentInputError(`方案 ${item.id} 的模式或参数无效，请按表单范围填写。`); }
   });
-  return value.kind === "support" ? { ...common, kind: "support", variants: variants as SupportVariant[] }
-    : { ...common, kind: "retrieval", variants: variants as RetrievalVariant[] };
+  if (value.kind === "support") return { ...common, version: 1, kind: "support", variants: variants as SupportVariant[] };
+  return value.version === 1 ? { ...common, version: 1, kind: "retrieval", variants: variants as RetrievalV1Variant[] }
+    : { ...common, version: 2, kind: "retrieval", variants: variants as RetrievalV2Variant[] };
 }
 export const remoteRequired = (config: ExperimentConfig) => config.kind === "support"
   || config.variants.some(variant => variant.modes.some(mode => mode !== "M0" && mode !== "M1"));
@@ -70,8 +81,8 @@ export const experimentFields: Record<"support" | "retrieval", Field[]> = {
   ],
 };
 export function experimentCatalog() {
-  const preset = (id: string, name: string, kind: string, variants: unknown[]) => ({ id, name, config: resolveExperimentConfig({
-    version: 1, kind, label: name, repeat: 1, allowRemote: false, variants }) });
+  const preset = (id: string, name: string, kind: string, variants: unknown[], version: 1 | 2 = 1) => ({ id, name, config: resolveExperimentConfig({
+    version, kind, label: name, repeat: 1, allowRemote: false, variants }) });
   return {
     presets: [
       preset("support-ab", "业务架构 A/B", "support", [{ id: "A", architecture: "atomic" }, { id: "B", architecture: "controller" }]),
@@ -79,9 +90,21 @@ export function experimentCatalog() {
       preset("retrieval-local", "本地检索 M0 / M1", "retrieval", [{ id: "A", modes: ["M0", "M1"] }]),
       preset("retrieval-rerank", "词项 / 全候选重排", "retrieval", [{ id: "A", modes: ["M0", "M4"] }]),
       preset("retrieval-all", "检索 M0–M6", "retrieval", [{ id: "A", modes: [...experimentModes] }]),
+      preset("acceptance-development", "A1 证据接收开发 A/B", "retrieval", [
+        { id: "A", modes: ["M4"], dataset: "acceptance-development", acceptance: { mode: "off" } },
+        { id: "B", modes: ["M4"], dataset: "acceptance-development", acceptance: { mode: "score", threshold: .71 } },
+      ], 2),
     ], fields: experimentFields,
+    datasets: [{ value: "legacy", label: "原检索开发集" }, { value: "acceptance-development", label: "A1 开发集（48 题）" },
+      { value: "acceptance-validation", label: "A1 固定验证集（60 题，非盲测）" }],
+    acceptanceFields: [
+      { key: "mode", label: "证据接收策略", type: "select", options: [{ value: "off", label: "关闭（范围内原始 Top5）" }, { value: "score", label: "按重排分数接收" }],
+        note: "分数策略仅支持 M4/M5/M6；不修改原始排名。" },
+      { key: "threshold", label: "接收分数阈值", type: "number", min: 0, max: 1, step: .01,
+        note: "仅分数策略启用时填写。0.71 来自开发集校准；分数不是概率，仍需固定验证，不代表上线门槛。" },
+    ] satisfies Field[],
     modes: ["M0 词项", "M1 BM25", "M2 向量", "M3 BM25 + 向量 RRF", "M4 全候选重排", "M5 词项候选重排", "M6 RRF 候选重排"].map((label, index) => ({ value: experimentModes[index], label })),
     limits: { variants: 2, repeat: 3, concurrentJobs: 1 },
-    notes: ["所有配置仅作用于本次评测，不修改在线 QQ 配置。", "检索是离线原始排名实验，固定 Recall@5 / MRR@5；未接入线上知识服务或证据接收。", "未提供证据阈值、长期记忆、模型改写开关；这些能力尚未完成。"],
+    notes: ["所有配置仅作用于本次评测，不修改在线 QQ 配置。", "检索是离线实验，固定原始 Recall@5 / MRR@5；A1 另行报告接收后的证据指标，尚未接入线上知识服务。", "A1 固定验证集已可见，属于固定回归验证而非独立盲测；开发阈值不代表已达标。", "长期记忆、模型改写开关尚未完成。"],
   };
 }

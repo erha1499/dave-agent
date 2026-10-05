@@ -1,0 +1,341 @@
+{
+  "version": 1,
+  "date": "2026-10-05",
+  "validationPolicy": "fixed-validation-not-blind",
+  "jobId": "3aafb27b-421d-43fc-872c-78d6fd494043",
+  "reports": [
+    {
+      "runId": "d1d3d14e-188a-477e-ad97-94eb8dd3d3ea",
+      "reportHash": "2d0bb3cb366417739d4f02bb8a114ee49a89aaafad4f11f1acb4da7c75beefdb",
+      "datasetHash": "1f4e269a7659bbc5c72da4f1a777f14dce9508fecc95a8308b08c2e4b883ea9b",
+      "status": "completed",
+      "usage": [
+        {
+          "operation": "embedding",
+          "requests": 0,
+          "successfulRequests": 0,
+          "cacheHits": 0,
+          "reportedRequests": 0,
+          "usageCoverage": null,
+          "knownTokens": null,
+          "completeTokens": null,
+          "knownEstimatedCostCny": null,
+          "completeEstimatedCostCny": null
+        },
+        {
+          "operation": "rerank",
+          "requests": 48,
+          "successfulRequests": 48,
+          "cacheHits": 0,
+          "reportedRequests": 48,
+          "usageCoverage": 1,
+          "knownTokens": 96553,
+          "completeTokens": 96553,
+          "knownEstimatedCostCny": 0.0482765,
+          "completeEstimatedCostCny": 0.0482765
+        }
+      ]
+    },
+    {
+      "runId": "2154afc0-0b02-4eea-b88e-c93b61b03a6c",
+      "reportHash": "a894d78093afd9e35eff7783cc0d5a31cbb5029ad5136d71867e2fb7fb64c7fd",
+      "datasetHash": "07cfdd4d01156507704427fd108b407b0680fad6b47d9cebd5f535bf06c242ea",
+      "status": "completed",
+      "usage": [
+        {
+          "operation": "embedding",
+          "requests": 0,
+          "successfulRequests": 0,
+          "cacheHits": 0,
+          "reportedRequests": 0,
+          "usageCoverage": null,
+          "knownTokens": null,
+          "completeTokens": null,
+          "knownEstimatedCostCny": null,
+          "completeEstimatedCostCny": null
+        },
+        {
+          "operation": "rerank",
+          "requests": 0,
+          "successfulRequests": 0,
+          "cacheHits": 48,
+          "reportedRequests": 0,
+          "usageCoverage": null,
+          "knownTokens": null,
+          "completeTokens": null,
+          "knownEstimatedCostCny": null,
+          "completeEstimatedCostCny": null
+        }
+      ]
+    },
+    {
+      "runId": "a4990ddc-f284-42a8-8991-75b69184f75d",
+      "reportHash": "e9d5897ae7e82552a0226024c7ce38164c1ea72314b0c381acc10f0a6f4851f7",
+      "datasetHash": "9f979e6933b50a8786eda7486b595c94ac4b71d7e4646e95f16a4142fac05333",
+      "status": "completed",
+      "usage": [
+        {
+          "operation": "embedding",
+          "requests": 0,
+          "successfulRequests": 0,
+          "cacheHits": 0,
+          "reportedRequests": 0,
+          "usageCoverage": null,
+          "knownTokens": null,
+          "completeTokens": null,
+          "knownEstimatedCostCny": null,
+          "completeEstimatedCostCny": null
+        },
+        {
+          "operation": "rerank",
+          "requests": 54,
+          "successfulRequests": 54,
+          "cacheHits": 0,
+          "reportedRequests": 54,
+          "usageCoverage": 1,
+          "knownTokens": 142024,
+          "completeTokens": 142024,
+          "knownEstimatedCostCny": 0.071012,
+          "completeEstimatedCostCny": 0.071012
+        }
+      ]
+    },
+    {
+      "runId": "aed37ace-f623-4359-a1ab-f7b47b576dd0",
+      "reportHash": "2bea660122ba3bb340a5d5d5068ac958ef831893684b87b6e9f409ac648e313f",
+      "datasetHash": "9f979e6933b50a8786eda7486b595c94ac4b71d7e4646e95f16a4142fac05333",
+      "status": "completed",
+      "usage": [
+        {
+          "operation": "embedding",
+          "requests": 0,
+          "successfulRequests": 0,
+          "cacheHits": 0,
+          "reportedRequests": 0,
+          "usageCoverage": null,
+          "knownTokens": null,
+          "completeTokens": null,
+          "knownEstimatedCostCny": null,
+          "completeEstimatedCostCny": null
+        },
+        {
+          "operation": "rerank",
+          "requests": 0,
+          "successfulRequests": 0,
+          "cacheHits": 54,
+          "reportedRequests": 0,
+          "usageCoverage": null,
+          "knownTokens": null,
+          "completeTokens": null,
+          "knownEstimatedCostCny": null,
+          "completeEstimatedCostCny": null
+        }
+      ]
+    }
+  ],
+  "results": [
+    {
+      "variant": "A",
+      "runId": "a4990ddc-f284-42a8-8991-75b69184f75d",
+      "config": {
+        "mode": "off"
+      },
+      "status": "completed",
+      "totals": {
+        "planned": 60,
+        "measured": 54,
+        "deferred": 6,
+        "incomplete": 0,
+        "acceptedRecallAt5": 1,
+        "answerable": 30,
+        "falseRejects": 0,
+        "falseRejectDenominator": 30,
+        "falseRejectRate": 0,
+        "falseAccepts": 12,
+        "noAnswer": 12,
+        "scopeAbstentionFailures": 12,
+        "scopeCases": 12,
+        "scopeViolations": 0,
+        "covered": 54
+      },
+      "meetsApplicableTargets": false,
+      "byCorpus": [
+        {
+          "corpus": "online",
+          "planned": 26,
+          "measured": 22,
+          "deferred": 4,
+          "failed": 0,
+          "missing": 0,
+          "answerable": 8,
+          "rawHits": 8,
+          "acceptedRecallSum": 8,
+          "falseRejects": 0,
+          "noAnswer": 8,
+          "falseAccepts": 8,
+          "scopeCases": 6,
+          "scopeNonempty": 6,
+          "scopeViolations": 0,
+          "covered": 22
+        },
+        {
+          "corpus": "reference",
+          "planned": 34,
+          "measured": 32,
+          "deferred": 2,
+          "failed": 0,
+          "missing": 0,
+          "answerable": 22,
+          "rawHits": 22,
+          "acceptedRecallSum": 22,
+          "falseRejects": 0,
+          "noAnswer": 4,
+          "falseAccepts": 4,
+          "scopeCases": 6,
+          "scopeNonempty": 6,
+          "scopeViolations": 0,
+          "covered": 32
+        }
+      ],
+      "usage": [
+        {
+          "operation": "embedding",
+          "requests": 0,
+          "successfulRequests": 0,
+          "cacheHits": 0,
+          "reportedRequests": 0,
+          "usageCoverage": null,
+          "knownTokens": null,
+          "completeTokens": null,
+          "knownEstimatedCostCny": null,
+          "completeEstimatedCostCny": null
+        },
+        {
+          "operation": "rerank",
+          "requests": 54,
+          "successfulRequests": 54,
+          "cacheHits": 0,
+          "reportedRequests": 54,
+          "usageCoverage": 1,
+          "knownTokens": 142024,
+          "completeTokens": 142024,
+          "knownEstimatedCostCny": 0.071012,
+          "completeEstimatedCostCny": 0.071012
+        }
+      ]
+    },
+    {
+      "variant": "B",
+      "runId": "aed37ace-f623-4359-a1ab-f7b47b576dd0",
+      "config": {
+        "mode": "score",
+        "threshold": 0.71
+      },
+      "status": "completed",
+      "totals": {
+        "planned": 60,
+        "measured": 54,
+        "deferred": 6,
+        "incomplete": 0,
+        "acceptedRecallAt5": 1,
+        "answerable": 30,
+        "falseRejects": 0,
+        "falseRejectDenominator": 30,
+        "falseRejectRate": 0,
+        "falseAccepts": 1,
+        "noAnswer": 12,
+        "scopeAbstentionFailures": 0,
+        "scopeCases": 12,
+        "scopeViolations": 0,
+        "covered": 31
+      },
+      "meetsApplicableTargets": false,
+      "byCorpus": [
+        {
+          "corpus": "online",
+          "planned": 26,
+          "measured": 22,
+          "deferred": 4,
+          "failed": 0,
+          "missing": 0,
+          "answerable": 8,
+          "rawHits": 8,
+          "acceptedRecallSum": 8,
+          "falseRejects": 0,
+          "noAnswer": 8,
+          "falseAccepts": 1,
+          "scopeCases": 6,
+          "scopeNonempty": 0,
+          "scopeViolations": 0,
+          "covered": 9
+        },
+        {
+          "corpus": "reference",
+          "planned": 34,
+          "measured": 32,
+          "deferred": 2,
+          "failed": 0,
+          "missing": 0,
+          "answerable": 22,
+          "rawHits": 22,
+          "acceptedRecallSum": 22,
+          "falseRejects": 0,
+          "noAnswer": 4,
+          "falseAccepts": 0,
+          "scopeCases": 6,
+          "scopeNonempty": 0,
+          "scopeViolations": 0,
+          "covered": 22
+        }
+      ],
+      "usage": [
+        {
+          "operation": "embedding",
+          "requests": 0,
+          "successfulRequests": 0,
+          "cacheHits": 0,
+          "reportedRequests": 0,
+          "usageCoverage": null,
+          "knownTokens": null,
+          "completeTokens": null,
+          "knownEstimatedCostCny": null,
+          "completeEstimatedCostCny": null
+        },
+        {
+          "operation": "rerank",
+          "requests": 0,
+          "successfulRequests": 0,
+          "cacheHits": 54,
+          "reportedRequests": 0,
+          "usageCoverage": null,
+          "knownTokens": null,
+          "completeTokens": null,
+          "knownEstimatedCostCny": null,
+          "completeEstimatedCostCny": null
+        }
+      ]
+    }
+  ],
+  "regressions": [],
+  "failure": [
+    {
+      "id": "a1-val-036",
+      "query": "不用查询本人订单，双人午餐这一批券统一是哪一天到期？",
+      "accepted": [
+        {
+          "id": "KB-PRODUCT-LUNCH",
+          "score": 0.7540437337750145,
+          "body": "【演示规则】双人午餐团购券标价79.80元，一张券对应两人午餐套餐，核销一次即视为整张券已使用。每张券具体截止时间以订单返回的 expiresAt 为准，不能从标价推断实付金额。菜品明细、过敏原和特殊节假日可用性未录入。"
+        }
+      ]
+    }
+  ],
+  "decision": "offline_delivery_complete_not_admitted",
+  "reason": "one of twelve no-answer questions accepted; target was zero. Six context questions await C1. Do not change the frozen threshold from these validation results.",
+  "measurement": {
+    "remoteRequests": 102,
+    "reportedTokens": 238577,
+    "estimatedCny": 0.1192885,
+    "pricing": "Existing Beijing snapshot, 0.5 CNY per million reported input tokens; estimate, not invoice. Kimi excluded. Replays reuse raw ranking; not independent repetition or latency."
+  }
+}

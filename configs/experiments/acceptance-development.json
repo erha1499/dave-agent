@@ -1,0 +1,30 @@
+{
+  "version": 2,
+  "kind": "retrieval",
+  "label": "A1 证据接收开发 A/B（0.8 为待校准试值）",
+  "repeat": 1,
+  "allowRemote": false,
+  "variants": [
+    {
+      "id": "A",
+      "modes": [
+        "M4"
+      ],
+      "dataset": "acceptance-development",
+      "acceptance": {
+        "mode": "off"
+      }
+    },
+    {
+      "id": "B",
+      "modes": [
+        "M4"
+      ],
+      "dataset": "acceptance-development",
+      "acceptance": {
+        "mode": "score",
+        "threshold": 0.71
+      }
+    }
+  ]
+}

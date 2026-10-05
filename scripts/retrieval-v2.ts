@@ -5,12 +5,13 @@ import { fileURLToPath } from "node:url";
 import { BailianBudgetStop, BailianError, contentHash, createBailianClient, validVector, type BailianAttempt, type BailianClient } from "../src/bailian.ts";
 import { scopeDocuments, rankLexical, rankBm25, rankDense, reciprocalRankFusion, serializeRetrievalDocument, resolveRetrievalParameters,
   type RetrievalExperimentParameters, type RetrievalDocument, type RetrievalScope, type RankedDocument } from "../src/retrieval-ranking.ts";
+import { acceptEvidence, evidenceAcceptanceBinding, evidenceAcceptanceVersion, resolveEvidenceAcceptance, type EvidenceAcceptanceConfig, type EvidenceAcceptanceResult } from "../src/evidence-acceptance.ts";
 import { loadRetrievalData } from "./retrieval-data.ts";
 
 export const retrievalModes = ["M0", "M1", "M2", "M3", "M4", "M5", "M6"] as const;
 export type RetrievalMode = typeof retrievalModes[number];
-export type V2Question = { id: string; query: string; suite: "standard" | "hard" | "scope" | "no_answer"; shopId: string | null;
-  productId?: string | null; relevant: string[]; forbidden?: string[]; required?: string[] };
+export type V2Question = { id: string; query: string; suite: "standard" | "hard" | "scope" | "no_answer" | "context"; shopId: string | null;
+  productId?: string | null; deferredReason?: string; expectedBehavior?: "answer" | "abstain" | "clarify"; relevant: string[]; forbidden?: string[]; required?: string[] };
 export type V2Corpus = { id: string; documents: RetrievalDocument[]; questions: V2Question[] };
 export type V2Dataset = { source: unknown; corpora: V2Corpus[] };
 type Call = { id: string; operation: "embedding" | "rerank"; purpose: "document" | "query" | "ranking"; cache: "hit" | "miss";
@@ -18,7 +19,8 @@ type Call = { id: string; operation: "embedding" | "rerank"; purpose: "document"
 type Metrics = { recallAt1: number; recallAt5: number; mrrAt5: number; mrrRecordedRanking: number; candidateRecall: number };
 export type V2Result = { corpus: string; id: string; suite: V2Question["suite"]; mode: RetrievalMode; query: string; scope: RetrievalScope;
   status: "ok" | "provider_error" | "not_applicable"; candidateIds: string[]; candidateHash: string; ranking: Array<{ id: string; score: number | null }>;
-  relevant: string[]; metrics: Metrics | null; scopePassed: boolean; boundaryPassed: boolean; forbiddenMatches: string[]; requiredPassed: boolean; empty: boolean | null; durationMs: number; callIds: string[];
+  relevant: string[]; metrics: Metrics | null; acceptance: EvidenceAcceptanceResult; acceptedMetrics: Metrics | null;
+  acceptedScopePassed: boolean; acceptedBoundaryPassed: boolean; expectedAbstention: boolean; falseRejectEligible: boolean | null; falseRejected: boolean | null; deferredReason: string | null; scopePassed: boolean; boundaryPassed: boolean; forbiddenMatches: string[]; requiredPassed: boolean; empty: boolean | null; durationMs: number; callIds: string[];
   fallback: { mode: "M0"; ranking: string[]; metrics: Metrics | null } | null; error: string | null };
 const root = fileURLToPath(new URL("../", import.meta.url));
 const modesNeedingDense = new Set<RetrievalMode>(["M2", "M3", "M6"]);
@@ -51,7 +53,8 @@ export function validateV2Dataset(data: V2Dataset) {
     scopeDocuments(corpus.documents, {});
     for (const q of corpus.questions) {
       if (!/^[A-Za-z0-9_-]{1,80}$/.test(q.id) || typeof q.query !== "string" || !q.query.trim() || q.query.length > 500
-        || !["standard", "hard", "scope", "no_answer"].includes(q.suite)) throw new Error("检索 v2 问题无效。");
+        || !["standard", "hard", "scope", "no_answer", "context"].includes(q.suite)
+        || (q.deferredReason !== undefined && (q.suite !== "context" || typeof q.deferredReason !== "string" || !q.deferredReason.trim() || q.deferredReason.length > 300))) throw new Error("检索 v2 问题无效。");
       const visible = scopeDocuments(corpus.documents, q);
       for (const ids of [q.relevant, q.required ?? [], q.forbidden ?? []]) {
         if (!Array.isArray(ids) || ids.some(id => typeof id !== "string" || !corpus.documents.some(doc => doc.id === id)) || new Set(ids).size !== ids.length) throw new Error("检索 v2 标签无效。");
@@ -88,7 +91,7 @@ function validRanks(value: unknown, length: number): value is Array<{ index: num
     && new Set(value.map(row => row.index)).size === length;
 }
 
-type PlannedCase = Pick<V2Result, "corpus" | "id" | "suite" | "mode">;
+type PlannedCase = Pick<V2Result, "corpus" | "id" | "suite" | "mode"> & { answerable?: boolean; expectedAbstention?: boolean; relevant?: string[]; deferredReason?: string | null };
 export function summarizeV2(results: V2Result[], calls: Call[], plan: PlannedCase[] = results, pricePerMillionCny: number | null = null) {
   const groups = [...new Set(plan.map(row => JSON.stringify([row.mode, row.corpus, row.suite])))].map(key => {
     const [mode, corpus, suite] = JSON.parse(key) as string[], rows = results.filter(row => row.mode === mode && row.corpus === corpus && row.suite === suite);
@@ -96,6 +99,17 @@ export function summarizeV2(results: V2Result[], calls: Call[], plan: PlannedCas
     const scored = rows.filter(row => row.metrics), successful = rows.filter(row => row.status === "ok");
     const mean = (field: keyof Metrics) => scored.length ? scored.reduce((sum, row) => sum + row.metrics![field], 0) / scored.length : null;
     const latency = successful.map(row => row.durationMs).sort((a, b) => a - b);
+    const plannedRows = plan.filter(row => row.mode === mode && row.corpus === corpus && row.suite === suite);
+    const applicablePlan = plannedRows.filter(row => !row.deferredReason);
+    const plannedAnswerable = applicablePlan.filter(row => row.answerable ?? (row.relevant ? row.relevant.length > 0 : ["standard", "hard"].includes(row.suite))).length;
+    const acceptedScored = successful.filter(row => row.acceptedMetrics), acceptedMeasured = successful.filter(row => row.acceptance);
+    const coveredCases = acceptedMeasured.filter(row => row.acceptance.accepted.length > 0).length;
+    const falseRejectDenominator = acceptedMeasured.filter(row => row.falseRejectEligible === true).length;
+    const falseRejectCases = acceptedMeasured.filter(row => row.falseRejected === true).length;
+    const noAnswerDenominator = suite === "no_answer" ? acceptedMeasured.length : 0;
+    const noAnswerFalseAcceptCases = suite === "no_answer" ? coveredCases : 0;
+    const abstentionRows = acceptedMeasured.filter(row => row.expectedAbstention ?? row.suite === "no_answer");
+    const abstentionFalseAcceptCases = abstentionRows.filter(row => row.acceptance.accepted.length > 0).length;
     return { mode, corpus, suite, planned, missing: planned - rows.length, succeeded: successful.length, failed: rows.filter(row => row.status === "provider_error").length,
       notApplicable: rows.filter(row => row.status === "not_applicable").length, measured: scored.length,
       recallAt1: mean("recallAt1"), recallAt5: mean("recallAt5"), mrrAt5: mean("mrrAt5"), candidateRecall: mean("candidateRecall"),
@@ -106,6 +120,24 @@ export function summarizeV2(results: V2Result[], calls: Call[], plan: PlannedCas
       forbiddenHitCases: successful.filter(row => row.forbiddenMatches.length > 0).length,
       requiredEvidenceMisses: successful.filter(row => !row.requiredPassed).length,
       noAnswerNonempty: suite === "no_answer" ? successful.filter(row => !row.empty).length : null,
+      acceptance: { planned: plannedRows.length, applicablePlanned: applicablePlan.length, measured: acceptedMeasured.length,
+        missing: planned - rows.length, failed: rows.filter(row => row.status === "provider_error").length,
+        notApplicable: rows.filter(row => row.status === "not_applicable").length, deferred: rows.filter(row => row.deferredReason).length,
+        plannedAnswerable, answerableMeasured: acceptedScored.length,
+        recallAt5: acceptedScored.length ? acceptedScored.reduce((sum, row) => sum + row.acceptedMetrics!.recallAt5, 0) / acceptedScored.length : null,
+        plannedRecallAt5: plannedAnswerable ? acceptedScored.reduce((sum, row) => sum + row.acceptedMetrics!.recallAt5, 0) / plannedAnswerable : null,
+        mrrAt5: acceptedScored.length ? acceptedScored.reduce((sum, row) => sum + row.acceptedMetrics!.mrrAt5, 0) / acceptedScored.length : null,
+        coveredCases, coverage: acceptedMeasured.length ? coveredCases / acceptedMeasured.length : null,
+        plannedCoverage: applicablePlan.length ? coveredCases / applicablePlan.length : null,
+        noAnswerFalseAcceptCases, noAnswerDenominator, noAnswerPlanned: suite === "no_answer" ? applicablePlan.length : 0,
+        noAnswerFalseAcceptRate: noAnswerDenominator ? noAnswerFalseAcceptCases / noAnswerDenominator : null,
+        abstentionFalseAcceptCases, abstentionDenominator: abstentionRows.length,
+        abstentionPlanned: applicablePlan.filter(row => row.expectedAbstention ?? row.suite === "no_answer").length,
+        abstentionFalseAcceptRate: abstentionRows.length ? abstentionFalseAcceptCases / abstentionRows.length : null,
+        answerableFalseRejectCases: falseRejectCases, answerableFalseRejectDenominator: falseRejectDenominator,
+        answerableFalseRejectRate: falseRejectDenominator ? falseRejectCases / falseRejectDenominator : null,
+        scopeViolations: acceptedMeasured.filter(row => !row.acceptedScopePassed).length,
+        boundaryFailures: acceptedMeasured.filter(row => !row.acceptedBoundaryPassed).length },
       durationP50Ms: latency.length ? latency[Math.ceil(latency.length * .5) - 1]! : null, durationP95Ms: latency.length ? latency[Math.ceil(latency.length * .95) - 1]! : null };
   });
   const usage = (["embedding", "rerank"] as const).map(operation => {
@@ -123,10 +155,11 @@ export function summarizeV2(results: V2Result[], calls: Call[], plan: PlannedCas
 
 export async function runRetrievalV2(options: { label: string; modes?: RetrievalMode[]; dataset?: V2Dataset; client?: BailianClient;
   allowRemote?: boolean; cacheDir?: string; outputDir?: string; maxRequests?: number; consecutiveFailureLimit?: number;
-  parameters?: Partial<RetrievalExperimentParameters> }) {
+  parameters?: Partial<RetrievalExperimentParameters>; acceptance?: EvidenceAcceptanceConfig }) {
   const modes = options.modes ?? ["M0", "M1"];
   if (!modes.length || new Set(modes).size !== modes.length || modes.some(mode => !retrievalModes.includes(mode))
     || !options.label.trim() || options.label.length > 120) throw new Error("检索实验模式或 label 无效。");
+  const acceptanceConfig = resolveEvidenceAcceptance(options.acceptance, modes);
   if (modes.some(remoteMode) && !options.allowRemote) throw new Error("远程实验必须显式设置 allowRemote。");
   // Validate before spreading so arrays, unknown keys and explicitly undefined values cannot be silently accepted.
   resolveRetrievalParameters(options.parameters);
@@ -147,7 +180,9 @@ export async function runRetrievalV2(options: { label: string; modes?: Retrieval
     ...(options.maxRequests !== undefined ? { maxRequests: options.maxRequests } : {}),
     ...(options.consecutiveFailureLimit !== undefined ? { consecutiveFailureLimit: options.consecutiveFailureLimit } : {}),
   });
-  const client = modes.some(remoteMode) ? injectedClient ?? createBailianClient({ timeoutMs: parameters.timeoutMs, retries: parameters.retries }) : undefined;
+  const dataset = validateV2Dataset(options.dataset ?? await loadV2Dataset());
+  const needsRemote = modes.some(remoteMode) && dataset.corpora.some(corpus => corpus.questions.some(question => !question.deferredReason));
+  const client = needsRemote ? injectedClient ?? createBailianClient({ timeoutMs: parameters.timeoutMs, retries: parameters.retries }) : undefined;
   const { maxRequests, consecutiveFailureLimit } = parameters;
   let networkRequests = 0, consecutiveFailures = 0, fatalProviderStatus: number | null = null, stopReason: string | null = null;
   const controls = {
@@ -164,24 +199,37 @@ export async function runRetrievalV2(options: { label: string; modes?: Retrieval
   };
   const origin = client?.settings.endpoints.origin ?? "";
   const pricePerMillionCny = origin === "https://dashscope.aliyuncs.com" || origin.endsWith(".cn-beijing.maas.aliyuncs.com") ? .5 : null;
-  const dataset = validateV2Dataset(options.dataset ?? await loadV2Dataset());
   const cacheDir = options.cacheDir ?? join(root, ".runtime/retrieval-v2-cache"), outputDir = options.outputDir ?? join(root, ".runtime/retrieval-v2");
   const runId = randomUUID(), calls: Call[] = [], results: V2Result[] = [];
-  const plan = dataset.corpora.flatMap(corpus => corpus.questions.flatMap(question => modes.map(mode => ({ corpus: corpus.id, id: question.id, suite: question.suite, mode }))));
+  const plan = dataset.corpora.flatMap(corpus => corpus.questions.flatMap(question => modes.map(mode => ({ corpus: corpus.id, id: question.id, suite: question.suite, mode, answerable: question.relevant.length > 0, expectedAbstention: question.expectedBehavior === "abstain" || question.suite === "no_answer", deferredReason: question.deferredReason ?? null }))));
+  // Deferred questions are materialized before any provider work, even when the request budget stops early.
+  for (const corpus of dataset.corpora) for (const question of corpus.questions.filter(question => question.deferredReason)) {
+    const scope = { shopId: question.shopId, productId: question.productId ?? null };
+        for (const mode of modes) results.push({ corpus: corpus.id, id: question.id, suite: question.suite, mode, query: question.query, scope,
+          status: "not_applicable", candidateIds: [], candidateHash: contentHash([]), ranking: [], relevant: question.relevant, metrics: null,
+          acceptance: acceptEvidence({ config: acceptanceConfig, documents: corpus.documents, scope, ranking: [], status: "not_applicable", query: question.query }),
+          acceptedMetrics: null, acceptedScopePassed: true, acceptedBoundaryPassed: false, expectedAbstention: false, falseRejectEligible: null, falseRejected: null,
+          deferredReason: question.deferredReason!, ...checkV2Boundaries(question, corpus.documents, []), empty: null, durationMs: 0,
+          callIds: [], fallback: null, error: question.deferredReason! });
+  }
   const settings = { modes, parameters, provider: client?.settings ?? null, bm25: { k1: parameters.bm25K1, b: parameters.bm25B },
     rrf: { k: parameters.rrfK, window: parameters.rrfWindow }, topN: 5,
     budget: { maxRequests, consecutiveFailureLimit }, pricing: { currency: "CNY", asOf: "2026-10-05", region: "China Beijing", estimated: true,
       perMillionInputTokens: pricePerMillionCny, source: "https://help.aliyun.com/zh/model-studio/model-pricing", note: "Only configured Beijing endpoint; reported total_tokens, not an invoice; other region prices unknown." },
-    context: "query-only", acceptance: "not-calibrated; raw ranking only", fallback: "diagnostic lexical; excluded from rerank score" };
-  const files = ["src/bailian.ts", "src/retrieval-ranking.ts", "src/knowledge-retrieval.ts", "scripts/retrieval-v2.ts", "scripts/retrieval-data.ts", "package-lock.json"];
+    context: "query-only", acceptance: { ...acceptanceConfig, version: evidenceAcceptanceVersion, ...evidenceAcceptanceBinding,
+      corpusHashes: Object.fromEntries(dataset.corpora.map(corpus => [corpus.id, contentHash(corpus.documents)])) }, fallback: "diagnostic lexical; excluded from rerank score" };
+  const files = ["src/bailian.ts", "src/evidence-acceptance.ts", "src/retrieval-ranking.ts", "src/knowledge-retrieval.ts", "scripts/retrieval-v2.ts", "scripts/retrieval-data.ts", "package-lock.json"];
   const snapshot = { datasetHash: contentHash(dataset), dataset, settings,
     checker: { version: 2, scopePassed: "Every ranked document is active and visible to the question scope.",
-      boundaryPassed: "No forbidden document in Top5 and every required document in Top5; independent of scopePassed." },
+      boundaryPassed: "No forbidden document in Top5 and every required document in Top5; independent of scopePassed.",
+      acceptanceVersion: 1, acceptedRecall: "Relevant IDs found in accepted original evidence, maximum 5. Planned denominator includes failed/missing applicable answerable cases.",
+      falseReject: "Applicable successful answerable cases with relevant evidence in raw Top5, but no relevant accepted evidence.",
+      noAnswerFalseAccept: "Applicable successful no_answer cases with any accepted evidence; failures/missing are reported separately, never successful rejections." },
     runtime: { node: process.version, icu: process.versions.icu },
     implementation: Object.fromEntries(await Promise.all(files.map(async file => [file, contentHash(await readFile(join(root, file), "utf8"))]))) };
   const report = { version: 2, runId, label: options.label.trim(), startedAt: new Date().toISOString(), finishedAt: null as string | null,
     status: "running", stopReason: null as string | null, answerQuality: "not_evaluated", snapshot, plan, calls, results, summary: summarizeV2(results, calls, plan, pricePerMillionCny),
-    measurement: "Offline retrieval development experiment. MRR@5 is comparable; full MRR is only within recorded ranking depth. Candidate recall uses configured candidateTopK except M4's complete scoped input. Timings reuse measured shared query stages and exclude document indexing; cache hits are identified in call ledger. Ledger usage is the actual experiment cost, not independent per-mode production cost. Cache replay is not an independent model repetition. Version 1 scopeViolations mixed authorization scope with forbidden Top5 hits; version 2 separates scopeViolations from boundaryFailures/forbiddenHitCases without removing forbidden or required checks. No answer nonempty is diagnostic. API failures stay in planned denominator. No acceptance policy, live business or QQ changes." };
+    measurement: "Offline retrieval development experiment. MRR@5 is comparable; full MRR is only within recorded ranking depth. Candidate recall uses configured candidateTopK except M4's complete scoped input. Timings reuse measured shared query stages and exclude document indexing; cache hits are identified in call ledger. Ledger usage is the actual experiment cost, not independent per-mode production cost. Cache replay is not an independent model repetition. Version 1 scopeViolations mixed authorization scope with forbidden Top5 hits; version 2 separates scopeViolations from boundaryFailures/forbiddenHitCases without removing forbidden or required checks. No answer nonempty is diagnostic. API failures stay in planned denominator. Acceptance off is the scoped raw Top5 diagnostic baseline; score uses the frozen model and serialization binding plus per-corpus hashes. Acceptance never reads labels. Context cases with deferredReason remain planned and not_applicable without provider calls. No live business or QQ changes." };
   const path = join(outputDir, `${runId}.json`);
   await atomicJson(path, report);
 
@@ -211,7 +259,7 @@ export async function runRetrievalV2(options: { label: string; modes?: Retrieval
   let embeddingSetupError: string | null = null;
   try {
     if (modes.some(mode => modesNeedingDense.has(mode))) {
-      const unique = [...new Map(dataset.corpora.flatMap(corpus => corpus.questions.flatMap(question => scopeDocuments(corpus.documents, question)))
+      const unique = [...new Map(dataset.corpora.flatMap(corpus => corpus.questions.filter(question => !question.deferredReason).flatMap(question => scopeDocuments(corpus.documents, question)))
         .map(doc => [contentHash(serializeRetrievalDocument(doc)), doc])).values()];
       // Stable batches are reusable between full/subset runs. Scope is applied again before every ranking and rerank request.
       for (let offset = 0; offset < unique.length; offset += 10) {
@@ -225,6 +273,7 @@ export async function runRetrievalV2(options: { label: string; modes?: Retrieval
     }
     for (const corpus of dataset.corpora) for (const question of corpus.questions) {
       const scope = { shopId: question.shopId, productId: question.productId ?? null }, visible = scopeDocuments(corpus.documents, scope);
+      if (question.deferredReason) continue;
       let start = performance.now(); const lexical = rankLexical(question.query, corpus.documents, scope); const lexicalMs = performance.now() - start;
       start = performance.now(); const bm25 = rankBm25(question.query, corpus.documents, scope, { k1: parameters.bm25K1, b: parameters.bm25B }); const bm25Ms = performance.now() - start;
       let dense: RankedDocument[] | undefined, fused: RankedDocument[] | undefined, denseError = embeddingSetupError;
@@ -269,9 +318,17 @@ export async function runRetrievalV2(options: { label: string; modes?: Retrieval
           }
         } catch (error) { if (!(error instanceof BailianError) || error instanceof BailianBudgetStop) throw error; status = "provider_error"; errorMessage = error.message; }
         const ranked = ranking.map(row => row.id);
+        const acceptance = acceptEvidence({ config: acceptanceConfig, scope, documents: corpus.documents, ranking, query: question.query, status });
+        const acceptedIds = acceptance.accepted.map(row => row.id), acceptedBoundary = checkV2Boundaries(question, corpus.documents, acceptedIds);
+        const falseRejectEligible = status === "ok" && question.relevant.length ? ranked.slice(0, 5).some(id => question.relevant.includes(id)) : null;
         results.push({ corpus: corpus.id, id: question.id, suite: question.suite, mode, query: question.query, scope, status,
           candidateIds: candidates, candidateHash: contentHash(candidates.map(id => [id, serializeRetrievalDocument(visible.find(doc => doc.id === id)!)])),
-          ranking, relevant: question.relevant, metrics: status === "ok" ? metrics(question.relevant, ranked, candidates) : null,
+          ranking, relevant: question.relevant, acceptance,
+          acceptedMetrics: status === "ok" ? metrics(question.relevant, acceptedIds, candidates) : null,
+          acceptedScopePassed: acceptedBoundary.scopePassed, acceptedBoundaryPassed: acceptedBoundary.boundaryPassed,
+          expectedAbstention: question.expectedBehavior === "abstain" || question.suite === "no_answer",
+          falseRejectEligible, falseRejected: falseRejectEligible === null ? null : falseRejectEligible && !acceptedIds.some(id => question.relevant.includes(id)), deferredReason: null,
+          metrics: status === "ok" ? metrics(question.relevant, ranked, candidates) : null,
           ...checkV2Boundaries(question, corpus.documents, ranked),
           empty: status === "ok" ? !ranking.length : null,
           durationMs: performance.now() - started + (mode === "M0" || mode === "M5" ? lexicalMs : mode === "M1" ? bm25Ms : mode === "M2" ? denseMs : mode === "M3" || mode === "M6" ? denseMs + bm25Ms + fusionMs : 0), callIds,
@@ -279,7 +336,7 @@ export async function runRetrievalV2(options: { label: string; modes?: Retrieval
       }
       report.summary = summarizeV2(results, calls, plan, pricePerMillionCny); await atomicJson(path, report);
     }
-    report.status = results.some(row => row.status !== "ok") ? "completed_with_errors" : "completed";
+    report.status = results.some(row => row.status !== "ok" && !row.deferredReason) ? "completed_with_errors" : "completed";
   } catch (error) {
     if (error instanceof BailianBudgetStop) { report.status = "budget_stopped"; report.stopReason = stopReason; }
     else { report.status = "failed"; throw new Error(`检索 v2 执行中断；已记录报告 ${runId}，未自动重跑。`); }

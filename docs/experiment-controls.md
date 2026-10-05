@@ -1,10 +1,10 @@
 # 实验配置与调试
 
-统一入口使用方案预设和参数白名单，不修改 `.env` 或运行中的 QQ。现有六项业务授权/确认约束始终生效。业务评测用隔离的模拟订单，检索仍是离线开发实验；M0–M6 不代表线上知识服务已切换。
+统一入口使用方案预设和参数白名单，不修改 `.env` 或运行中的 QQ。现有六项业务授权/确认约束始终生效。业务评测用隔离的模拟订单，检索仍是离线实验；M0–M6 及 A1 接收策略不代表线上知识服务已切换。
 
 ## 配置
 
-`src/experiment-config.ts` 是 CLI 与工作台共享的校验入口，格式 version 1：
+`src/experiment-config.ts` 是 CLI 与工作台共享的校验入口。旧格式 version 1 保留原始排名语义：
 
 ```json
 {
@@ -24,7 +24,31 @@
 
 检索方案改为 `kind: "retrieval"`，每个 variant 使用 `modes: ["M0", "M4"]` 替代 architecture。参数含 candidateTopK、bm25K1/bm25B、rrfK/rrfWindow、cache、timeoutMs、retries、maxRequests、consecutiveFailureLimit。默认及边界由共享校验器提供。M4 始终使用可见范围内全部候选；Recall@5 / MRR@5 固定。cache=refresh 不读取或写入持久结果缓存，复用缓存的运行不能声称为独立模型重复或生产延迟。
 
-模型固定为现有业务模型配置及百炼 text-embedding-v4 1024 维、qwen3-rerank。没有任意模型、API URL、系统提示词、命令、文件路径或环境变量表单。A1 阈值、长期记忆和模型改写暂未实现，不提供假开关。
+模型固定为现有业务模型配置及百炼 text-embedding-v4 1024 维、qwen3-rerank。没有任意模型、API URL、系统提示词、命令、文件路径或环境变量表单。长期记忆和模型改写暂未实现。
+
+### A1 配置 version 2
+
+仅适用于 `kind: "retrieval"`。每个 variant 显式增加 `dataset` 和 `acceptance`：
+
+```json
+{
+  "version": 2,
+  "kind": "retrieval",
+  "label": "A1 开发策略对照",
+  "repeat": 1,
+  "allowRemote": false,
+  "variants": [
+    { "id": "A", "modes": ["M4"], "parameters": {}, "dataset": "acceptance-development", "acceptance": { "mode": "off" } },
+    { "id": "B", "modes": ["M4"], "parameters": {}, "dataset": "acceptance-development", "acceptance": { "mode": "score", "threshold": 0.8 } }
+  ]
+}
+```
+
+示例的 0.8 仅展示参数写法，不代表已选定或合格阈值。数据集枚举为 `legacy`、`acceptance-development`（48 题）、`acceptance-validation`（60 题，6 道待 C1）。`off` 是范围内原始 Top5 的诊断基线，`score` 接收分数不低于 threshold 的原文，最多 5 条；threshold 必须显式提供有限数值 0–1，仅支持 M4/M5/M6。策略开关始终保留 active/门店/套餐过滤。非适用模式、未知参数及 version 1 偷带新字段在执行前拒绝。旧 JSON 不自动迁移或套用新阈值。
+
+策略不读取 gold；gold 仅由评分器在策略执行后读取。缺失分数、失效/越权文档和 provider 错误不会成为已接受证据；失败时的 lexical 结果只用于诊断。每轮快照保存实际阈值、策略版本、模型/指令、文本格式及 corpus hashes，原始排名保持不变。改模型、语料或格式后必须重新校准，rerank 分数不是答案正确概率。
+
+先用开发集校准，冻结后再运行固定验证。只看验证结果改阈值后，该题集不再能提供新的独立验证结论。数据来源与 24 个业务对话准备情况见 [数据说明](./acceptance-data.md)。
 
 CLI 默认仅预览，不调用模型或数据库：
 
@@ -33,13 +57,15 @@ node scripts/experiment.ts --list
 node scripts/experiment.ts --preset support-ab --dry-run
 node scripts/experiment.ts --config configs/experiments/retrieval-local.json --run
 node --env-file-if-exists=.env scripts/experiment.ts --preset support-ab --run --allow-remote
+node scripts/experiment.ts --preset acceptance-development --dry-run
+node --env-file-if-exists=.env scripts/experiment.ts --preset acceptance-development --run --allow-remote
 ```
 
 配置文件可来自工作台下载或 `configs/experiments/` 示例。CLI 和网页执行共用目录锁及任务记录，执行中的配置不会随表单更改而改变。
 
 ## 工作台接口（本机）
 
-- `GET /api/experiments/catalog` → `{presets:[{id,name,config}],fields:{support:[],retrieval:[]},modes:[{value,label}],limits,notes}`。field 含 key/label/type(number|select)/min/max/step/options/note。config 已填默认参数；allowRemote 默认 false。
+- `GET /api/experiments/catalog` → `{presets:[{id,name,config}],fields:{support:[],retrieval:[]},modes:[{value,label}],datasets:[{value,label}],acceptanceFields:[],limits,notes}`。field 含 key/label/type(number|select)/min/max/step/options/note。接收字段独立于 ranking parameters；config 已填默认参数，allowRemote 默认 false。
 - `GET /api/experiments` → `{jobs: ExperimentJob[]}`，最新 30 项。
 - `GET /api/experiments/<uuid>` → `ExperimentJob`。
 - `POST /api/experiments`，Content-Type application/json、`X-Experiment-Request: 1`，body 为配置本身 → 202 `ExperimentJob`。400 参数/组合/远程调用未允许，409 已有活动实验，503 启动不可用。错误响应 `{error:string}`。
@@ -64,6 +90,8 @@ type ExperimentJob = {
 ```
 
 support 的 runId 是现有 MySQL 评测记录，summary 为 `RunAnalysis`（counts/usage/timing/issues 等，合同见 evaluation-api.md），可在现有页面查看或对比。检索 runId 对应已有 `.runtime/retrieval-v2/<id>.json`，summary 是该报告的真实 summary（groups 按 mode/corpus/suite 分列，usage 按 operation 分列；含缺失、失败、缓存命中和部分用量），工作台只展示实验关联结果，不扫描导入历史离线报告。不能把 USD/CNY 合并或把各种语料和题集合成单一通过率。
+
+新报告每行另有 `acceptance`（接收原文、拒收原因、分数诊断）与 `acceptedMetrics`；summary.groups[].acceptance 包含成功及计划分母的 Recall、覆盖率、`noAnswerFalseAcceptCases/noAnswerDenominator/noAnswerPlanned`、`answerableFalseRejectCases/answerableFalseRejectDenominator`，以及 `abstentionFalseAcceptCases/abstentionDenominator/abstentionPlanned`。最后一项包括范围题的预期拒答，区别于权限范围违规。误拒分母仅含原始 Top5 已有有效证据的可回答题；缺少观测时 rate 为 null。`deferred/failed/missing` 分列，6 道上下文题留在计划且不发模型请求，不能算通过或成功拒答。旧报告没有接收字段时显示未记录。任务 completed 只说明执行结束，不证明策略达到准入门槛。
 
 HTTP 不接受命令或密钥；仅本机 Host/Origin，严格 JSON、请求体上限 32 KiB。任务执行状态和完整配置保存在忽略的 `.runtime/experiments/`。终止后不自动重跑；中断及未执行重复不能算通过。实验目录锁限制同一工作区同时一个实验；关闭工作台会等待当前实验完成，以便清理隔离订单。
 

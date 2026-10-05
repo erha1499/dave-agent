@@ -30,6 +30,8 @@ v2 候选已提供 `SUPPORT_ARCHITECTURE=controller npm start`（QQ 同样支持
 
 调试方案可使用工作台的“实验调试”，或 `node scripts/experiment.ts --preset retrieval-local --dry-run` 预览完整参数，加 `--run` 执行。业务与远程检索需显式允许模型调用；可下载 JSON 配置供 CLI 复现。开关包括架构、通知方式、格式修复预算、候选数、BM25/RRF、缓存和请求预算，详见 [实验配置说明](./docs/experiment-controls.md)。
 
+A1 新增数据集与证据接收开关：`--preset acceptance-development` 对比原始 Top5 和分数门槛。开发阈值 0.71 在固定验证中仍误接收 1/12 道无答案题，**未准入在线业务**；实现、冻结数据、费用及下一步见 [A1 实施记录](./docs/a1-implementation-results.md)。
+
 需要 Node.js >=22.19.0、npm、运行中的 Docker。Pi 直接依赖固定为 `1.0.0`，MySQL 镜像固定为 `8.4.11` 与 digest，完整依赖树见 `package-lock.json`。
 
 当前 `npm audit` 报告 Pi `1.0.0` 间接依赖 `brace-expansion@5.0.9` 存在 [资源耗尽漏洞](https://github.com/advisories/GHSA-q2hr-2g5m-vwhr)。Pi 发布包的 `npm-shrinkwrap.json` 固定了这个版本，本轮 `npm audit fix` 未能更新它；本应用不提供用户可控的 glob/文件搜索工具。升级 Pi 时需重新检查，当前不宣称依赖审计全通过。

@@ -1,0 +1,66 @@
+{
+  "version": 1,
+  "frozenBeforeValidationAt": "2026-10-05T12:28:10.969Z",
+  "developmentRunId": "2154afc0-0b02-4eea-b88e-c93b61b03a6c",
+  "sourceReportHash": "a894d78093afd9e35eff7783cc0d5a31cbb5029ad5136d71867e2fb7fb64c7fd",
+  "developmentDatasetHash": "07cfdd4d01156507704427fd108b407b0680fad6b47d9cebd5f535bf06c242ea",
+  "binding": {
+    "model": "qwen3-rerank",
+    "serialization": "json-title-tags-body-v1",
+    "policyVersion": "score-gate-v1",
+    "corpusHashes": {
+      "online": "84294287d3ca7585379fa9965fa0a9d8c7f4886011c22119372d36dd32298a5e",
+      "reference": "4e35976e88104de37f38502a336b0186136826ba3444fcf13ac2346bed2190d5"
+    }
+  },
+  "selectionRule": "M4 development only; fixed 0.00..1.00 grid step 0.01; choose smallest threshold meeting all applicable targets including abstention on scope negatives. If none, retain failed diagnostic only; do not promote.",
+  "selected": {
+    "mode": "score",
+    "threshold": 0.71
+  },
+  "eligibleThresholds": [
+    0.71,
+    0.72,
+    0.73,
+    0.74,
+    0.75,
+    0.76
+  ],
+  "baseline": {
+    "planned": 48,
+    "measured": 48,
+    "deferred": 0,
+    "incomplete": 0,
+    "acceptedRecallAt5": 1,
+    "answerable": 24,
+    "falseRejects": 0,
+    "falseRejectDenominator": 24,
+    "falseRejectRate": 0,
+    "falseAccepts": 12,
+    "noAnswer": 12,
+    "scopeAbstentionFailures": 12,
+    "scopeCases": 12,
+    "scopeViolations": 0,
+    "covered": 48
+  },
+  "development": {
+    "planned": 48,
+    "measured": 48,
+    "deferred": 0,
+    "incomplete": 0,
+    "acceptedRecallAt5": 1,
+    "answerable": 24,
+    "falseRejects": 0,
+    "falseRejectDenominator": 24,
+    "falseRejectRate": 0,
+    "falseAccepts": 0,
+    "noAnswer": 12,
+    "scopeAbstentionFailures": 0,
+    "scopeCases": 12,
+    "scopeViolations": 0,
+    "covered": 24
+  },
+  "validationConfigHash": "9483ae9d92b3769993cf69913d9c3b87090f2e20ba74cb289bd208e281ebfa5e",
+  "validationPolicy": "fixed-validation-not-blind; do not tune against this validation result",
+  "limitations": "Offline cache replay, not an independent model repetition or latency measurement. Scope abstention is reported separately from authorization. A development candidate does not pass fixed validation or deferred C1 cases."
+}

@@ -6,6 +6,7 @@ import { requireExperimentExecution, resolveExperimentConfig, type ExperimentCon
 import type { EvalRunAnalysis } from "./eval-analysis.ts";
 import type { EvalBatch } from "./evaluation.ts";
 import type { runRetrievalV2 } from "../scripts/retrieval-v2.ts";
+import type { loadAcceptanceDataset } from "../scripts/acceptance-data.ts";
 
 type ResultBase = { variantId: string; repetition: number; status: string; runId: string };
 export type ExperimentResult = ResultBase & ({ kind: "support"; summary: EvalRunAnalysis }
@@ -43,7 +44,12 @@ async function serialized<T>(directory: string, action: () => Promise<T>): Promi
   finally { release(); if (gates.get(directory) === current) gates.delete(directory); }
 }
 
-export const executeExperiment: ExperimentExecute = async input => {
+type RetrievalRunner = (options: Parameters<typeof runRetrievalV2>[0]) => Promise<{
+  report: Pick<Awaited<ReturnType<typeof runRetrievalV2>>["report"], "runId" | "summary" | "status">;
+}>;
+export async function executeExperiment(input: ExperimentExecution, dependencies: {
+  runRetrieval?: RetrievalRunner; loadAcceptance?: typeof loadAcceptanceDataset;
+} = {}): Promise<ExperimentResult> {
   const common = { variantId: input.variant.id, repetition: input.repetition };
   if (input.config.kind === "support" && "architecture" in input.variant) {
     const [{ runSupportV2Live }, { createPool }, { EvalStore, readEvalDatabaseConfig }, { analyzeEvaluation }] = await Promise.all([
@@ -62,11 +68,22 @@ export const executeExperiment: ExperimentExecute = async input => {
     } finally { await history.close(); }
   }
   if (input.config.kind !== "retrieval" || !("modes" in input.variant)) throw new Error("实验方案类型不匹配。");
-  const { runRetrievalV2 } = await import("../scripts/retrieval-v2.ts");
-  const { report } = await runRetrievalV2({ label: `${input.config.label} · ${input.variant.id}`,
-    modes: input.variant.modes, parameters: input.variant.parameters, allowRemote: input.config.allowRemote });
+  const runRetrieval = dependencies.runRetrieval ?? (await import("../scripts/retrieval-v2.ts")).runRetrievalV2;
+  let acceptanceOptions: Pick<Parameters<typeof runRetrievalV2>[0], "dataset" | "acceptance"> = {};
+  if ("dataset" in input.variant) {
+    const { dataset, acceptance } = input.variant;
+    acceptanceOptions = { acceptance };
+    // The caller selects a fixed dataset enum, never an arbitrary file or module path.
+    if (dataset !== "legacy") {
+      const loadAcceptance = dependencies.loadAcceptance ?? (await import("../scripts/acceptance-data.ts")).loadAcceptanceDataset;
+      if (dataset !== "acceptance-development" && dataset !== "acceptance-validation") throw new Error("未知实验数据集。");
+      acceptanceOptions.dataset = await loadAcceptance(dataset === "acceptance-development" ? "development" : "validation");
+    }
+  }
+  const { report } = await runRetrieval({ label: `${input.config.label} · ${input.variant.id}`,
+    modes: input.variant.modes, parameters: input.variant.parameters, allowRemote: input.config.allowRemote, ...acceptanceOptions });
   return { ...common, kind: "retrieval", runId: report.runId, summary: report.summary, status: report.status };
-};
+}
 
 export class ExperimentJobs {
   readonly directory: string;
