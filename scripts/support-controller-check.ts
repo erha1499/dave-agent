@@ -369,8 +369,8 @@ console.log("[support-controller] typed business denial vs infrastructure failur
   assert.equal(observed.at(-1)!.applicabilityContext!.requestId, current.evidence.requestId);
   await test.controller.createTurn(test.context(`假如 ${orderId} 有多张券，一般规则是什么？`))
     .execute({ protocol: "v2.2", kind: "policy", orderRef: explicit,
-      question: "一般多券规则", questionContext: { kind: "standalone" } });
-  assert.equal(observed.at(-1)!.applicabilityContext, null, "general rules bypass current-order premise checks");
+      question: "一般多券规则", questionContext: { kind: "standalone" }, evidenceTarget: { kind: "rule_only", basis: `假如 ${orderId} 有多张券` } });
+  assert.equal(observed.at(-1)!.applicabilityContext, null, "explicit hypothetical conditions stay explanation-only");
 }
 console.log("[support-controller] injected knowledge, original-query preservation, source scope and trace provenance PASS");
 
@@ -728,7 +728,9 @@ console.log("[support-controller] v2.2 strict protocol, raw question preservatio
     assert.deepEqual(context.applicability!.facts, { couponCount: counts.total,
       couponStates: { unused: counts.unused, redeemed: counts.redeemed, expired: counts.expired, refunded: counts.refunded } });
     assert.equal(context.applicability!.unknownReason, null);
-    assert.ok(context.effectiveQuery.endsWith(`已核实本单券数：${suffix}（按券状态字段计数）。`));
+    assert.ok(context.effectiveQuery.includes(`已核实本单券数：${suffix}（按券状态字段计数）。`));
+    assert.equal(context.purpose, "current_order");
+    assert.equal(context.applicability!.purpose, "current_order");
     assert.equal(knowledge.trace.query, context.effectiveQuery);
     assert.equal(result.evidence.actualCalls.find(call => call.name === "search_faq")!.input.query, context.effectiveQuery);
   }
@@ -740,10 +742,12 @@ console.log("[support-controller] v2.2 strict protocol, raw question preservatio
   assert.equal(legacy.evidence.knowledge[0]!.context.effectiveQuery,
     `该订单 能申请退款吗？\n已核实订单商品：${order.items[0]!.productName}。\n订单状态对应的规则条件：未核销退款。`, "legacy query bytes stay unchanged");
   const prepared = await test.controller.createTurn(test.context()).execute({ protocol, kind: "refund_prepare", orderRef: explicit });
-  assert.match(prepared.evidence.knowledge[0]!.context.effectiveQuery, /^未核销退款\n已核实本单券数：共1张/);
+  assert.match(prepared.evidence.knowledge[0]!.context.effectiveQuery, /^未核销退款\n/);
+  assert.ok(prepared.evidence.knowledge[0]!.context.effectiveQuery.includes("已核实本单券数：共1张"));
   assert.equal(prepared.evidence.knowledge[0]!.context.applicability!.purpose, "business_prerequisite");
   const generic = await test.controller.createTurn(test.context(`假如订单 ${orderId} 有多张券，一般怎么处理退款？`))
-    .execute({ protocol, kind: "policy", question: "多张券的一般规则", orderRef: explicit, questionContext: standalone });
+    .execute({ protocol, kind: "policy", question: "多张券的一般规则", orderRef: explicit, questionContext: standalone,
+      evidenceTarget: { kind: "rule_only", basis: `假如订单 ${orderId} 有多张券` } });
   assert.equal(generic.evidence.knowledge[0]!.context.applicability, undefined, "general policy consultation does not claim instance eligibility");
 }
 console.log("[support-controller] v2.2 fresh coupon cardinality/status counts and legacy query compatibility PASS");

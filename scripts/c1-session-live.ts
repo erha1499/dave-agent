@@ -47,7 +47,7 @@ export type C1SessionSuite = "development" | "product-clarification";
 const suitePaths = (suite: C1SessionSuite) => ({ datasetPath: `data/c1-session-${suite}.json`, sourcePath: `data/c1-session-${suite}-source.json` });
 const byteHash = (value: Buffer) => createHash("sha256").update(value).digest("hex");
 const codeFiles = ["scripts/c1-session-live.ts", "scripts/c1-context-check.ts", "src/support-session.ts", "src/support-controller.ts",
-  "src/support-context-action.ts", "src/support-action.ts", "src/support-context.ts", "src/agent.ts", "src/eval-capture.ts",
+  "src/support-context-action.ts", "src/support-action.ts", "src/support-context.ts", "src/support-evidence-context.ts", "src/agent.ts", "src/eval-capture.ts",
   "src/knowledge-service.ts", "src/knowledge-applicability.ts", "data/knowledge-applicability.json", "src/support-parameters.ts",
   "src/bailian.ts", "src/evidence-support.ts", "src/evidence-acceptance.ts", "src/retrieval-ranking.ts",
   "prompts/customer-service-v2.md", "skills/shop-support-v2/SKILL.md", "package-lock.json"];

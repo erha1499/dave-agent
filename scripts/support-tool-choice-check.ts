@@ -97,8 +97,10 @@ export async function checkSupportToolChoice() {
     const missedReply = supportReply(session)!; assert.equal(missedReply.kind, "notice");
     assert.ok("text" in missedReply && /未形成有效业务动作/.test(missedReply.text));
     assert.ok(!calls.some(call => call.parentSpanId === missed.requestId), "ignored tool choice cannot create a synthetic successful action");
-    const badInit = await prompt("你好", [finish], "wrong-group");
-    assert.deepEqual(badInit.choices, ["auto"]); assert.equal(getSupportResult(session), undefined);
+    const beforeBadInit = bodies.length;
+    await assert.rejects(prompt("你好", [finish], "wrong-group"), /可信群路由/);
+    assert.equal(bodies.length, beforeBadInit, "invalid trusted ingress stops before native Pi/provider entry");
+    assert.equal(getSupportResult(session), undefined);
 
     readMode = "cancel";
     const canceled = await prompt(`查 ${orderId}`, [select()]);
@@ -124,8 +126,9 @@ export async function checkSupportToolChoice() {
     read: async () => { if (cancelDuringInit) cancelSupportTurn(session); return undefined; }, write: async () => {},
   } });
   try {
-    const canceledInit = await prompt("你好", [finish]);
-    assert.deepEqual(canceledInit.choices, ["auto"], "cancellation during async initialization is visible before the HTTP request");
+    const beforeCanceledInit = bodies.length;
+    await assert.rejects(prompt("你好", [finish]), /aborted/);
+    assert.equal(bodies.length, beforeCanceledInit, "cancellation during async initialization now prevents the HTTP request entirely");
     assert.equal(getSupportResult(session), undefined);
     cancelDuringInit = false;
     const initialized = await prompt("你好", [hello, finish]);

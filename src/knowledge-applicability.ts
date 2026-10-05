@@ -8,7 +8,7 @@ export type KnowledgeApplicabilityMode = "model_only" | "declared";
 const states = ["unused", "redeemed", "expired", "refunded"] as const;
 type CouponState = typeof states[number];
 type Scope = { shopId: string | null; productId: string | null };
-type Purpose = "refund_eligibility" | "business_prerequisite";
+type Purpose = "refund_eligibility" | "business_prerequisite" | "current_order";
 type Order = Awaited<ReturnType<CouponStore["getOrder"]>>;
 const hash = (value: string | Buffer) => createHash("sha256").update(value).digest("hex");
 const object = (value: unknown): value is Record<string, unknown> => !!value && typeof value === "object" && !Array.isArray(value);
@@ -100,7 +100,7 @@ export function buildKnowledgeApplicabilityContext(input: { order: Order; reques
     requestId: input.requestId, orderId: identifier(order?.id) ? order.id : null, asOf: timestamp(order?.asOf) ? order.asOf : null,
     scope, facts: null, unknownReason: null };
   const finish = (reason: string | null) => { base.unknownReason = reason; return freeze({ ...base, factsHash: contextHash(base) }); };
-  if (!text(input.requestId) || input.requestId.length > 512 || !["refund_eligibility", "business_prerequisite"].includes(input.purpose)
+  if (!text(input.requestId) || input.requestId.length > 512 || !["refund_eligibility", "business_prerequisite", "current_order"].includes(input.purpose)
     || order?.source !== "demo-database" || !base.orderId || !base.asOf || !scope.shopId) return finish("invalid_order_binding");
   if (!Array.isArray(order.items) || !order.items.length || order.items.length > 100 || !Array.isArray(order.coupons) || order.coupons.length > 100) return finish("incomplete_order_items");
   const items = new Map<string, { productId: string; quantity: number; observed: number }>();
@@ -126,7 +126,7 @@ export function buildKnowledgeApplicabilityContext(input: { order: Order; reques
 
 function validContext(context: KnowledgeApplicabilityContext, scope: RetrievalScope): boolean {
   if (!object(context) || !keys(context, ["version", "purpose", "requestId", "orderId", "asOf", "scope", "facts", "factsHash", "unknownReason"])
-    || context.version !== "order-coupon-facts-v1" || !["refund_eligibility", "business_prerequisite"].includes(context.purpose)
+    || context.version !== "order-coupon-facts-v1" || !["refund_eligibility", "business_prerequisite", "current_order"].includes(context.purpose)
     || !text(context.requestId) || context.requestId.length > 512 || !identifier(context.orderId) || !timestamp(context.asOf)
     || !scopeValid(context.scope) || !context.scope.shopId || !context.scope.productId || !scopeEqual(context.scope, scope)
     || !sha(context.factsHash) || context.unknownReason !== null || !object(context.facts)

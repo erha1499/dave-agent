@@ -4,7 +4,7 @@ import type { QQBotInboundMessage, ReplyTarget } from "@tencent-connect/qqbot-no
 import { renderReply, type Reply, type RenderedReply } from "./reply.ts";
 import { replyFromTools } from "./reply-from-tools.ts";
 import type { MerchantTask } from "./after-sales.ts";
-import { cancelSupportTurn, isSupportSession, prepareSupportPrompt, supportReply } from "./support-session.ts";
+import { cancelSupportTurn, getSupportHostReceipt, isSupportSession, prepareSupportPrompt, supportReply } from "./support-session.ts";
 
 export type ContinuationOutcome = "busy" | "sent" | "deferred" | "unknown";
 
@@ -163,7 +163,7 @@ export class QQAgent {
           }),
         ]);
         clearTimeout(timer);
-        if (session.agent.state.errorMessage) throw new Error("模型请求失败");
+        if (!getSupportHostReceipt(session) && session.agent.state.errorMessage) throw new Error("模型请求失败");
         const text = session.getLastAssistantText()?.trim();
         if (!text && !supportRun) throw new Error("模型未生成回复");
         conversation.turns++;

@@ -3,13 +3,16 @@ import { createHash } from "node:crypto";
 import { isDeepStrictEqual } from "node:util";
 import { pathToFileURL } from "node:url";
 import { contentHash } from "../src/bailian.ts";
+import { merchantSourceKey } from "../src/after-sales.ts";
+import { buildSupportEvidenceBinding, evidenceBindingVersion } from "../src/support-evidence-context.ts";
 import { acceptEvidence } from "../src/evidence-acceptance.ts";
 import { applyEvidenceSupport, validateEvidenceSupportVerification, evidenceSupportInputHash, evidenceSupportRequestHash,
   evidenceSupportValidationVersion, type EvidenceSupportDecision, type EvidenceSupportSettings, type EvidenceSupportVerification } from "../src/evidence-support.ts";
-import type { CouponStore } from "../src/coupon-store.ts";
+import type { CouponStore, QQIdentity } from "../src/coupon-store.ts";
 import type { ContextSupportAction } from "../src/support-context-action.ts";
-import type { RemainingAmountComparison } from "../src/support-context.ts";
-import type { SupportCall, SupportKnowledgeContext, SupportResult } from "../src/support-controller.ts";
+import { amountChoiceTtlMs, compareRemainingAmount, createAmountReference, rememberAmountChoice, resolveAmountReference, type RemainingAmountComparison } from "../src/support-context.ts";
+import type { SupportHostReceipt } from "../src/support-session.ts";
+import type { SupportCall, SupportKnowledgeContext, SupportResult, TrustedPolicyTopic } from "../src/support-controller.ts";
 import { applyKnowledgeApplicabilityGate, finishKnowledgeApplicabilityAcceptance, knowledgeApplicabilitySettings, type KnowledgeTrace } from "../src/knowledge-service.ts";
 import { buildKnowledgeApplicabilityContext, gateKnowledgeApplicability, knowledgeApplicabilitySourceHash, validateKnowledgeApplicabilitySnapshot,
   type KnowledgeApplicabilityMode, type KnowledgeApplicabilitySnapshot } from "../src/knowledge-applicability.ts";
@@ -17,7 +20,7 @@ import { rankLexical, scopeDocuments, type RetrievalDocument, type RetrievalScop
 import type { SessionTurnActual } from "./c1-session-live.ts";
 
 // Pure contracts/scoring only. No executor, generated validation questions, I/O or model judge.
-export const c1ValidationScoringVersion = "c1-session-validation-v3";
+export const c1ValidationScoringVersion = "c1-session-validation-v4";
 export const c1Families = ["order_state", "paid_amount", "alternative_order", "policy_followup", "refund_time", "appointment_actor"] as const;
 export const c1Strata = ["known", "missing", "competing", "direct_missing_fact", "boundary"] as const;
 type Family = typeof c1Families[number];
@@ -44,13 +47,19 @@ export type C1ValidationManifest = { version: 1; frozenBeforeExecution: true; va
   corpusHashes: Record<"online" | "reference", string>;
   counts: { cases: number; turns: number; strata: Record<Stratum, number> } };
 // requestId is the actual ingress ID supplied to prepareSupportPrompt, not one inferred from a returned result.
-export type C1ValidationActual = SessionTurnActual & { caseId: string; turn: number; requestId: string | null; execution: "completed" | "failed" | "not_run" };
+export type C1ValidationActual = SessionTurnActual & { caseId: string; turn: number; requestId: string | null; execution: "completed" | "failed" | "not_run";
+  // New recordings expose actual ingress; old traces remain replayable without inventing it.
+  ingress?: { identity: QQIdentity; groupOpenid: string; messageId: string; requestId: string; observedAt?: string } | null;
+  hostReceipt?: SupportHostReceipt };
+export type C1ValidationHistory = readonly { question: string; actual: C1ValidationActual }[];
 export type C1AnswerReview = { caseId: string; turn: number; reviewer: "codex"; forHumanReview: true; humanAcceptance: false;
   status: "passed" | "failed" | "unreviewed"; replyHash: string; criteriaHash: string;
   checks: Array<{ criterionId: string; passed: boolean; reasoning: string }> };
 type Corpora = Record<C1ValidationCase["corpus"], readonly RetrievalDocument[]>;
 // Supplied by the frozen run configuration, never inferred from the report being scored.
-export type C1ValidationKnowledgeConfiguration = { applicability?: KnowledgeApplicabilityMode; applicabilitySnapshot?: KnowledgeApplicabilitySnapshot };
+export type C1ValidationKnowledgeConfiguration = { applicability?: KnowledgeApplicabilityMode; applicabilitySnapshot?: KnowledgeApplicabilitySnapshot;
+  // Frozen candidate requirement, independent of a trace's own version label.
+  evidenceBindingVersion?: "order-evidence-binding-v2" };
 const nonempty = (value: unknown): value is string => typeof value === "string" && Boolean(value.trim());
 const digest = (value: unknown) => typeof value === "string" && /^[a-f0-9]{64}$/.test(value);
 const equal = isDeepStrictEqual;
@@ -127,8 +136,76 @@ function reviewPassed(turn: C1ValidationTurn, actual: C1ValidationActual | undef
     && turn.expected.answerCriteria.every(criterion => review.checks.some(row => row.criterionId === criterion.id && row.passed === true && nonempty(row.reasoning)));
 }
 
-function prepareKnowledgeEvidence(actual: C1ValidationActual, call: SupportCall, documents: readonly RetrievalDocument[], configuration: C1ValidationKnowledgeConfiguration) {
+// Rebuild the host binding from actual ingress and completed prior results. The
+// recorded context is only compared with this reconstruction, never used as input.
+function reconstructKnowledgeBinding(actual: C1ValidationActual, call: SupportCall, corpus: readonly RetrievalDocument[],
+  configuration: C1ValidationKnowledgeConfiguration, originalQuery: string | undefined, history: C1ValidationHistory) {
+  const { context, trace } = call.knowledge!;
+  if (configuration.evidenceBindingVersion) assert.equal(context.evidenceBindingVersion, configuration.evidenceBindingVersion, "Frozen binding version cannot be omitted or downgraded");
+  if (!context.evidenceBindingVersion) {
+    assert.equal(context.evidenceTarget, undefined); assert.equal(context.evidenceUse, undefined);
+    return undefined;
+  }
+  assert.equal(context.evidenceBindingVersion, evidenceBindingVersion); assert.equal(context.protocol, "v2.2");
+  const ingress = actual.ingress, result = actual.result;
+  assert.ok(ingress && result && originalQuery !== undefined, "New binding requires actual ingress and the original planned message");
+  assert.equal(ingress.requestId, actual.requestId); assert.equal(result.evidence.requestId, ingress.requestId);
+  assert.deepEqual(result.evidence.trustedRoute, { groupOpenid: ingress.groupOpenid, messageId: ingress.messageId });
+  assert.deepEqual(result.evidence.action, result.action);
+  const action = result.action; assert.ok("protocol" in action && action.protocol === "v2.2");
+  assert.equal(context.originalQuery, originalQuery); assert.equal(trace.originalQuery, originalQuery);
+  assert.equal(context.modelQuestion, "question" in action ? action.question : null);
+  const order = result.evidence.order;
+  const priorReads = actual.calls.slice(0, actual.calls.indexOf(call)).filter(item => item.name === "get_order" && !item.isError);
+  if (order) {
+    assert.equal(priorReads.length, 1); const read = priorReads[0]!;
+    assert.equal(read.parentSpanId, actual.requestId); assert.equal(read.input.orderId, order.id); assert.deepEqual(read.output, order);
+    assert.ok("orderRef" in action && action.orderRef);
+    if (action.orderRef.kind === "explicit") { assert.equal(action.orderRef.orderId, order.id); assert.ok(originalQuery.includes(order.id)); }
+    else assert.equal(action.orderRef.kind === "alternative" ? actual.hostReference?.alternativeOrderId : actual.hostReference?.orderId, order.id);
+    assert.equal(context.orderSource, action.orderRef.kind === "explicit" ? "current_explicit" : action.orderRef.kind === "alternative" ? "verified_alternative" : "verified_focus");
+  } else { assert.equal(priorReads.length, 0); assert.equal(context.orderSource, "none"); }
+  assert.equal(context.scopeSource, order ? "fresh_order" : "global");
+  const scope = { shopId: order?.shop.id ?? null, productId: order?.items[0]?.productId ?? null };
+  assert.deepEqual({ shopId: trace.scope.shopId ?? null, productId: trace.scope.productId ?? null }, scope);
+  const sourceKey = merchantSourceKey(ingress.identity, ingress.groupOpenid);
+  let topic: TrustedPolicyTopic | null = null;
+  if ("questionContext" in action && action.questionContext.kind === "previous") {
+    const referencedRequestId = action.questionContext.requestId;
+    assert.equal(actual.hostReference?.policyTopic?.requestId, referencedRequestId);
+    const donors = history.filter(row => row.actual.caseId === actual.caseId && row.actual.turn < actual.turn && row.actual.requestId === referencedRequestId);
+    assert.equal(donors.length, 1, "Previous topic must come from one actual earlier Session turn");
+    const donor = donors[0]!, previous = donor.actual, previousResult = previous.result;
+    assert.ok(previous.execution === "completed" && previousResult?.outcome === "ready" && previousResult.verifiedPolicyTopic && previous.ingress);
+    assert.deepEqual(previous.ingress.identity, ingress.identity); assert.equal(previous.ingress.groupOpenid, ingress.groupOpenid);
+    assert.ok(knowledgeProofPassed(previous, corpus, configuration, donor.question, history.filter(row => row.actual.turn < previous.turn)), "Prior sources must themselves have a valid recorded proof");
+    topic = previousResult.verifiedPolicyTopic;
+    assert.equal(topic.requestId, previous.requestId); assert.equal(topic.sourceKey, sourceKey); assert.equal(topic.groupOpenid, ingress.groupOpenid);
+    assert.ok(previousResult.action.kind === "policy" || previousResult.action.kind === "refund_eligibility");
+    assert.equal(topic.intent, previousResult.action.kind); assert.equal(topic.orderId, previousResult.evidence.order?.id ?? null);
+    assert.deepEqual(topic.scope, { shopId: previousResult.evidence.order?.shop.id ?? null, productId: previousResult.evidence.order?.items[0]?.productId ?? null });
+    const previousContext = previousResult.evidence.knowledge[0]?.context;
+    assert.ok(previousContext && previousResult.evidence.rules.length > 0);
+    const priorIsAlternative = previousResult.action.orderRef?.kind === "alternative";
+    assert.equal(topic.originalQuery, priorIsAlternative ? donor.question : previousContext.policyTopic?.originalQuery ?? donor.question);
+    assert.deepEqual(topic.sources, previousResult.evidence.rules.map(rule => ({ sourceId: rule.sourceId, version: rule.version })));
+    if (action.orderRef?.kind === "alternative") {
+      assert.equal(topic.orderId, actual.hostReference?.orderId, "Alternative-order intent belongs to the actual prior focus");
+      assert.notEqual(topic.orderId, order?.id);
+    } else assert.deepEqual(topic.scope, scope);
+  }
+  assert.deepEqual(context.policyTopic, topic);
+  const reconstructed = buildSupportEvidenceBinding({ action, originalQuery, order, requestId: ingress.requestId, verifiedTopic: topic,
+    binding: { sourceKey, groupOpenid: ingress.groupOpenid, orderId: order?.id ?? null } });
+  for (const key of ["evidenceBindingVersion", "evidenceTarget", "evidenceUse", "purpose", "facts", "effectiveQuery"] as const) assert.deepEqual(context[key], reconstructed[key], `Rebuilt ${key}`);
+  assert.deepEqual(context.applicability ?? null, reconstructed.applicability ?? null);
+  return reconstructed;
+}
+
+function prepareKnowledgeEvidence(actual: C1ValidationActual, call: SupportCall, documents: readonly RetrievalDocument[], configuration: C1ValidationKnowledgeConfiguration,
+  originalQuery?: string, history: C1ValidationHistory = [], corpus: readonly RetrievalDocument[] = documents) {
   const { trace, context } = call.knowledge!;
+  const binding = reconstructKnowledgeBinding(actual, call, corpus, configuration, originalQuery, history);
   let prepared = acceptEvidence({ query: trace.query, scope: trace.scope, documents, ranking: trace.rawRanking,
     config: trace.mode === "lexical" ? { mode: "off" } : { mode: "support", threshold: trace.threshold! } });
   const mode = configuration.applicability ?? "model_only";
@@ -142,9 +219,9 @@ function prepareKnowledgeEvidence(actual: C1ValidationActual, call: SupportCall,
   assert.ok(snapshot, "Declared mode requires an externally frozen metadata snapshot");
   const { sha256, ...manifest } = snapshot;
   const frozen = validateKnowledgeApplicabilitySnapshot(manifest, sha256);
-  let trustedContext = null;
+  let trustedContext = binding?.applicability ?? null;
   assert.equal(context.protocol, "v2.2", "Declared validation requires the frozen current host protocol");
-  if (context.protocol === "v2.2") {
+  if (!binding && context.protocol === "v2.2") {
     const action = actual.result!.action;
     assert.ok("protocol" in action && action.protocol === "v2.2");
     const purpose = action.kind === "refund_eligibility" ? "refund_eligibility"
@@ -157,7 +234,7 @@ function prepareKnowledgeEvidence(actual: C1ValidationActual, call: SupportCall,
         && prior.parentSpanId === actual.requestId && prior.input.orderId === order.id && equal(prior.output, order)), "Fresh authorized facts must precede the knowledge call");
       trustedContext = buildKnowledgeApplicabilityContext({ order, requestId: actual.requestId, purpose });
     }
-  } else assert.ok(!actual.result || !("protocol" in actual.result.action), "Current protocol cannot omit its host context version");
+  } else if (!binding) assert.ok(!actual.result || !("protocol" in actual.result.action), "Current protocol cannot omit its host context version");
   assert.deepEqual(context.applicability ?? null, trustedContext);
   const gate = gateKnowledgeApplicability({ snapshot: frozen, context: trustedContext, scope: trace.scope, candidates: prepared.pendingSupport ?? [] });
   const { candidates: _candidates, ...audit } = gate;
@@ -168,7 +245,8 @@ function prepareKnowledgeEvidence(actual: C1ValidationActual, call: SupportCall,
 }
 
 // Reuse the production acceptance/binding checks against the frozen corpus; IDs alone are not evidence.
-function knowledgeProofPassed(actual: C1ValidationActual | undefined, corpus: readonly RetrievalDocument[], configuration: C1ValidationKnowledgeConfiguration = {}) {
+function knowledgeProofPassed(actual: C1ValidationActual | undefined, corpus: readonly RetrievalDocument[], configuration: C1ValidationKnowledgeConfiguration = {},
+  originalQuery?: string, history: C1ValidationHistory = []): boolean {
   if (!actual) return false;
   try {
     const result = actual.result, calls = actual.calls, knowledgeCalls = calls.filter(call => call.knowledge);
@@ -189,7 +267,7 @@ function knowledgeProofPassed(actual: C1ValidationActual | undefined, corpus: re
       if (trace.mode === "m4-support" && (trace.rawRanking.length !== documents.length || new Set(trace.rawRanking.map(row => row.id)).size !== documents.length
         || trace.rawRanking.some((row, index) => !documents.some(doc => doc.id === row.id) || typeof row.score !== "number" || !Number.isFinite(row.score)
           || row.score < 0 || row.score > 1 || index > 0 && row.score > trace.rawRanking[index - 1]!.score!))) return false;
-      const { prepared, gate } = prepareKnowledgeEvidence(actual, call, documents, configuration);
+      const { prepared, gate } = prepareKnowledgeEvidence(actual, call, documents, configuration, originalQuery, history, corpus);
       let acceptance = prepared;
       const supportCalls = trace.calls.filter(item => item.operation === "support");
       if (prepared.pendingSupport?.length) {
@@ -215,8 +293,66 @@ function knowledgeProofPassed(actual: C1ValidationActual | undefined, corpus: re
   } catch { return false; }
 }
 
+function amountProofPassed(actual: C1ValidationActual | undefined, originalQuery: string, history: C1ValidationHistory, configuration: C1ValidationKnowledgeConfiguration) {
+  const result = actual?.result;
+  if (!result?.evidence.amountComparison || !configuration.evidenceBindingVersion && !result.evidence.amountChoices) return true;
+  try {
+    assert.ok(actual?.ingress && result.action.kind === "paid_amount_compare" && result.evidence.order);
+    const ingress = actual.ingress, order = result.evidence.order, choices = result.evidence.amountChoices;
+    assert.equal(ingress.requestId, actual.requestId); assert.deepEqual(result.evidence.trustedRoute, { groupOpenid: ingress.groupOpenid, messageId: ingress.messageId });
+    if (result.action.orderRef.kind === "explicit") { assert.equal(result.action.orderRef.orderId, order.id); assert.ok(originalQuery.includes(order.id)); }
+    else assert.equal(actual.hostReference?.orderId, order.id);
+    const binding = { sourceKey: merchantSourceKey(ingress.identity, ingress.groupOpenid), groupOpenid: ingress.groupOpenid };
+    const read = actual.calls.find(call => call.name === "get_order" && !call.isError && call.parentSpanId === actual.requestId && equal(call.output, order));
+    assert.ok(read && read.input.orderId === order.id && Number.isFinite(Date.parse(read.observedAt)) && choices);
+    // Replays use the recorded observation time, never today's wall clock.
+    const reference = resolveAmountReference(choices, binding, Date.parse(read.observedAt));
+    assert.ok(reference, "Competing amounts require a real user selection; latest is not unique");
+    assert.equal(result.action.amountRef.requestId, reference.requestId); assert.equal(actual.hostReference?.itemPaidUnit?.requestId, reference.requestId);
+    for (const candidate of choices.candidates) {
+      const donors: C1ValidationHistory = history.filter(row => row.actual.caseId === actual.caseId && row.actual.turn < actual.turn && row.actual.requestId === candidate.reference.requestId);
+      assert.equal(donors.length, 1); const donor = donors[0]!.actual, previous = donor.result;
+      assert.ok(donor.execution === "completed" && donor.ingress && previous?.outcome === "ready" && previous.needsAnswer === false
+        && previous.reply.kind === "order" && previous.evidence.order);
+      const visibleReply = previous.evidence.knowledge.some(entry => entry.context.evidenceUse === "explanation")
+        ? { ...previous.reply, text: "以下仅解释所问条件，不表示当前订单已满足，也不构成退款批准。\n" + previous.reply.text } : previous.reply;
+      assert.deepEqual(donor.reply, visibleReply, "A tool result alone does not establish an actually delivered paid-unit display");
+      assert.deepEqual(donor.ingress.identity, ingress.identity); assert.equal(donor.ingress.groupOpenid, ingress.groupOpenid);
+      assert.equal(donor.ingress.requestId, donor.requestId); assert.equal(previous.evidence.requestId, donor.requestId);
+      assert.deepEqual(previous.evidence.trustedRoute, { groupOpenid: donor.ingress.groupOpenid, messageId: donor.ingress.messageId });
+      assert.ok(donor.calls.some(call => call.name === "get_order" && !call.isError && call.parentSpanId === donor.requestId
+        && call.input.orderId === previous.evidence.order!.id && equal(call.output, previous.evidence.order)));
+      const rebuilt = createAmountReference(previous.evidence.order, binding, donor.requestId!);
+      assert.deepEqual(previous.verifiedAmountReference, rebuilt); assert.deepEqual(previous.evidence.displayedPaidUnit, rebuilt);
+      assert.deepEqual(candidate.reference, rebuilt);
+      const displayedAt = Date.parse(donor.ingress.observedAt ?? "");
+      assert.ok(Number.isFinite(displayedAt) && donor.durationMs !== null && Number.isFinite(donor.durationMs) && donor.durationMs >= 0);
+      assert.ok(candidate.expiresAt >= displayedAt + amountChoiceTtlMs && candidate.expiresAt <= displayedAt + donor.durationMs + amountChoiceTtlMs,
+        "Recorded expiry must originate within the actual display turn's TTL window");
+    }
+    if (choices.selectedToken) {
+      assert.equal(actual.hostReference?.orderId, order.id, "Changing an explicit target cannot preserve an old selection");
+      const selections = history.filter(row => row.actual.caseId === actual.caseId && row.actual.turn < actual.turn && row.actual.hostReceipt?.outcome === "selected"
+        && row.actual.hostReceipt.choices.selectedToken === choices.selectedToken);
+      const selected = selections.at(-1); assert.ok(selected?.actual.ingress, "Selected token needs a real host receipt");
+      const receipt = selected.actual.hostReceipt!;
+      assert.equal(selected.question.trim(), `选择金额基准 ${choices.selectedToken}`); assert.equal(selected.actual.execution, "completed");
+      assert.equal(selected.actual.result, undefined); assert.deepEqual(selected.actual.calls, []); assert.deepEqual(selected.actual.requests, []);
+      assert.equal(receipt.version, "amount-selection-v1"); assert.notEqual(receipt.historyFailed, true); assert.equal(receipt.requestId, selected.actual.requestId);
+      assert.equal(selected.actual.ingress.requestId, receipt.requestId); assert.deepEqual(selected.actual.ingress.identity, ingress.identity);
+      assert.equal(receipt.sourceKey, binding.sourceKey); assert.deepEqual(receipt.trustedRoute, { groupOpenid: ingress.groupOpenid, messageId: selected.actual.ingress.messageId });
+      assert.deepEqual(selected.actual.reply, receipt.reply); assert.equal(receipt.selectedRequestId, reference.requestId);
+      assert.deepEqual(receipt.choices.candidates.find(row => row.token === choices.selectedToken), choices.candidates.find(row => row.token === choices.selectedToken));
+      assert.ok(!history.some(row => row.actual.turn > selected.actual.turn && row.actual.turn < actual.turn
+        && (row.actual.result?.verifiedAmountReference || row.actual.hostReceipt)), "New displays or later selection receipts invalidate an earlier explicit selection");
+    }
+    assert.deepEqual(result.evidence.amountComparison, compareRemainingAmount(order, reference, binding));
+    return true;
+  } catch { return false; }
+}
+
 export function scoreC1ValidationTurn(turn: C1ValidationTurn, actual: C1ValidationActual | undefined, corpus: readonly RetrievalDocument[], review?: C1AnswerReview,
-  configuration: C1ValidationKnowledgeConfiguration = {}) {
+  configuration: C1ValidationKnowledgeConfiguration = {}, history: C1ValidationHistory = []) {
   const e = turn.expected, result = actual?.result, calls = actual?.calls ?? [], host = actual?.hostReference;
   const traces = calls.flatMap(call => call.knowledge ? [call.knowledge.trace] : []);
   const bound = Boolean(actual && nonempty(actual.requestId) && (!result || result.evidence.requestId === actual.requestId)
@@ -232,17 +368,17 @@ export function scoreC1ValidationTurn(turn: C1ValidationTurn, actual: C1Validati
     const trace = call.knowledge.trace;
     try {
       const settings = trace.settings?.support, verification = trace.supportVerification;
-      const { prepared } = prepareKnowledgeEvidence(actual, call, scopeDocuments(corpus, trace.scope), configuration);
+      const { prepared } = prepareKnowledgeEvidence(actual, call, scopeDocuments(corpus, trace.scope), configuration, turn.question, history, corpus);
       return settings && verification && validateEvidenceSupportVerification(verification,
         { query: trace.query, scope: trace.scope, candidates: prepared.pendingSupport ?? [], settings }) ? verification.value : [];
     } catch { return []; }
   });
   const unavailable = !complete || traces.some(trace => trace.supportFailure || trace.status === "unavailable");
-  const evidenceProofPassed = knowledgeProofPassed(actual, corpus, configuration);
+  const evidenceProofPassed = knowledgeProofPassed(actual, corpus, configuration, turn.question, history);
   const applicabilityGates = calls.flatMap(call => {
     if (!call.knowledge || !actual) return [];
     try {
-      const { gate } = prepareKnowledgeEvidence(actual, call, scopeDocuments(corpus, call.knowledge.trace.scope), configuration);
+      const { gate } = prepareKnowledgeEvidence(actual, call, scopeDocuments(corpus, call.knowledge.trace.scope), configuration, turn.question, history, corpus);
       return gate ? [gate] : [];
     } catch { return []; }
   });
@@ -276,9 +412,10 @@ export function scoreC1ValidationTurn(turn: C1ValidationTurn, actual: C1Validati
   const knowledge = e.knowledge === "none" ? Boolean(noKnowledge && !accepted.length)
     : e.knowledge === "rejected" ? evidenceProofPassed && traces.length === 1 && traces[0]!.status === "rejected" && !accepted.length && !invalid.length && !unavailable
     : evidenceProofPassed && traces.length === 1 && !unavailable && accepted.some(id => gold.includes(id)) && !extra.length;
-  const amount = !e.amount || Boolean(result?.evidence.amountComparison && result.evidence.amountComparison.remainingCouponCount === 1
+  const amountEvidenceProofPassed = amountProofPassed(actual, turn.question, history, configuration);
+  const amount = amountEvidenceProofPassed && (!e.amount || Boolean(result?.evidence.amountComparison && result.evidence.amountComparison.remainingCouponCount === 1
     && result.evidence.amountComparison.refundApproved === false && result.needsAnswer === false && noKnowledge
-    && Object.entries(e.amount).every(([key, value]) => equal(result.evidence.amountComparison![key as keyof RemainingAmountComparison], value)));
+    && Object.entries(e.amount).every(([key, value]) => equal(result.evidence.amountComparison![key as keyof RemainingAmountComparison], value))));
   // Host-safe refusal and model classification are different measures.
   const actionGate = e.outcome === "clarification" || e.outcome === "business_denial" ? true : actionCorrect;
   const engineeringPassed = Boolean(complete && evidenceProofPassed && outcome && actionGate && fresh && noSideEffects && scoped && !scopeViolations.length && amount);
@@ -289,7 +426,7 @@ export function scoreC1ValidationTurn(turn: C1ValidationTurn, actual: C1Validati
     answerPassed, passed: engineeringPassed && knowledge && supportIntegrityPassed && applicabilityIntegrityPassed && answerPassed,
     actionCorrect, firstActionKindCorrect, safeStopped: engineeringPassed && e.outcome !== "ready" && knowledge,
     observedStop: result?.action.kind === "clarify" ? "model_clarify" : outcome && e.outcome !== "ready" ? "host_denial" : null,
-    fresh, reference, amount, requestBound: bound, evidenceProofPassed, scopeMatched: scoped, extraAcceptedIds: extra, scopeViolationIds: scopeViolations, invalidDecisionIds: invalid,
+    fresh, reference, amount, amountEvidenceProofPassed, requestBound: bound, evidenceProofPassed, scopeMatched: scoped, extraAcceptedIds: extra, scopeViolationIds: scopeViolations, invalidDecisionIds: invalid,
     applicabilityExcludedIds: applicabilityDecisions.filter(row => row.status === "mismatched").map(row => row.id),
     applicabilityUnknownIds: applicabilityDecisions.filter(row => row.status === "unknown").map(row => row.id),
     applicabilityUncheckedIds: applicabilityDecisions.filter(row => row.status === "not_checked").map(row => row.id),
@@ -310,7 +447,8 @@ export function summarizeC1Validation(plan: C1ValidationPlan, actuals: C1Validat
   for (const records of [actuals, reviews]) { assert.equal(new Set(records.map(key)).size, records.length); assert.ok(records.every(row => planned.has(key(row)))); }
   const rows = plan.cases.flatMap(item => item.turns.map((turn, index) => {
     const actual = actuals.find(row => row.caseId === item.id && row.turn === index + 1);
-    const score = scoreC1ValidationTurn(turn, actual, corpora[item.corpus], reviews.find(row => row.caseId === item.id && row.turn === index + 1), configuration);
+    const history = actuals.filter(row => row.caseId === item.id && row.turn < index + 1).map(row => ({ question: item.turns[row.turn - 1]!.question, actual: row }));
+    const score = scoreC1ValidationTurn(turn, actual, corpora[item.corpus], reviews.find(row => row.caseId === item.id && row.turn === index + 1), configuration, history);
     const prior = actuals.filter(row => row.caseId === item.id && row.turn < index + 1 && row.execution === "completed");
     let stateChangePassed = true;
     if (turn.stateChange) {
@@ -323,7 +461,7 @@ export function summarizeC1Validation(plan: C1ValidationPlan, actuals: C1Validat
     if (turn.expected.reference === "previous") referenceProvenancePassed = prior.some(row => {
       const topic = row.result?.verifiedPolicyTopic, current = actual?.result?.evidence.knowledge[0]?.context.policyTopic;
       return Boolean(topic && row.requestId === actual?.hostReference?.policyTopic?.requestId && topic.requestId === row.requestId
-        && row.result!.outcome === "ready" && row.result!.evidence.rules.length > 0 && knowledgeProofPassed(row, corpora[item.corpus], configuration)
+        && row.result!.outcome === "ready" && row.result!.evidence.rules.length > 0 && knowledgeProofPassed(row, corpora[item.corpus], configuration, item.turns[row.turn - 1]!.question, history.filter(entry => entry.actual.turn < row.turn))
         && equal(topic.sources, row.result!.evidence.rules.map(rule => ({ sourceId: rule.sourceId, version: rule.version })))
         && topic.groupOpenid === row.result!.evidence.trustedRoute.groupOpenid && topic.groupOpenid === actual?.result?.evidence.trustedRoute.groupOpenid
         && equal(current, topic));
@@ -625,6 +763,168 @@ export function checkC1ValidationScoring() {
   assert.equal(mismatchScore.correctlyRejected, true); assert.equal(mismatchScore.validDecisionCount, 0);
   const unknownOnly = scoreDeclared(declaredActual(incomplete, [doc]), { ...rejectedTurn, expected: { ...rejectedTurn.expected, freshOrder: incomplete } }, [doc]);
   assert.equal(unknownOnly.correctlyRejected, false); assert.equal(unknownOnly.unavailable, true);
+  // New host-binding replay is independent of the model's policy/refund label,
+  // and remains mandatory when metadata gating is disabled.
+  const bindingConfiguration = { ...declaredConfiguration, evidenceBindingVersion };
+  function boundActual(input: { question: string; action: ContextSupportAction; order?: Order; topic?: TrustedPolicyTopic;
+    requestId?: string; turn?: number; mode?: "model_only" | "declared" }, documents: RetrievalDocument[] = [doc, multiDoc]) {
+    const value = structuredClone(actual), r = value.result!, knowledgeCall = value.calls[0]!, t = knowledgeCall.knowledge!.trace, ctx = knowledgeCall.knowledge!.context;
+    value.requestId = input.requestId ?? "bound-request"; value.turn = input.turn ?? 1;
+    value.ingress = { requestId: value.requestId, identity: { appId: "unit-app", senderId: "unit-user" }, groupOpenid: "unit-group", messageId: value.requestId + "-message" };
+    const sourceKey = merchantSourceKey(value.ingress.identity, value.ingress.groupOpenid);
+    r.action = input.action; r.evidence.action = input.action; r.evidence.requestId = value.requestId;
+    r.evidence.trustedRoute = { groupOpenid: value.ingress.groupOpenid, messageId: value.ingress.messageId };
+    if (input.order) r.evidence.order = input.order; else delete r.evidence.order;
+    knowledgeCall.parentSpanId = value.requestId;
+    value.calls = input.order ? [{ ...structuredClone(orderCall), parentSpanId: value.requestId, input: { orderId: input.order.id }, output: input.order }, knowledgeCall] : [knowledgeCall];
+    r.evidence.actualCalls = value.calls;
+    const scope = { shopId: input.order?.shop.id ?? null, productId: input.order?.items[0]?.productId ?? null };
+    Object.assign(ctx, { originalQuery: input.question, modelQuestion: "question" in input.action ? input.action.question : null,
+      scopeSource: input.order ? "fresh_order" : "global", orderSource: input.order ? "current_explicit" : "none", policyTopic: input.topic ?? null,
+      ...buildSupportEvidenceBinding({ action: input.action, originalQuery: input.question, order: input.order, requestId: value.requestId,
+        verifiedTopic: input.topic, binding: { sourceKey, groupOpenid: value.ingress.groupOpenid, orderId: input.order?.id ?? null } }) });
+    if (input.topic) value.hostReference = { policyTopic: { requestId: input.topic.requestId } };
+    const query = ctx.effectiveQuery, visibleDocs = scopeDocuments(documents, scope);
+    knowledgeCall.input = { query, ...scope }; Object.assign(t, { query, originalQuery: input.question, scope,
+      sourceHashes: { before: contentHash(visibleDocs), after: contentHash(visibleDocs) }, rawRanking: visibleDocs.map((entry, index) => ({ id: entry.id, score: .9 - index * .1 })) });
+    let prepared = acceptEvidence({ query, scope, documents: visibleDocs, ranking: t.rawRanking, config: { mode: "support", threshold: .5 } });
+    const gate = input.mode === "model_only" ? undefined : gateKnowledgeApplicability({ snapshot: declaredSnapshot, context: ctx.applicability ?? null, scope, candidates: prepared.pendingSupport! });
+    t.settings = { serialization: "json-title-tags-body-v1", support: settings };
+    if (gate) { const { candidates: _candidates, ...audit } = gate; t.applicability = { mode: "declared", gate: audit };
+      t.settings.applicability = knowledgeApplicabilitySettings(declaredSnapshot); prepared = applyKnowledgeApplicabilityGate(prepared, gate); }
+    else t.applicability = { mode: "model_only" };
+    const supportInput = { query, scope, candidates: prepared.pendingSupport!, settings };
+    const decisions = supportInput.candidates.map(entry => ({ id: entry.id, supported: true, category: "direct_fact" as const, quote: entry.body, reason: "Synthetic source proof" }));
+    const verification: EvidenceSupportVerification = { value: decisions, inputHash: evidenceSupportInputHash(supportInput), requestHash: evidenceSupportRequestHash(supportInput),
+      attempts: structuredClone(trace.supportVerification!.attempts), validation: { status: "complete", outputHash: contentHash(decisions), invalidDecisions: [] } };
+    t.supportVerification = verification; t.calls = [{ operation: "support", requestHash: verification.requestHash, attempts: verification.attempts, status: "ok" }];
+    t.acceptance = finishKnowledgeApplicabilityAcceptance(applyEvidenceSupport({ prepared, verification, query, scope, documents: visibleDocs, settings }), gate);
+    t.status = t.acceptance.status; t.reason = null;
+    const output = t.acceptance.accepted.map(entry => ({ source: "demo-knowledge" as const, sourceId: entry.id, title: entry.title, body: entry.body, scope: { shopId: null, productId: null } }));
+    knowledgeCall.output = output; t.sources = output.map(entry => ({ sourceId: entry.sourceId, version: contentHash(entry) }));
+    r.evidence.rules = output.map(entry => ({ ...entry, version: contentHash(entry) })); r.evidence.knowledge = [{ callId: knowledgeCall.id, context: ctx, trace: t }];
+    return value;
+  }
+  const boundQuestion = `订单 ${order.id} 是否符合退款条件？`;
+  const boundAction: ContextSupportAction = { protocol: "v2.2", kind: "policy", question: boundQuestion, questionContext: { kind: "standalone" }, orderRef: { kind: "explicit", orderId: order.id } };
+  const boundTurn = { ...declaredTurn, question: boundQuestion, expected: { ...declaredTurn.expected, allowedKinds: ["policy", "refund_eligibility"] as ReadKind[] } };
+  const scoreBound = (value: C1ValidationActual, expected = boundTurn, configuration = bindingConfiguration, history: C1ValidationHistory = [], documents = [doc, multiDoc]) =>
+    scoreC1ValidationTurn(expected, value, documents, reviewed(value, expected), configuration, history);
+  const boundPolicy = boundActual({ question: boundQuestion, action: boundAction, order });
+  const boundRefund = boundActual({ question: boundQuestion, action: { ...boundAction, kind: "refund_eligibility", orderRef: { kind: "explicit", orderId: order.id } }, order });
+  assert.equal(scoreBound(boundPolicy).passed, true); assert.equal(scoreBound(boundRefund).passed, true);
+  assert.deepEqual(boundPolicy.calls[1]!.knowledge!.trace.applicability, boundRefund.calls[1]!.knowledge!.trace.applicability);
+  for (const mutate of [
+    (value: C1ValidationActual) => { delete value.calls[1]!.knowledge!.context.evidenceBindingVersion; },
+    (value: C1ValidationActual) => { value.calls[1]!.knowledge!.context.evidenceUse = "explanation"; },
+    (value: C1ValidationActual) => { value.calls[1]!.knowledge!.context.purpose = "user_policy"; },
+    (value: C1ValidationActual) => { value.calls[1]!.knowledge!.context.facts!.couponCounts!.total = 2; },
+    (value: C1ValidationActual) => { value.calls[1]!.knowledge!.context.facts!.couponDates![0]!.expiredAtAsOf = true; },
+    (value: C1ValidationActual) => { value.calls[1]!.knowledge!.context.evidenceTarget!.basis = "invented"; },
+    (value: C1ValidationActual) => { value.calls[0]!.parentSpanId = "old-request"; },
+    (value: C1ValidationActual) => { value.calls[0]!.output = { ...order, coupons: [] }; },
+    (value: C1ValidationActual) => { value.ingress!.groupOpenid = "other-group"; },
+  ]) { const forged = structuredClone(boundPolicy); mutate(forged); assert.equal(scoreBound(forged).evidenceProofPassed, false); }
+  const modelOnly = boundActual({ question: boundQuestion, action: boundAction, order, mode: "model_only" }, [doc]);
+  const modelConfiguration = { evidenceBindingVersion };
+  assert.equal(scoreC1ValidationTurn(boundTurn, modelOnly, [doc], reviewed(modelOnly, boundTurn), modelConfiguration).passed, true);
+  modelOnly.calls[1]!.knowledge!.context.facts!.status = "refunded";
+  assert.equal(scoreC1ValidationTurn(boundTurn, modelOnly, [doc], undefined, modelConfiguration).evidenceProofPassed, false);
+  const hypothetical = `订单 ${order.id}，假设有两张未核销券，规则是什么？`;
+  const ruleAction: ContextSupportAction = { ...boundAction, question: hypothetical, evidenceTarget: { kind: "rule_only", basis: "假设有两张未核销券" } };
+  const ruleOnly = boundActual({ question: hypothetical, action: ruleAction, order });
+  const hypotheticalTurn = { ...boundTurn, question: hypothetical, expected: { ...boundTurn.expected, gold: [doc, multiDoc].map(entry => ({ sourceId: entry.id, quote: entry.body })) } };
+  assert.equal(scoreBound(ruleOnly, hypotheticalTurn).passed, true); assert.equal(ruleOnly.calls[1]!.knowledge!.context.applicability, undefined);
+  assert.deepEqual(scoreBound(ruleOnly, hypotheticalTurn).applicabilityUncheckedIds, [multiDoc.id, doc.id]);
+  const previousQuestion = "假设有两张未核销券，规则是什么？";
+  const previousAction: ContextSupportAction = { protocol: "v2.2", kind: "policy", question: previousQuestion, questionContext: { kind: "standalone" } };
+  const previous = boundActual({ question: previousQuestion, action: previousAction, requestId: "prior-rule" }, [doc]);
+  const prior: TrustedPolicyTopic = { requestId: previous.requestId!, sourceKey: merchantSourceKey(previous.ingress!.identity, previous.ingress!.groupOpenid),
+    groupOpenid: previous.ingress!.groupOpenid, originalQuery: previousQuestion, orderId: null, scope: { shopId: null, productId: null }, intent: "policy",
+    sources: previous.result!.evidence.rules.map(rule => ({ sourceId: rule.sourceId, version: rule.version })) };
+  previous.result!.verifiedPolicyTopic = prior;
+  const followQuestion = "那这种情况呢？", followAction: ContextSupportAction = { ...previousAction, question: followQuestion,
+    questionContext: { kind: "previous", requestId: prior.requestId }, evidenceTarget: { kind: "rule_only", basis: "假设有两张未核销券" } };
+  const follow = boundActual({ question: followQuestion, action: followAction, requestId: "follow-rule", turn: 2, topic: prior }, [doc]);
+  const followTurn = { ...positive, question: followQuestion };
+  const priorHistory = [{ question: previousQuestion, actual: previous }];
+  assert.equal(scoreBound(follow, followTurn, bindingConfiguration, priorHistory, [doc]).passed, true);
+  assert.equal(scoreBound(follow, followTurn, bindingConfiguration, [], [doc]).evidenceProofPassed, false);
+  for (const mutate of [
+    (value: C1ValidationActual) => { value.result!.verifiedPolicyTopic!.originalQuery = "invented earlier condition"; },
+    (value: C1ValidationActual) => { value.ingress!.identity.senderId = "other-user"; },
+    (value: C1ValidationActual) => { value.result!.verifiedPolicyTopic!.sources[0]!.version = "0".repeat(64); },
+  ]) { const forgedPrior = structuredClone(previous); mutate(forgedPrior);
+    assert.equal(scoreBound(follow, followTurn, bindingConfiguration, [{ question: previousQuestion, actual: forgedPrior }], [doc]).evidenceProofPassed, false); }
+  const changedQuestion = { ...followTurn, question: "different actual input" };
+  assert.equal(scoreBound(follow, changedQuestion, bindingConfiguration, priorHistory, [doc]).evidenceProofPassed, false);
+  // Amount candidates are real host displays; a model-written latest requestId
+  // or selectedToken must not impersonate a user's deterministic selection.
+  const amountOrder = structuredClone(order); amountOrder.status = "partially_redeemed";
+  amountOrder.items[0]!.quantity = 2; amountOrder.items[0]!.totalCents = 200;
+  amountOrder.amounts = { totalCents: 200, paidCents: 200, refundedCents: 0 }; amountOrder.payments[0]!.amountCents = 200;
+  amountOrder.coupons.push({ ...amountOrder.coupons[0]!, id: "unit-redeemed", status: "redeemed" });
+  const now = Date.parse(order.asOf), identity = { appId: "unit-app", senderId: "unit-user" }, groupOpenid = "unit-group";
+  const amountBinding = { sourceKey: merchantSourceKey(identity, groupOpenid), groupOpenid };
+  const display = (fresh: Order, requestId: string, turnIndex: number): C1ValidationActual => {
+    const value = structuredClone(orderActual), r = value.result!, reference = createAmountReference(fresh, amountBinding, requestId)!;
+    value.requestId = requestId; value.turn = turnIndex; value.ingress = { identity, requestId, groupOpenid, messageId: requestId + "-message", observedAt: order.asOf };
+    r.action = { protocol: "v2.2", kind: "order", orderRef: { kind: "explicit", orderId: fresh.id } }; r.evidence.action = r.action;
+    r.evidence.requestId = requestId; r.evidence.trustedRoute = { groupOpenid, messageId: value.ingress.messageId }; r.evidence.order = fresh;
+    value.calls[0]!.parentSpanId = requestId; value.calls[0]!.input = { orderId: fresh.id }; value.calls[0]!.output = fresh; r.evidence.actualCalls = value.calls;
+    r.reply = { kind: "order", text: "Synthetic actual paid-unit display", orders: [{ id: fresh.id, status: fresh.status,
+      paidCents: fresh.amounts.paidCents, refundedCents: fresh.amounts.refundedCents, couponStatuses: fresh.coupons.map(coupon => coupon.status) }], evidenceIds: [] };
+    value.reply = r.reply; r.verifiedAmountReference = reference; r.evidence.displayedPaidUnit = reference;
+    return value;
+  };
+  const displayed = display(amountOrder, "amount-display", 1), amountReference = displayed.result!.verifiedAmountReference!;
+  const comparison = display(amountOrder, "amount-compare", 3);
+  comparison.result!.action = { protocol: "v2.2", kind: "paid_amount_compare", orderRef: { kind: "focus" }, amountRef: { requestId: amountReference.requestId } };
+  comparison.result!.evidence.action = comparison.result!.action;
+  comparison.result!.evidence.amountChoices = rememberAmountChoice(undefined, amountBinding, amountReference, now)!;
+  comparison.result!.evidence.amountComparison = compareRemainingAmount(amountOrder, amountReference, amountBinding)!;
+  comparison.hostReference = { orderId: amountOrder.id, itemPaidUnit: { requestId: amountReference.requestId, paidCents: amountReference.paidCents } };
+  const amountTurn: C1ValidationTurn = { question: "当前剩余券实付和之前显示的一样吗？", expected: { ...orderTurn.expected,
+    allowedKinds: ["paid_amount_compare"], reference: "amount", freshOrder: amountOrder,
+    amount: { couponId: amountOrder.coupons[0]!.id, remainingUnitPaidCents: 100, referencePaidCents: 100, comparisonEqual: true } } };
+  const amountHistory: C1ValidationHistory = [{ question: `查询 ${amountOrder.id}`, actual: displayed }];
+  const scoreAmount = (value: C1ValidationActual, history = amountHistory) => scoreC1ValidationTurn(amountTurn, value, [doc], reviewed(value, amountTurn), { evidenceBindingVersion }, history);
+  assert.equal(scoreAmount(comparison).passed, true); assert.equal(scoreAmount(comparison, []).amountEvidenceProofPassed, false);
+  const notDelivered = structuredClone(displayed); notDelivered.reply = { kind: "notice", text: "未能展示金额" };
+  assert.equal(scoreAmount(comparison, [{ question: amountHistory[0]!.question, actual: notDelivered }]).amountEvidenceProofPassed, false,
+    "A hidden fixed tool result cannot become a delivered amount reference");
+  const secondOrder = { ...structuredClone(amountOrder), id: "COUPON-8888" }, secondDisplay = display(secondOrder, "second-display", 2);
+  const competingAmount = structuredClone(comparison);
+  competingAmount.result!.evidence.amountChoices = rememberAmountChoice(comparison.result!.evidence.amountChoices, amountBinding, secondDisplay.result!.verifiedAmountReference!, now)!;
+  const twoDisplays = [...amountHistory, { question: `查询 ${secondOrder.id}`, actual: secondDisplay }];
+  assert.equal(scoreAmount(competingAmount, twoDisplays).amountEvidenceProofPassed, false, "Two displays cannot silently become the most recent reference");
+  const selectedAmount = structuredClone(competingAmount), choices = selectedAmount.result!.evidence.amountChoices!;
+  choices.selectedToken = choices.candidates[0]!.token; selectedAmount.turn = 4;
+  assert.equal(scoreAmount(selectedAmount, twoDisplays).amountEvidenceProofPassed, false, "A forged selectedToken has no user receipt");
+  const receipt: SupportHostReceipt = { version: "amount-selection-v1", requestId: "amount-selection", sourceKey: amountBinding.sourceKey,
+    trustedRoute: { groupOpenid, messageId: "selection-message" }, outcome: "selected", selectedRequestId: amountReference.requestId,
+    choices: structuredClone(choices), reply: { kind: "notice", text: "Synthetic selected host receipt" } };
+  const selection: C1ValidationActual = { caseId: selectedAmount.caseId, turn: 3, requestId: receipt.requestId, execution: "completed", durationMs: 1,
+    ingress: { identity, groupOpenid, messageId: receipt.trustedRoute.messageId, requestId: receipt.requestId, observedAt: order.asOf },
+    hostReceipt: receipt, reply: receipt.reply, calls: [], steps: [], requests: [] };
+  const selectedHistory = [...twoDisplays, { question: `选择金额基准 ${choices.selectedToken}`, actual: selection }];
+  assert.equal(scoreAmount(selectedAmount, selectedHistory).passed, true);
+  for (const mutate of [
+    (value: C1ValidationActual) => { value.hostReceipt!.sourceKey = "another actor"; },
+    (value: C1ValidationActual) => { value.hostReceipt!.selectedRequestId = "forged-display"; },
+    (value: C1ValidationActual) => { value.hostReceipt!.historyFailed = true; },
+  ]) { const forged = structuredClone(selection); mutate(forged);
+    assert.equal(scoreAmount(selectedAmount, [...twoDisplays, { question: selectedHistory[2]!.question, actual: forged }]).amountEvidenceProofPassed, false); }
+  assert.equal(scoreAmount(selectedAmount, [...twoDisplays, { question: "请你帮我选最新的金额", actual: selection }]).amountEvidenceProofPassed, false);
+  const afterRejected = structuredClone(selectedAmount); afterRejected.turn = 5;
+  const rejectedSelection = structuredClone(selection); rejectedSelection.turn = 4; rejectedSelection.requestId = "rejected-selection";
+  rejectedSelection.hostReceipt!.outcome = "rejected"; delete rejectedSelection.hostReceipt!.selectedRequestId;
+  assert.equal(scoreAmount(afterRejected, [...selectedHistory, { question: "选择金额基准 invalid", actual: rejectedSelection }]).amountEvidenceProofPassed, false,
+    "A later rejected selection must not revive an earlier selected token");
+  const expired = structuredClone(comparison); expired.result!.evidence.amountChoices!.candidates[0]!.expiresAt = now;
+  assert.equal(scoreAmount(expired).amountEvidenceProofPassed, false, "TTL is checked at the actual read time");
+  const extended = structuredClone(comparison); extended.result!.evidence.amountChoices!.candidates[0]!.expiresAt += 60_000;
+  assert.equal(scoreAmount(extended).amountEvidenceProofPassed, false, "A trace cannot invent a later expiry");
   console.log("C1 pure scoring checks passed: schema/manifest, planned denominators, fresh authorization and declared metadata replay, unknown/invalid/extra evidence, reply/topic bindings; no final dataset or API.");
 }
 

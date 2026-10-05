@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import type { CouponStore } from "./coupon-store.ts";
 
 type Order = Awaited<ReturnType<CouponStore["getOrder"]>>;
@@ -8,6 +8,16 @@ export type TrustedAmountReference = Binding & {
   requestId: string; orderId: string; itemId: string; productId: string;
   field: "item_paid_unit"; paidCents: number; orderVersion: string;
 };
+export const amountChoicesVersion = "amount-choices-v1" as const;
+export const amountChoiceTtlMs = 15 * 60_000;
+export type TrustedAmountChoices = Binding & {
+  version: typeof amountChoicesVersion;
+  candidates: Array<{ token: string; version: string; expiresAt: number; reference: TrustedAmountReference }>;
+  overflow: boolean;
+  // Expiry must not silently choose the survivor of an earlier ambiguous list.
+  selectionRequired: boolean;
+  selectedToken?: string;
+};
 export type RemainingAmountComparison = {
   orderId: string; couponId: string; itemId: string; productId: string; asOf: string;
   remainingCouponCount: 1; remainingUnitPaidCents: number; referencePaidCents: number; comparisonEqual: boolean;
@@ -15,6 +25,55 @@ export type RemainingAmountComparison = {
 };
 export const orderVersion = (order: Order) => createHash("sha256").update(JSON.stringify(order)).digest("hex");
 const bound = (value: Binding | undefined, binding: Binding) => value?.sourceKey === binding.sourceKey && value.groupOpenid === binding.groupOpenid;
+const amountVersion = (reference: TrustedAmountReference) => createHash("sha256").update(JSON.stringify(reference)).digest("hex");
+const amountSource = (reference: TrustedAmountReference) => JSON.stringify([reference.orderId, reference.itemId, reference.productId]);
+const validAmount = (reference: TrustedAmountReference, binding: Binding) => bound(reference, binding)
+  && /^COUPON-\d{4}$/.test(reference.orderId) && Boolean(reference.requestId && reference.itemId && reference.productId)
+  && reference.field === "item_paid_unit" && Number.isSafeInteger(reference.paidCents) && reference.paidCents > 0
+  && /^[a-f0-9]{64}$/.test(reference.orderVersion);
+export function currentAmountChoices(choices: TrustedAmountChoices | undefined, binding: Binding, now = Date.now()): TrustedAmountChoices | undefined {
+  if (!bound(choices, binding) || choices!.version !== amountChoicesVersion || !Array.isArray(choices!.candidates)
+    || choices!.candidates.length > 2 || typeof choices!.overflow !== "boolean" || typeof choices!.selectionRequired !== "boolean"
+    || new Set(choices!.candidates.map(row => row.token)).size !== choices!.candidates.length
+    || new Set(choices!.candidates.map(row => amountSource(row.reference))).size !== choices!.candidates.length
+    || choices!.candidates.some(row => !/^[a-f0-9-]{36}$/.test(row.token) || !validAmount(row.reference, binding)
+      || row.version !== amountVersion(row.reference) || !Number.isSafeInteger(row.expiresAt))) return undefined;
+  const candidates = choices!.candidates.filter(row => row.expiresAt > now);
+  if (!candidates.length) return undefined;
+  const selectedToken = candidates.some(row => row.token === choices!.selectedToken) ? choices!.selectedToken : undefined;
+  return { ...structuredClone(choices!), candidates: structuredClone(candidates), selectedToken,
+    selectionRequired: choices!.selectionRequired || choices!.overflow || choices!.candidates.length > 1 };
+}
+export function rememberAmountChoice(previous: TrustedAmountChoices | undefined, binding: Binding,
+  reference: TrustedAmountReference, now = Date.now()): TrustedAmountChoices | undefined {
+  if (!validAmount(reference, binding)) return undefined;
+  const before = currentAmountChoices(previous, binding, now);
+  const candidates = [...(before?.candidates ?? []).filter(row => amountSource(row.reference) !== amountSource(reference)),
+    { token: randomUUID(), version: amountVersion(reference), expiresAt: now + amountChoiceTtlMs, reference: structuredClone(reference) }];
+  return { ...binding, version: amountChoicesVersion, candidates: candidates.slice(-2),
+    overflow: Boolean(before?.overflow) || candidates.length > 2,
+    selectionRequired: Boolean(before?.selectionRequired) || candidates.length > 1 };
+}
+export function selectAmountChoice(choices: TrustedAmountChoices | undefined, binding: Binding, token: string,
+  now = Date.now()): TrustedAmountChoices | undefined {
+  const current = currentAmountChoices(choices, binding, now);
+  return current?.candidates.some(row => row.token === token) ? { ...current, selectedToken: token } : undefined;
+}
+export function resolveAmountReference(choices: TrustedAmountChoices | undefined, binding: Binding,
+  now = Date.now()): TrustedAmountReference | undefined {
+  const current = currentAmountChoices(choices, binding, now);
+  const selected = current?.selectedToken ? current.candidates.find(row => row.token === current.selectedToken)
+    : current && !current.selectionRequired && !current.overflow && current.candidates.length === 1 ? current.candidates[0] : undefined;
+  return selected ? structuredClone(selected.reference) : undefined;
+}
+export function amountChoiceNotice(choices: TrustedAmountChoices | undefined, binding: Binding): string {
+  const current = currentAmountChoices(choices, binding);
+  if (!current) return "缺少仍有效的历史实付展示。请先查询要作基准的订单，取得每券实付展示；用户提供的数字不能代替支付记录。";
+  return "请明确选择用于比较的历史实付基准，订单焦点或模型引用不能代替你的选择。\n"
+    + current.candidates.map(row => `${row.reference.orderId} / 商品 ${row.reference.productId}：每券实付 ${(row.reference.paidCents / 100).toFixed(2)} 元。\n选择金额基准 ${row.token}`).join("\n")
+    + (current.overflow ? "\n历史展示超过两个，这里只列最近两个来源；如需其他来源，请重新查询该订单。" : "")
+    + "\n请单独发送一行选择指令。当前只支持同一订单的实付比较，选择其他订单不会执行跨订单比较；这不表示退款批准。";
+}
 export function rememberOrderChoice(previous: TrustedOrderChoices | undefined, binding: Binding, orderId: string, requestId: string): TrustedOrderChoices {
   const before = bound(previous, binding) ? previous!.orders : [];
   const orders = [...before.filter(row => row.orderId !== orderId), { orderId, requestId }];

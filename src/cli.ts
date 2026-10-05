@@ -12,7 +12,7 @@ import { RefundStore, readRefundDatabaseConfig } from "./refunds.ts";
 import { confirmRefundReply, markRefundReplyPresented } from "./refund-entry.ts";
 import { renderReply, type Reply } from "./reply.ts";
 import { replyFromTools } from "./reply-from-tools.ts";
-import { cancelSupportTurn, createSupportSession, getSupportResult, prepareSupportPrompt, readSupportArchitecture, supportReply } from "./support-session.ts";
+import { cancelSupportTurn, createSupportSession, getSupportHostReceipt, getSupportResult, prepareSupportPrompt, readSupportArchitecture, supportReply } from "./support-session.ts";
 import { createKnowledgeService } from "./knowledge-service.ts";
 import { readKnowledgeParameters, resolveSupportRunParameters } from "./support-parameters.ts";
 
@@ -26,7 +26,7 @@ export async function runCliPrompt(
   let modelFailed = false;
   try {
     await session.prompt(text, { expandPromptTemplates: false });
-    if (session.agent.state.errorMessage) throw new Error("模型请求失败。");
+    if (!getSupportHostReceipt(session) && session.agent.state.errorMessage) throw new Error("模型请求失败。");
   } catch {
     modelFailed = true;
     cancelSupportTurn(session);

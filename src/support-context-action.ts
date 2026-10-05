@@ -16,26 +16,38 @@ const questionContext = Type.Union([
 ]);
 const question = Type.String({ minLength: 1, maxLength: 500, pattern: "\\S" });
 const productMention = Type.Optional(Type.String({ minLength: 2, maxLength: 80, pattern: "\\S" }));
-const common = supportActionSchema.anyOf.filter(schema => !["policy", "refund_eligibility"].includes(schema.properties.kind.const))
+const evidenceTarget = Type.Optional(Type.Union([
+  Type.Object({ kind: Type.Literal("current_order") }, { additionalProperties: false }),
+  Type.Object({ kind: Type.Literal("rule_only"), basis: question }, { additionalProperties: false }),
+]));
+const clarificationFields = ["order", "reason", "intent", "amount_basis", "policy_topic", "time_channel", "actor"] as const;
+const common = supportActionSchema.anyOf.filter(schema => !["policy", "refund_eligibility", "clarify"].includes(schema.properties.kind.const))
   .map(schema => Type.Object({ ...schema.properties, protocol }, { additionalProperties: false }));
 
 // The historical v2.1 schema is immutable: current sessions expose only this version.
 export const contextSupportActionSchema = Type.Union([...common,
   Type.Object({ protocol, kind: Type.Literal("policy"), question, questionContext,
-    orderRef: Type.Optional(readOrderRef), productMention }, { additionalProperties: false }),
+    orderRef: Type.Optional(readOrderRef), productMention, evidenceTarget }, { additionalProperties: false }),
   Type.Object({ protocol, kind: Type.Literal("refund_eligibility"), question, questionContext,
-    orderRef: readOrderRef, productMention }, { additionalProperties: false }),
+    orderRef: readOrderRef, productMention, evidenceTarget }, { additionalProperties: false }),
   Type.Object({ protocol, kind: Type.Literal("paid_amount_compare"), orderRef: currentOrderRef,
     amountRef: Type.Object({ requestId }, { additionalProperties: false }), productMention }, { additionalProperties: false }),
+  Type.Object({ protocol, kind: Type.Literal("clarify"),
+    field: Type.Union(clarificationFields.map(field => Type.Literal(field))),
+    reason: Type.Union([Type.Literal("missing"), Type.Literal("ambiguous"), Type.Literal("multiple_intents")]),
+  }, { additionalProperties: false }),
 ]);
 export const contextSupportActionParameters = Type.Object({ action: contextSupportActionSchema }, { additionalProperties: false });
 export type ContextQuestionRef = { kind: "standalone" } | { kind: "previous"; requestId: string };
 export type ContextOrderRef = SupportOrderRef | { kind: "alternative" };
+export type ContextEvidenceTarget = { kind: "current_order" } | { kind: "rule_only"; basis: string };
+export type ContextClarificationField = typeof clarificationFields[number];
 export type ContextSupportAction = { protocol: "v2.2" } & (
-  Exclude<SupportAction, { kind: "policy" | "refund_eligibility" }>
-  | { kind: "policy"; question: string; questionContext: ContextQuestionRef; orderRef?: ContextOrderRef; productMention?: string }
-  | { kind: "refund_eligibility"; question: string; questionContext: ContextQuestionRef; orderRef: ContextOrderRef; productMention?: string }
+  Exclude<SupportAction, { kind: "policy" | "refund_eligibility" | "clarify" }>
+  | { kind: "policy"; question: string; questionContext: ContextQuestionRef; orderRef?: ContextOrderRef; productMention?: string; evidenceTarget?: ContextEvidenceTarget }
+  | { kind: "refund_eligibility"; question: string; questionContext: ContextQuestionRef; orderRef: ContextOrderRef; productMention?: string; evidenceTarget?: ContextEvidenceTarget }
   | { kind: "paid_amount_compare"; orderRef: SupportOrderRef; amountRef: { requestId: string }; productMention?: string }
+  | { kind: "clarify"; field: ContextClarificationField; reason: "missing" | "ambiguous" | "multiple_intents" }
 );
 export type AnySupportAction = SupportAction | ContextSupportAction;
 export const isContextSupportAction = (action: AnySupportAction): action is ContextSupportAction => "protocol" in action;

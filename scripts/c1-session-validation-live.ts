@@ -4,6 +4,7 @@ import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
 import { isDeepStrictEqual } from "node:util";
 import { createConfiguredModelRuntime } from "../src/agent.ts";
+import { merchantSourceKey } from "../src/after-sales.ts";
 import { BailianError, contentHash, createBailianClient, type BailianClient } from "../src/bailian.ts";
 import { OrderAccessError, type CouponStore, type QQIdentity } from "../src/coupon-store.ts";
 import { createEvidenceSupportClient, EvidenceSupportError, resolveEvidenceSupportModel, type EvidenceSupportSettings } from "../src/evidence-support.ts";
@@ -11,7 +12,7 @@ import { captureEvaluationTurn } from "../src/eval-capture.ts";
 import { loadKnowledgeApplicabilitySnapshot, type KnowledgeApplicabilitySnapshot } from "../src/knowledge-applicability.ts";
 import { createKnowledgeService } from "../src/knowledge-service.ts";
 import type { RetrievalDocument } from "../src/retrieval-ranking.ts";
-import { cancelSupportTurn, createSupportSession, getSupportResult, prepareSupportPrompt, supportReply } from "../src/support-session.ts";
+import { cancelSupportTurn, createSupportSession, getSupportHostReceipt, getSupportResult, prepareSupportPrompt, supportReply } from "../src/support-session.ts";
 import { resolveSupportRunParameters, type SupportExperimentParameters } from "../src/support-parameters.ts";
 import { checkC1ValidationScoring, scoreC1ValidationTurn, summarizeC1Validation, verifyC1ValidationManifest,
   type C1AnswerReview, type C1ValidationActual, type C1ValidationManifest, type C1ValidationPlan, type C1ValidationTurn } from "./c1-session-validation-check.ts";
@@ -27,6 +28,8 @@ type ModelSnapshot = { provider: string; id: string; api: string; baseUrl: strin
 export type C1ValidationSetup = {
   version: 1;
   configuration: { architecture: "controller"; parameters: SupportExperimentParameters; model: ModelSnapshot;
+    evidenceBindingVersion: "order-evidence-binding-v2";
+    dataUse: "fixed-validation-not-blind" | "exposed-development";
     support: EvidenceSupportSettings; rerank: BailianClient["settings"];
     pricing: { estimated: true; asOf: string; source: "Pi catalog and Bailian published estimate"; rerankCnyPerMillionTokens: number | null };
     dependencySnapshot: Awaited<ReturnType<typeof readC1ValidationDependencies>>;
@@ -40,7 +43,7 @@ type Request = { operation: Operation; caseId: string; turn: number; requestId: 
   currency: "USD" | "CNY"; usageRecorded: boolean };
 type Active = { caseId: string; turn: number; requestId: string; signal: AbortSignal };
 type Actual = C1ValidationActual & { reason: string | null; replyHash: string | null; modelFinalText: string | null;
-  ingress: { identity: QQIdentity; groupOpenid: string; messageId: string; requestId: string } | null;
+  ingress: { identity: QQIdentity; groupOpenid: string; messageId: string; requestId: string; observedAt: string } | null;
   ingressIntegrityPassed: boolean | null;
   sdkRetryEvents: Array<{ type: string; attempt: number }>; storeReads: StoreRead[];
   stateChange: { applied: boolean; beforeHash: string; afterHash: string | null } | null };
@@ -144,6 +147,8 @@ export async function loadC1ValidationExecution(planPath: string, manifestPath: 
   const setup = JSON.parse(input[setupPath]!.toString()) as C1ValidationSetup;
   assert.equal(setup.version, 1); assert.equal(setup.configuration.architecture, "controller");
   const configuration = setup.configuration, parameters = configuration.parameters;
+  assert.equal(configuration.evidenceBindingVersion, "order-evidence-binding-v2", "Freeze the current evidence binding contract explicitly");
+  assert.ok(["fixed-validation-not-blind", "exposed-development"].includes(configuration.dataUse), "Declare whether the questions were exposed");
   assert.deepEqual(configuration.dependencySnapshot, await readC1ValidationDependencies(), "Actual runtime dependencies differ from frozen candidate");
   assert.deepEqual(configuration.limits, c1ValidationLimits);
   assert.deepEqual(resolveSupportRunParameters("controller", parameters), parameters, "Freeze resolved parameters, not implicit defaults");
@@ -190,6 +195,9 @@ function ingressIntegrity(row: Actual) {
   const ingress = row.ingress;
   return Boolean(ingress && row.requestId === ingress.requestId && (!row.result || row.result.evidence.requestId === ingress.requestId
     && row.result.evidence.trustedRoute.groupOpenid === ingress.groupOpenid && row.result.evidence.trustedRoute.messageId === ingress.messageId)
+    && (!row.hostReceipt || row.hostReceipt.requestId === ingress.requestId
+      && row.hostReceipt.sourceKey === merchantSourceKey(ingress.identity, ingress.groupOpenid)
+      && row.hostReceipt.trustedRoute.groupOpenid === ingress.groupOpenid && row.hostReceipt.trustedRoute.messageId === ingress.messageId)
     && row.requests.every(request => request.caseId === row.caseId && request.turn === row.turn)
     && row.storeReads.every(read => read.requestId === ingress.requestId && isDeepStrictEqual(read.identity, ingress.identity)
       && (!read.allowed || isDeepStrictEqual(read.owner, ingress.identity)))
@@ -225,7 +233,7 @@ export async function runC1SessionValidation(planPath: string, manifestPath: str
   const rows = plannedRows(plan), cleanup: Array<{ caseId: string; sessionDisposed: boolean; remainingOrders: number }> = [];
   const directory = new URL(".runtime/c1-session-validation/", root); await mkdir(directory, { recursive: true });
   const path = new URL(`${runId}.json`, directory);
-  const artifact = { version: 1, runId, startedAt, finishedAt: null as string | null, stage: "fixed-validation-not-blind",
+  const artifact = { version: 1, runId, startedAt, finishedAt: null as string | null, stage: config.dataUse,
     scope: "Real production Pi Session and providers; isolated synthetic in-memory orders; no SQL, QQ transport or money transfer.",
     manifest, plan, setup, actualSettings: null as null | { model: ModelSnapshot; support: EvidenceSupportSettings; rerank: BailianClient["settings"] },
     rows, requests: guard.requests, cleanup, codeHashes: { before: loaded.before, after: {} as Record<string, string> }, codeStable: false,
@@ -235,7 +243,8 @@ export async function runC1SessionValidation(planPath: string, manifestPath: str
     usage: guard.usage(), stopReason: null as string | null, failure: null as string | null, summary: {} as Record<string, unknown>,
     answerReviewInputs: reviewInputs(plan, rows), reviews: [] as C1AnswerReview[], runIntegrityPassed: false, admitted: false };
   const save = () => writeFile(path, `${JSON.stringify(artifact, null, 2)}\n`);
-  const knowledgeConfiguration = { applicability: p.knowledgeApplicability, applicabilitySnapshot: setup.applicabilitySnapshot };
+  const knowledgeConfiguration = { applicability: p.knowledgeApplicability, applicabilitySnapshot: setup.applicabilitySnapshot,
+    evidenceBindingVersion: config.evidenceBindingVersion };
   await save();
   let restoreStream: (() => void) | undefined;
   try {
@@ -289,7 +298,8 @@ export async function runC1SessionValidation(planPath: string, manifestPath: str
           if (turn.stateChange) row.stateChange = controlled.change(turn.stateChange);
           const abort = new AbortController(), requestId = `${runId}:${item.id}:${index + 1}`;
           const active = { caseId: item.id, turn: index + 1, requestId, signal: abort.signal };
-          row.ingress = { identity: structuredClone(fixture.actor), groupOpenid: fixture.groupOpenid, messageId: requestId, requestId };
+          row.ingress = { identity: structuredClone(fixture.actor), groupOpenid: fixture.groupOpenid, messageId: requestId, requestId,
+            observedAt: new Date().toISOString() };
           row.requestId = requestId; row.reason = null;
           guard.setActive(active); controlled.setActive({ ingress: active, reads: row.storeReads });
           let collecting = true;
@@ -321,6 +331,7 @@ export async function runC1SessionValidation(planPath: string, manifestPath: str
           const measured = capture.finish(); row.durationMs = measured.durationMs; row.steps = measured.steps;
           row.requests = structuredClone(guard.requests.slice(requestStart)); row.hostReference = lastHost(session.messages.slice(messagesBefore));
           const result = getSupportResult(session); if (result) row.result = structuredClone(result);
+          const hostReceipt = getSupportHostReceipt(session); if (hostReceipt) row.hostReceipt = hostReceipt;
           const finalMessage = session.messages.slice(messagesBefore).findLast(message => message.role === "assistant");
           row.modelFinalText = finalMessage?.role === "assistant" ? finalMessage.content.filter(part => part.type === "text").map(part => part.text).join("") : null;
           row.reply = supportReply(session, row.modelFinalText ?? ""); row.replyHash = row.reply === undefined ? null : contentHash(row.reply);
@@ -328,7 +339,9 @@ export async function runC1SessionValidation(planPath: string, manifestPath: str
           row.execution = !failed && !timedOut && !measured.failed && !row.steps.some(step => step.type === "model" && step.isError) ? "completed" : "failed";
           if (!row.ingressIntegrityPassed) row.execution = "failed";
           row.reason = timedOut ? "turn_timeout" : row.execution === "failed" ? guard.stopped() ?? "session_failed" : null;
-          const score = scoreC1ValidationTurn(turn, row, setup.corpora[item.corpus], undefined, knowledgeConfiguration);
+          const history = item.turns.slice(0, index).map((prior, priorIndex) => ({ question: prior.question,
+            actual: rows.find(value => value.caseId === item.id && value.turn === priorIndex + 1)! }));
+          const score = scoreC1ValidationTurn(turn, row, setup.corpora[item.corpus], undefined, knowledgeConfiguration, history);
           // Reply review happens later. Only a real, correct prior business result can establish context;
           // valid evidence may survive an invalid sibling without pretending integrity passed.
           priorPassed = score.engineeringPassed && score.knowledgePassed;
@@ -412,7 +425,8 @@ export async function checkC1ValidationExecutor() {
   store.orders.clear(); assert.equal(store.orders.size, 0);
   const unitPlan = { cases: [{ id: "unit", turns: [{}, {}] }] } as C1ValidationPlan;
   const rows = plannedRows(unitPlan); assert.equal(rows.length, 2); assert.ok(rows.every(row => row.execution === "not_run" && row.requestId === null));
-  const row = rows[0]!; row.requestId = active.requestId; row.ingress = { identity: actor, groupOpenid: "unit-group", messageId: "unit-message", requestId: active.requestId };
+  const row = rows[0]!; row.requestId = active.requestId; row.ingress = { identity: actor, groupOpenid: "unit-group", messageId: "unit-message", requestId: active.requestId,
+    observedAt: new Date().toISOString() };
   row.storeReads = [reads[0]!]; assert.equal(ingressIntegrity(row), true);
   row.storeReads[0] = { ...reads[0]!, owner: { ...actor, senderId: "other" } }; assert.equal(ingressIntegrity(row), false);
   console.log("C1 validation executor engineering checks passed: per-operation HTTP caps, soft costs, unknown usage, deadline/abort, actual actor/ownership/state transition, complete placeholders; no API or final questions.");

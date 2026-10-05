@@ -26,6 +26,14 @@ await import("./retrieval-context-check.ts");
 // Deterministic v2 checks only: faux Pi, in-memory services and mocked provider fetch.
 await import("./support-controller-check.ts");
 await import("./support-session-check.ts");
+await import("./support-clarification-check.ts");
+const { checkSupportAmountContext } = await import("./support-amount-context-check.ts");
+await checkSupportAmountContext();
+await import("./support-host-entry-check.ts");
+await import("./support-session-race-check.ts");
+await import("./support-evidence-context-check.ts");
+const { checkAmountSelectionProbe } = await import("./c1-amount-selection-live.ts");
+await checkAmountSelectionProbe();
 await import("./support-notification-check.ts");
 await import("./support-v2-check.ts");
 await import("./retrieval-v2-ranking-check.ts");

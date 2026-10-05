@@ -3,15 +3,17 @@ import { isDeepStrictEqual } from "node:util";
 import { MerchantBusinessError, merchantReasonControls, merchantSourceKey, type AfterSalesStore, type MerchantTask } from "./after-sales.ts";
 import { OrderAccessError, type CouponStore, type QQIdentity } from "./coupon-store.ts";
 import type { KnowledgeService, KnowledgeTrace } from "./knowledge-service.ts";
-import { buildKnowledgeApplicabilityContext, type KnowledgeApplicabilityContext } from "./knowledge-applicability.ts";
+import type { KnowledgeApplicabilityContext } from "./knowledge-applicability.ts";
+import { buildSupportEvidenceBinding, validateSupportEvidenceTarget, SupportEvidenceFactsError, orderRefundState as refundQuery,
+  type SupportEvidenceTarget, type SupportOrderFacts } from "./support-evidence-context.ts";
 import { RefundBusinessError, type RefundStore } from "./refunds.ts";
 import { isRefundOperation, type Reply } from "./reply.ts";
 import { SupportProtocolError } from "./support-action.ts";
-import { isContextSupportAction, parseAnySupportAction, type AnySupportAction, type ContextOrderRef } from "./support-context-action.ts";
+import { isContextSupportAction, parseAnySupportAction, type AnySupportAction, type ContextOrderRef, type ContextClarificationField } from "./support-context-action.ts";
 export { parseAnySupportAction as parseExecutedSupportAction } from "./support-context-action.ts";
-import { compareRemainingAmount, createAmountReference, selectAlternativeOrder, supportObjectReference,
-  type RemainingAmountComparison, type TrustedAmountReference, type TrustedOrderChoices } from "./support-context.ts";
-export type { RemainingAmountComparison, TrustedAmountReference, TrustedOrderChoices } from "./support-context.ts";
+import { amountChoiceNotice, compareRemainingAmount, createAmountReference, resolveAmountReference, selectAlternativeOrder, supportObjectReference,
+  type RemainingAmountComparison, type TrustedAmountReference, type TrustedAmountChoices, type TrustedOrderChoices } from "./support-context.ts";
+export type { RemainingAmountComparison, TrustedAmountReference, TrustedAmountChoices, TrustedOrderChoices } from "./support-context.ts";
 
 type Order = Awaited<ReturnType<CouponStore["getOrder"]>>;
 type Knowledge = Awaited<ReturnType<CouponStore["searchKnowledge"]>>;
@@ -25,15 +27,19 @@ export type SupportCall = {
 };
 export type SupportKnowledgeContext = {
   originalQuery: string; modelQuestion: string | null; effectiveQuery: string;
-  purpose: "user_policy" | "refund_eligibility" | "business_prerequisite";
+  purpose: "user_policy" | "refund_eligibility" | "business_prerequisite" | "current_order";
   orderSource: "current_explicit" | "verified_focus" | "verified_alternative" | "none";
   scopeSource: "fresh_order" | "global";
   facts: { orderId: string; asOf: string; status: string; productId: string; productName: string; refundState: string;
     // Absent in legacy replay. Counts are the fresh coupon status fields, not inferred lifecycle transitions.
-    couponCounts?: { total: number; unused: number; redeemed: number; expired: number; refunded: number } } | null;
+    couponCounts?: { total: number; unused: number; redeemed: number; expired: number; refunded: number };
+    couponDates?: SupportOrderFacts["couponDates"] } | null;
   policyTopic: TrustedPolicyTopic | null;
   objectReference: { kind: "remaining_amount" | "alternative_order"; sourceRequestIds: string[]; fromOrderId: string; toOrderId: string } | null;
   protocol?: "v2.2";
+  evidenceBindingVersion?: "order-evidence-binding-v2";
+  evidenceTarget?: SupportEvidenceTarget;
+  evidenceUse?: "current_order" | "explanation";
   // Built from this turn's authorized order, never from user/model-supplied counts.
   applicability?: KnowledgeApplicabilityContext;
 };
@@ -89,7 +95,7 @@ export type SupportTurnContext = {
   requestId: string; identity: QQIdentity; sourceKey: string;
   trustedRoute: { groupOpenid: string; messageId: string };
   userText: string; focusOrderId?: string; policyTopic?: TrustedPolicyTopic; signal?: AbortSignal;
-  orderChoices?: TrustedOrderChoices; amountReference?: TrustedAmountReference;
+  orderChoices?: TrustedOrderChoices; amountReference?: TrustedAmountReference; amountChoices?: TrustedAmountChoices;
   onCall?: (call: SupportCall) => void;
 };
 export type EvidenceBundle = {
@@ -100,6 +106,7 @@ export type EvidenceBundle = {
   knowledge: Array<{ callId: string; context: SupportKnowledgeContext; trace: KnowledgeTrace }>;
   amountComparison?: RemainingAmountComparison;
   displayedPaidUnit?: TrustedAmountReference;
+  amountChoices?: TrustedAmountChoices;
   task?: MerchantTask | null;
   operation?: Awaited<ReturnType<RefundStore["get"]>> | null;
 };
@@ -124,18 +131,6 @@ function orderReply(order: Order, ids: string[], text: string): Reply {
     paidCents: order.amounts.paidCents, refundedCents: order.amounts.refundedCents,
     couponStatuses: order.coupons.map(coupon => coupon.status) }], evidenceIds: ids };
 }
-function refundQuery(order: Order): string {
-  if (order.status === "pending_payment") return "未支付退款";
-  if (order.status === "closed") return "已关闭订单退款";
-  if (order.status === "refunded" || order.amounts.refundedCents > 0) return "已退款重复退款";
-  if (order.status === "partially_redeemed") return "部分核销剩余退款";
-  if (order.status === "redeemed" || order.coupons.some(coupon => coupon.status === "redeemed")) return "已核销退款";
-  if (order.coupons.some(coupon => coupon.status === "expired"
-    || (coupon.expiresAt !== null && Date.parse(coupon.expiresAt) <= Date.parse(order.asOf)))) return "过期退款";
-  return order.status === "paid" && order.coupons.length > 0 && order.coupons.every(coupon => coupon.status === "unused")
-    ? "未核销退款" : "券状态待核实的退款条件";
-}
-
 export class SupportController {
   private services: SupportServices;
   constructor(services: SupportServices) { this.services = services; }
@@ -150,6 +145,7 @@ export class SupportController {
     const trusted = { ...context, identity: { ...context.identity }, trustedRoute: { ...context.trustedRoute },
       ...(context.policyTopic ? { policyTopic: structuredClone(context.policyTopic) } : {}),
       ...(context.orderChoices ? { orderChoices: structuredClone(context.orderChoices) } : {}),
+      ...(context.amountChoices ? { amountChoices: structuredClone(context.amountChoices) } : {}),
       ...(context.amountReference ? { amountReference: structuredClone(context.amountReference) } : {}) };
     let accepted: AnySupportAction | undefined;
     let pending: Promise<SupportResult> | undefined;
@@ -171,6 +167,13 @@ export class SupportController {
       if (isContextSupportAction(action) && "productMention" in action && action.productMention
         && (action.productMention.trim() !== action.productMention || !trusted.userText.includes(action.productMention))) {
         throw new SupportProtocolError("商品描述必须摘取本轮用户原文的连续片段，不能补写或从历史话术生成。");
+      }
+      if (isContextSupportAction(action) && (action.kind === "policy" || action.kind === "refund_eligibility")) {
+        const orderId = action.orderRef?.kind === "explicit" ? action.orderRef.orderId : action.orderRef?.kind === "alternative"
+          ? selectAlternativeOrder(trusted.orderChoices, { sourceKey: trusted.sourceKey, groupOpenid: trusted.trustedRoute.groupOpenid }, trusted.focusOrderId)
+          : action.orderRef ? trusted.focusOrderId : undefined;
+        validateSupportEvidenceTarget({ action, originalQuery: trusted.userText, verifiedTopic: trusted.policyTopic,
+          binding: { sourceKey: trusted.sourceKey, groupOpenid: trusted.trustedRoute.groupOpenid, orderId: orderId ?? null } });
       }
       return action;
     };
@@ -194,6 +197,11 @@ export class SupportController {
   private async execute(context: SupportTurnContext, action: AnySupportAction): Promise<SupportResult> {
     const evidence: EvidenceBundle = { version: 1, requestId: context.requestId, trustedRoute: { ...context.trustedRoute }, action,
       actualCalls: [], rules: [], knowledge: [] };
+    if (context.amountChoices) evidence.amountChoices = structuredClone(context.amountChoices);
+    const binding = { sourceKey: context.sourceKey, groupOpenid: context.trustedRoute.groupOpenid };
+    // A supplied candidate list is authoritative: the model cannot bypass its
+    // ambiguity by naming any otherwise valid historical requestId.
+    const amountReference = context.amountChoices ? resolveAmountReference(context.amountChoices, binding) : context.amountReference;
     let verifiedOrderId: string | undefined;
     let verifiedPolicyTopic: TrustedPolicyTopic | undefined;
     let verifiedAmountReference: TrustedAmountReference | undefined;
@@ -232,17 +240,20 @@ export class SupportController {
       context.signal?.throwIfAborted();
       return value;
     };
-    const clarify = (field: "order" | "reason" | "intent") => result(notice({
+    const clarify = (field: ContextClarificationField) => result(notice({
       order: "请明确本次要查询或操作的模拟订单号。",
       reason: "请说明希望联系商家协商的原因。",
       intent: "请明确本次先处理哪项需求：政策咨询、协商进度、退款申请或退款状态。若续问前文，请补充所指规则、时间或对象。",
+      amount_basis: amountChoiceNotice(context.amountChoices, binding),
+      policy_topic: "请补充你指的具体使用规则或上一次问题；如果有几种规则，请明确要继续问哪一种，我再按相应条件查询。",
+      time_channel: "请说明支付渠道，以及你说的时间是退款审核期限还是到账时限；如果前面有几个时限，请明确指哪一个，并补充具体天数。",
+      actor: "请说明是哪项操作，以及你说的“他/对方”指商家还是平台；我再核对该操作是否需要其许可。",
     }[field]), "clarification");
     if (action.kind === "clarify") return clarify(action.field);
     if (action.kind === "non_business") return result(notice(action.reason === "greeting"
       ? "你好，我可以查询模拟团购券订单、说明套餐规则，以及办理模拟协商和退款。请告诉我你的问题。"
       : "当前仅支持模拟团购券咨询、订单查询、协商和退款，不支持这项请求。"), "non_business");
 
-    const binding = { sourceKey: context.sourceKey, groupOpenid: context.trustedRoute.groupOpenid };
     const semantic = isContextSupportAction(action);
     const objectReference = semantic ? action.kind === "paid_amount_compare" ? "remaining_amount"
       : action.orderRef?.kind === "alternative" ? "alternative_order" : null : supportObjectReference(context.userText);
@@ -258,9 +269,12 @@ export class SupportController {
         alternativeOrderId = selectAlternativeOrder(context.orderChoices, binding, context.focusOrderId);
         if (!alternativeOrderId || !semantic && (!policyTopicMatches(context.policyTopic, { ...binding, orderId: context.focusOrderId })
           || !["policy", "refund_eligibility"].includes(context.policyTopic!.intent ?? ""))) return clarify("order");
-      } else if (!context.amountReference || context.amountReference.sourceKey !== context.sourceKey
-        || context.amountReference.groupOpenid !== binding.groupOpenid || context.amountReference.orderId !== selectedOrderId
-        || action.kind === "paid_amount_compare" && action.amountRef.requestId !== context.amountReference.requestId) return clarify("order");
+      } else {
+        if (!amountReference || amountReference.sourceKey !== context.sourceKey || amountReference.groupOpenid !== binding.groupOpenid
+          || action.kind === "paid_amount_compare" && action.amountRef.requestId !== amountReference.requestId) return clarify("amount_basis");
+        if (amountReference.orderId !== selectedOrderId) return result(notice("已选金额基准来自 " + amountReference.orderId
+          + "，当前比较对象是 " + selectedOrderId + "。暂不支持跨订单实付比较；请查询并选择当前订单的基准。未计算金额差异，也不表示退款批准。"), "clarification");
+      }
       if (!semantic && objectReference === "remaining_amount" && /(?:[\d零一二三四五六七八九十百千万两]+(?:\.\d+)?\s*(?:元|块)|[￥¥]\s*\d|(?:金额|单价|价格)\s*(?:是|为|=|：|:)?\s*\d)/u.test(context.userText)) {
         return result(notice("请明确要比较之前展示的每券实付，还是本轮新提到的金额；本轮不会把新金额当作已批准退款额。"), "clarification");
       }
@@ -382,7 +396,8 @@ export class SupportController {
     };
     if (action.kind === "order") return result(orderReply(order!, [], `以上为当前本人订单事实。${showPaidUnit()}`));
     if (objectReference === "remaining_amount") {
-      evidence.amountComparison = compareRemainingAmount(order!, context.amountReference, binding);
+      if (context.amountChoices && !isDeepStrictEqual(resolveAmountReference(context.amountChoices, binding), amountReference)) return clarify("amount_basis");
+      evidence.amountComparison = compareRemainingAmount(order!, amountReference, binding);
       if (!evidence.amountComparison) return result(notice("无法唯一核对剩余券与之前展示的实付单价。请明确具体券；存在多张剩余券、已过期或优惠分摊数据缺失时不能推算。"), "clarification");
     }
     if (action.kind === "paid_amount_compare") {
@@ -399,16 +414,18 @@ export class SupportController {
     // The model may classify the request, but cannot replace an unknown fact with an easier policy question.
     const currentScope = { shopId: order?.shop.id ?? null, productId: order?.items[0]?.productId ?? null };
     if (question.topic && !alternativeOrderId && !isDeepStrictEqual(question.topic.scope, currentScope)) return clarify("intent");
-    const couponCounts = semantic && order ? { total: order.coupons.length,
-      unused: order.coupons.filter(coupon => coupon.status === "unused").length,
-      redeemed: order.coupons.filter(coupon => coupon.status === "redeemed").length,
-      expired: order.coupons.filter(coupon => coupon.status === "expired").length,
-      refunded: order.coupons.filter(coupon => coupon.status === "refunded").length } : undefined;
-    let query = prerequisite ? refundQuery(order!) : question.query.trim()
+    let evidenceBinding: ReturnType<typeof buildSupportEvidenceBinding> | undefined;
+    try {
+      if (semantic) evidenceBinding = buildSupportEvidenceBinding({ action, originalQuery: context.userText,
+        verifiedTopic: question.topic, order, requestId: context.requestId,
+        binding: { ...binding, orderId: order?.id ?? null } });
+    } catch (error) {
+      if (error instanceof SupportEvidenceFactsError) return result(notice(error.message), "clarification");
+      throw error;
+    }
+    let query = evidenceBinding?.effectiveQuery ?? (prerequisite ? refundQuery(order!) : question.query.trim()
       + (order ? `\n已核实订单商品：${order.items[0]!.productName}。` : "")
-      + (refundQuestion ? `\n订单状态对应的规则条件：${refundQuery(order!)}。` : "");
-    if (couponCounts && (refundQuestion || prerequisite)) query += `\n已核实本单券数：共${couponCounts.total}张，未核销${couponCounts.unused}张、`
-      + `已核销${couponCounts.redeemed}张、已过期${couponCounts.expired}张、已退款${couponCounts.refunded}张（按券状态字段计数）。`;
+      + (refundQuestion ? `\n订单状态对应的规则条件：${refundQuery(order!)}。` : ""));
     // The authorized ID selects the scope, not semantic evidence. Preserve it in
     // originalQuery/facts while normalizing only this known locator for retrieval.
     if (order) query = query.replaceAll(`订单 ${order.id}`, "该订单").replaceAll(`订单${order.id}`, "该订单").replaceAll(order.id, "该订单");
@@ -424,11 +441,9 @@ export class SupportController {
         sourceRequestIds: objectReference === "remaining_amount" ? [context.amountReference!.requestId]
           : [...(question.topic ? [question.topic.requestId] : []), ...context.orderChoices!.orders.map(row => row.requestId)] } : null,
       ...(semantic ? { protocol: "v2.2" as const } : {}),
-      ...(semantic && order && purpose !== "user_policy" ? { applicability: buildKnowledgeApplicabilityContext({ order,
-        requestId: context.requestId, purpose }) } : {}),
       facts: order ? { orderId: order.id, asOf: order.asOf, status: order.status,
-        productId: order.items[0]!.productId, productName: order.items[0]!.productName, refundState: refundQuery(order),
-        ...(couponCounts ? { couponCounts } : {}) } : null };
+        productId: order.items[0]!.productId, productName: order.items[0]!.productName, refundState: refundQuery(order) } : null,
+      ...evidenceBinding };
     const ids = await getRules(knowledgeContext, order);
     if (action.kind === "policy" || action.kind === "refund_eligibility") {
       const anchor = semantic && alternativeOrderId ? context.userText : alternateAnchor ?? question.topic?.originalQuery ?? context.userText;

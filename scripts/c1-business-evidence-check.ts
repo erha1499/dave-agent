@@ -11,6 +11,8 @@ import { buildKnowledgeApplicabilityContext, gateKnowledgeApplicability, knowled
   validateKnowledgeApplicabilitySnapshot, type KnowledgeApplicabilitySnapshot } from "../src/knowledge-applicability.ts";
 import { applyKnowledgeApplicabilityGate, finishKnowledgeApplicabilityAcceptance, knowledgeApplicabilitySettings, type KnowledgeTrace } from "../src/knowledge-service.ts";
 import { scopeDocuments, serializeRetrievalDocument, type RetrievalDocument } from "../src/retrieval-ranking.ts";
+import { buildSupportEvidenceBinding, evidenceBindingVersion } from "../src/support-evidence-context.ts";
+import type { SupportKnowledgeContext } from "../src/support-controller.ts";
 import { parseContextSupportAction } from "../src/support-context-action.ts";
 
 type Order = Awaited<ReturnType<CouponStore["getOrder"]>>;
@@ -26,7 +28,8 @@ export const businessEvidenceContracts: readonly Contract[] = [
   { caseId: "unknown-policy-fact", turn: 1, purpose: "user_policy", kind: "unknown" },
   { caseId: "knowledge-service-unavailable", turn: 1, purpose: "business_prerequisite", kind: "database_error" },
 ];
-const checkerVersion = "c1-business-evidence-v2";
+const checkerVersion = "c1-business-evidence-v3";
+type EvidenceBindingVersion = "order-evidence-binding-v2";
 const registryPath = "data/knowledge-applicability.json";
 const checkNames = ["coverage", "trusted_context", "recorded_evidence", "applicability", "semantic_contract"] as const;
 const object = (value: unknown): Record<string, unknown> => {
@@ -45,16 +48,21 @@ function corpusFromSnapshot(business: Record<string, unknown>): RetrievalDocumen
   return documents.sort((a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
 }
 
-function trustedContext(turn: EvalTurn, call: EvalSpan, contract: Contract) {
+function trustedContext(turn: EvalTurn, call: EvalSpan, contract: Contract, expectedEvidenceBindingVersion?: EvidenceBindingVersion) {
   const spans = turn.spans!, { context, trace } = call.knowledge!, protocol = object(turn.observations?.protocol);
   const action = parseContextSupportAction(protocol.action);
+  if (expectedEvidenceBindingVersion) assert.equal(context.evidenceBindingVersion, expectedEvidenceBindingVersion, "Frozen binding version cannot be omitted or downgraded");
+  const modern = context.evidenceBindingVersion !== undefined;
+  if (modern) assert.equal(context.evidenceBindingVersion, evidenceBindingVersion);
+  else { assert.equal(context.evidenceTarget, undefined); assert.equal(context.evidenceUse, undefined); }
   const purpose = action.kind === "refund_eligibility" ? "refund_eligibility"
     : ["refund_prepare", "merchant_prepare"].includes(action.kind) ? "business_prerequisite" : action.kind === "policy" ? "user_policy" : null;
   // The fixed unknown-fact fixture requires a read-only consultation, not a
   // particular classifier label. Its actual action still determines the gate.
-  if (contract.kind === "unknown") assert.ok(purpose === "user_policy" || purpose === "refund_eligibility");
+  if (contract.kind === "unknown" || modern && contract.purpose === "refund_eligibility") assert.ok(purpose === "user_policy" || purpose === "refund_eligibility");
   else assert.equal(purpose, contract.purpose);
-  assert.equal(context.purpose, purpose); assert.equal(context.protocol, "v2.2");
+  if (!modern) assert.equal(context.purpose, purpose);
+  assert.equal(context.protocol, "v2.2");
   assert.equal(context.originalQuery, turn.question); assert.equal(trace.originalQuery, turn.question);
   assert.equal(context.effectiveQuery, trace.query); assert.equal(object(call.input).query, trace.query);
   assert.deepEqual(normalizeScope(object(call.input)), normalizeScope(trace.scope));
@@ -77,13 +85,30 @@ function trustedContext(turn: EvalTurn, call: EvalSpan, contract: Contract) {
   assert.equal(context.facts.productId, order.items[0]!.productId); assert.equal(context.facts.productName, order.items[0]!.productName);
   assert.deepEqual(context.facts.couponCounts, { total: 1, unused: 1, redeemed: 0, expired: 0, refunded: 0 });
   assert.deepEqual(normalizeScope(trace.scope), { shopId: order.shop.id, productId: order.items[0]!.productId });
+  let rebuilt: ReturnType<typeof buildSupportEvidenceBinding> | undefined;
+  if (modern) {
+    // These fixed DB probes do not carry prior-topic provenance. Do not invent
+    // actor/history authority from the trace; a new previous-topic input fails.
+    if ("questionContext" in action) assert.equal(action.questionContext.kind, "standalone", "Business audit lacks independently recorded previous-topic history");
+    assert.equal(context.policyTopic, null); assert.equal(context.objectReference, null);
+    if (action.orderRef.kind === "explicit") assert.ok(turn.question.includes(order.id), "Explicit current order must occur in the real input");
+    assert.equal(context.orderSource, action.orderRef.kind === "explicit" ? "current_explicit" : "verified_focus");
+    assert.notEqual(action.orderRef.kind, "alternative", "Fixed DB probes do not establish competing-order provenance");
+    assert.equal(context.modelQuestion, "question" in action ? action.question : null);
+    rebuilt = buildSupportEvidenceBinding({ action, originalQuery: turn.question, requestId: call.parentSpanId!, order,
+      // No output field depends on this unavailable identity for standalone
+      // targets. Previous-topic targets were rejected above, before replay.
+      binding: { sourceKey: "not-collected-in-business-recording", groupOpenid: "", orderId: order.id } });
+    for (const key of ["evidenceBindingVersion", "evidenceTarget", "evidenceUse", "purpose", "facts", "effectiveQuery"] as const) assert.deepEqual(context[key], rebuilt[key], `Rebuilt ${key}`);
+    assert.deepEqual(context.applicability ?? null, rebuilt.applicability ?? null);
+  }
   if (contract.kind === "unknown") {
     assert.ok(action.kind === "policy" || action.kind === "refund_eligibility");
     assert.equal(action.questionContext.kind, "standalone");
     assert.equal(context.modelQuestion, action.question); assert.equal(context.policyTopic, null); assert.equal(context.objectReference, null);
     // Verify the actual provider question, not just an originalQuery label or
     // self-consistent request hashes. Only current authorized facts may follow it.
-    const expectedQuery = (turn.question.trim() + `\n已核实订单商品：${order.items[0]!.productName}。`
+    const expectedQuery = rebuilt?.effectiveQuery ?? (turn.question.trim() + `\n已核实订单商品：${order.items[0]!.productName}。`
       + (purpose === "refund_eligibility" ? "\n订单状态对应的规则条件：未核销退款。"
         + "\n已核实本单券数：共1张，未核销1张、已核销0张、已过期0张、已退款0张（按券状态字段计数）。" : ""))
       .replaceAll(`订单 ${order.id}`, "该订单").replaceAll(`订单${order.id}`, "该订单").replaceAll(order.id, "该订单");
@@ -92,11 +117,12 @@ function trustedContext(turn: EvalTurn, call: EvalSpan, contract: Contract) {
     assert.ok(spans.every(span => span.component !== "business-service" || ["get_order", "search_faq"].includes(span.name)),
       "Unknown-fact consultation cannot initiate business writes");
   }
+  if (rebuilt) return rebuilt.applicability ?? null;
   return purpose === "user_policy" ? null : buildKnowledgeApplicabilityContext({ order, requestId: call.parentSpanId!, purpose: purpose! });
 }
 
 function recordedEvidence(turn: EvalTurn, call: EvalSpan, contract: Contract, corpus: RetrievalDocument[], mode: "model_only" | "declared",
-  registry: KnowledgeApplicabilitySnapshot | undefined, configuration: Record<string, unknown>) {
+  registry: KnowledgeApplicabilitySnapshot | undefined, configuration: Record<string, unknown>, expectedEvidenceBindingVersion?: EvidenceBindingVersion) {
   const { trace, context } = call.knowledge!;
   assert.equal(call.name, "search_faq"); assert.equal(call.component, "business-service"); assert.equal(call.outcome, "ok");
   assert.equal(trace.mode, "m4-support"); assert.equal(trace.threshold, configuration.knowledgeThreshold);
@@ -134,7 +160,7 @@ function recordedEvidence(turn: EvalTurn, call: EvalSpan, contract: Contract, co
   let gate;
   if (mode === "declared") {
     assert.ok(registry, "Declared audit requires the exact independently frozen registry");
-    const fresh = trustedContext(turn, call, contract);
+    const fresh = trustedContext(turn, call, contract, expectedEvidenceBindingVersion);
     assert.deepEqual(context.applicability ?? null, fresh);
     gate = gateKnowledgeApplicability({ snapshot: registry, context: fresh, scope: trace.scope, candidates: prepared.pendingSupport ?? [] });
     const { candidates: _candidates, ...audit } = gate;
@@ -174,7 +200,7 @@ function recordedEvidence(turn: EvalTurn, call: EvalSpan, contract: Contract, co
     : trace.applicability ? "not_enabled" as const : "not_recorded" as const, support: "complete" as const };
 }
 
-export function auditC1BusinessEvidence(artifact: EvalRunDetail, artifactHash: string, registry?: KnowledgeApplicabilitySnapshot) {
+export function auditC1BusinessEvidence(artifact: EvalRunDetail, artifactHash: string, registry?: KnowledgeApplicabilitySnapshot, expectedEvidenceBindingVersion?: EvidenceBindingVersion) {
   const snapshot = artifact.run.snapshot, configuration = object(snapshot.content.settings), business = object(snapshot.content.business);
   const globalIssues: string[] = [];
   const attempt = (fn: () => void) => { try { fn(); } catch (error) { globalIssues.push(error instanceof Error ? error.message : "Invalid snapshot"); } };
@@ -209,8 +235,8 @@ export function auditC1BusinessEvidence(artifact: EvalRunDetail, artifactHash: s
       const declared = fixtureCases.filter(item => object(item).id === contract.caseId); assert.equal(declared.length, 1);
       assert.equal(object(declared[0]).knowledge, contract.kind === "empty" ? "empty" : contract.kind === "database_error" ? "error" : "normal",
         "Only the frozen explicit fixture may inject an empty corpus or database fault"); });
-    check("trusted_context", () => { assert.ok(call?.knowledge && turn); trustedContext(turn, call, contract); });
-    check("recorded_evidence", () => { assert.ok(call?.knowledge && turn); proof = recordedEvidence(turn, call, contract, corpus, mode as "model_only" | "declared", registry, configuration); });
+    check("trusted_context", () => { assert.ok(call?.knowledge && turn); trustedContext(turn, call, contract, expectedEvidenceBindingVersion); });
+    check("recorded_evidence", () => { assert.ok(call?.knowledge && turn); proof = recordedEvidence(turn, call, contract, corpus, mode as "model_only" | "declared", registry, configuration, expectedEvidenceBindingVersion); });
     check("applicability", () => { assert.ok(proof); if (mode === "declared" && contract.kind !== "database_error") assert.equal(proof.gate, "complete"); });
     const expected = contract.kind === "evidence" ? ["KB-REFUND-UNUSED"] : [];
     const accepted = Array.isArray(call?.output) ? call.output.map(doc => object(doc).sourceId) : [];
@@ -223,7 +249,8 @@ export function auditC1BusinessEvidence(artifact: EvalRunDetail, artifactHash: s
       supportCompleteness: proof?.support ?? "incomplete", actualKnowledgeCalls: calls.length };
   });
   return { checkerVersion, runId: artifact.run.id, artifactHash, scope: "Additional development evidence audit; original business checks and historical scores are unchanged",
-    authority: "Frozen corpus and registry hashes plus recorded host spans; no DB/API replay or claim of final-answer quality", applicabilityMode: mode,
+    authority: "Frozen corpus and registry hashes plus recorded host spans; standalone DB probes only, no prior-topic/actor replay or claim of final-answer quality",
+    evidenceBindingVersion: expectedEvidenceBindingVersion ?? null, applicabilityMode: mode,
     passed: !globalIssues.length && !unexpected.length && rows.every(row => row.passed), globalIssues, unexpected,
     counts: { plannedTurns: 8, presentTurns: rows.filter(row => row.actualKnowledgeCalls > 0).length, passedTurns: rows.filter(row => row.passed).length,
       plannedChecks: 8 * checkNames.length, passedChecks: rows.reduce((n, row) => n + row.checks.filter(check => check.passed).length, 0),
@@ -257,27 +284,31 @@ export function checkC1BusinessEvidenceAudit() {
   const dataset = { cases: [...new Map(businessEvidenceContracts.map(contract => [contract.caseId, { id: contract.caseId,
     knowledge: contract.kind === "empty" ? "empty" : contract.kind === "database_error" ? "error" : "normal" }])).values()] };
   const plan = { unit: true };
+  function fixtureArtifact(modern = false) {
   const artifact = { run: { id: "unit-only", suiteId: "support-business-live-development-v2", status: "completed", snapshot: {
     hashes: { business: contentHash(business), dataset: contentHash({ plan, dataset }) }, content: { business, dataset, evaluation: plan, settings: { knowledgeMode: "m4-support", knowledgeSupport: "typed",
       knowledgeSupportModel: "deepseek-v4-pro", knowledgeThreshold: .5, knowledgeApplicability: "declared" },
     implementation: { files: { [registryPath]: registry.sha256 } } } } }, cases: [] } as unknown as EvalRunDetail;
   for (const [index, contract] of businessEvidenceContracts.entries()) {
-    const requestId = `request-${index}`, question = contract.kind === "unknown" ? "COUPON-9999 这张券会额外扣几元服务费？请给出明确金额。" : "Synthetic input",
+    const requestId = `request-${index}`, question = contract.kind === "unknown" ? "COUPON-9999 这张券会额外扣几元服务费？请给出明确金额。" : modern ? "订单 COUPON-9999 退款资格咨询" : "Synthetic input",
       scope = { shopId: order.shop.id, productId: order.items[0]!.productId };
-    const query = contract.kind === "unknown" ? "该订单 这张券会额外扣几元服务费？请给出明确金额。\n已核实订单商品：unit。" : question;
+    let query = contract.kind === "unknown" ? "该订单 这张券会额外扣几元服务费？请给出明确金额。\n已核实订单商品：unit。" : question;
     const action = { protocol: "v2.2", kind: contract.purpose === "refund_eligibility" ? "refund_eligibility"
       : contract.purpose === "business_prerequisite" ? "refund_prepare" : "policy", orderRef: { kind: "explicit", orderId: order.id },
       ...(contract.purpose !== "business_prerequisite" ? { question, questionContext: { kind: "standalone" } } : {}) };
+    const rebuilt = modern ? buildSupportEvidenceBinding({ action: parseContextSupportAction(action), originalQuery: question, order, requestId,
+      binding: { sourceKey: "not-collected-in-business-recording", groupOpenid: "", orderId: order.id } }) : undefined;
+    if (rebuilt) query = rebuilt.effectiveQuery;
     const trace: KnowledgeTrace = { mode: "m4-support", supportProfile: "typed", supportModel: "deepseek-v4-pro", threshold: .5,
       applicability: { mode: "declared" }, query, originalQuery: question, scope, status: "unavailable", reason: null,
       rawRanking: [], acceptance: null, sources: [], sourceHashes: { before: null, after: null }, durationMs: 1, calls: [],
       usage: { rerankTokens: 0, supportTokens: 0, estimatedCny: 0, estimatedUsd: 0, incompleteCalls: 0 },
       pricing: { estimated: true, rerankCnyPerMillionTokens: .5, rerankAsOf: "2026-10-05", supportSource: "Pi model catalog" } };
-    const context = { protocol: "v2.2" as const, originalQuery: question, modelQuestion: contract.kind === "unknown" ? question : null, effectiveQuery: query, purpose: contract.purpose,
+    const context: SupportKnowledgeContext = { protocol: "v2.2" as const, originalQuery: question, modelQuestion: modern && contract.purpose !== "business_prerequisite" || contract.kind === "unknown" ? question : null, effectiveQuery: query, purpose: contract.purpose,
       orderSource: "current_explicit" as const, scopeSource: "fresh_order" as const, facts: { orderId: order.id, asOf: order.asOf, status: order.status,
         productId: order.items[0]!.productId, productName: order.items[0]!.productName, refundState: "未核销退款",
         couponCounts: { total: 1, unused: 1, redeemed: 0, expired: 0, refunded: 0 } }, policyTopic: null, objectReference: null,
-      ...(contract.purpose === "user_policy" ? {} : { applicability: buildKnowledgeApplicabilityContext({ order, requestId, purpose: contract.purpose }) }) };
+      ...(contract.purpose === "user_policy" ? {} : { applicability: buildKnowledgeApplicabilityContext({ order, requestId, purpose: contract.purpose }) }), ...rebuilt };
     const common = { actor: "host" as const, trigger: "user" as const, observedAt: order.asOf, durationMs: 1, outcome: "ok" as const };
     const call: EvalSpan = { ...common, id: `${requestId}:knowledge`, parentSpanId: requestId, component: "business-service", name: "search_faq",
       input: { query, ...scope }, output: [], knowledge: { context, trace } };
@@ -321,6 +352,9 @@ export function checkC1BusinessEvidenceAudit() {
     const previous = artifact.cases.find(item => item.id === contract.caseId);
     if (previous) previous.turns.push(turn); else artifact.cases.push({ id: contract.caseId, name: "unit", category: "unit", status: "passed", turns: [turn] });
   }
+  return artifact;
+  }
+  const artifact = fixtureArtifact();
   const score = (value = artifact, manifest = registry) => auditC1BusinessEvidence(value, contentHash(value), manifest);
   assert.equal(score().passed, true, JSON.stringify(score())); assert.equal(score().counts.plannedChecks, 40);
   const tamper = (fn: (value: EvalRunDetail) => void) => { const changed = structuredClone(artifact); fn(changed); assert.equal(score(changed).passed, false); };
@@ -398,19 +432,39 @@ export function checkC1BusinessEvidenceAudit() {
   assert.equal(extraRow.applicability, "not_recorded"); assert.equal(extraRow.passed, false);
   assert.deepEqual(extraRow.checks.filter(check => !check.passed).map(check => check.name), ["semantic_contract"]);
   assert.deepEqual(extraRow.extraAcceptedIds, ["KB-REFUND-PARTIAL"]);
+  const modern = fixtureArtifact(true);
+  const modernScore = (value = modern) => auditC1BusinessEvidence(value, contentHash(value), registry, evidenceBindingVersion);
+  assert.equal(modernScore().passed, true, JSON.stringify(modernScore()));
+  assert.equal(modernScore(artifact).passed, false, "A frozen new candidate cannot downgrade to an old trace");
+  const modernPolicy = structuredClone(modern), modernFirst = modernPolicy.cases[0]!.turns[0]!;
+  object(object(modernFirst.observations!.protocol).action).kind = "policy";
+  assert.equal(modernScore(modernPolicy).passed, true, "Current-order policy and eligibility share the same reconstructed gate");
+  for (const mutate of [
+    (turn: EvalTurn) => { delete turn.spans![2]!.knowledge!.context.evidenceBindingVersion; },
+    (turn: EvalTurn) => { turn.spans![2]!.knowledge!.context.purpose = "user_policy"; },
+    (turn: EvalTurn) => { turn.spans![2]!.knowledge!.context.evidenceUse = "explanation"; },
+    (turn: EvalTurn) => { turn.spans![2]!.knowledge!.context.facts!.couponDates![0]!.expiredAtAsOf = true; },
+    (turn: EvalTurn) => { turn.spans![2]!.knowledge!.context.evidenceTarget!.basis = "invented condition"; },
+    (turn: EvalTurn) => { turn.spans![1]!.parentSpanId = "another-request"; },
+    (turn: EvalTurn) => { turn.question = "a different actual original question"; },
+    (turn: EvalTurn) => { object(object(turn.observations!.protocol).action).questionContext = { kind: "previous", requestId: "unproved-history" }; },
+  ]) { const changed = structuredClone(modern); mutate(changed.cases[0]!.turns[0]!); assert.equal(modernScore(changed).passed, false); }
   return { checkerVersion, status: "passed", scope: "In-memory mutation checks only; no DB/API", plannedTurns: 8, plannedChecks: 40 };
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  const args = process.argv.slice(2);
+  const rawArgs = process.argv.slice(2), bindingArgument = "--evidence-binding=order-evidence-binding-v2";
+  const expectedEvidenceBindingVersion: EvidenceBindingVersion | undefined = rawArgs.includes(bindingArgument) ? "order-evidence-binding-v2" : undefined;
+  const args = rawArgs.filter(arg => arg !== bindingArgument);
+  assert.ok(rawArgs.filter(arg => arg === bindingArgument).length <= 1);
   if (args.length === 1 && args[0] === "--check") console.log(JSON.stringify(checkC1BusinessEvidenceAudit(), null, 2));
   else {
-    assert.ok(args.length === 2 && args[0] === "--file", "Use --check or --file <synthetic-run-artifact.json>");
+    assert.ok(args.length === 2 && args[0] === "--file", "Use --check or --file <synthetic-run-artifact.json> [--evidence-binding=order-evidence-binding-v2]");
     const bytes = await readFile(args[1]!), artifact = JSON.parse(bytes.toString()) as EvalRunDetail;
     const mode = object(artifact.run.snapshot.content.settings).knowledgeApplicability;
     const registryBytes = mode === "declared" ? await readFile(new URL(`../${registryPath}`, import.meta.url)) : undefined;
     const registry = registryBytes ? validateKnowledgeApplicabilitySnapshot(JSON.parse(registryBytes.toString()), contentHash(registryBytes)) : undefined;
-    const result = auditC1BusinessEvidence(artifact, contentHash(bytes), registry);
+    const result = auditC1BusinessEvidence(artifact, contentHash(bytes), registry, expectedEvidenceBindingVersion);
     console.log(JSON.stringify({ ...result, checkerHash: contentHash(await readFile(fileURLToPath(import.meta.url))) }, null, 2));
     if (!result.passed) process.exitCode = 1;
   }
