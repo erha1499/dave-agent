@@ -7,7 +7,8 @@ import { merchantSourceKey } from "../src/after-sales.ts";
 import { buildSupportEvidenceBinding, evidenceBindingVersion } from "../src/support-evidence-context.ts";
 import { acceptEvidence } from "../src/evidence-acceptance.ts";
 import { applyEvidenceSupport, validateEvidenceSupportVerification, evidenceSupportInputHash, evidenceSupportRequestHash,
-  evidenceSupportValidationVersion, type EvidenceSupportDecision, type EvidenceSupportSettings, type EvidenceSupportVerification } from "../src/evidence-support.ts";
+  evidenceSupportValidationVersion, evidenceSupportTypedPromptVersion, evidenceSupportTypedV6PromptVersion,
+  type EvidenceSupportDecision, type EvidenceSupportSettings, type EvidenceSupportVerification } from "../src/evidence-support.ts";
 import type { CouponStore, QQIdentity } from "../src/coupon-store.ts";
 import type { ContextSupportAction } from "../src/support-context-action.ts";
 import { amountChoiceTtlMs, compareRemainingAmount, createAmountReference, rememberAmountChoice, resolveAmountReference, type RemainingAmountComparison } from "../src/support-context.ts";
@@ -20,7 +21,7 @@ import { rankLexical, scopeDocuments, serializeRetrievalDocument, type Retrieval
 import type { SessionTurnActual } from "./c1-session-live.ts";
 
 // Pure contracts/scoring only. No executor, generated validation questions, I/O or model judge.
-export const c1ValidationScoringVersion = "c1-session-validation-v5";
+export const c1ValidationScoringVersion = "c1-session-validation-v6";
 export const c1Families = ["order_state", "paid_amount", "alternative_order", "policy_followup", "refund_time", "appointment_actor"] as const;
 export const c1Strata = ["known", "missing", "competing", "direct_missing_fact", "boundary"] as const;
 type Family = typeof c1Families[number];
@@ -59,6 +60,8 @@ type Corpora = Record<C1ValidationCase["corpus"], readonly RetrievalDocument[]>;
 // Supplied by the frozen run configuration, never inferred from the report being scored.
 export type C1ValidationKnowledgeConfiguration = { applicability?: KnowledgeApplicabilityMode; applicabilitySnapshot?: KnowledgeApplicabilitySnapshot;
   queryMode?: "combined" | "separated";
+  supportPrompt?: "v5" | "v6";
+  supportSettings?: EvidenceSupportSettings;
   // Frozen candidate requirement, independent of a trace's own version label.
   evidenceBindingVersion?: "order-evidence-binding-v2" };
 const nonempty = (value: unknown): value is string => typeof value === "string" && Boolean(value.trim());
@@ -218,6 +221,17 @@ function reconstructKnowledgeBinding(actual: C1ValidationActual, call: SupportCa
 function prepareKnowledgeEvidence(actual: C1ValidationActual, call: SupportCall, documents: readonly RetrievalDocument[], configuration: C1ValidationKnowledgeConfiguration,
   originalQuery?: string, history: C1ValidationHistory = [], corpus: readonly RetrievalDocument[] = documents) {
   const { trace, context } = call.knowledge!;
+  if (configuration.supportPrompt !== undefined) {
+    assert.ok(configuration.supportPrompt === "v5" || configuration.supportPrompt === "v6");
+    assert.equal(trace.supportPrompt, configuration.supportPrompt, "The selected prompt cannot be omitted even when no support request is needed");
+    assert.ok(configuration.supportSettings, "Freeze actual settings with the selected support prompt");
+    if (configuration.supportSettings.profile === "typed") assert.equal(configuration.supportSettings.promptVersion,
+      configuration.supportPrompt === "v6" ? evidenceSupportTypedV6PromptVersion : evidenceSupportTypedPromptVersion);
+    else assert.equal(configuration.supportPrompt, "v5");
+  }
+  if (configuration.supportSettings && trace.settings?.support) {
+    assert.deepEqual(trace.settings.support, configuration.supportSettings, "Support settings must match the independently frozen candidate");
+  }
   const binding = reconstructKnowledgeBinding(actual, call, corpus, configuration, originalQuery, history);
   const evidenceQuery = configuration.queryMode === undefined ? trace.query : binding!.effectiveQuery;
   let prepared = acceptEvidence({ query: trace.query, scope: trace.scope, documents, ranking: trace.rawRanking,
@@ -587,6 +601,44 @@ export function checkC1ValidationScoring() {
   assert.equal(scoreC1ValidationTurn(turn, undefined, [doc]).passed, false);
   assert.equal(scoreC1ValidationTurn(turn, actual, [doc]).passed, false, "unreviewed is never final-answer success");
   assert.equal(scoreC1ValidationTurn(turn, actual, [doc], review).passed, true);
+  for (const supportPrompt of ["v5", "v6"] as const) {
+    const selectedSettings = { ...settings, promptVersion: supportPrompt === "v6" ? evidenceSupportTypedV6PromptVersion : evidenceSupportTypedPromptVersion,
+      promptHash: contentHash(`Synthetic ${supportPrompt} prompt`) };
+    trace.supportPrompt = supportPrompt; trace.settings!.support = selectedSettings;
+    const prepared = acceptEvidence({ config: { mode: "support", threshold: .5 }, query: trace.query, scope: trace.scope, documents: [doc], ranking: trace.rawRanking });
+    const input = { query: trace.query, scope: trace.scope, candidates: prepared.pendingSupport!, settings: selectedSettings };
+    trace.supportVerification!.inputHash = evidenceSupportInputHash(input); trace.supportVerification!.requestHash = evidenceSupportRequestHash(input);
+    trace.calls[0]!.requestHash = trace.supportVerification!.requestHash;
+    const frozen = { supportPrompt, supportSettings: selectedSettings };
+    assert.equal(scoreC1ValidationTurn(turn, actual, [doc], review, frozen).passed, true);
+    const otherPrompt = supportPrompt === "v5" ? "v6" : "v5";
+    const otherSettings = { ...selectedSettings, promptVersion: otherPrompt === "v6" ? evidenceSupportTypedV6PromptVersion : evidenceSupportTypedPromptVersion,
+      promptHash: contentHash(`Synthetic ${otherPrompt} prompt`) };
+    assert.equal(scoreC1ValidationTurn(turn, actual, [doc], review, { supportPrompt: otherPrompt, supportSettings: otherSettings }).evidenceProofPassed, false,
+      "A self-consistent result from the other prompt cannot satisfy an independently frozen candidate");
+    assert.equal(scoreC1ValidationTurn(turn, actual, [doc], review, { supportSettings: otherSettings }).evidenceProofPassed, false,
+      "External settings alone also prevent cross-group replay");
+    for (const mutate of [
+      (value: C1ValidationActual) => { delete value.calls[0]!.knowledge!.trace.supportPrompt; },
+      (value: C1ValidationActual) => { delete value.calls[0]!.knowledge!.trace.settings!.support; },
+      (value: C1ValidationActual) => {
+        const t = value.calls[0]!.knowledge!.trace; t.settings!.support = otherSettings;
+        const changedInput = { ...input, settings: otherSettings };
+        t.supportVerification!.inputHash = evidenceSupportInputHash(changedInput); t.supportVerification!.requestHash = evidenceSupportRequestHash(changedInput);
+        t.calls[0]!.requestHash = t.supportVerification!.requestHash;
+        assert.equal(validateEvidenceSupportVerification(t.supportVerification, changedInput), true);
+      },
+    ]) { const changed = structuredClone(actual); mutate(changed);
+      assert.equal(scoreC1ValidationTurn(turn, changed, [doc], review, frozen).evidenceProofPassed, false); }
+    const noRequest = structuredClone(actual), t = noRequest.calls[0]!.knowledge!.trace;
+    t.rawRanking = [{ id: doc.id, score: .1 }]; t.calls = []; delete t.supportVerification; delete t.settings!.support;
+    t.acceptance = acceptEvidence({ config: { mode: "support", threshold: .5 }, query: t.query, scope: t.scope, documents: [doc], ranking: t.rawRanking });
+    t.status = t.acceptance.status;
+    assert.equal(scoreC1ValidationTurn(turn, noRequest, [doc], review, frozen).passed, true, "Below-threshold evidence records the selected prompt without inventing a support call");
+    delete t.supportPrompt;
+    assert.equal(scoreC1ValidationTurn(turn, noRequest, [doc], review, frozen).evidenceProofPassed, false);
+  }
+  delete trace.supportPrompt; setKnowledge([negative]);
   setKnowledge([], [doc], [{ id: doc.id, code: "invalid_quote" }]);
   assert.equal(scoreC1ValidationTurn(turn, actual, [doc], review).correctlyRejected, false, "invalid is not unsupported");
   delete trace.supportVerification; trace.status = "unavailable";

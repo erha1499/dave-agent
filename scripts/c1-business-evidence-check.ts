@@ -5,6 +5,7 @@ import { contentHash, rerankInstruction } from "../src/bailian.ts";
 import type { CouponStore } from "../src/coupon-store.ts";
 import { acceptEvidence } from "../src/evidence-acceptance.ts";
 import { applyEvidenceSupport, evidenceSupportInputHash, evidenceSupportRequestHash, evidenceSupportValidationVersion,
+  evidenceSupportTypedPromptVersion, evidenceSupportTypedV6PromptVersion, evidenceSupportTypedPrompt, evidenceSupportTypedV6Prompt,
   validateEvidenceSupportVerification, type EvidenceSupportSettings, type EvidenceSupportVerification } from "../src/evidence-support.ts";
 import type { EvalRunDetail, EvalSpan, EvalTurn } from "../src/evaluation.ts";
 import { buildKnowledgeApplicabilityContext, gateKnowledgeApplicability, knowledgeApplicabilitySourceHash,
@@ -28,7 +29,7 @@ export const businessEvidenceContracts: readonly Contract[] = [
   { caseId: "unknown-policy-fact", turn: 1, purpose: "user_policy", kind: "unknown" },
   { caseId: "knowledge-service-unavailable", turn: 1, purpose: "business_prerequisite", kind: "database_error" },
 ];
-const checkerVersion = "c1-business-evidence-v4";
+const checkerVersion = "c1-business-evidence-v5";
 type EvidenceBindingVersion = "order-evidence-binding-v2";
 type QueryMode = "combined" | "separated";
 const registryPath = "data/knowledge-applicability.json";
@@ -134,8 +135,13 @@ function trustedContext(turn: EvalTurn, call: EvalSpan, contract: Contract, expe
 }
 
 function recordedEvidence(turn: EvalTurn, call: EvalSpan, contract: Contract, corpus: RetrievalDocument[], mode: "model_only" | "declared",
-  registry: KnowledgeApplicabilitySnapshot | undefined, configuration: Record<string, unknown>, expectedEvidenceBindingVersion?: EvidenceBindingVersion) {
+  registry: KnowledgeApplicabilitySnapshot | undefined, configuration: Record<string, unknown>, expectedEvidenceBindingVersion?: EvidenceBindingVersion,
+  expectedSupportSettings?: EvidenceSupportSettings) {
   const { trace, context } = call.knowledge!;
+  if (expectedSupportSettings) {
+    assert.equal(trace.supportPrompt, configuration.knowledgeSupportPrompt, "Selected support prompt must be recorded, including no-request paths");
+    if (trace.settings?.support) assert.deepEqual(trace.settings.support, expectedSupportSettings, "Actual support settings differ from the independently frozen candidate");
+  }
   const evidenceQuery = configuration.knowledgeQueryMode === undefined ? trace.query : context.effectiveQuery;
   assert.equal(call.name, "search_faq"); assert.equal(call.component, "business-service"); assert.equal(call.outcome, "ok");
   assert.equal(trace.mode, "m4-support"); assert.equal(trace.threshold, configuration.knowledgeThreshold);
@@ -214,7 +220,7 @@ function recordedEvidence(turn: EvalTurn, call: EvalSpan, contract: Contract, co
 }
 
 export function auditC1BusinessEvidence(artifact: EvalRunDetail, artifactHash: string, registry?: KnowledgeApplicabilitySnapshot,
-  expectedEvidenceBindingVersion?: EvidenceBindingVersion, expectedQueryMode?: QueryMode) {
+  expectedEvidenceBindingVersion?: EvidenceBindingVersion, expectedQueryMode?: QueryMode, expectedSupportSettings?: EvidenceSupportSettings) {
   const snapshot = artifact.run.snapshot, configuration = object(snapshot.content.settings), business = object(snapshot.content.business);
   const globalIssues: string[] = [];
   const attempt = (fn: () => void) => { try { fn(); } catch (error) { globalIssues.push(error instanceof Error ? error.message : "Invalid snapshot"); } };
@@ -227,6 +233,13 @@ export function auditC1BusinessEvidence(artifact: EvalRunDetail, artifactHash: s
   const queryMode = expectedQueryMode ?? configuration.knowledgeQueryMode as QueryMode | undefined;
   attempt(() => assert.ok(queryMode === undefined || queryMode === "combined" || queryMode === "separated"));
   if (expectedQueryMode !== undefined) attempt(() => assert.equal(configuration.knowledgeQueryMode, expectedQueryMode, "Run query mode differs from the independently frozen candidate"));
+  if (expectedSupportSettings || configuration.knowledgeSupportPrompt !== undefined) attempt(() => {
+    assert.ok(expectedSupportSettings, "New prompt candidates require independently frozen support settings");
+    const selectedPrompt = expectedSupportSettings.profile === "typed" && expectedSupportSettings.promptVersion === evidenceSupportTypedV6PromptVersion ? "v6" : "v5";
+    if (expectedSupportSettings.profile === "typed") assert.equal(expectedSupportSettings.promptVersion,
+      selectedPrompt === "v6" ? evidenceSupportTypedV6PromptVersion : evidenceSupportTypedPromptVersion);
+    assert.equal(configuration.knowledgeSupportPrompt, selectedPrompt, "Frozen prompt selection cannot be omitted or downgraded");
+  });
   if (mode === "declared") attempt(() => {
     assert.ok(registry, "Missing frozen declaration registry");
     assert.equal(object(object(snapshot.content.implementation).files)[registryPath], registry.sha256, "Registry must match the run's frozen sidecar hash");
@@ -253,7 +266,7 @@ export function auditC1BusinessEvidence(artifact: EvalRunDetail, artifactHash: s
       assert.equal(object(declared[0]).knowledge, contract.kind === "empty" ? "empty" : contract.kind === "database_error" ? "error" : "normal",
         "Only the frozen explicit fixture may inject an empty corpus or database fault"); });
     check("trusted_context", () => { assert.ok(call?.knowledge && turn); trustedContext(turn, call, contract, expectedEvidenceBindingVersion, queryMode); });
-    check("recorded_evidence", () => { assert.ok(call?.knowledge && turn); proof = recordedEvidence(turn, call, contract, corpus, mode as "model_only" | "declared", registry, configuration, expectedEvidenceBindingVersion); });
+    check("recorded_evidence", () => { assert.ok(call?.knowledge && turn); proof = recordedEvidence(turn, call, contract, corpus, mode as "model_only" | "declared", registry, configuration, expectedEvidenceBindingVersion, expectedSupportSettings); });
     check("applicability", () => { assert.ok(proof); if (mode === "declared" && contract.kind !== "database_error") assert.equal(proof.gate, "complete"); });
     const expected = contract.kind === "evidence" ? ["KB-REFUND-UNUSED"] : [];
     const accepted = Array.isArray(call?.output) ? call.output.map(doc => object(doc).sourceId) : [];
@@ -458,6 +471,40 @@ export function checkC1BusinessEvidenceAudit() {
   const modernPolicy = structuredClone(modern), modernFirst = modernPolicy.cases[0]!.turns[0]!;
   object(object(modernFirst.observations!.protocol).action).kind = "policy";
   assert.equal(modernScore(modernPolicy).passed, true, "Current-order policy and eligibility share the same reconstructed gate");
+  for (const supportPrompt of ["v5", "v6"] as const) {
+    const selectedSettings = { ...supportSettings,
+      promptVersion: supportPrompt === "v6" ? evidenceSupportTypedV6PromptVersion : evidenceSupportTypedPromptVersion,
+      promptHash: contentHash(supportPrompt === "v6" ? evidenceSupportTypedV6Prompt : evidenceSupportTypedPrompt) };
+    const recorded = structuredClone(modern);
+    object(recorded.run.snapshot.content.settings).knowledgeSupportPrompt = supportPrompt;
+    for (const item of recorded.cases) for (const turn of item.turns) {
+      const call = turn.spans!.find(span => span.knowledge)!, { context, trace } = call.knowledge!;
+      trace.supportPrompt = supportPrompt;
+      if (!trace.supportVerification) continue;
+      const prepared = acceptEvidence({ query: trace.query, scope: trace.scope, documents, ranking: trace.rawRanking, config: { mode: "support", threshold: .5 } });
+      const gate = gateKnowledgeApplicability({ snapshot: registry, context: context.applicability ?? null, scope: trace.scope, candidates: prepared.pendingSupport! });
+      trace.settings!.support = selectedSettings;
+      const input = { query: context.effectiveQuery, scope: trace.scope, candidates: gate.candidates, settings: selectedSettings }, verification = trace.supportVerification;
+      verification.inputHash = evidenceSupportInputHash(input); verification.requestHash = evidenceSupportRequestHash(input);
+      trace.calls.find(provider => provider.operation === "support")!.requestHash = verification.requestHash;
+      turn.spans!.find(provider => provider.component === "knowledge-support")!.input = { requestHash: verification.requestHash };
+      assert.equal(validateEvidenceSupportVerification(verification, input), true);
+    }
+    const scorePrompt = (value = recorded, expected = selectedSettings) => auditC1BusinessEvidence(value, contentHash(value), registry, evidenceBindingVersion, undefined, expected);
+    assert.equal(scorePrompt().passed, true, JSON.stringify(scorePrompt()));
+    assert.equal(auditC1BusinessEvidence(recorded, contentHash(recorded), registry, evidenceBindingVersion).passed, false,
+      "An explicit new prompt recording cannot use legacy self-reported settings as independent evidence");
+    const otherSettings = { ...selectedSettings,
+      promptVersion: supportPrompt === "v6" ? evidenceSupportTypedPromptVersion : evidenceSupportTypedV6PromptVersion,
+      promptHash: contentHash(supportPrompt === "v6" ? evidenceSupportTypedPrompt : evidenceSupportTypedV6Prompt) };
+    assert.equal(scorePrompt(recorded, otherSettings).passed, false, "Cross-prompt replay fails despite internally valid verification");
+    for (const mutate of [
+      (value: EvalRunDetail) => { delete object(value.run.snapshot.content.settings).knowledgeSupportPrompt; },
+      (value: EvalRunDetail) => { delete value.cases[0]!.turns[0]!.spans![2]!.knowledge!.trace.supportPrompt; },
+      (value: EvalRunDetail) => { delete value.cases[0]!.turns[0]!.spans![2]!.knowledge!.trace.settings!.support; },
+      (value: EvalRunDetail) => { delete value.cases.at(-1)!.turns[0]!.spans![2]!.knowledge!.trace.supportPrompt; },
+    ]) { const changed = structuredClone(recorded); mutate(changed); assert.equal(scorePrompt(changed).passed, false); }
+  }
   for (const mutate of [
     (turn: EvalTurn) => { delete turn.spans![2]!.knowledge!.context.evidenceBindingVersion; },
     (turn: EvalTurn) => { turn.spans![2]!.knowledge!.context.purpose = "user_policy"; },
@@ -518,16 +565,21 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   assert.ok(queryArguments.length <= 1);
   const expectedQueryMode = queryArguments[0]?.slice("--query-mode=".length) as QueryMode | undefined;
   assert.ok(expectedQueryMode === undefined || expectedQueryMode === "combined" || expectedQueryMode === "separated");
-  const args = rawArgs.filter(arg => arg !== bindingArgument && !queryArguments.includes(arg));
+  const supportArguments = rawArgs.filter(arg => arg.startsWith("--support-settings="));
+  assert.ok(supportArguments.length <= 1);
+  const settingsPath = supportArguments[0]?.slice("--support-settings=".length);
+  assert.ok(settingsPath === undefined || settingsPath.trim());
+  const args = rawArgs.filter(arg => arg !== bindingArgument && !queryArguments.includes(arg) && !supportArguments.includes(arg));
   assert.ok(rawArgs.filter(arg => arg === bindingArgument).length <= 1);
   if (args.length === 1 && args[0] === "--check") console.log(JSON.stringify(checkC1BusinessEvidenceAudit(), null, 2));
   else {
-    assert.ok(args.length === 2 && args[0] === "--file", "Use --check or --file <synthetic-run-artifact.json> [--evidence-binding=order-evidence-binding-v2] [--query-mode=combined|separated]");
+    assert.ok(args.length === 2 && args[0] === "--file", "Use --check or --file <synthetic-run-artifact.json> [--evidence-binding=order-evidence-binding-v2] [--query-mode=combined|separated] [--support-settings=<frozen-settings.json>]");
     const bytes = await readFile(args[1]!), artifact = JSON.parse(bytes.toString()) as EvalRunDetail;
     const mode = object(artifact.run.snapshot.content.settings).knowledgeApplicability;
     const registryBytes = mode === "declared" ? await readFile(new URL(`../${registryPath}`, import.meta.url)) : undefined;
     const registry = registryBytes ? validateKnowledgeApplicabilitySnapshot(JSON.parse(registryBytes.toString()), contentHash(registryBytes)) : undefined;
-    const result = auditC1BusinessEvidence(artifact, contentHash(bytes), registry, expectedEvidenceBindingVersion, expectedQueryMode);
+    const expectedSupportSettings = settingsPath === undefined ? undefined : object(JSON.parse(await readFile(settingsPath, "utf8"))) as EvidenceSupportSettings;
+    const result = auditC1BusinessEvidence(artifact, contentHash(bytes), registry, expectedEvidenceBindingVersion, expectedQueryMode, expectedSupportSettings);
     console.log(JSON.stringify({ ...result, checkerHash: contentHash(await readFile(fileURLToPath(import.meta.url))) }, null, 2));
     if (!result.passed) process.exitCode = 1;
   }

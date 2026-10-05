@@ -5,7 +5,8 @@ import type { AssistantMessage } from "@earendil-works/pi-ai";
 import type { Pool } from "mysql2/promise";
 import { contentHash, createBailianClient } from "../src/bailian.ts";
 import { CouponStore } from "../src/coupon-store.ts";
-import { createEvidenceSupportClient, evidenceSupportInputHash, evidenceSupportTypedPromptVersion, resolveEvidenceSupportModel } from "../src/evidence-support.ts";
+import { createEvidenceSupportClient, evidenceSupportInputHash, evidenceSupportTypedPromptVersion, evidenceSupportTypedV6Prompt,
+  evidenceSupportTypedV6PromptVersion, resolveEvidenceSupportModel } from "../src/evidence-support.ts";
 import { createKnowledgeService, type KnowledgeServiceOptions } from "../src/knowledge-service.ts";
 import { rankKnowledge } from "../src/knowledge-retrieval.ts";
 import type { RetrievalDocument } from "../src/retrieval-ranking.ts";
@@ -219,6 +220,32 @@ assert.equal(invalidAll.trace.supportVerification!.attempts[0]!.outcome, "invali
 assert.equal(invalidAll.trace.supportVerification!.validation!.invalidDecisions.length, 2); assert.equal(invalidAll.trace.usage.supportTokens, 50);
 assert.ok(invalidAll.trace.acceptance!.rejected.every(row => row.reason !== "unsupported"));
 typedCorruption = "none";
+
+let v6Judges = 0;
+const v6Client = await createEvidenceSupportClient({ profile: "typed", typedPromptVersion: evidenceSupportTypedV6PromptVersion, timeoutMs: 1000,
+  runtime: { model, complete: async (context, parameters) => {
+    v6Judges++; assert.equal(context.systemPrompt, evidenceSupportTypedV6Prompt); assert.equal(parameters.maxRetries, 0);
+    const input = JSON.parse(String(context.messages[0]!.content)); assert.equal(input.query, query);
+    return { role: "assistant", api: "openai-completions", provider: model.provider, model: model.id, stopReason: "stop", timestamp: 0,
+      content: [{ type: "text", text: JSON.stringify({ decisions: input.documents.map((doc: { id: string; body: string }) => ({
+        id: doc.id, category: doc.id === "A" ? "direct_fact" : "limitation_only", quote: doc.body, reason: "固定工程分类",
+      })) }) }], usage: { input: 30, output: 20, cacheRead: 0, cacheWrite: 0, totalTokens: 50,
+        cost: { input: .000003, output: .000004, cacheRead: 0, cacheWrite: 0, total: .000007 } } };
+  } } });
+const v6Options: KnowledgeServiceOptions = { ...options, supportProfile: "typed", supportPrompt: "v6", clients: { rerank, support: v6Client } };
+const v6Result = await createKnowledgeService(store, v6Options).search({ query, scope });
+assert.equal(v6Judges, 1); assert.equal(v6Result.trace.supportPrompt, "v6");
+assert.equal(v6Result.trace.settings!.support!.promptVersion, evidenceSupportTypedV6PromptVersion);
+assert.deepEqual(v6Result.documents, typedResult.documents); assert.equal(typedResult.trace.supportPrompt, "v5");
+assert.notEqual(v6Result.trace.supportVerification!.requestHash, typedResult.trace.supportVerification!.requestHash);
+assert.throws(() => createKnowledgeService(store, { ...v6Options, clients: { rerank, support: typedClient } }), /Prompt/);
+assert.throws(() => createKnowledgeService(store, { ...v6Options, supportPrompt: "v5" }), /Prompt/);
+assert.throws(() => createKnowledgeService(store, { ...v6Options, clients: { rerank, support: {
+  ...v6Client, settings: { ...v6Client.settings, promptHash: typedClient.settings.promptHash },
+} } }), /Prompt/);
+assert.throws(() => createKnowledgeService(store, { supportPrompt: "v6" }));
+assert.throws(() => createKnowledgeService(store, { ...options, supportPrompt: "v6" }));
+assert.throws(() => createKnowledgeService(store, { ...options, supportPrompt: "v7" as "v5" }));
 
 // Only the support judge changes model; mismatched injected clients cannot make the switch a no-op.
 assert.throws(() => createKnowledgeService(store, { supportModel: "deepseek-v4-pro" }), /仅适用于/);

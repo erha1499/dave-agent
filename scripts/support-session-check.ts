@@ -16,7 +16,7 @@ import type { SupportCall } from "../src/support-controller.ts";
 import { readKnowledgeParameters, resolveSupportParameters, resolveSupportRunParameters, type SupportExperimentParameters } from "../src/support-parameters.ts";
 import { runSupportV2Live } from "./support-v2-live.ts";
 
-const knowledgeDefaults = { knowledgeMode: "lexical", knowledgeSupport: "binary", knowledgeSupportModel: "configured", knowledgeApplicability: "model_only", knowledgeQueryMode: "combined", knowledgeThreshold: .71, knowledgeTimeoutMs: 15_000 };
+const knowledgeDefaults = { knowledgeMode: "lexical", knowledgeSupport: "binary", knowledgeSupportModel: "configured", knowledgeSupportPrompt: "v5", knowledgeApplicability: "model_only", knowledgeQueryMode: "combined", knowledgeThreshold: .71, knowledgeTimeoutMs: 15_000 };
 assert.deepEqual(resolveSupportParameters(), { timeoutMs: 60_000, repairBudget: 1, merchantEvents: "architecture", ...knowledgeDefaults });
 assert.deepEqual(resolveSupportParameters({ timeoutMs: 10_000, repairBudget: 0, merchantEvents: "host" }),
   { timeoutMs: 10_000, repairBudget: 0, merchantEvents: "host", ...knowledgeDefaults });
@@ -28,11 +28,13 @@ assert.deepEqual(resolveSupportRunParameters("atomic", { merchantEvents: "host",
   { timeoutMs: 60_000, repairBudget: null, merchantEvents: "host", ...knowledgeDefaults });
 assert.deepEqual(readKnowledgeParameters({}), knowledgeDefaults);
 assert.deepEqual(readKnowledgeParameters({ KNOWLEDGE_MODE: "m4-support", KNOWLEDGE_THRESHOLD: "0.8", KNOWLEDGE_TIMEOUT_MS: "12000" }),
-  { knowledgeMode: "m4-support", knowledgeSupport: "binary", knowledgeSupportModel: "configured", knowledgeApplicability: "model_only", knowledgeQueryMode: "combined", knowledgeThreshold: .8, knowledgeTimeoutMs: 12_000 });
+  { knowledgeMode: "m4-support", knowledgeSupport: "binary", knowledgeSupportModel: "configured", knowledgeSupportPrompt: "v5", knowledgeApplicability: "model_only", knowledgeQueryMode: "combined", knowledgeThreshold: .8, knowledgeTimeoutMs: 12_000 });
 assert.equal(readKnowledgeParameters({ KNOWLEDGE_MODE: "m4-support", KNOWLEDGE_SUPPORT: "typed" }).knowledgeSupport, "typed");
+assert.equal(readKnowledgeParameters({ KNOWLEDGE_MODE: "m4-support", KNOWLEDGE_SUPPORT: "typed", KNOWLEDGE_SUPPORT_PROMPT: "v6" }).knowledgeSupportPrompt, "v6");
 for (const env of [{ KNOWLEDGE_MODE: "typo" }, { KNOWLEDGE_THRESHOLD: "NaN" }, { KNOWLEDGE_THRESHOLD: "1.01" },
   { KNOWLEDGE_THRESHOLD: "0x1" }, { KNOWLEDGE_TIMEOUT_MS: "0" }, { KNOWLEDGE_TIMEOUT_MS: "1.1" }, { KNOWLEDGE_TIMEOUT_MS: "60001" },
-  { KNOWLEDGE_SUPPORT: "typed" }, { KNOWLEDGE_SUPPORT: "invalid" }]) {
+  { KNOWLEDGE_SUPPORT: "typed" }, { KNOWLEDGE_SUPPORT: "invalid" }, { KNOWLEDGE_SUPPORT_PROMPT: "v6" },
+  { KNOWLEDGE_MODE: "m4-support", KNOWLEDGE_SUPPORT_PROMPT: "v6" }, { KNOWLEDGE_SUPPORT_PROMPT: "typo" }]) {
   assert.throws(() => readKnowledgeParameters(env));
 }
 assert.throws(() => resolveSupportRunParameters("atomic", { knowledgeMode: "m4-support" }), /atomic 仅支持 lexical/);
@@ -54,12 +56,14 @@ try {
   await assert.rejects(runSupportV2Live({ architecture: "controller", label: "invalid combination preflight", parameters: { merchantEvents: "model" } }), /controller 仅支持宿主/);
   await assert.rejects(runSupportV2Live({ architecture: "atomic", label: "invalid knowledge preflight", parameters: { knowledgeMode: "m4-support" } }), /atomic 仅支持 lexical/);
   await assert.rejects(runSupportV2Live({ architecture: "controller", label: "invalid applicability", parameters: { knowledgeApplicability: "declared" } }), /仅适用于/);
+  await assert.rejects(runSupportV2Live({ architecture: "controller", label: "invalid support prompt", parameters: { knowledgeMode: "m4-support", knowledgeSupportPrompt: "v6" } }), /knowledgeSupportPrompt v6 仅适用于/);
   await assert.rejects(runSupportV2Live({ architecture: "atomic", label: "invalid applicability architecture", parameters: { knowledgeMode: "m4-support", knowledgeApplicability: "declared" } }), /atomic/);
   assert.equal(credentialReads, 0);
 } finally { process.env = originalEnv; }
 for (const input of [null, [], { timeoutMs: 9999 }, { timeoutMs: 120001 }, { timeoutMs: 60_000.5 }, { timeoutMs: "60000" },
   { timeoutMs: Infinity }, { repairBudget: -1 }, { repairBudget: 3 }, { repairBudget: 0.5 }, { repairBudget: null },
   { merchantEvents: "typo" }, { merchantEvents: undefined }, { unauthorized: true }, { knowledgeMode: "typo" }, { knowledgeSupport: "typo" }, { knowledgeSupport: "typed" },
+  { knowledgeSupportPrompt: "typo" }, { knowledgeSupportPrompt: null }, { knowledgeSupportPrompt: undefined },
   { knowledgeThreshold: NaN }, { knowledgeThreshold: -1 }, { knowledgeThreshold: 1.01 }, { knowledgeThreshold: "0.71" },
   { knowledgeTimeoutMs: 0 }, { knowledgeTimeoutMs: 60001 }, { knowledgeTimeoutMs: 1000.1 }]) {
   const parameters = input as Partial<SupportExperimentParameters>;

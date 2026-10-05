@@ -76,7 +76,7 @@ const counts = (planned: number, passed: number, failed: number, skipped: number
   ({ planned, passed, failed, skipped, missing, passRate: planned ? passed / planned : null });
 const supportParams = (over: Record<string, unknown> = {}): any => ({
   timeoutMs: 60000, repairBudget: 1, merchantEvents: "architecture",
-  knowledgeMode: "lexical", knowledgeSupport: "binary", knowledgeSupportModel: "configured", knowledgeApplicability: "model_only", knowledgeQueryMode: "combined",
+  knowledgeMode: "lexical", knowledgeSupport: "binary", knowledgeSupportModel: "configured", knowledgeSupportPrompt: "v5", knowledgeApplicability: "model_only", knowledgeQueryMode: "combined",
   knowledgeThreshold: 0.71, knowledgeTimeoutMs: 15000, ...over,
 });
 const retrievalParams = (over: Record<string, unknown> = {}): any => ({
@@ -102,6 +102,9 @@ const catalog = (): any => ({
     { id: "support-knowledge-applicability-ab", name: "规则适用条件 A/B", config: { version: 1, kind: "support", label: "规则适用条件 A/B", repeat: 1, allowRemote: false, variants: [
       { id: "A", architecture: "controller", parameters: supportParams({ knowledgeMode: "m4-support", knowledgeSupport: "typed", knowledgeSupportModel: "deepseek-v4-pro", knowledgeApplicability: "model_only", knowledgeQueryMode: "combined", knowledgeThreshold: 0.5 }) },
       { id: "B", architecture: "controller", parameters: supportParams({ knowledgeMode: "m4-support", knowledgeSupport: "typed", knowledgeSupportModel: "deepseek-v4-pro", knowledgeApplicability: "declared", knowledgeThreshold: 0.5 }) }] } },
+    { id: "support-knowledge-prompt-ab", name: "分类判别 Prompt A/B", config: { version: 1, kind: "support", label: "分类判别 Prompt A/B", repeat: 1, allowRemote: false, variants: [
+      { id: "A", architecture: "controller", parameters: supportParams({ knowledgeMode: "m4-support", knowledgeSupport: "typed", knowledgeSupportModel: "deepseek-v4-pro", knowledgeSupportPrompt: "v5", knowledgeApplicability: "declared", knowledgeThreshold: 0.5 }) },
+      { id: "B", architecture: "controller", parameters: supportParams({ knowledgeMode: "m4-support", knowledgeSupport: "typed", knowledgeSupportModel: "deepseek-v4-pro", knowledgeSupportPrompt: "v6", knowledgeApplicability: "declared", knowledgeThreshold: 0.5 }) }] } },
     { id: "retrieval-local", name: "本地检索 M0 / M1", config: { version: 1, kind: "retrieval", label: "本地检索 M0 / M1", repeat: 1, allowRemote: false, variants: [
       { id: "A", modes: ["M0", "M1"], parameters: retrievalParams() } ] } },
     { id: "retrieval-rerank", name: "词项 / 全候选重排", config: { version: 1, kind: "retrieval", label: "词项 / 全候选重排", repeat: 1, allowRemote: false, variants: [
@@ -126,6 +129,8 @@ const catalog = (): any => ({
         { value: "binary", label: "二元基线 v1" }, { value: "typed", label: "分类候选 v3" }], note: "typed 仅用于 m4-support" },
       { key: "knowledgeSupportModel", label: "支持判别模型", type: "select", options: [
         { value: "configured", label: "跟随已配置模型" }, { value: "deepseek-v4-pro", label: "DeepSeek V4 Pro" }], note: "仅 Controller + m4-support；Pro 只切换支持判别" },
+      { key: "knowledgeSupportPrompt", label: "分类判别 Prompt", type: "select", options: [
+        { value: "v5", label: "v5 基线" }, { value: "v6", label: "v6 诉求合同" }], note: "v6 仅 Controller + m4-support + typed；服务端严格校验" },
       { key: "knowledgeApplicability", label: "规则适用条件", type: "select", options: [
         { value: "model_only", label: "仅模型判断" }, { value: "declared", label: "已声明必要前提" }], note: "declared 仅 Controller + m4-support；binary/typed 均可" },
       { key: "knowledgeTimeoutMs", label: "单次知识查询超时（ms）", type: "number", min: 1000, max: 60000, step: 1000, note: "包含读取、重排、支持判别和来源复检；无自动重试" },
@@ -176,6 +181,27 @@ const openExperiments = async (booted: Awaited<ReturnType<typeof boot>>, jobs: u
   respond(find(request => request.path === "/api/experiments", "jobs"), { jobs });
   await flush();
 };
+
+// Existing metadata-driven controls preserve a valid prompt comparison; backend
+// combination rejection is covered by experiment-check, not inferred from UI.
+{
+  const booted = await boot(), { element, find, flush, pendingCount } = booted;
+  await openExperiments(booted);
+  const root = element("experiments"), preset = findAttr(root, "data-field", "preset")!;
+  preset.value = "support-knowledge-prompt-ab"; preset.fire("change"); await flush();
+  const prompts = findAllAttr(root, "data-field", "knowledgeSupportPrompt");
+  assert.deepEqual(prompts.map(input => input.value), ["v5", "v6"]);
+  assert.match(content(root), /knowledgeSupportPrompt v5 → v6/);
+  const allow = findAttr(root, "data-field", "allow-remote")!; allow.checked = true; allow.fire("change"); await flush();
+  assert.equal(findClass(root, "primary-button")!.disabled, false);
+  findClass(root, "primary-button")!.fire("click"); await flush(1);
+  const post = find(request => request.path === "/api/experiments" && request.options?.method === "POST", "prompt comparison POST");
+  const body = JSON.parse(post.options?.body || "{}");
+  assert.deepEqual(body.variants.map((variant: any) => variant.parameters.knowledgeSupportPrompt), ["v5", "v6"]);
+  respond(post, job("prompt-comparison", { config: body })); await flush();
+  assert.equal(pendingCount(), 0);
+  console.log("PASS 实验调试：Prompt 元数据呈现、v5/v6 单变量差异及提交参数保留。");
+}
 
 // 表单：懒加载、远程勾选门控、Controller 隐藏 model 通知、atomic 修复次数不适用、复制/删除方案与参数差异。
 {

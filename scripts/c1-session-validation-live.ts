@@ -7,7 +7,8 @@ import { createConfiguredModelRuntime } from "../src/agent.ts";
 import { merchantSourceKey } from "../src/after-sales.ts";
 import { BailianError, contentHash, createBailianClient, type BailianClient } from "../src/bailian.ts";
 import { OrderAccessError, type CouponStore, type QQIdentity } from "../src/coupon-store.ts";
-import { createEvidenceSupportClient, EvidenceSupportError, resolveEvidenceSupportModel, type EvidenceSupportSettings } from "../src/evidence-support.ts";
+import { createEvidenceSupportClient, EvidenceSupportError, evidenceSupportTypedPromptVersion, evidenceSupportTypedV6PromptVersion,
+  resolveEvidenceSupportModel, type EvidenceSupportSettings } from "../src/evidence-support.ts";
 import { captureEvaluationTurn } from "../src/eval-capture.ts";
 import { loadKnowledgeApplicabilitySnapshot, type KnowledgeApplicabilitySnapshot } from "../src/knowledge-applicability.ts";
 import { createKnowledgeService } from "../src/knowledge-service.ts";
@@ -153,10 +154,13 @@ export async function loadC1ValidationExecution(planPath: string, manifestPath: 
   assert.deepEqual(configuration.limits, c1ValidationLimits);
   assert.deepEqual(resolveSupportRunParameters("controller", parameters), parameters, "Freeze resolved parameters, not implicit defaults");
   assert.ok(parameters.knowledgeQueryMode === "combined" || parameters.knowledgeQueryMode === "separated", "Freeze the query mode explicitly for this candidate");
+  assert.ok(parameters.knowledgeSupportPrompt === "v5" || parameters.knowledgeSupportPrompt === "v6", "Freeze the support prompt explicitly for this candidate");
   assert.equal(parameters.timeoutMs, c1ValidationLimits.turnTimeoutMs); assert.equal(parameters.knowledgeMode, "m4-support");
   assert.equal(configuration.providerRetries, 0); assert.equal(configuration.sessionAutomaticRetries, 2);
   assert.equal(configuration.rerank.retries, 0); assert.equal(configuration.rerank.timeoutMs, parameters.knowledgeTimeoutMs);
   assert.equal(configuration.support.timeoutMs, parameters.knowledgeTimeoutMs); assert.equal(configuration.support.maxRetries, 0);
+  if (parameters.knowledgeSupport === "typed") assert.equal(configuration.support.promptVersion,
+    parameters.knowledgeSupportPrompt === "v6" ? evidenceSupportTypedV6PromptVersion : evidenceSupportTypedPromptVersion);
   assert.equal(configuration.model.provider, "deepseek"); assert.equal(configuration.model.api, "openai-completions");
   assert.equal(configuration.pricing.estimated, true); assert.ok(configuration.pricing.asOf);
   const rate = configuration.pricing.rerankCnyPerMillionTokens;
@@ -245,7 +249,8 @@ export async function runC1SessionValidation(planPath: string, manifestPath: str
     answerReviewInputs: reviewInputs(plan, rows), reviews: [] as C1AnswerReview[], runIntegrityPassed: false, admitted: false };
   const save = () => writeFile(path, `${JSON.stringify(artifact, null, 2)}\n`);
   const knowledgeConfiguration = { applicability: p.knowledgeApplicability, applicabilitySnapshot: setup.applicabilitySnapshot,
-    evidenceBindingVersion: config.evidenceBindingVersion, queryMode: p.knowledgeQueryMode };
+    evidenceBindingVersion: config.evidenceBindingVersion, queryMode: p.knowledgeQueryMode,
+    supportPrompt: p.knowledgeSupportPrompt, supportSettings: config.support };
   await save();
   let restoreStream: (() => void) | undefined;
   try {
@@ -259,6 +264,7 @@ export async function runC1SessionValidation(planPath: string, manifestPath: str
     restoreStream = () => { modelRuntime.streamSimple = originalStream; };
     const rerankBase = createBailianClient({ retries: 0, timeoutMs: p.knowledgeTimeoutMs, fetch: guard.fetchFor("rerank") });
     const supportBase = await createEvidenceSupportClient({ profile: p.knowledgeSupport, modelSelection: p.knowledgeSupportModel,
+      ...(p.knowledgeSupport === "typed" ? { typedPromptVersion: p.knowledgeSupportPrompt === "v6" ? evidenceSupportTypedV6PromptVersion : evidenceSupportTypedPromptVersion } : {}),
       timeoutMs: p.knowledgeTimeoutMs, runtime: { model: supportModel,
         complete: (transcript, options) => modelRuntime.complete(supportModel, transcript, { ...options, fetch: guard.fetchFor("support") }) } });
     assert.deepEqual(rerankBase.settings, config.rerank); assert.deepEqual(supportBase.settings, config.support);
@@ -289,7 +295,8 @@ export async function runC1SessionValidation(planPath: string, manifestPath: str
       try {
         const knowledge = createKnowledgeService({ readKnowledgeDocuments: async () => structuredClone(setup.corpora[item.corpus]) },
           { mode: p.knowledgeMode, threshold: p.knowledgeThreshold, timeoutMs: p.knowledgeTimeoutMs, supportProfile: p.knowledgeSupport,
-            supportModel: p.knowledgeSupportModel, queryMode: p.knowledgeQueryMode, applicability: p.knowledgeApplicability, applicabilitySnapshot: setup.applicabilitySnapshot, clients: { rerank, support } });
+            supportModel: p.knowledgeSupportModel, supportPrompt: p.knowledgeSupportPrompt, queryMode: p.knowledgeQueryMode,
+            applicability: p.knowledgeApplicability, applicabilitySnapshot: setup.applicabilitySnapshot, clients: { rerank, support } });
         session = await createSupportSession(fixture.actor, controlled.store, modelRuntime, model, undefined,
           { groupOpenid: fixture.groupOpenid, repairBudget: p.repairBudget, knowledge });
         let priorPassed = true;

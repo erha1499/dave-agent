@@ -2,6 +2,8 @@ import { BailianError, contentHash, createBailianClient, rerankInstruction, type
 import type { CouponStore } from "./coupon-store.ts";
 import { acceptEvidence, resolveEvidenceAcceptance, type EvidenceAcceptanceResult, type EvidenceRanking } from "./evidence-acceptance.ts";
 import { applyEvidenceSupport, createEvidenceSupportClient, EvidenceSupportError, verifyEvidenceSupport, resolveEvidenceSupportModel,
+  evidenceSupportPrompt, evidenceSupportPromptVersion, evidenceSupportTypedPrompt, evidenceSupportTypedPromptVersion,
+  evidenceSupportTypedV6Prompt, evidenceSupportTypedV6PromptVersion,
   type EvidenceSupportAttempt, type EvidenceSupportClient, type EvidenceSupportModel, type EvidenceSupportProfile, type EvidenceSupportFailure, type EvidenceSupportSettings, type EvidenceSupportVerification } from "./evidence-support.ts";
 import { rankLexical, scopeDocuments, serializeRetrievalDocument, type RetrievalScope } from "./retrieval-ranking.ts";
 import { gateKnowledgeApplicability, loadKnowledgeApplicabilitySnapshot, validateKnowledgeApplicabilitySnapshot,
@@ -10,6 +12,7 @@ import { gateKnowledgeApplicability, loadKnowledgeApplicabilitySnapshot, validat
 
 export type KnowledgeMode = "lexical" | "m4-support";
 export type KnowledgeQueryMode = "combined" | "separated";
+export type KnowledgeSupportPrompt = "v5" | "v6";
 export const knowledgeQueryPlanVersion = "knowledge-query-plan-v1";
 export type KnowledgeStage = "read" | "rerank" | "applicability" | "support" | "recheck";
 export type KnowledgeDocuments = Awaited<ReturnType<CouponStore["searchKnowledge"]>>;
@@ -28,6 +31,7 @@ export type KnowledgeTrace = {
   supportVerification?: EvidenceSupportVerification;
   supportFailure?: EvidenceSupportFailure;
   supportProfile?: EvidenceSupportProfile; supportModel?: EvidenceSupportModel;
+  supportPrompt?: KnowledgeSupportPrompt;
   applicability?: { mode: KnowledgeApplicabilityMode; gate?: Omit<KnowledgeApplicabilityResult, "candidates"> };
   sourceHashes: { before: string | null; after: string | null }; durationMs: number; calls: KnowledgeCall[];
   usage: { rerankTokens: number | null; supportTokens: number | null; estimatedCny: number | null; estimatedUsd: number | null; incompleteCalls: number };
@@ -41,6 +45,7 @@ export type KnowledgeSearchInput = { query: string; retrievalQuery?: string; ori
 export type KnowledgeSearchResult = { documents: KnowledgeDocuments; trace: KnowledgeTrace };
 export type KnowledgeService = { search(input: KnowledgeSearchInput): Promise<KnowledgeSearchResult> };
 export type KnowledgeServiceOptions = { mode?: KnowledgeMode; threshold?: number; timeoutMs?: number; supportProfile?: EvidenceSupportProfile; supportModel?: EvidenceSupportModel;
+  supportPrompt?: KnowledgeSupportPrompt;
   queryMode?: KnowledgeQueryMode;
   applicability?: KnowledgeApplicabilityMode; applicabilitySnapshot?: KnowledgeApplicabilitySnapshot;
   clients?: { rerank?: Pick<BailianClient, "settings" | "rerank">; support?: EvidenceSupportClient } };
@@ -75,6 +80,11 @@ export function finishKnowledgeApplicabilityAcceptance(acceptance: EvidenceAccep
 export function createKnowledgeService(store: Pick<CouponStore, "readKnowledgeDocuments">, options: KnowledgeServiceOptions = {}): KnowledgeService {
   const mode = options.mode ?? "lexical", threshold = options.threshold ?? .71, timeoutMs = options.timeoutMs ?? 60_000;
   const supportProfile = options.supportProfile ?? "binary", supportModel = options.supportModel ?? "configured";
+  const supportPrompt = options.supportPrompt ?? "v5";
+  if (!["v5", "v6"].includes(supportPrompt) || supportPrompt === "v6" && (mode !== "m4-support" || supportProfile !== "typed")) throw new Error("v6 支持提示词仅适用于 m4-support + typed。");
+  const typedPromptVersion = supportPrompt === "v6" ? evidenceSupportTypedV6PromptVersion : evidenceSupportTypedPromptVersion;
+  const promptMatches = (client: EvidenceSupportClient) => client.settings.promptVersion === (supportProfile === "typed" ? typedPromptVersion : evidenceSupportPromptVersion)
+    && client.settings.promptHash === contentHash(supportProfile === "binary" ? evidenceSupportPrompt : supportPrompt === "v6" ? evidenceSupportTypedV6Prompt : evidenceSupportTypedPrompt);
   const queryMode = options.queryMode ?? "combined";
   if (!["combined", "separated"].includes(queryMode) || queryMode === "separated" && mode !== "m4-support") throw new Error("查询分离仅适用于 m4-support 知识检索。");
   const applicability = options.applicability ?? "model_only";
@@ -85,6 +95,7 @@ export function createKnowledgeService(store: Pick<CouponStore, "readKnowledgeDo
   if (options.clients?.support && !modelMatches(options.clients.support)) throw new Error("知识配置与注入的支持判别模型不一致。");
   if (!["binary", "typed"].includes(supportProfile) || mode === "lexical" && supportProfile !== "binary") throw new Error("typed 支持判别仅适用于 m4-support 知识检索。");
   if (options.clients?.support && (options.clients.support.settings.profile ?? "binary") !== supportProfile) throw new Error("知识配置与注入的支持判别 profile 不一致。");
+  if (options.clients?.support && !promptMatches(options.clients.support)) throw new Error("知识配置与注入的支持判别 Prompt 版本或内容不一致。");
   if (!["lexical", "m4-support"].includes(mode) || !Number.isSafeInteger(timeoutMs) || timeoutMs < 1000 || timeoutMs > 60_000) throw new Error("知识服务模式或超时配置无效。");
   resolveEvidenceAcceptance({ mode: "support", threshold }, ["M4"]);
   let rerankClient = options.clients?.rerank, supportClient = options.clients?.support;
@@ -100,7 +111,7 @@ export function createKnowledgeService(store: Pick<CouponStore, "readKnowledgeDo
     const retrievalQuery = queryMode === "separated" ? input.retrievalQuery : input.query;
     const started = performance.now(), deadline = AbortSignal.timeout(timeoutMs);
     const signal = input.signal ? AbortSignal.any([input.signal, deadline]) : deadline;
-    const trace: KnowledgeTrace = { mode, supportProfile, supportModel, applicability: { mode: applicability }, threshold: mode === "lexical" ? null : threshold, query: retrievalQuery ?? "",
+    const trace: KnowledgeTrace = { mode, supportProfile, supportModel, supportPrompt, applicability: { mode: applicability }, threshold: mode === "lexical" ? null : threshold, query: retrievalQuery ?? "",
       originalQuery: input.originalQuery ?? input.query, scope: { shopId: input.scope?.shopId ?? null, productId: input.scope?.productId ?? null },
       status: "unavailable", reason: null, rawRanking: [], acceptance: null, sources: [], sourceHashes: { before: null, after: null }, durationMs: 0, calls: [],
       usage: { rerankTokens: 0, supportTokens: 0, estimatedCny: 0, estimatedUsd: 0, incompleteCalls: 0 },
@@ -188,10 +199,11 @@ export function createKnowledgeService(store: Pick<CouponStore, "readKnowledgeDo
         enter("support");
         if (!supportClient) {
           supportLoading ??= createEvidenceSupportClient({ timeoutMs, profile: supportProfile, modelSelection: supportModel,
+            ...(supportProfile === "typed" ? { typedPromptVersion } : {}),
             env: { ...process.env, MODEL_PROVIDER: selectedModel.provider, MODEL_ID: selectedModel.model } }).catch(error => { supportLoading = undefined; throw error; });
           supportClient = await wait(() => supportLoading!);
         }
-        if (!modelMatches(supportClient) || supportClient.settings.maxRetries !== 0 || (supportClient.settings.profile ?? "binary") !== supportProfile) throw new Error();
+        if (!modelMatches(supportClient) || !promptMatches(supportClient) || supportClient.settings.maxRetries !== 0 || (supportClient.settings.profile ?? "binary") !== supportProfile) throw new Error();
         trace.settings!.support = structuredClone(supportClient.settings);
         const call: Extract<KnowledgeCall, { operation: "support" }> = { operation: "support", requestHash: null, attempts: [], status: "unavailable" };
         try {

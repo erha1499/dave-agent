@@ -28,4 +28,27 @@ node --env-file-if-exists=.env scripts/c1-support-intent-development.ts --inspec
 node --env-file-if-exists=.env scripts/c1-support-intent-development.ts --live
 ```
 
-实际执行后在此追加结果和采用决定。
+## 实际结果与采用决定
+
+执行前提交为 `56ad97f`，运行 `d1c61ef6-1069-4fe2-b55f-2b3b0ea02926`。两组各20个输入完整执行，总计40次真实support HTTP、0 rerank/Agent；输入/请求哈希、Prompt唯一变量、实际用量与冻结源码均通过独立复核。无无效/partial判别、超时、未执行或未知费用，批次57.983秒。见[逐例结果摘要](../data/c1-support-intent-development-results.json)。
+
+| 指标 | typed v5 | typed v6 |
+| --- | ---: | ---: |
+| 类别及接收合同通过 | 18/20 | 19/20 |
+| 负例误收 / 10个负例 | 1/10 | 0/10 |
+| 正例误拒 / 10个正例 | 1/10 | 1/10 |
+| 完整响应 P50 / P95 | 1427 / 1616 ms | 1448 / 1808 ms |
+| tokens | 32758 | 37352 |
+| USD 目录估算 | 0.012803472 | 0.019168512 |
+
+唯一改变判定的是019：v5把索取具体名称改写为“文档覆盖范围”，v6正确归为 `limitation_only`；023询问记录覆盖，两组均保留 `boundary_answer`。其余18题结果一致，未用普遍拒收换取误收下降。
+
+`c1-language-005` 两组仍误拒：没有利用已给前文中的普通周末条件作保留条件的说明，理由都质疑“星期天是否属于普通周末”，并把需核实接待作为不足依据。v5另提出该券适用性问题，v6未明确提出。商品到规则类别的可信映射仍是数据边界，但不能把它说成两组共同根因；模型给出的理由也不是内部因果证明。原gold与该失败保留。
+
+本次v6 tokens约增加14.0%，USD估算约增加49.7%，延迟未改善。更长Prompt和实际输入/输出、缓存命中共同影响计费，单次结果不能证明未来稳定增加同样比例；为减少一个错误接收付出的本次实际成本应一并展示。
+
+**决定：达到预声明推进条件，将v6接为显式实验参数，typed默认继续v5。** 不改QQ/atomic+lexical默认，不把19/20作为C1准入。后续仍需检验完整Session的指代、实际回复、错误额外证据和完整业务合同；优先处理竞争引用的交互与恢复，再冻结候选回归。
+
+参数接线已完成：`knowledgeSupportPrompt=v5|v6`、`KNOWLEDGE_SUPPORT_PROMPT`、实验 CLI 与单变量预设 `support-knowledge-prompt-ab` 共用配置，v6 仅允许 Controller + M4-support + typed。参数、实际请求版本及哈希绑定、评分器外部冻结配置、历史报告兼容和完整 `npm run validate` 均通过；本次接线检查没有新增真实模型或 QQ 调用。用法与独立复核要求见[实验开关](./experiment-controls.md)。
+
+复现本次对照应使用 `56ad97f`；后续参数接线属于新的实现版本，不重写此清单。原始报告位于本机 `.runtime/c1-support-intent-development/d1c61ef6-1069-4fe2-b55f-2b3b0ea02926.json`，SHA-256 `a40054c8420e05090472982fe5b5c58b41037f55edbd5a9d9e560f724cc271c8`。真实执行前全量 `npm run validate`、候选版本假请求/跨版本绑定检查及执行器 `--check` / `--inspect` 均通过；纯工程通过与真实语义结果分别记录。

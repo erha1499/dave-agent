@@ -35,6 +35,7 @@
 | `knowledgeMode` | `lexical` / `m4-support`，默认 `lexical` | Controller 查询知识时采用词项排名或重排加支持性判别；atomic + m4-support 在启动前拒绝。 |
 | `knowledgeSupport` | `binary` / `typed`，默认 `binary` | binary 保持 A1 的二元判断；typed 区分事实/规则、明确边界问题、仅信息缺失和无关证据。typed 仅适用于 Controller + m4-support，非法组合启动前拒绝。实际 Prompt 版本写入 trace，类别不代表已获业务授权。 |
 | `knowledgeSupportModel` | `configured` / `deepseek-v4-pro`，默认 `configured` | 仅 Controller + m4-support 可固定支持判别模型；configured 跟随业务模型配置，固定 Pro 要求 DeepSeek provider。业务 Agent 的模型不因此改变；实际执行模型以 `trace.settings.support` 为准。 |
+| `knowledgeSupportPrompt` | `v5` / `v6`，默认 `v5` | v6 仅 Controller + m4-support + typed，增加先确定用户所问命题的合同；选择只影响 typed，binary 继续使用 `fact-support-v1`。实际支持调用须核对版本和内容哈希，未发生调用只记录配置。 |
 | `knowledgeApplicability` | `model_only` / `declared`，默认 `model_only` | 仅 Controller + m4-support 可启用 declared：在原分数 / Top5 后，用本轮订单事实检查规则已声明的必要前提，再交模型判断。通过不代表整篇规则适用或已获退款批准；不增加模型阶段。 |
 | `knowledgeQueryMode` | `combined` / `separated`，默认 `combined` | 仅 Controller + m4-support 可启用 separated：排序使用原问、可信前文、商品与简短订单状态；支持判别仍使用完整券数、按券状态关联的日期和原问。两者均由宿主构造，不增加模型改写阶段。 |
 | `knowledgeThreshold` | 0–1，默认 0.71 | 仅 m4-support 的相关性预筛；分数不是概率。变更后属于新实验配置。 |
@@ -51,7 +52,19 @@ node --env-file-if-exists=.env scripts/experiment.ts --preset support-knowledge-
 
 `support-knowledge-model-ab` 固定 Controller / m4-support / typed / 0.5，仅比较 configured 与 Pro。只有环境中的 configured 实际为 Flash 时，才构成 Flash/Pro 对照；界面允许预览、修改、下载和运行，非法组合可在原控件修复而不暗改参数。该预设不代表当前候选已准入。开发对照与费用见 [支持模型结果](./c1-support-model-results.md)。
 
-CLI / QQ 读取 `KNOWLEDGE_MODE`、`KNOWLEDGE_SUPPORT`、`KNOWLEDGE_SUPPORT_MODEL`、`KNOWLEDGE_APPLICABILITY`、`KNOWLEDGE_QUERY_MODE`、`KNOWLEDGE_THRESHOLD`、`KNOWLEDGE_TIMEOUT_MS`；未配置仍为 lexical / binary / configured / model_only / combined。Controller 通过 `SUPPORT_ARCHITECTURE=controller` 显式选择。环境变量只在进程启动时读取；实验表单只控制本次评测，不修改环境文件或运行中的 QQ。确认、身份与金额边界不受上述开关影响。
+CLI / QQ 读取 `KNOWLEDGE_MODE`、`KNOWLEDGE_SUPPORT`、`KNOWLEDGE_SUPPORT_MODEL`、`KNOWLEDGE_SUPPORT_PROMPT`、`KNOWLEDGE_APPLICABILITY`、`KNOWLEDGE_QUERY_MODE`、`KNOWLEDGE_THRESHOLD`、`KNOWLEDGE_TIMEOUT_MS`；未配置仍为 lexical / binary / configured / v5 / model_only / combined。Controller 通过 `SUPPORT_ARCHITECTURE=controller` 显式选择。环境变量只在进程启动时读取；实验表单只控制本次评测，不修改环境文件或运行中的 QQ。确认、身份与金额边界不受上述开关影响。
+
+`support-knowledge-prompt-ab` 固定 Controller / m4-support / typed / Pro / 0.5 / declared / combined，仅比较 v5 与 v6，知识查询超时均为 60000 毫秒。v6 强调先确定原问命题：对象属性、组成或具体清单也是事实请求；资料缺失不能把该请求变成资料覆盖问题；原问明确询问覆盖、推断或核实去向时才按元边界判断，规则要求的核实流程仍可直接回答流程问题。没有新增模型层、类别或解析器，默认仍为 v5。
+
+```sh
+node scripts/experiment.ts --preset support-knowledge-prompt-ab --dry-run
+# 显式真实 MySQL 开发运行；会产生模型和数据库调用。
+node --env-file-if-exists=.env scripts/support-v2-live.ts --live --architecture controller --repeat 1 --knowledge-mode m4-support --knowledge-support typed --knowledge-support-model deepseek-v4-pro --knowledge-support-prompt v6 --applicability declared --query-mode combined --knowledge-threshold .5 --knowledge-timeout-ms 60000
+```
+
+运行参数和 `trace.supportPrompt` 标记本次配置；发生支持判别请求时，通用业务审计将 `trace.settings.support.promptVersion` 和 `promptHash` 与预期原文双重比对，输出 `supportPrompt=matched|mismatched`。没有支持请求则标 `not_called`，不能将空候选或数据库故障当作已验证 v6。既有报告和 v5 字节保持，候选收益以独立开发记录为准，开关本身不代表 C1 已准入。
+
+独立重评新业务报告时，`scripts/c1-business-evidence-check.ts --file <报告路径> --support-settings=<冻结配置路径>` 必须提供执行前保存的完整 `EvidenceSupportSettings` JSON；不能从待评分报告自取配置充当独立依据。旧报告未记录该参数时保留原评分合同。Session 验证执行器则直接使用冻结 manifest 中的支持配置，交叉版本、缺失标记及自洽但被改写的配置均不能通过。
 
 `declared` 使用独立的 [`data/knowledge-applicability.json`](../data/knowledge-applicability.json)，未修改既有语料和 gold。每个服务实例在首次使用时加载一次不可变快照；文件变更需新建服务 / 重启进程生效。快照哈希、文档原文 / scope / 状态哈希、依据引文和本轮事实哈希分别留痕。当前只有“最少券数”和“至少存在某种券状态”两类必要前提；一般 / 假设规则咨询不套用当前订单条件。没有声明的前提不等于已经证明，缺失事实也不等于不符合。原始排名不重排、不补位，因此第六名有效证据仍可能未被接收；这属于本候选的召回取舍。
 

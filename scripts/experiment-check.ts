@@ -9,6 +9,7 @@ import { experimentCatalog, resolveExperimentConfig, remoteRequired, requireExpe
 import { parseExperimentArgs } from "./experiment.ts";
 import { auditSupportKnowledgeCall, type runSupportV2Live } from "./support-v2-live.ts";
 import { knowledgeQueryPlanVersion, type KnowledgeTrace } from "../src/knowledge-service.ts";
+import { createEvidenceSupportClient, evidenceSupportTypedV6PromptVersion } from "../src/evidence-support.ts";
 import { createEvaluationServer } from "../src/eval-server.ts";
 import { executeExperiment, ExperimentBusyError, type ExperimentJob } from "../src/experiment-jobs.ts";
 
@@ -30,7 +31,7 @@ assert.ok(knowledgeAB.variants.every(variant => variant.parameters.knowledgeThre
 assert.deepEqual(resolveExperimentConfig(JSON.parse(await readFile("configs/experiments/support-knowledge-ab.json", "utf8"))), knowledgeAB);
 assert.throws(() => requireExperimentExecution(knowledgeAB));
 assert.throws(() => resolveExperimentConfig({ ...support, variants: [{ id: "A", architecture: "atomic", parameters: { knowledgeMode: "m4-support" } }] }));
-for (const key of ["knowledgeMode", "knowledgeSupport", "knowledgeSupportModel", "knowledgeApplicability", "knowledgeQueryMode", "knowledgeThreshold", "knowledgeTimeoutMs"]) assert.ok(catalog.fields.support.some(field => field.key === key));
+for (const key of ["knowledgeMode", "knowledgeSupport", "knowledgeSupportModel", "knowledgeSupportPrompt", "knowledgeApplicability", "knowledgeQueryMode", "knowledgeThreshold", "knowledgeTimeoutMs"]) assert.ok(catalog.fields.support.some(field => field.key === key));
 const profileAB = catalog.presets.find(preset => preset.id === "support-knowledge-profile-ab")!.config;
 assert.equal(profileAB.kind, "support");
 if (profileAB.kind !== "support") throw new Error("profile preset kind");
@@ -70,15 +71,31 @@ for (const parameters of [{ knowledgeQueryMode: "separated" }, { knowledgeMode: 
   assert.throws(() => resolveExperimentConfig({ ...support, variants: [{ id: "A", architecture: "controller", parameters }] }));
 }
 assert.throws(() => resolveSupportRunParameters("atomic", { knowledgeMode: "m4-support", knowledgeQueryMode: "separated" }), /atomic/);
-for (const variant of queryAB.variants) {
+const promptAB = catalog.presets.find(preset => preset.id === "support-knowledge-prompt-ab")!.config;
+if (promptAB.kind !== "support") throw new Error("prompt preset kind");
+assert.deepEqual(promptAB.variants.map(v => v.parameters.knowledgeSupportPrompt), ["v5", "v6"]);
+assert.deepEqual({ ...promptAB.variants[0]!.parameters, knowledgeSupportPrompt: "same" },
+  { ...promptAB.variants[1]!.parameters, knowledgeSupportPrompt: "same" }, "prompt A/B changes one parameter only");
+assert.ok(promptAB.variants.every(v => v.architecture === "controller" && v.parameters.knowledgeMode === "m4-support"
+  && v.parameters.knowledgeSupport === "typed" && v.parameters.knowledgeSupportModel === "deepseek-v4-pro"
+  && v.parameters.knowledgeThreshold === .5 && v.parameters.knowledgeApplicability === "declared" && v.parameters.knowledgeQueryMode === "combined"));
+assert.equal(promptAB.allowRemote, false); assert.throws(() => requireExperimentExecution(promptAB));
+assert.equal(readKnowledgeParameters({}).knowledgeSupportPrompt, "v5");
+assert.equal(readKnowledgeParameters({ KNOWLEDGE_MODE: "m4-support", KNOWLEDGE_SUPPORT: "typed", KNOWLEDGE_SUPPORT_PROMPT: "v6" }).knowledgeSupportPrompt, "v6");
+for (const knowledgeSupportPrompt of ["typo", "V6", null, undefined]) assert.throws(() => resolveExperimentConfig({ ...support,
+  variants: [{ id: "A", architecture: "controller", parameters: { knowledgeMode: "m4-support", knowledgeSupport: "typed", knowledgeSupportPrompt } }] }));
+for (const parameters of [{ knowledgeSupportPrompt: "v6" as const }, { knowledgeMode: "m4-support" as const, knowledgeSupportPrompt: "v6" as const }])
+  assert.throws(() => resolveSupportRunParameters("controller", parameters), /knowledgeSupportPrompt v6 仅适用于/);
+assert.throws(() => resolveSupportRunParameters("atomic", { knowledgeMode: "m4-support", knowledgeSupport: "typed", knowledgeSupportPrompt: "v6" }), /atomic/);
+for (const config of [queryAB, promptAB]) for (const variant of config.variants) {
   let actual: Parameters<typeof runSupportV2Live>[0] | undefined;
-  await assert.rejects(executeExperiment({ config: { ...queryAB, allowRemote: true }, variant, jobId: "query-check", repetition: 1,
+  await assert.rejects(executeExperiment({ config: { ...config, allowRemote: true }, variant, jobId: "query-check", repetition: 1,
     batch: { id: "query-check", repetition: 1, plannedRepetitions: 1 } }, {
     runSupport: async options => { actual = structuredClone(options); return "query-run-check"; }, readSupport: async () => undefined,
   }), /没有可回读记录/);
-  assert.deepEqual(actual?.parameters, variant.parameters, "actual job adapter passes both resolved query modes to the runner (no services)");
+  assert.deepEqual(actual?.parameters, variant.parameters, "actual job adapter passes resolved query/prompt modes to the runner (no services)");
 }
-const auditTrace: KnowledgeTrace = { mode: "m4-support", supportProfile: "typed", supportModel: "deepseek-v4-pro", threshold: .5,
+const auditTrace: KnowledgeTrace = { mode: "m4-support", supportProfile: "typed", supportModel: "deepseek-v4-pro", supportPrompt: "v5", threshold: .5,
   applicability: { mode: "declared" }, query: "synthetic check", originalQuery: "synthetic check", scope: { shopId: null, productId: null },
   queries: { version: knowledgeQueryPlanVersion, mode: "combined", retrieval: "synthetic check", evidence: "synthetic check" },
   status: "accepted", reason: null, rawRanking: [], acceptance: null, sourceHashes: { before: null, after: null }, durationMs: 0, calls: [],
@@ -93,6 +110,34 @@ auditTrace.applicability!.gate = { version: "declared-order-preconditions-v1", s
 assert.equal(auditSupportKnowledgeCall(auditCall, declaredParameters).passed, false, "positive evidence cannot hide unknown necessary facts");
 auditTrace.applicability!.gate.integrity = true;
 assert.equal(auditSupportKnowledgeCall(auditCall, declaredParameters).passed, true);
+assert.equal(auditSupportKnowledgeCall(auditCall, declaredParameters).supportPrompt, "not_called", "configured prompt is not proof that a provider ran");
+const promptModel = { provider: "deepseek", id: "deepseek-v4-pro", api: "openai-completions", baseUrl: "https://api.deepseek.com", maxTokens: 2048,
+  cost: { input: .1, output: .2, cacheRead: .01, cacheWrite: 0 } };
+for (const knowledgeSupportPrompt of ["v5", "v6"] as const) {
+  const proof = structuredClone(auditCall), parameters = { ...declaredParameters, knowledgeSupportPrompt };
+  proof.knowledge.trace.supportPrompt = knowledgeSupportPrompt;
+  const configured = await createEvidenceSupportClient({ profile: "typed", typedPromptVersion: knowledgeSupportPrompt === "v6" ? evidenceSupportTypedV6PromptVersion : undefined,
+    runtime: { model: promptModel, complete: async () => { throw new Error("settings-only check must never call a model"); } } });
+  proof.knowledge.trace.settings = { serialization: "json-title-tags-body-v1", support: configured.settings };
+  assert.equal(auditSupportKnowledgeCall(proof, parameters).supportPrompt, "not_called");
+  proof.knowledge.trace.calls.push({ operation: "support", status: "ok", requestHash: "synthetic", attempts: [] });
+  assert.equal(auditSupportKnowledgeCall(proof, parameters).passed, true);
+  assert.equal(auditSupportKnowledgeCall(proof, parameters).supportPrompt, "matched");
+  for (const field of ["promptHash", "promptVersion"] as const) {
+    const changed = structuredClone(proof); changed.knowledge.trace.settings!.support![field] = "mismatch";
+    assert.equal(auditSupportKnowledgeCall(changed, parameters).passed, false, "actual support settings bind both version and hash");
+  }
+  proof.knowledge.trace.supportPrompt = knowledgeSupportPrompt === "v5" ? "v6" : "v5";
+  assert.equal(auditSupportKnowledgeCall(proof, parameters).passed, false, "trace configuration must match the run, not just compatible settings");
+}
+const binaryProof = structuredClone(auditCall);
+binaryProof.knowledge.trace.supportProfile = "binary";
+binaryProof.knowledge.trace.settings = { serialization: "json-title-tags-body-v1", support: (await createEvidenceSupportClient({ profile: "binary",
+  runtime: { model: promptModel, complete: async () => { throw new Error("settings only"); } } })).settings };
+binaryProof.knowledge.trace.calls.push({ operation: "support", status: "ok", requestHash: "synthetic", attempts: [] });
+assert.equal(binaryProof.knowledge.trace.settings.support!.promptVersion, "fact-support-v1");
+assert.equal(auditSupportKnowledgeCall(binaryProof, { ...declaredParameters, knowledgeSupport: "binary" }).passed, true,
+  "the default v5 selection never relabels binary's actual v1 prompt");
 const separatedCall = structuredClone(auditCall), separatedParameters = { ...declaredParameters, knowledgeQueryMode: "separated" as const };
 separatedCall.knowledge.trace.queries!.mode = "separated";
 separatedCall.knowledge.trace.queries!.retrieval = separatedCall.knowledge.trace.query = "short question";
@@ -140,6 +185,8 @@ await assert.rejects(promisify(execFile)(process.execPath, ["scripts/support-v2-
 for (const [args, errorPattern] of [
   [["--query-mode", "separated"], /knowledgeQueryMode separated 仅适用于/],
   [["--knowledge-mode", "m4-support", "--query-mode", "typo"], /knowledgeQueryMode 仅支持/],
+  [["--knowledge-mode", "m4-support", "--knowledge-support-prompt", "v6"], /knowledgeSupportPrompt v6 仅适用于/],
+  [["--knowledge-mode", "m4-support", "--knowledge-support", "typed", "--knowledge-support-prompt", "typo"], /knowledgeSupportPrompt 仅支持/],
 ] as const) await assert.rejects(promisify(execFile)(process.execPath,
   ["scripts/support-v2-live.ts", "--live", "--architecture", "controller", "--repeat", "1", ...args], { env: {}, timeout: 5000 }),
   (error: unknown) => { const failure = error as { code?: number; stderr?: string };
@@ -151,6 +198,12 @@ for (const entry of ["src/cli.ts", "src/qq.ts"]) {
   }), (error: unknown) => {
     const failure = error as { code?: number; stderr?: string };
     assert.equal(failure.code, 1); assert.match(failure.stderr ?? "", /atomic 仅支持 lexical/);
+    assert.doesNotMatch(failure.stderr ?? "", /DB_PASSWORD|API_KEY|QQBOT_APP_SECRET/); return true;
+  });
+  await assert.rejects(promisify(execFile)(process.execPath, [entry], {
+    env: { SUPPORT_ARCHITECTURE: "controller", KNOWLEDGE_MODE: "m4-support", KNOWLEDGE_SUPPORT_PROMPT: "v6" }, timeout: 5000,
+  }), (error: unknown) => { const failure = error as { code?: number; stderr?: string };
+    assert.equal(failure.code, 1); assert.match(failure.stderr ?? "", /knowledgeSupportPrompt v6 仅适用于/);
     assert.doesNotMatch(failure.stderr ?? "", /DB_PASSWORD|API_KEY|QQBOT_APP_SECRET/); return true;
   });
 }
@@ -250,6 +303,10 @@ const queryCli = await promisify(execFile)(process.execPath, ["scripts/experimen
   env: { PATH: process.env.PATH }, maxBuffer: 100_000,
 });
 assert.deepEqual(JSON.parse(queryCli.stdout).config, queryAB, "query A/B preview resolves without model/DB credentials");
+const promptCli = await promisify(execFile)(process.execPath, ["scripts/experiment.ts", "--preset", "support-knowledge-prompt-ab", "--dry-run"], {
+  env: { PATH: process.env.PATH }, maxBuffer: 100_000,
+});
+assert.deepEqual(JSON.parse(promptCli.stdout).config, promptAB, "prompt A/B preview resolves without model/DB credentials");
 
 let starts = 0, busy = false;
 const job: ExperimentJob = {
