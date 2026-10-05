@@ -59,7 +59,8 @@ try {
 
   // Exercise the real executor adapter with injected provider-free runner and fixed-enum dataset loader.
   const seenOptions: Parameters<typeof runRetrievalV2>[0][] = [], loaded: string[] = [];
-  const datasets: Record<string, V2Dataset> = { development: { source: { split: "development" }, corpora: [] }, validation: { source: { split: "validation" }, corpora: [] } };
+  const datasets: Record<string, V2Dataset> = { development: { source: { split: "development" }, corpora: [] }, validation: { source: { split: "validation" }, corpora: [] },
+    "support-validation": { source: { split: "support-validation" }, corpora: [] } };
   const executeA1: ExperimentExecute = input => executeExperiment(input, {
     loadAcceptance: async split => { loaded.push(split); return datasets[split]!; },
     runRetrieval: async options => {
@@ -102,6 +103,26 @@ try {
   assert.equal(loaded.length, loadedBeforeLegacy);
   assert.equal(Object.hasOwn(seenOptions.at(-1)!, "dataset"), false);
   assert.equal(Object.hasOwn(seenOptions.at(-1)!, "acceptance"), false, "v1 retains the original runner call semantics");
+  const supportConfig = { ...experimentCatalog().presets.find(p => p.id === "support-validation")!.config, repeat: 2, allowRemote: true };
+  const supportVerifier = service("support-verifier", executeA1), beforeSupportCalls = seenOptions.length, beforeSupportLoads = loaded.length;
+  await assert.rejects(supportVerifier.start({ ...supportConfig, variants: [{ id: "A", modes: ["M0"], dataset: "acceptance-support-validation", acceptance: { mode: "support", threshold: .71 } }] }));
+  assert.equal(seenOptions.length, beforeSupportCalls); assert.equal(loaded.length, beforeSupportLoads);
+  const supportStarted = await supportVerifier.start(supportConfig); await supportVerifier.close();
+  const supportOptions = seenOptions.slice(beforeSupportCalls);
+  assert.deepEqual(loaded.slice(beforeSupportLoads), Array(4).fill("support-validation"));
+  assert.deepEqual(supportOptions.map(options => options.acceptance), [
+    { mode: "score", threshold: .71 }, { mode: "support", threshold: .71 }, { mode: "score", threshold: .71 }, { mode: "support", threshold: .71 },
+  ]);
+  assert.ok(supportOptions.every(options => JSON.stringify(options.dataset) === JSON.stringify(datasets["support-validation"])
+    && options.parameters?.maxRequests === 160 && options.parameters.timeoutMs === 60000 && options.parameters.retries === 0));
+  const supportSaved = (await supportVerifier.get(supportStarted.id))!;
+  assert.equal(supportSaved.status, "completed"); assert.equal(supportSaved.results.length, 4);
+  assert.deepEqual(supportSaved.config, supportStarted.config, "the persisted config preserves support mode and the new split");
+  const scoreOnly = service("support-score-only", executeA1), supportOnly = service("support-only", executeA1);
+  const sameVariant = { id: "A", modes: ["M4"], dataset: "acceptance-support-validation", parameters: { maxRequests: 160, timeoutMs: 60000, retries: 0 } };
+  const scoreJob = await scoreOnly.start({ ...supportConfig, repeat: 1, variants: [{ ...sameVariant, acceptance: { mode: "score", threshold: .71 } }] }); await scoreOnly.close();
+  const supportJob = await supportOnly.start({ ...supportConfig, repeat: 1, variants: [{ ...sameVariant, acceptance: { mode: "support", threshold: .71 } }] }); await supportOnly.close();
+  assert.notEqual(supportJob.configHash, scoreJob.configHash, "changing only acceptance strategy changes the condition hash");
 
   let calls = 0;
   const failures = service("failure", async input => { if (++calls === 2) throw new Error("synthetic-secret-must-not-leak"); return result(input); });

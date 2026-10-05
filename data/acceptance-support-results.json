@@ -1,0 +1,5938 @@
+{
+  "version": 1,
+  "recordedAt": "2026-10-05T13:08:05.741Z",
+  "freezeSha256": "ef1a13f7f82251650ad47d84a6533eccd4f3c678fb5d90d7b113faf42ee637d3",
+  "decision": "Fresh fixed validation meets A1 offline acceptance targets. Eligible for C1/online integration work, not online business or QQ acceptance.",
+  "disclosure": "Fixed synthetic shared-workspace validation, not blind. Old validation regression is exposed and is not an independent result. Cache reuse is not an independent repetition; all answerQuality remains not_evaluated.",
+  "runs": {
+    "developmentScore": {
+      "runId": "b9b9a83e-573b-42f9-8f8b-ca9f4570145f",
+      "reportSha256": "2c66ba653a59b978e708bc9c7e986f76534d04f7889a994ba1da79b1758f9a1f",
+      "startedAt": "2026-10-05T13:00:29.323Z",
+      "finishedAt": "2026-10-05T13:00:40.856Z",
+      "status": "completed",
+      "settings": {
+        "modes": [
+          "M4"
+        ],
+        "parameters": {
+          "candidateTopK": 20,
+          "bm25K1": 1.2,
+          "bm25B": 0.75,
+          "rrfK": 60,
+          "rrfWindow": 20,
+          "cache": "reuse",
+          "timeoutMs": 60000,
+          "retries": 0,
+          "maxRequests": 160,
+          "consecutiveFailureLimit": 5
+        },
+        "provider": {
+          "endpoints": {
+            "origin": "https://ws-tiy939iiusj2254o.cn-beijing.maas.aliyuncs.com",
+            "embedding": "https://ws-tiy939iiusj2254o.cn-beijing.maas.aliyuncs.com/compatible-mode/v1/embeddings",
+            "rerank": "https://ws-tiy939iiusj2254o.cn-beijing.maas.aliyuncs.com/compatible-api/v1/reranks"
+          },
+          "timeoutMs": 60000,
+          "retries": 0,
+          "embeddingModel": "text-embedding-v4",
+          "dimensions": 1024,
+          "rerankModel": "qwen3-rerank",
+          "rerankInstruction": "Given a web search query, retrieve relevant passages that answer the query."
+        },
+        "bm25": {
+          "k1": 1.2,
+          "b": 0.75
+        },
+        "rrf": {
+          "k": 60,
+          "window": 20
+        },
+        "topN": 5,
+        "budget": {
+          "maxRequests": 160,
+          "consecutiveFailureLimit": 5
+        },
+        "pricing": {
+          "currency": "CNY",
+          "asOf": "2026-10-05",
+          "region": "China Beijing",
+          "estimated": true,
+          "perMillionInputTokens": 0.5,
+          "source": "https://help.aliyun.com/zh/model-studio/model-pricing",
+          "note": "Only configured Beijing endpoint; reported total_tokens, not an invoice; other region prices unknown."
+        },
+        "context": "query-only",
+        "acceptance": {
+          "mode": "score",
+          "threshold": 0.71,
+          "version": "score-gate-v1",
+          "model": "qwen3-rerank",
+          "serialization": "json-title-tags-body-v1",
+          "support": null,
+          "corpusHashes": {
+            "online": "84294287d3ca7585379fa9965fa0a9d8c7f4886011c22119372d36dd32298a5e",
+            "reference": "4e35976e88104de37f38502a336b0186136826ba3444fcf13ac2346bed2190d5"
+          }
+        },
+        "fallback": "diagnostic lexical; excluded from rerank score"
+      },
+      "totals": {
+        "planned": 48,
+        "measured": 48,
+        "deferred": 0,
+        "incomplete": 0,
+        "answerable": 24,
+        "acceptedRecallAt5": 1,
+        "falseRejects": 0,
+        "falseRejectDenominator": 24,
+        "falseRejectRate": 0,
+        "falseAccepts": 0,
+        "noAnswer": 12,
+        "noAnswerPlanned": 12,
+        "scopeCases": 12,
+        "scopeAbstentionFailures": 0,
+        "scopeViolations": 0,
+        "boundaryFailures": 0,
+        "covered": 24
+      },
+      "meetsApplicableTargets": true,
+      "groups": [
+        {
+          "corpus": "online",
+          "planned": 28,
+          "measured": 28,
+          "deferred": 0,
+          "incomplete": 0,
+          "answerable": 12,
+          "rawHits": 12,
+          "acceptedRecallSum": 12,
+          "falseRejects": 0,
+          "noAnswer": 8,
+          "noAnswerPlanned": 8,
+          "falseAccepts": 0,
+          "scopeCases": 8,
+          "scopeAbstentionFailures": 0,
+          "scopeViolations": 0,
+          "boundaryFailures": 0,
+          "covered": 12,
+          "cases": [
+            {
+              "id": "a1-dev-001",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "KB-REFUND-PARTIAL",
+                "KB-REFUND-UNUSED"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-dev-002",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "KB-REFUND-UNUSED"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-dev-003",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "KB-REFUND-REDEEMED",
+                "KB-REFUND-EXPIRED",
+                "KB-REFUND-PARTIAL",
+                "KB-REFUND-UNUSED"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-dev-004",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "KB-REFUND-REDEEMED"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-dev-005",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "KB-REFUND-EXPIRED"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-dev-006",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "KB-REFUND-PARTIAL"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-dev-007",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "KB-REFUND-PAYMENT"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-dev-008",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "KB-REFUND-PAYMENT"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-dev-009",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "KB-SHOP-DEMO-1"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-dev-010",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "KB-SHOP-DEMO-1"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-dev-011",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "KB-PRODUCT-LUNCH"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-dev-012",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "KB-PRODUCT-DINNER",
+                "KB-REFUND-PARTIAL"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-dev-025",
+              "suite": "no_answer",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-dev-026",
+              "suite": "no_answer",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-dev-027",
+              "suite": "no_answer",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-dev-028",
+              "suite": "no_answer",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-dev-029",
+              "suite": "no_answer",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-dev-030",
+              "suite": "no_answer",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-dev-031",
+              "suite": "no_answer",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-dev-032",
+              "suite": "no_answer",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-dev-037",
+              "suite": "scope",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-dev-038",
+              "suite": "scope",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-dev-039",
+              "suite": "scope",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-dev-040",
+              "suite": "scope",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-dev-041",
+              "suite": "scope",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-dev-042",
+              "suite": "scope",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-dev-043",
+              "suite": "scope",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-dev-044",
+              "suite": "scope",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            }
+          ]
+        },
+        {
+          "corpus": "reference",
+          "planned": 20,
+          "measured": 20,
+          "deferred": 0,
+          "incomplete": 0,
+          "answerable": 12,
+          "rawHits": 12,
+          "acceptedRecallSum": 12,
+          "falseRejects": 0,
+          "noAnswer": 4,
+          "noAnswerPlanned": 4,
+          "falseAccepts": 0,
+          "scopeCases": 4,
+          "scopeAbstentionFailures": 0,
+          "scopeViolations": 0,
+          "boundaryFailures": 0,
+          "covered": 12,
+          "cases": [
+            {
+              "id": "a1-dev-013",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "RF001",
+                "ET006"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-dev-014",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "RF002"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-dev-015",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "RF003"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-dev-016",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "RF004"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-dev-017",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "RF005"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-dev-018",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "RS001"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-dev-019",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "RS003"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-dev-020",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "VF002"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-dev-021",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "VF003"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-dev-022",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "CY003"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-dev-023",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "PY001"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-dev-024",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "ET005"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-dev-033",
+              "suite": "no_answer",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-dev-034",
+              "suite": "no_answer",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-dev-035",
+              "suite": "no_answer",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-dev-036",
+              "suite": "no_answer",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-dev-045",
+              "suite": "scope",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-dev-046",
+              "suite": "scope",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-dev-047",
+              "suite": "scope",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-dev-048",
+              "suite": "scope",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            }
+          ]
+        }
+      ],
+      "usage": [
+        {
+          "operation": "embedding",
+          "requests": 0,
+          "successfulRequests": 0,
+          "cacheHits": 0,
+          "reportedRequests": 0,
+          "usageCoverage": null,
+          "knownTokens": null,
+          "completeTokens": null,
+          "knownEstimatedCostCny": null,
+          "completeEstimatedCostCny": null
+        },
+        {
+          "operation": "rerank",
+          "requests": 48,
+          "successfulRequests": 48,
+          "cacheHits": 0,
+          "reportedRequests": 48,
+          "usageCoverage": 1,
+          "knownTokens": 96553,
+          "completeTokens": 96553,
+          "knownEstimatedCostCny": 0.0482765,
+          "completeEstimatedCostCny": 0.0482765
+        }
+      ],
+      "supportDuration": {
+        "measuredRequests": 0,
+        "p50Ms": null,
+        "p95Ms": null
+      }
+    },
+    "developmentSupport": {
+      "runId": "b378d67d-d8fe-4834-975b-7670281406f5",
+      "reportSha256": "19ceaa9fe85e19d6d51a9d660d203e37cf9807cc1fecbbebb25e15070b8c796e",
+      "startedAt": "2026-10-05T13:00:40.880Z",
+      "finishedAt": "2026-10-05T13:01:04.028Z",
+      "status": "completed",
+      "settings": {
+        "modes": [
+          "M4"
+        ],
+        "parameters": {
+          "candidateTopK": 20,
+          "bm25K1": 1.2,
+          "bm25B": 0.75,
+          "rrfK": 60,
+          "rrfWindow": 20,
+          "cache": "reuse",
+          "timeoutMs": 60000,
+          "retries": 0,
+          "maxRequests": 160,
+          "consecutiveFailureLimit": 5
+        },
+        "provider": {
+          "endpoints": {
+            "origin": "https://ws-tiy939iiusj2254o.cn-beijing.maas.aliyuncs.com",
+            "embedding": "https://ws-tiy939iiusj2254o.cn-beijing.maas.aliyuncs.com/compatible-mode/v1/embeddings",
+            "rerank": "https://ws-tiy939iiusj2254o.cn-beijing.maas.aliyuncs.com/compatible-api/v1/reranks"
+          },
+          "timeoutMs": 60000,
+          "retries": 0,
+          "embeddingModel": "text-embedding-v4",
+          "dimensions": 1024,
+          "rerankModel": "qwen3-rerank",
+          "rerankInstruction": "Given a web search query, retrieve relevant passages that answer the query."
+        },
+        "bm25": {
+          "k1": 1.2,
+          "b": 0.75
+        },
+        "rrf": {
+          "k": 60,
+          "window": 20
+        },
+        "topN": 5,
+        "budget": {
+          "maxRequests": 160,
+          "consecutiveFailureLimit": 5
+        },
+        "pricing": {
+          "currency": "CNY",
+          "asOf": "2026-10-05",
+          "region": "China Beijing",
+          "estimated": true,
+          "perMillionInputTokens": 0.5,
+          "source": "https://help.aliyun.com/zh/model-studio/model-pricing",
+          "note": "Only configured Beijing endpoint; reported total_tokens, not an invoice; other region prices unknown."
+        },
+        "context": "query-only",
+        "acceptance": {
+          "mode": "support",
+          "threshold": 0.71,
+          "version": "score-support-v1",
+          "model": "qwen3-rerank",
+          "serialization": "json-title-tags-body-v1",
+          "support": {
+            "provider": "deepseek",
+            "model": "deepseek-flash",
+            "api": "openai-completions",
+            "endpoint": "https://api.deepseek.com",
+            "timeoutMs": 60000,
+            "temperature": 0,
+            "maxTokens": 2048,
+            "maxRetries": 0,
+            "promptVersion": "fact-support-v1",
+            "promptHash": "3d254e0bca8e14fae05804a0f027c653f5f099e1b91e5fb519088b5aaa04f15a",
+            "serialization": "json-query-id-title-tags-body-v1",
+            "serializationHash": "1d16c5e3ef4647c120fe6ddce72417c9ec618ee41dc77faa447ec214e5749c4a",
+            "pricing": {
+              "currency": "USD",
+              "estimated": true,
+              "source": "Pi model catalog",
+              "rates": {
+                "input": 0.3,
+                "output": 1.2,
+                "cacheRead": 0.006,
+                "cacheWrite": 0
+              }
+            }
+          },
+          "corpusHashes": {
+            "online": "84294287d3ca7585379fa9965fa0a9d8c7f4886011c22119372d36dd32298a5e",
+            "reference": "4e35976e88104de37f38502a336b0186136826ba3444fcf13ac2346bed2190d5"
+          }
+        },
+        "fallback": "diagnostic lexical; excluded from rerank score"
+      },
+      "totals": {
+        "planned": 48,
+        "measured": 48,
+        "deferred": 0,
+        "incomplete": 0,
+        "answerable": 24,
+        "acceptedRecallAt5": 1,
+        "falseRejects": 0,
+        "falseRejectDenominator": 24,
+        "falseRejectRate": 0,
+        "falseAccepts": 0,
+        "noAnswer": 12,
+        "noAnswerPlanned": 12,
+        "scopeCases": 12,
+        "scopeAbstentionFailures": 0,
+        "scopeViolations": 0,
+        "boundaryFailures": 0,
+        "covered": 24
+      },
+      "meetsApplicableTargets": true,
+      "groups": [
+        {
+          "corpus": "online",
+          "planned": 28,
+          "measured": 28,
+          "deferred": 0,
+          "incomplete": 0,
+          "answerable": 12,
+          "rawHits": 12,
+          "acceptedRecallSum": 12,
+          "falseRejects": 0,
+          "noAnswer": 8,
+          "noAnswerPlanned": 8,
+          "falseAccepts": 0,
+          "scopeCases": 8,
+          "scopeAbstentionFailures": 0,
+          "scopeViolations": 0,
+          "boundaryFailures": 0,
+          "covered": 12,
+          "cases": [
+            {
+              "id": "a1-dev-001",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "KB-REFUND-PARTIAL",
+                "KB-REFUND-UNUSED"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-dev-002",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "KB-REFUND-UNUSED"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-dev-003",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "KB-REFUND-REDEEMED"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-dev-004",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "KB-REFUND-REDEEMED"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-dev-005",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "KB-REFUND-EXPIRED"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-dev-006",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "KB-REFUND-PARTIAL"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-dev-007",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "KB-REFUND-PAYMENT"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-dev-008",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "KB-REFUND-PAYMENT"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-dev-009",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "KB-SHOP-DEMO-1"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-dev-010",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "KB-SHOP-DEMO-1"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-dev-011",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "KB-PRODUCT-LUNCH"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-dev-012",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "KB-PRODUCT-DINNER"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-dev-025",
+              "suite": "no_answer",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-dev-026",
+              "suite": "no_answer",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-dev-027",
+              "suite": "no_answer",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-dev-028",
+              "suite": "no_answer",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-dev-029",
+              "suite": "no_answer",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-dev-030",
+              "suite": "no_answer",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-dev-031",
+              "suite": "no_answer",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-dev-032",
+              "suite": "no_answer",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-dev-037",
+              "suite": "scope",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-dev-038",
+              "suite": "scope",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-dev-039",
+              "suite": "scope",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-dev-040",
+              "suite": "scope",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-dev-041",
+              "suite": "scope",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-dev-042",
+              "suite": "scope",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-dev-043",
+              "suite": "scope",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-dev-044",
+              "suite": "scope",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            }
+          ]
+        },
+        {
+          "corpus": "reference",
+          "planned": 20,
+          "measured": 20,
+          "deferred": 0,
+          "incomplete": 0,
+          "answerable": 12,
+          "rawHits": 12,
+          "acceptedRecallSum": 12,
+          "falseRejects": 0,
+          "noAnswer": 4,
+          "noAnswerPlanned": 4,
+          "falseAccepts": 0,
+          "scopeCases": 4,
+          "scopeAbstentionFailures": 0,
+          "scopeViolations": 0,
+          "boundaryFailures": 0,
+          "covered": 12,
+          "cases": [
+            {
+              "id": "a1-dev-013",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "RF001",
+                "ET006"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-dev-014",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "RF002"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-dev-015",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "RF003"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-dev-016",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "RF004"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-dev-017",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "RF005"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-dev-018",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "RS001"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-dev-019",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "RS003"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-dev-020",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "VF002"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-dev-021",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "VF003"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-dev-022",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "CY003"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-dev-023",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "PY001"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-dev-024",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "ET005"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-dev-033",
+              "suite": "no_answer",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-dev-034",
+              "suite": "no_answer",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-dev-035",
+              "suite": "no_answer",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-dev-036",
+              "suite": "no_answer",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-dev-045",
+              "suite": "scope",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-dev-046",
+              "suite": "scope",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-dev-047",
+              "suite": "scope",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-dev-048",
+              "suite": "scope",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            }
+          ]
+        }
+      ],
+      "usage": [
+        {
+          "operation": "embedding",
+          "requests": 0,
+          "successfulRequests": 0,
+          "cacheHits": 0,
+          "reportedRequests": 0,
+          "usageCoverage": null,
+          "knownTokens": null,
+          "completeTokens": null,
+          "knownEstimatedCostCny": null,
+          "completeEstimatedCostCny": null
+        },
+        {
+          "operation": "rerank",
+          "requests": 0,
+          "successfulRequests": 0,
+          "cacheHits": 48,
+          "reportedRequests": 0,
+          "usageCoverage": null,
+          "knownTokens": null,
+          "completeTokens": null,
+          "knownEstimatedCostCny": null,
+          "completeEstimatedCostCny": null
+        },
+        {
+          "operation": "support",
+          "requests": 24,
+          "successfulRequests": 24,
+          "cacheHits": 0,
+          "reportedRequests": 24,
+          "usageCoverage": 1,
+          "knownTokens": 15220,
+          "completeTokens": 15220,
+          "knownEstimatedCostCny": null,
+          "completeEstimatedCostCny": null,
+          "knownEstimatedCostUsd": 0.004673628,
+          "completeEstimatedCostUsd": 0.004673628,
+          "costCoverage": 1
+        }
+      ],
+      "supportDuration": {
+        "measuredRequests": 24,
+        "p50Ms": 875.2048340000001,
+        "p95Ms": 1514.306708
+      }
+    },
+    "validationScore": {
+      "runId": "67222a3f-780a-4f78-83e0-1ffc2c36a2aa",
+      "reportSha256": "819586100095680ecb2054efe738740c241be88e52cff8d95b82e8cf77a8b54f",
+      "startedAt": "2026-10-05T13:03:25.887Z",
+      "finishedAt": "2026-10-05T13:03:40.179Z",
+      "status": "completed",
+      "settings": {
+        "modes": [
+          "M4"
+        ],
+        "parameters": {
+          "candidateTopK": 20,
+          "bm25K1": 1.2,
+          "bm25B": 0.75,
+          "rrfK": 60,
+          "rrfWindow": 20,
+          "cache": "reuse",
+          "timeoutMs": 60000,
+          "retries": 0,
+          "maxRequests": 160,
+          "consecutiveFailureLimit": 5
+        },
+        "provider": {
+          "endpoints": {
+            "origin": "https://ws-tiy939iiusj2254o.cn-beijing.maas.aliyuncs.com",
+            "embedding": "https://ws-tiy939iiusj2254o.cn-beijing.maas.aliyuncs.com/compatible-mode/v1/embeddings",
+            "rerank": "https://ws-tiy939iiusj2254o.cn-beijing.maas.aliyuncs.com/compatible-api/v1/reranks"
+          },
+          "timeoutMs": 60000,
+          "retries": 0,
+          "embeddingModel": "text-embedding-v4",
+          "dimensions": 1024,
+          "rerankModel": "qwen3-rerank",
+          "rerankInstruction": "Given a web search query, retrieve relevant passages that answer the query."
+        },
+        "bm25": {
+          "k1": 1.2,
+          "b": 0.75
+        },
+        "rrf": {
+          "k": 60,
+          "window": 20
+        },
+        "topN": 5,
+        "budget": {
+          "maxRequests": 160,
+          "consecutiveFailureLimit": 5
+        },
+        "pricing": {
+          "currency": "CNY",
+          "asOf": "2026-10-05",
+          "region": "China Beijing",
+          "estimated": true,
+          "perMillionInputTokens": 0.5,
+          "source": "https://help.aliyun.com/zh/model-studio/model-pricing",
+          "note": "Only configured Beijing endpoint; reported total_tokens, not an invoice; other region prices unknown."
+        },
+        "context": "query-only",
+        "acceptance": {
+          "mode": "score",
+          "threshold": 0.71,
+          "version": "score-gate-v1",
+          "model": "qwen3-rerank",
+          "serialization": "json-title-tags-body-v1",
+          "support": null,
+          "corpusHashes": {
+            "online": "84294287d3ca7585379fa9965fa0a9d8c7f4886011c22119372d36dd32298a5e",
+            "reference": "4e35976e88104de37f38502a336b0186136826ba3444fcf13ac2346bed2190d5"
+          }
+        },
+        "fallback": "diagnostic lexical; excluded from rerank score"
+      },
+      "totals": {
+        "planned": 60,
+        "measured": 60,
+        "deferred": 0,
+        "incomplete": 0,
+        "answerable": 30,
+        "acceptedRecallAt5": 0.9666666666666667,
+        "falseRejects": 1,
+        "falseRejectDenominator": 30,
+        "falseRejectRate": 0.03333333333333333,
+        "falseAccepts": 4,
+        "noAnswer": 18,
+        "noAnswerPlanned": 18,
+        "scopeCases": 12,
+        "scopeAbstentionFailures": 0,
+        "scopeViolations": 0,
+        "boundaryFailures": 0,
+        "covered": 33
+      },
+      "meetsApplicableTargets": false,
+      "groups": [
+        {
+          "corpus": "online",
+          "planned": 27,
+          "measured": 27,
+          "deferred": 0,
+          "incomplete": 0,
+          "answerable": 12,
+          "rawHits": 12,
+          "acceptedRecallSum": 11,
+          "falseRejects": 1,
+          "noAnswer": 9,
+          "noAnswerPlanned": 9,
+          "falseAccepts": 2,
+          "scopeCases": 6,
+          "scopeAbstentionFailures": 0,
+          "scopeViolations": 0,
+          "boundaryFailures": 0,
+          "covered": 13,
+          "cases": [
+            {
+              "id": "a1-sup-001",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "KB-REFUND-PARTIAL",
+                "KB-REFUND-UNUSED"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-002",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "KB-REFUND-REDEEMED",
+                "KB-REFUND-PARTIAL"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-003",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "KB-REFUND-EXPIRED"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-004",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "KB-REFUND-PARTIAL"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-005",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "KB-REFUND-PAYMENT"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-006",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "KB-REFUND-PAYMENT"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-007",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "KB-SHOP-DEMO-1"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-008",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "KB-SHOP-DEMO-1"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-009",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": 0,
+              "rawHit": true,
+              "falseReject": true,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-010",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "KB-PRODUCT-LUNCH",
+                "KB-REFUND-PAYMENT"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-011",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "KB-PRODUCT-DINNER",
+                "KB-REFUND-PARTIAL"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-012",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "KB-SHOP-DEMO-1"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-031",
+              "suite": "no_answer",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-032",
+              "suite": "no_answer",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-033",
+              "suite": "no_answer",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-034",
+              "suite": "no_answer",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-035",
+              "suite": "no_answer",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-036",
+              "suite": "no_answer",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-037",
+              "suite": "no_answer",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [
+                "KB-PRODUCT-LUNCH"
+              ],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": true,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-038",
+              "suite": "no_answer",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [
+                "KB-PRODUCT-DINNER"
+              ],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": true,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-039",
+              "suite": "no_answer",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-049",
+              "suite": "scope",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-050",
+              "suite": "scope",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-051",
+              "suite": "scope",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-052",
+              "suite": "scope",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-053",
+              "suite": "scope",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-054",
+              "suite": "scope",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            }
+          ]
+        },
+        {
+          "corpus": "reference",
+          "planned": 33,
+          "measured": 33,
+          "deferred": 0,
+          "incomplete": 0,
+          "answerable": 18,
+          "rawHits": 18,
+          "acceptedRecallSum": 18,
+          "falseRejects": 0,
+          "noAnswer": 9,
+          "noAnswerPlanned": 9,
+          "falseAccepts": 2,
+          "scopeCases": 6,
+          "scopeAbstentionFailures": 0,
+          "scopeViolations": 0,
+          "boundaryFailures": 0,
+          "covered": 20,
+          "cases": [
+            {
+              "id": "a1-sup-013",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "RF001"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-014",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "RF002"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-015",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "RS001"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-016",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "RS002"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-017",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "VF001"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-018",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "VF003"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-019",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "VF004"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-020",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "CY001"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-021",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "CY002"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-022",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "CY003",
+                "MC001"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-023",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "ET001"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-024",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "ET003"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-025",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "ET004"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-026",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "ET006"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-027",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "ET007"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-028",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "ET008"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-029",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "SH001"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-030",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "SH002"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-040",
+              "suite": "no_answer",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [
+                "RF001"
+              ],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": true,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-041",
+              "suite": "no_answer",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-042",
+              "suite": "no_answer",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-043",
+              "suite": "no_answer",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-044",
+              "suite": "no_answer",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-045",
+              "suite": "no_answer",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-046",
+              "suite": "no_answer",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-047",
+              "suite": "no_answer",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-048",
+              "suite": "no_answer",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [
+                "SH001"
+              ],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": true,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-055",
+              "suite": "scope",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-056",
+              "suite": "scope",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-057",
+              "suite": "scope",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-058",
+              "suite": "scope",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-059",
+              "suite": "scope",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-060",
+              "suite": "scope",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            }
+          ]
+        }
+      ],
+      "usage": [
+        {
+          "operation": "embedding",
+          "requests": 0,
+          "successfulRequests": 0,
+          "cacheHits": 0,
+          "reportedRequests": 0,
+          "usageCoverage": null,
+          "knownTokens": null,
+          "completeTokens": null,
+          "knownEstimatedCostCny": null,
+          "completeEstimatedCostCny": null
+        },
+        {
+          "operation": "rerank",
+          "requests": 60,
+          "successfulRequests": 60,
+          "cacheHits": 0,
+          "reportedRequests": 60,
+          "usageCoverage": 1,
+          "knownTokens": 156128,
+          "completeTokens": 156128,
+          "knownEstimatedCostCny": 0.078064,
+          "completeEstimatedCostCny": 0.078064
+        }
+      ],
+      "supportDuration": {
+        "measuredRequests": 0,
+        "p50Ms": null,
+        "p95Ms": null
+      }
+    },
+    "validationSupport": {
+      "runId": "7c0b436e-6ff9-4830-9091-e98bfa3b1f28",
+      "reportSha256": "63adeaf9ed036d7c7c6270a5184069dc72aa3aca5786bf038146de9b2f4c33ef",
+      "startedAt": "2026-10-05T13:03:40.212Z",
+      "finishedAt": "2026-10-05T13:04:12.071Z",
+      "status": "completed",
+      "settings": {
+        "modes": [
+          "M4"
+        ],
+        "parameters": {
+          "candidateTopK": 20,
+          "bm25K1": 1.2,
+          "bm25B": 0.75,
+          "rrfK": 60,
+          "rrfWindow": 20,
+          "cache": "reuse",
+          "timeoutMs": 60000,
+          "retries": 0,
+          "maxRequests": 160,
+          "consecutiveFailureLimit": 5
+        },
+        "provider": {
+          "endpoints": {
+            "origin": "https://ws-tiy939iiusj2254o.cn-beijing.maas.aliyuncs.com",
+            "embedding": "https://ws-tiy939iiusj2254o.cn-beijing.maas.aliyuncs.com/compatible-mode/v1/embeddings",
+            "rerank": "https://ws-tiy939iiusj2254o.cn-beijing.maas.aliyuncs.com/compatible-api/v1/reranks"
+          },
+          "timeoutMs": 60000,
+          "retries": 0,
+          "embeddingModel": "text-embedding-v4",
+          "dimensions": 1024,
+          "rerankModel": "qwen3-rerank",
+          "rerankInstruction": "Given a web search query, retrieve relevant passages that answer the query."
+        },
+        "bm25": {
+          "k1": 1.2,
+          "b": 0.75
+        },
+        "rrf": {
+          "k": 60,
+          "window": 20
+        },
+        "topN": 5,
+        "budget": {
+          "maxRequests": 160,
+          "consecutiveFailureLimit": 5
+        },
+        "pricing": {
+          "currency": "CNY",
+          "asOf": "2026-10-05",
+          "region": "China Beijing",
+          "estimated": true,
+          "perMillionInputTokens": 0.5,
+          "source": "https://help.aliyun.com/zh/model-studio/model-pricing",
+          "note": "Only configured Beijing endpoint; reported total_tokens, not an invoice; other region prices unknown."
+        },
+        "context": "query-only",
+        "acceptance": {
+          "mode": "support",
+          "threshold": 0.71,
+          "version": "score-support-v1",
+          "model": "qwen3-rerank",
+          "serialization": "json-title-tags-body-v1",
+          "support": {
+            "provider": "deepseek",
+            "model": "deepseek-flash",
+            "api": "openai-completions",
+            "endpoint": "https://api.deepseek.com",
+            "timeoutMs": 60000,
+            "temperature": 0,
+            "maxTokens": 2048,
+            "maxRetries": 0,
+            "promptVersion": "fact-support-v1",
+            "promptHash": "3d254e0bca8e14fae05804a0f027c653f5f099e1b91e5fb519088b5aaa04f15a",
+            "serialization": "json-query-id-title-tags-body-v1",
+            "serializationHash": "1d16c5e3ef4647c120fe6ddce72417c9ec618ee41dc77faa447ec214e5749c4a",
+            "pricing": {
+              "currency": "USD",
+              "estimated": true,
+              "source": "Pi model catalog",
+              "rates": {
+                "input": 0.3,
+                "output": 1.2,
+                "cacheRead": 0.006,
+                "cacheWrite": 0
+              }
+            }
+          },
+          "corpusHashes": {
+            "online": "84294287d3ca7585379fa9965fa0a9d8c7f4886011c22119372d36dd32298a5e",
+            "reference": "4e35976e88104de37f38502a336b0186136826ba3444fcf13ac2346bed2190d5"
+          }
+        },
+        "fallback": "diagnostic lexical; excluded from rerank score"
+      },
+      "totals": {
+        "planned": 60,
+        "measured": 60,
+        "deferred": 0,
+        "incomplete": 0,
+        "answerable": 30,
+        "acceptedRecallAt5": 0.9666666666666667,
+        "falseRejects": 1,
+        "falseRejectDenominator": 30,
+        "falseRejectRate": 0.03333333333333333,
+        "falseAccepts": 0,
+        "noAnswer": 18,
+        "noAnswerPlanned": 18,
+        "scopeCases": 12,
+        "scopeAbstentionFailures": 0,
+        "scopeViolations": 0,
+        "boundaryFailures": 0,
+        "covered": 29
+      },
+      "meetsApplicableTargets": true,
+      "groups": [
+        {
+          "corpus": "online",
+          "planned": 27,
+          "measured": 27,
+          "deferred": 0,
+          "incomplete": 0,
+          "answerable": 12,
+          "rawHits": 12,
+          "acceptedRecallSum": 11,
+          "falseRejects": 1,
+          "noAnswer": 9,
+          "noAnswerPlanned": 9,
+          "falseAccepts": 0,
+          "scopeCases": 6,
+          "scopeAbstentionFailures": 0,
+          "scopeViolations": 0,
+          "boundaryFailures": 0,
+          "covered": 11,
+          "cases": [
+            {
+              "id": "a1-sup-001",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "KB-REFUND-UNUSED"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-002",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "KB-REFUND-REDEEMED"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-003",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "KB-REFUND-EXPIRED"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-004",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "KB-REFUND-PARTIAL"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-005",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "KB-REFUND-PAYMENT"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-006",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "KB-REFUND-PAYMENT"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-007",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "KB-SHOP-DEMO-1"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-008",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "KB-SHOP-DEMO-1"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-009",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": 0,
+              "rawHit": true,
+              "falseReject": true,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-010",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "KB-PRODUCT-LUNCH",
+                "KB-REFUND-PAYMENT"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-011",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "KB-PRODUCT-DINNER"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-012",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "KB-SHOP-DEMO-1"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-031",
+              "suite": "no_answer",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-032",
+              "suite": "no_answer",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-033",
+              "suite": "no_answer",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-034",
+              "suite": "no_answer",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-035",
+              "suite": "no_answer",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-036",
+              "suite": "no_answer",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-037",
+              "suite": "no_answer",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-038",
+              "suite": "no_answer",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-039",
+              "suite": "no_answer",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-049",
+              "suite": "scope",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-050",
+              "suite": "scope",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-051",
+              "suite": "scope",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-052",
+              "suite": "scope",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-053",
+              "suite": "scope",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-054",
+              "suite": "scope",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            }
+          ]
+        },
+        {
+          "corpus": "reference",
+          "planned": 33,
+          "measured": 33,
+          "deferred": 0,
+          "incomplete": 0,
+          "answerable": 18,
+          "rawHits": 18,
+          "acceptedRecallSum": 18,
+          "falseRejects": 0,
+          "noAnswer": 9,
+          "noAnswerPlanned": 9,
+          "falseAccepts": 0,
+          "scopeCases": 6,
+          "scopeAbstentionFailures": 0,
+          "scopeViolations": 0,
+          "boundaryFailures": 0,
+          "covered": 18,
+          "cases": [
+            {
+              "id": "a1-sup-013",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "RF001"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-014",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "RF002"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-015",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "RS001"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-016",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "RS002"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-017",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "VF001"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-018",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "VF003"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-019",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "VF004"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-020",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "CY001"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-021",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "CY002"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-022",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "CY003",
+                "MC001"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-023",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "ET001"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-024",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "ET003"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-025",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "ET004"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-026",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "ET006"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-027",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "ET007"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-028",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "ET008"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-029",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "SH001"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-030",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "SH002"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-040",
+              "suite": "no_answer",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-041",
+              "suite": "no_answer",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-042",
+              "suite": "no_answer",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-043",
+              "suite": "no_answer",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-044",
+              "suite": "no_answer",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-045",
+              "suite": "no_answer",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-046",
+              "suite": "no_answer",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-047",
+              "suite": "no_answer",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-048",
+              "suite": "no_answer",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-055",
+              "suite": "scope",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-056",
+              "suite": "scope",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-057",
+              "suite": "scope",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-058",
+              "suite": "scope",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-059",
+              "suite": "scope",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-sup-060",
+              "suite": "scope",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            }
+          ]
+        }
+      ],
+      "usage": [
+        {
+          "operation": "embedding",
+          "requests": 0,
+          "successfulRequests": 0,
+          "cacheHits": 0,
+          "reportedRequests": 0,
+          "usageCoverage": null,
+          "knownTokens": null,
+          "completeTokens": null,
+          "knownEstimatedCostCny": null,
+          "completeEstimatedCostCny": null
+        },
+        {
+          "operation": "rerank",
+          "requests": 0,
+          "successfulRequests": 0,
+          "cacheHits": 60,
+          "reportedRequests": 0,
+          "usageCoverage": null,
+          "knownTokens": null,
+          "completeTokens": null,
+          "knownEstimatedCostCny": null,
+          "completeEstimatedCostCny": null
+        },
+        {
+          "operation": "support",
+          "requests": 33,
+          "successfulRequests": 33,
+          "cacheHits": 0,
+          "reportedRequests": 33,
+          "usageCoverage": 1,
+          "knownTokens": 20321,
+          "completeTokens": 20321,
+          "knownEstimatedCostCny": null,
+          "completeEstimatedCostCny": null,
+          "knownEstimatedCostUsd": 0.005304744,
+          "completeEstimatedCostUsd": 0.005304744,
+          "costCoverage": 1
+        }
+      ],
+      "supportDuration": {
+        "measuredRequests": 33,
+        "p50Ms": 961.8610420000041,
+        "p95Ms": 1463.8491670000003
+      }
+    },
+    "exposedRegression": {
+      "runId": "0807e90f-4d8a-4052-a9cd-98b2a90f581e",
+      "reportSha256": "ac74acc9c1493212e6c3cd94e07d20822d7da7f41b98e9f99757ca8a95b97d62",
+      "startedAt": "2026-10-05T13:05:58.184Z",
+      "finishedAt": "2026-10-05T13:06:38.703Z",
+      "status": "completed",
+      "settings": {
+        "modes": [
+          "M4"
+        ],
+        "parameters": {
+          "candidateTopK": 20,
+          "bm25K1": 1.2,
+          "bm25B": 0.75,
+          "rrfK": 60,
+          "rrfWindow": 20,
+          "cache": "reuse",
+          "timeoutMs": 60000,
+          "retries": 0,
+          "maxRequests": 160,
+          "consecutiveFailureLimit": 5
+        },
+        "provider": {
+          "endpoints": {
+            "origin": "https://ws-tiy939iiusj2254o.cn-beijing.maas.aliyuncs.com",
+            "embedding": "https://ws-tiy939iiusj2254o.cn-beijing.maas.aliyuncs.com/compatible-mode/v1/embeddings",
+            "rerank": "https://ws-tiy939iiusj2254o.cn-beijing.maas.aliyuncs.com/compatible-api/v1/reranks"
+          },
+          "timeoutMs": 60000,
+          "retries": 0,
+          "embeddingModel": "text-embedding-v4",
+          "dimensions": 1024,
+          "rerankModel": "qwen3-rerank",
+          "rerankInstruction": "Given a web search query, retrieve relevant passages that answer the query."
+        },
+        "bm25": {
+          "k1": 1.2,
+          "b": 0.75
+        },
+        "rrf": {
+          "k": 60,
+          "window": 20
+        },
+        "topN": 5,
+        "budget": {
+          "maxRequests": 160,
+          "consecutiveFailureLimit": 5
+        },
+        "pricing": {
+          "currency": "CNY",
+          "asOf": "2026-10-05",
+          "region": "China Beijing",
+          "estimated": true,
+          "perMillionInputTokens": 0.5,
+          "source": "https://help.aliyun.com/zh/model-studio/model-pricing",
+          "note": "Only configured Beijing endpoint; reported total_tokens, not an invoice; other region prices unknown."
+        },
+        "context": "query-only",
+        "acceptance": {
+          "mode": "support",
+          "threshold": 0.71,
+          "version": "score-support-v1",
+          "model": "qwen3-rerank",
+          "serialization": "json-title-tags-body-v1",
+          "support": {
+            "provider": "deepseek",
+            "model": "deepseek-flash",
+            "api": "openai-completions",
+            "endpoint": "https://api.deepseek.com",
+            "timeoutMs": 60000,
+            "temperature": 0,
+            "maxTokens": 2048,
+            "maxRetries": 0,
+            "promptVersion": "fact-support-v1",
+            "promptHash": "3d254e0bca8e14fae05804a0f027c653f5f099e1b91e5fb519088b5aaa04f15a",
+            "serialization": "json-query-id-title-tags-body-v1",
+            "serializationHash": "1d16c5e3ef4647c120fe6ddce72417c9ec618ee41dc77faa447ec214e5749c4a",
+            "pricing": {
+              "currency": "USD",
+              "estimated": true,
+              "source": "Pi model catalog",
+              "rates": {
+                "input": 0.3,
+                "output": 1.2,
+                "cacheRead": 0.006,
+                "cacheWrite": 0
+              }
+            }
+          },
+          "corpusHashes": {
+            "online": "84294287d3ca7585379fa9965fa0a9d8c7f4886011c22119372d36dd32298a5e",
+            "reference": "4e35976e88104de37f38502a336b0186136826ba3444fcf13ac2346bed2190d5"
+          }
+        },
+        "fallback": "diagnostic lexical; excluded from rerank score"
+      },
+      "totals": {
+        "planned": 60,
+        "measured": 54,
+        "deferred": 6,
+        "incomplete": 0,
+        "answerable": 30,
+        "acceptedRecallAt5": 1,
+        "falseRejects": 0,
+        "falseRejectDenominator": 30,
+        "falseRejectRate": 0,
+        "falseAccepts": 0,
+        "noAnswer": 12,
+        "noAnswerPlanned": 12,
+        "scopeCases": 12,
+        "scopeAbstentionFailures": 0,
+        "scopeViolations": 0,
+        "boundaryFailures": 0,
+        "covered": 30
+      },
+      "meetsApplicableTargets": true,
+      "groups": [
+        {
+          "corpus": "online",
+          "planned": 26,
+          "measured": 22,
+          "deferred": 4,
+          "incomplete": 0,
+          "answerable": 8,
+          "rawHits": 8,
+          "acceptedRecallSum": 8,
+          "falseRejects": 0,
+          "noAnswer": 8,
+          "noAnswerPlanned": 8,
+          "falseAccepts": 0,
+          "scopeCases": 6,
+          "scopeAbstentionFailures": 0,
+          "scopeViolations": 0,
+          "boundaryFailures": 0,
+          "covered": 8,
+          "cases": [
+            {
+              "id": "a1-val-001",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "KB-REFUND-UNUSED"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-val-002",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "KB-REFUND-REDEEMED"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-val-003",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "KB-REFUND-EXPIRED"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-val-004",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "KB-SHOP-DEMO-1"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-val-005",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "KB-REFUND-UNUSED"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-val-006",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "KB-REFUND-PAYMENT"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-val-007",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "KB-PRODUCT-LUNCH"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-val-008",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "KB-PRODUCT-LUNCH",
+                "KB-REFUND-PAYMENT"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-val-031",
+              "suite": "no_answer",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-val-032",
+              "suite": "no_answer",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-val-033",
+              "suite": "no_answer",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-val-034",
+              "suite": "no_answer",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-val-035",
+              "suite": "no_answer",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-val-036",
+              "suite": "no_answer",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-val-037",
+              "suite": "no_answer",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-val-038",
+              "suite": "no_answer",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-val-043",
+              "suite": "scope",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-val-044",
+              "suite": "scope",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-val-045",
+              "suite": "scope",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-val-046",
+              "suite": "scope",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-val-047",
+              "suite": "scope",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-val-048",
+              "suite": "scope",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-val-055",
+              "suite": "context",
+              "answerable": false,
+              "status": "deferred"
+            },
+            {
+              "id": "a1-val-056",
+              "suite": "context",
+              "answerable": false,
+              "status": "deferred"
+            },
+            {
+              "id": "a1-val-057",
+              "suite": "context",
+              "answerable": false,
+              "status": "deferred"
+            },
+            {
+              "id": "a1-val-058",
+              "suite": "context",
+              "answerable": false,
+              "status": "deferred"
+            }
+          ]
+        },
+        {
+          "corpus": "reference",
+          "planned": 34,
+          "measured": 32,
+          "deferred": 2,
+          "incomplete": 0,
+          "answerable": 22,
+          "rawHits": 22,
+          "acceptedRecallSum": 22,
+          "falseRejects": 0,
+          "noAnswer": 4,
+          "noAnswerPlanned": 4,
+          "falseAccepts": 0,
+          "scopeCases": 6,
+          "scopeAbstentionFailures": 0,
+          "scopeViolations": 0,
+          "boundaryFailures": 0,
+          "covered": 22,
+          "cases": [
+            {
+              "id": "a1-val-009",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "RF001"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-val-010",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "RS002"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-val-011",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "RS003"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-val-012",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "VF001"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-val-013",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "VF001"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-val-014",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "VF004"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-val-015",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "CY001"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-val-016",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "CY002"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-val-017",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "LR001"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-val-018",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "LR002"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-val-019",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "XY001"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-val-020",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "XY002"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-val-021",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "XY002"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-val-022",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "JL001"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-val-023",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "JL002"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-val-024",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "JL002"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-val-025",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "PY001"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-val-026",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "PY002"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-val-027",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "MC001"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-val-028",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "MC002"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-val-029",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "ET004"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-val-030",
+              "suite": "standard",
+              "answerable": true,
+              "status": "measured",
+              "acceptedIds": [
+                "ET008"
+              ],
+              "recall": 1,
+              "rawHit": true,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-val-039",
+              "suite": "no_answer",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-val-040",
+              "suite": "no_answer",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-val-041",
+              "suite": "no_answer",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-val-042",
+              "suite": "no_answer",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-val-049",
+              "suite": "scope",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-val-050",
+              "suite": "scope",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-val-051",
+              "suite": "scope",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-val-052",
+              "suite": "scope",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-val-053",
+              "suite": "scope",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-val-054",
+              "suite": "scope",
+              "answerable": false,
+              "status": "measured",
+              "acceptedIds": [],
+              "recall": null,
+              "rawHit": false,
+              "falseReject": false,
+              "falseAccept": false,
+              "scopeAbstentionFailure": false,
+              "scopeViolation": false,
+              "boundaryFailure": false
+            },
+            {
+              "id": "a1-val-059",
+              "suite": "context",
+              "answerable": false,
+              "status": "deferred"
+            },
+            {
+              "id": "a1-val-060",
+              "suite": "context",
+              "answerable": false,
+              "status": "deferred"
+            }
+          ]
+        }
+      ],
+      "usage": [
+        {
+          "operation": "embedding",
+          "requests": 0,
+          "successfulRequests": 0,
+          "cacheHits": 0,
+          "reportedRequests": 0,
+          "usageCoverage": null,
+          "knownTokens": null,
+          "completeTokens": null,
+          "knownEstimatedCostCny": null,
+          "completeEstimatedCostCny": null
+        },
+        {
+          "operation": "rerank",
+          "requests": 54,
+          "successfulRequests": 54,
+          "cacheHits": 0,
+          "reportedRequests": 54,
+          "usageCoverage": 1,
+          "knownTokens": 142024,
+          "completeTokens": 142024,
+          "knownEstimatedCostCny": 0.071012,
+          "completeEstimatedCostCny": 0.071012
+        },
+        {
+          "operation": "support",
+          "requests": 31,
+          "successfulRequests": 31,
+          "cacheHits": 0,
+          "reportedRequests": 31,
+          "usageCoverage": 1,
+          "knownTokens": 19193,
+          "completeTokens": 19193,
+          "knownEstimatedCostCny": null,
+          "completeEstimatedCostCny": null,
+          "knownEstimatedCostUsd": 0.005033567999999999,
+          "completeEstimatedCostUsd": 0.005033567999999999,
+          "costCoverage": 1
+        }
+      ],
+      "supportDuration": {
+        "measuredRequests": 31,
+        "p50Ms": 856.0128750000003,
+        "p95Ms": 1185.875500000002
+      }
+    }
+  },
+  "totalUsage": {
+    "rerankRequests": 162,
+    "supportRequests": 88,
+    "rerankTokens": 394705,
+    "supportTokens": 54734,
+    "estimatedCny": 0.1973525,
+    "estimatedUsd": 0.015011939999999998
+  },
+  "caseAnalysis": [
+    {
+      "id": "a1-sup-009",
+      "query": "一张双人午餐券第一次核销以后，能保留半张券的使用权益留到另一天吗？",
+      "relevant": [
+        "KB-PRODUCT-LUNCH"
+      ],
+      "top5": [
+        {
+          "id": "KB-PRODUCT-LUNCH",
+          "score": 0.666225675072017
+        },
+        {
+          "id": "KB-REFUND-PARTIAL",
+          "score": 0.469863447621597
+        },
+        {
+          "id": "KB-REFUND-EXPIRED",
+          "score": 0.33037349518715886
+        },
+        {
+          "id": "KB-REFUND-REDEEMED",
+          "score": 0.3279760981136417
+        },
+        {
+          "id": "KB-REFUND-UNUSED",
+          "score": 0.2941856020295363
+        }
+      ],
+      "scoreAccepted": [],
+      "supportAccepted": [],
+      "decisions": [],
+      "rejections": [
+        {
+          "id": "KB-PRODUCT-LUNCH",
+          "rank": 1,
+          "reason": "below_threshold"
+        },
+        {
+          "id": "KB-REFUND-PARTIAL",
+          "rank": 2,
+          "reason": "below_threshold"
+        },
+        {
+          "id": "KB-REFUND-EXPIRED",
+          "rank": 3,
+          "reason": "below_threshold"
+        },
+        {
+          "id": "KB-REFUND-REDEEMED",
+          "rank": 4,
+          "reason": "below_threshold"
+        },
+        {
+          "id": "KB-REFUND-UNUSED",
+          "rank": 5,
+          "reason": "below_threshold"
+        },
+        {
+          "id": "KB-SHOP-DEMO-1",
+          "rank": 6,
+          "reason": "below_threshold"
+        },
+        {
+          "id": "KB-REFUND-PAYMENT",
+          "rank": 7,
+          "reason": "below_threshold"
+        }
+      ]
+    },
+    {
+      "id": "a1-sup-037",
+      "query": "双人午餐标价79.80元；一次购买三张券统一能享受几折批量优惠？",
+      "relevant": [],
+      "top5": [
+        {
+          "id": "KB-PRODUCT-LUNCH",
+          "score": 0.8580906955186463
+        },
+        {
+          "id": "KB-REFUND-PAYMENT",
+          "score": 0.32613743317371735
+        },
+        {
+          "id": "KB-REFUND-PARTIAL",
+          "score": 0.2904510309743604
+        },
+        {
+          "id": "KB-SHOP-DEMO-1",
+          "score": 0.241890790133647
+        },
+        {
+          "id": "KB-REFUND-REDEEMED",
+          "score": 0.226720899643364
+        }
+      ],
+      "scoreAccepted": [
+        "KB-PRODUCT-LUNCH"
+      ],
+      "supportAccepted": [],
+      "decisions": [
+        {
+          "id": "KB-PRODUCT-LUNCH",
+          "supported": false,
+          "quote": null,
+          "reason": "原文仅给出单张券标价79.80元，未提及一次购买三张券的批量优惠或折扣规则。"
+        }
+      ],
+      "rejections": [
+        {
+          "id": "KB-REFUND-PAYMENT",
+          "rank": 2,
+          "reason": "below_threshold"
+        },
+        {
+          "id": "KB-REFUND-PARTIAL",
+          "rank": 3,
+          "reason": "below_threshold"
+        },
+        {
+          "id": "KB-SHOP-DEMO-1",
+          "rank": 4,
+          "reason": "below_threshold"
+        },
+        {
+          "id": "KB-REFUND-REDEEMED",
+          "rank": 5,
+          "reason": "below_threshold"
+        },
+        {
+          "id": "KB-REFUND-EXPIRED",
+          "rank": 6,
+          "reason": "below_threshold"
+        },
+        {
+          "id": "KB-REFUND-UNUSED",
+          "rank": 7,
+          "reason": "below_threshold"
+        },
+        {
+          "id": "KB-PRODUCT-LUNCH",
+          "rank": 1,
+          "reason": "unsupported"
+        }
+      ]
+    },
+    {
+      "id": "a1-sup-038",
+      "query": "单人晚餐券标价59.90元，但我没有提供订单；这张券准确到期的年月日是什么？",
+      "relevant": [],
+      "top5": [
+        {
+          "id": "KB-PRODUCT-DINNER",
+          "score": 0.88774573861834
+        },
+        {
+          "id": "KB-REFUND-PAYMENT",
+          "score": 0.389569778038971
+        },
+        {
+          "id": "KB-REFUND-EXPIRED",
+          "score": 0.32538041737957557
+        },
+        {
+          "id": "KB-REFUND-PARTIAL",
+          "score": 0.3225618334142152
+        },
+        {
+          "id": "KB-REFUND-UNUSED",
+          "score": 0.30274246458566545
+        }
+      ],
+      "scoreAccepted": [
+        "KB-PRODUCT-DINNER"
+      ],
+      "supportAccepted": [],
+      "decisions": [
+        {
+          "id": "KB-PRODUCT-DINNER",
+          "supported": false,
+          "quote": null,
+          "reason": "原文仅说明券标价59.90元及核销规则，未给出任何具体到期年月日，且明确剩余券状态以订单查询为准。"
+        }
+      ],
+      "rejections": [
+        {
+          "id": "KB-REFUND-PAYMENT",
+          "rank": 2,
+          "reason": "below_threshold"
+        },
+        {
+          "id": "KB-REFUND-EXPIRED",
+          "rank": 3,
+          "reason": "below_threshold"
+        },
+        {
+          "id": "KB-REFUND-PARTIAL",
+          "rank": 4,
+          "reason": "below_threshold"
+        },
+        {
+          "id": "KB-REFUND-UNUSED",
+          "rank": 5,
+          "reason": "below_threshold"
+        },
+        {
+          "id": "KB-REFUND-REDEEMED",
+          "rank": 6,
+          "reason": "below_threshold"
+        },
+        {
+          "id": "KB-SHOP-DEMO-1",
+          "rank": 7,
+          "reason": "below_threshold"
+        },
+        {
+          "id": "KB-PRODUCT-DINNER",
+          "rank": 1,
+          "reason": "unsupported"
+        }
+      ]
+    },
+    {
+      "id": "a1-sup-040",
+      "query": "有效未核销团购券退回原账户的规则我知道了，这一笔现在是不是已经到银行账户？",
+      "relevant": [],
+      "top5": [
+        {
+          "id": "RF001",
+          "score": 0.9358262136010399
+        },
+        {
+          "id": "RF004",
+          "score": 0.6966180829769314
+        },
+        {
+          "id": "PY002",
+          "score": 0.6429982375469694
+        },
+        {
+          "id": "RF002",
+          "score": 0.6090775607907628
+        },
+        {
+          "id": "VF002",
+          "score": 0.5179154170735415
+        }
+      ],
+      "scoreAccepted": [
+        "RF001"
+      ],
+      "supportAccepted": [],
+      "decisions": [
+        {
+          "id": "RF001",
+          "supported": false,
+          "quote": null,
+          "reason": "原文仅说明退款一般1-3个工作日到账、以支付渠道为准，未给出该笔退款当前是否已到银行账户的具体事实。"
+        }
+      ],
+      "rejections": [
+        {
+          "id": "RF004",
+          "rank": 2,
+          "reason": "below_threshold"
+        },
+        {
+          "id": "PY002",
+          "rank": 3,
+          "reason": "below_threshold"
+        },
+        {
+          "id": "RF002",
+          "rank": 4,
+          "reason": "below_threshold"
+        },
+        {
+          "id": "VF002",
+          "rank": 5,
+          "reason": "below_threshold"
+        },
+        {
+          "id": "RF005",
+          "rank": 6,
+          "reason": "below_threshold"
+        },
+        {
+          "id": "VF003",
+          "rank": 7,
+          "reason": "below_threshold"
+        },
+        {
+          "id": "VF001",
+          "rank": 8,
+          "reason": "below_threshold"
+        },
+        {
+          "id": "PY001",
+          "rank": 9,
+          "reason": "below_threshold"
+        },
+        {
+          "id": "MC002",
+          "rank": 10,
+          "reason": "below_threshold"
+        },
+        {
+          "id": "VF004",
+          "rank": 11,
+          "reason": "below_threshold"
+        },
+        {
+          "id": "ET006",
+          "rank": 12,
+          "reason": "below_threshold"
+        },
+        {
+          "id": "ET005",
+          "rank": 13,
+          "reason": "below_threshold"
+        },
+        {
+          "id": "JL002",
+          "rank": 14,
+          "reason": "below_threshold"
+        },
+        {
+          "id": "RS002",
+          "rank": 15,
+          "reason": "below_threshold"
+        },
+        {
+          "id": "ET008",
+          "rank": 16,
+          "reason": "below_threshold"
+        },
+        {
+          "id": "CY001",
+          "rank": 17,
+          "reason": "below_threshold"
+        },
+        {
+          "id": "XY001",
+          "rank": 18,
+          "reason": "below_threshold"
+        },
+        {
+          "id": "JL001",
+          "rank": 19,
+          "reason": "below_threshold"
+        },
+        {
+          "id": "MC001",
+          "rank": 20,
+          "reason": "below_threshold"
+        },
+        {
+          "id": "LR002",
+          "rank": 21,
+          "reason": "below_threshold"
+        },
+        {
+          "id": "RS001",
+          "rank": 22,
+          "reason": "below_threshold"
+        },
+        {
+          "id": "ET002",
+          "rank": 23,
+          "reason": "below_threshold"
+        },
+        {
+          "id": "ET007",
+          "rank": 24,
+          "reason": "below_threshold"
+        },
+        {
+          "id": "RF003",
+          "rank": 25,
+          "reason": "below_threshold"
+        },
+        {
+          "id": "CY003",
+          "rank": 26,
+          "reason": "below_threshold"
+        },
+        {
+          "id": "ET004",
+          "rank": 27,
+          "reason": "below_threshold"
+        },
+        {
+          "id": "ET003",
+          "rank": 28,
+          "reason": "below_threshold"
+        },
+        {
+          "id": "CY002",
+          "rank": 29,
+          "reason": "below_threshold"
+        },
+        {
+          "id": "XY002",
+          "rank": 30,
+          "reason": "below_threshold"
+        },
+        {
+          "id": "RS003",
+          "rank": 31,
+          "reason": "below_threshold"
+        },
+        {
+          "id": "LR001",
+          "rank": 32,
+          "reason": "below_threshold"
+        },
+        {
+          "id": "ET001",
+          "rank": 33,
+          "reason": "below_threshold"
+        },
+        {
+          "id": "RF001",
+          "rank": 1,
+          "reason": "unsupported"
+        }
+      ]
+    },
+    {
+      "id": "a1-sup-048",
+      "query": "2026年7至8月暑期赠送的一份果盘，当时规定每种水果各是多少克？",
+      "relevant": [],
+      "top5": [
+        {
+          "id": "SH001",
+          "score": 0.7665557909821616
+        },
+        {
+          "id": "RS001",
+          "score": 0.3434133324229744
+        },
+        {
+          "id": "VF003",
+          "score": 0.3211765972324334
+        },
+        {
+          "id": "VF004",
+          "score": 0.2906104396996961
+        },
+        {
+          "id": "ET007",
+          "score": 0.29028111211330343
+        }
+      ],
+      "scoreAccepted": [
+        "SH001"
+      ],
+      "supportAccepted": [],
+      "decisions": [
+        {
+          "id": "SH001",
+          "supported": false,
+          "quote": null,
+          "reason": "原文仅说明暑期活动赠送果盘，未给出果盘中每种水果的具体克数。"
+        }
+      ],
+      "rejections": [
+        {
+          "id": "RS001",
+          "rank": 2,
+          "reason": "below_threshold"
+        },
+        {
+          "id": "VF003",
+          "rank": 3,
+          "reason": "below_threshold"
+        },
+        {
+          "id": "VF004",
+          "rank": 4,
+          "reason": "below_threshold"
+        },
+        {
+          "id": "ET007",
+          "rank": 5,
+          "reason": "below_threshold"
+        },
+        {
+          "id": "ET008",
+          "rank": 6,
+          "reason": "below_threshold"
+        },
+        {
+          "id": "ET006",
+          "rank": 7,
+          "reason": "below_threshold"
+        },
+        {
+          "id": "ET005",
+          "rank": 8,
+          "reason": "below_threshold"
+        },
+        {
+          "id": "XY001",
+          "rank": 9,
+          "reason": "below_threshold"
+        },
+        {
+          "id": "RS002",
+          "rank": 10,
+          "reason": "below_threshold"
+        },
+        {
+          "id": "RF002",
+          "rank": 11,
+          "reason": "below_threshold"
+        },
+        {
+          "id": "CY001",
+          "rank": 12,
+          "reason": "below_threshold"
+        },
+        {
+          "id": "MC001",
+          "rank": 13,
+          "reason": "below_threshold"
+        },
+        {
+          "id": "RF001",
+          "rank": 14,
+          "reason": "below_threshold"
+        },
+        {
+          "id": "CY002",
+          "rank": 15,
+          "reason": "below_threshold"
+        },
+        {
+          "id": "VF001",
+          "rank": 16,
+          "reason": "below_threshold"
+        },
+        {
+          "id": "MC002",
+          "rank": 17,
+          "reason": "below_threshold"
+        },
+        {
+          "id": "ET003",
+          "rank": 18,
+          "reason": "below_threshold"
+        },
+        {
+          "id": "ET001",
+          "rank": 19,
+          "reason": "below_threshold"
+        },
+        {
+          "id": "CY003",
+          "rank": 20,
+          "reason": "below_threshold"
+        },
+        {
+          "id": "RF004",
+          "rank": 21,
+          "reason": "below_threshold"
+        },
+        {
+          "id": "VF002",
+          "rank": 22,
+          "reason": "below_threshold"
+        },
+        {
+          "id": "RF003",
+          "rank": 23,
+          "reason": "below_threshold"
+        },
+        {
+          "id": "SH002",
+          "rank": 24,
+          "reason": "below_threshold"
+        },
+        {
+          "id": "PY001",
+          "rank": 25,
+          "reason": "below_threshold"
+        },
+        {
+          "id": "XY002",
+          "rank": 26,
+          "reason": "below_threshold"
+        },
+        {
+          "id": "PY002",
+          "rank": 27,
+          "reason": "below_threshold"
+        },
+        {
+          "id": "RS003",
+          "rank": 28,
+          "reason": "below_threshold"
+        },
+        {
+          "id": "ET004",
+          "rank": 29,
+          "reason": "below_threshold"
+        },
+        {
+          "id": "LR002",
+          "rank": 30,
+          "reason": "below_threshold"
+        },
+        {
+          "id": "ET002",
+          "rank": 31,
+          "reason": "below_threshold"
+        },
+        {
+          "id": "LR001",
+          "rank": 32,
+          "reason": "below_threshold"
+        },
+        {
+          "id": "RF005",
+          "rank": 33,
+          "reason": "below_threshold"
+        },
+        {
+          "id": "JL002",
+          "rank": 34,
+          "reason": "below_threshold"
+        },
+        {
+          "id": "JL001",
+          "rank": 35,
+          "reason": "below_threshold"
+        },
+        {
+          "id": "SH001",
+          "rank": 1,
+          "reason": "unsupported"
+        }
+      ]
+    }
+  ],
+  "originalFailureRegression": {
+    "corpus": "online",
+    "id": "a1-val-036",
+    "suite": "no_answer",
+    "mode": "M4",
+    "query": "不用查询本人订单，双人午餐这一批券统一是哪一天到期？",
+    "scope": {
+      "shopId": "shop-demo-1",
+      "productId": "product-demo-1"
+    },
+    "status": "ok",
+    "candidateIds": [
+      "KB-PRODUCT-LUNCH",
+      "KB-REFUND-EXPIRED",
+      "KB-REFUND-PARTIAL",
+      "KB-REFUND-PAYMENT",
+      "KB-REFUND-REDEEMED",
+      "KB-REFUND-UNUSED",
+      "KB-SHOP-DEMO-1"
+    ],
+    "candidateHash": "908736f4836cef0d08d2320d5130cea945c4f12e9889fbb9fafd74e10d630868",
+    "ranking": [
+      {
+        "id": "KB-PRODUCT-LUNCH",
+        "score": 0.7540437337750145
+      },
+      {
+        "id": "KB-REFUND-UNUSED",
+        "score": 0.4723597794354348
+      },
+      {
+        "id": "KB-REFUND-PARTIAL",
+        "score": 0.39942411536043065
+      },
+      {
+        "id": "KB-REFUND-EXPIRED",
+        "score": 0.34495753842482724
+      },
+      {
+        "id": "KB-SHOP-DEMO-1",
+        "score": 0.3215063108730224
+      },
+      {
+        "id": "KB-REFUND-PAYMENT",
+        "score": 0.2852704992334806
+      },
+      {
+        "id": "KB-REFUND-REDEEMED",
+        "score": 0.2439990943910968
+      }
+    ],
+    "relevant": [],
+    "acceptance": {
+      "version": "score-support-v1",
+      "config": {
+        "mode": "support",
+        "threshold": 0.71
+      },
+      "status": "rejected",
+      "accepted": [],
+      "rejected": [
+        {
+          "id": "KB-REFUND-UNUSED",
+          "rank": 2,
+          "reason": "below_threshold"
+        },
+        {
+          "id": "KB-REFUND-PARTIAL",
+          "rank": 3,
+          "reason": "below_threshold"
+        },
+        {
+          "id": "KB-REFUND-EXPIRED",
+          "rank": 4,
+          "reason": "below_threshold"
+        },
+        {
+          "id": "KB-SHOP-DEMO-1",
+          "rank": 5,
+          "reason": "below_threshold"
+        },
+        {
+          "id": "KB-REFUND-PAYMENT",
+          "rank": 6,
+          "reason": "below_threshold"
+        },
+        {
+          "id": "KB-REFUND-REDEEMED",
+          "rank": 7,
+          "reason": "below_threshold"
+        },
+        {
+          "id": "KB-PRODUCT-LUNCH",
+          "rank": 1,
+          "reason": "unsupported"
+        }
+      ],
+      "diagnostics": {
+        "topScore": 0.7540437337750145,
+        "scoreGap": 0.28168395433957977,
+        "candidates": [
+          {
+            "id": "KB-PRODUCT-LUNCH",
+            "rank": 1,
+            "scoreMargin": 0.04404373377501458,
+            "titleMatch": false,
+            "matchedTags": [
+              "午餐",
+              "双人"
+            ]
+          },
+          {
+            "id": "KB-REFUND-UNUSED",
+            "rank": 2,
+            "scoreMargin": -0.23764022056456519,
+            "titleMatch": false,
+            "matchedTags": []
+          },
+          {
+            "id": "KB-REFUND-PARTIAL",
+            "rank": 3,
+            "scoreMargin": -0.3105758846395693,
+            "titleMatch": false,
+            "matchedTags": []
+          },
+          {
+            "id": "KB-REFUND-EXPIRED",
+            "rank": 4,
+            "scoreMargin": -0.3650424615751727,
+            "titleMatch": false,
+            "matchedTags": [
+              "到期"
+            ]
+          },
+          {
+            "id": "KB-SHOP-DEMO-1",
+            "rank": 5,
+            "scoreMargin": -0.38849368912697757,
+            "titleMatch": false,
+            "matchedTags": []
+          },
+          {
+            "id": "KB-REFUND-PAYMENT",
+            "rank": 6,
+            "scoreMargin": -0.4247295007665194,
+            "titleMatch": false,
+            "matchedTags": []
+          },
+          {
+            "id": "KB-REFUND-REDEEMED",
+            "rank": 7,
+            "scoreMargin": -0.46600090560890317,
+            "titleMatch": false,
+            "matchedTags": []
+          }
+        ]
+      }
+    },
+    "supportVerification": {
+      "value": [
+        {
+          "id": "KB-PRODUCT-LUNCH",
+          "supported": false,
+          "quote": null,
+          "reason": "原文仅说明每张券截止时间以订单返回的expiresAt为准，未给出该批券统一到期的具体日期，无法支持所问事实。"
+        }
+      ],
+      "requestHash": "5addd3eace3b644655c6a8a95ecfaf65509d372979f5f6b0acaae0fd77337125",
+      "attempts": [
+        {
+          "operation": "support",
+          "provider": "deepseek",
+          "model": "deepseek-flash",
+          "attempt": 1,
+          "durationMs": 766.0225840000003,
+          "outcome": "ok",
+          "totalTokens": 589,
+          "inputTokens": 144,
+          "outputTokens": 61,
+          "cacheReadTokens": 384,
+          "cacheWriteTokens": 0,
+          "costUsd": 0.00011870399999999998
+        }
+      ],
+      "inputHash": "5ffcacf421564900071cba954e09dcde32fc2df67192dcbdc686ea99f2f115e6"
+    },
+    "acceptedMetrics": null,
+    "acceptedScopePassed": true,
+    "acceptedBoundaryPassed": true,
+    "expectedAbstention": true,
+    "falseRejectEligible": null,
+    "falseRejected": null,
+    "deferredReason": null,
+    "metrics": null,
+    "scopePassed": true,
+    "boundaryPassed": true,
+    "forbiddenMatches": [],
+    "requiredPassed": true,
+    "empty": false,
+    "durationMs": 982.4170840000006,
+    "callIds": [
+      "56ae266a-769e-4a07-bcda-8374754e84d4",
+      "bd6dc8a8-dc93-4d0b-b370-9f5f6948e218"
+    ],
+    "fallback": null,
+    "error": null
+  }
+}

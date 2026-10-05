@@ -4,7 +4,7 @@ import { resolveEvidenceAcceptance, type EvidenceAcceptanceConfig } from "./evid
 
 export const experimentModes = ["M0", "M1", "M2", "M3", "M4", "M5", "M6"] as const;
 export type SupportVariant = { id: string; architecture: "atomic" | "controller"; parameters: SupportExperimentParameters };
-export const experimentDatasets = ["legacy", "acceptance-development", "acceptance-validation"] as const;
+export const experimentDatasets = ["legacy", "acceptance-development", "acceptance-validation", "acceptance-support-validation"] as const;
 type RetrievalV1Variant = { id: string; modes: Array<typeof experimentModes[number]>; parameters: RetrievalExperimentParameters };
 export type RetrievalV2Variant = RetrievalV1Variant & { dataset: typeof experimentDatasets[number]; acceptance: EvidenceAcceptanceConfig };
 export type RetrievalVariant = RetrievalV1Variant | RetrievalV2Variant;
@@ -76,7 +76,7 @@ export const experimentFields: Record<"support" | "retrieval", Field[]> = {
     { key: "cache", label: "远程结果缓存", type: "select", options: [{ value: "reuse", label: "复用缓存" }, { value: "refresh", label: "重新请求" }], note: "缓存复用不算独立模型重复；比较时延请重新请求" },
     { key: "timeoutMs", label: "单请求超时（ms）", type: "number", min: 1000, max: 60000, step: 1000 },
     { key: "retries", label: "失败重试次数", type: "number", min: 0, max: 2, step: 1 },
-    { key: "maxRequests", label: "每次运行请求上限", type: "number", min: 1, max: 10000, step: 1 },
+    { key: "maxRequests", label: "每次运行请求上限", type: "number", min: 1, max: 10000, step: 1, note: "包含向量、重排及事实支持判别的实际请求；缓存命中不消耗请求数" },
     { key: "consecutiveFailureLimit", label: "连续失败停止数", type: "number", min: 1, max: 20, step: 1 },
   ],
 };
@@ -94,17 +94,26 @@ export function experimentCatalog() {
         { id: "A", modes: ["M4"], dataset: "acceptance-development", acceptance: { mode: "off" } },
         { id: "B", modes: ["M4"], dataset: "acceptance-development", acceptance: { mode: "score", threshold: .71 } },
       ], 2),
+      preset("support-development", "A1 事实支持开发 A/B", "retrieval", [
+        { id: "A", modes: ["M4"], dataset: "acceptance-development", acceptance: { mode: "score", threshold: .71 }, parameters: { maxRequests: 160, timeoutMs: 60000, retries: 0 } },
+        { id: "B", modes: ["M4"], dataset: "acceptance-development", acceptance: { mode: "support", threshold: .71 }, parameters: { maxRequests: 160, timeoutMs: 60000, retries: 0 } },
+      ], 2),
+      preset("support-validation", "A1 事实支持固定验证 A/B", "retrieval", [
+        { id: "A", modes: ["M4"], dataset: "acceptance-support-validation", acceptance: { mode: "score", threshold: .71 }, parameters: { maxRequests: 160, timeoutMs: 60000, retries: 0 } },
+        { id: "B", modes: ["M4"], dataset: "acceptance-support-validation", acceptance: { mode: "support", threshold: .71 }, parameters: { maxRequests: 160, timeoutMs: 60000, retries: 0 } },
+      ], 2),
     ], fields: experimentFields,
     datasets: [{ value: "legacy", label: "原检索开发集" }, { value: "acceptance-development", label: "A1 开发集（48 题）" },
-      { value: "acceptance-validation", label: "A1 固定验证集（60 题，非盲测）" }],
+      { value: "acceptance-validation", label: "A1 原分数固定验证集（60 题，已曝光，非盲测）" },
+      { value: "acceptance-support-validation", label: "A1 事实支持固定验证集（60 题，非盲测）" }],
     acceptanceFields: [
-      { key: "mode", label: "证据接收策略", type: "select", options: [{ value: "off", label: "关闭（范围内原始 Top5）" }, { value: "score", label: "按重排分数接收" }],
-        note: "分数策略仅支持 M4/M5/M6；不修改原始排名。" },
+      { key: "mode", label: "证据接收策略", type: "select", options: [{ value: "off", label: "关闭（范围内原始 Top5）" }, { value: "score", label: "按重排分数接收" }, { value: "support", label: "分数 + 事实支持判别" }],
+        note: "score/support 仅支持 M4/M5/M6；support 会额外调用模型判断原文是否支持所问事实，增加请求与成本；不修改原始排名。" },
       { key: "threshold", label: "接收分数阈值", type: "number", min: 0, max: 1, step: .01,
-        note: "仅分数策略启用时填写。0.71 来自开发集校准；分数不是概率，仍需固定验证，不代表上线门槛。" },
+        note: "score/support 都须显式填写。0.71 为开发冻结值，分数不是概率；原纯分数验证有误接收，事实支持策略须另行验证，尚未准入在线。" },
     ] satisfies Field[],
     modes: ["M0 词项", "M1 BM25", "M2 向量", "M3 BM25 + 向量 RRF", "M4 全候选重排", "M5 词项候选重排", "M6 RRF 候选重排"].map((label, index) => ({ value: experimentModes[index], label })),
     limits: { variants: 2, repeat: 3, concurrentJobs: 1 },
-    notes: ["所有配置仅作用于本次评测，不修改在线 QQ 配置。", "检索是离线实验，固定原始 Recall@5 / MRR@5；A1 另行报告接收后的证据指标，尚未接入线上知识服务。", "A1 固定验证集已可见，属于固定回归验证而非独立盲测；开发阈值不代表已达标。", "长期记忆、模型改写开关尚未完成。"],
+    notes: ["所有配置仅作用于本次评测，不修改在线 QQ 配置。", "检索是离线实验，固定原始 Recall@5 / MRR@5；A1 另行报告接收后的证据指标，尚未接入线上知识服务。", "原分数验证已曝光且未准入；事实支持策略使用单独的新固定验证集，仍非独立盲测，开发阈值不代表已达标。", "事实支持判别增加模型调用；与重排共用请求预算，费用按真实调用分别报告。", "长期记忆、模型改写开关尚未完成。"],
   };
 }

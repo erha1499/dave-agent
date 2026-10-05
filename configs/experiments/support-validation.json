@@ -1,0 +1,41 @@
+{
+  "version": 2,
+  "kind": "retrieval",
+  "label": "A1 事实支持固定验证 A/B",
+  "repeat": 1,
+  "allowRemote": false,
+  "variants": [
+    {
+      "id": "A",
+      "modes": [
+        "M4"
+      ],
+      "dataset": "acceptance-support-validation",
+      "acceptance": {
+        "mode": "score",
+        "threshold": 0.71
+      },
+      "parameters": {
+        "maxRequests": 160,
+        "timeoutMs": 60000,
+        "retries": 0
+      }
+    },
+    {
+      "id": "B",
+      "modes": [
+        "M4"
+      ],
+      "dataset": "acceptance-support-validation",
+      "acceptance": {
+        "mode": "support",
+        "threshold": 0.71
+      },
+      "parameters": {
+        "maxRequests": 160,
+        "timeoutMs": 60000,
+        "retries": 0
+      }
+    }
+  ]
+}

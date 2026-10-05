@@ -1,0 +1,53 @@
+{
+  "version": 1,
+  "createdDate": "2026-10-05",
+  "split": "support-validation",
+  "name": "A1 fresh fact-support fixed validation",
+  "validationPolicy": "fixed-validation-not-blind",
+  "dataset": {
+    "path": "data/acceptance-support-validation.json",
+    "sha256": "c02b791c56865b582db6d62f124876fa6be0e3df063314388e2c40eaff18d031",
+    "bytes": 38675
+  },
+  "counts": {
+    "total": 60,
+    "standard": 30,
+    "no_answer": 18,
+    "scope": 12,
+    "context": 0
+  },
+  "corpora": {
+    "online": {
+      "standard": 12,
+      "no_answer": 9,
+      "scope": 6,
+      "total": 27
+    },
+    "reference": {
+      "standard": 18,
+      "no_answer": 9,
+      "scope": 6,
+      "total": 33
+    }
+  },
+  "baseFiles": {
+    "data/acceptance-development.json": "fe9916b888f73401312e2f2aa6c43687716aa0eef86556b8731abbf7a414ae95",
+    "data/acceptance-validation.json": "0ead08f6c37cf43be8d84b47557692e3ac2cc264fe37994f2f030cddf7d50592",
+    "data/acceptance-online.json": "5f97b7f4e77cd1695a38ef9b0c42e53f52f40f7ae869a39fcdcdae5ae8971b72",
+    "data/acceptance-source.json": "a142141b94aea8b5a3ac9812d6abc2bb9171b2e437e47c69d615a9c688bd042c"
+  },
+  "review": {
+    "stage": "frozen-before-new-verifier-evaluation",
+    "isBlind": false,
+    "newVerifierInspected": false,
+    "policy": "Read only the frozen eight online rules and 35 reference rules; enumerate requested facts/conditions and check every same-corpus document for direct or equivalent support. In multi-gold cases each listed document independently supports the requested conclusion. Topical overlap, user assertions and a contact-merchant fallback do not provide missing numeric/date/transaction facts. Explicit policy denials are answerable, not absent evidence.",
+    "negativeReview": "For each no-answer case record visible near-miss docs and the exact missing fact. For each scope case check full trusted scope and forbid out-of-scope or inactive sources. Keep numeric facts supplied only by users out of gold.",
+    "novelty": "Exact queries differ from both earlier splits; new conditional, false-premise, capability-versus-fact, numeric-boundary and historical-time combinations. Limited shared policy corpus prevents a claim of independent intent distribution or statistical generalization.",
+    "multipleGoldCases": [
+      "a1-sup-010",
+      "a1-sup-022"
+    ],
+    "c1": "No deferred or multi-turn context cases in this split.",
+    "retuning": "Use this set once with a pre-frozen configuration. Any adjustment based on its results is development feedback and requires a further fresh validation set."
+  }
+}

@@ -76,8 +76,10 @@ export async function executeExperiment(input: ExperimentExecution, dependencies
     // The caller selects a fixed dataset enum, never an arbitrary file or module path.
     if (dataset !== "legacy") {
       const loadAcceptance = dependencies.loadAcceptance ?? (await import("../scripts/acceptance-data.ts")).loadAcceptanceDataset;
-      if (dataset !== "acceptance-development" && dataset !== "acceptance-validation") throw new Error("未知实验数据集。");
-      acceptanceOptions.dataset = await loadAcceptance(dataset === "acceptance-development" ? "development" : "validation");
+      const split = dataset === "acceptance-development" ? "development" : dataset === "acceptance-validation" ? "validation"
+        : dataset === "acceptance-support-validation" ? "support-validation" : undefined;
+      if (!split) throw new Error("未知实验数据集。");
+      acceptanceOptions.dataset = await loadAcceptance(split);
     }
   }
   const { report } = await runRetrieval({ label: `${input.config.label} · ${input.variant.id}`,

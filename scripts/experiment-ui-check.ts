@@ -92,7 +92,10 @@ const catalog = (): any => ({
       { id: "A", modes: ["M0", "M4"], parameters: retrievalParams() } ] } },
     { id: "acceptance-development", name: "A1 证据接收开发 A/B", config: { version: 2, kind: "retrieval", label: "A1 证据接收开发 A/B", repeat: 1, allowRemote: false, variants: [
       { id: "A", modes: ["M4"], dataset: "acceptance-development", acceptance: { mode: "off" }, parameters: retrievalParams() },
-      { id: "B", modes: ["M4"], dataset: "acceptance-development", acceptance: { mode: "score", threshold: 0.8 }, parameters: retrievalParams() } ] } },
+      { id: "B", modes: ["M4"], dataset: "acceptance-development", acceptance: { mode: "score", threshold: 0.71 }, parameters: retrievalParams() } ] } },
+    { id: "support-validation", name: "A1 事实支持固定验证 A/B", config: { version: 2, kind: "retrieval", label: "A1 事实支持固定验证 A/B", repeat: 1, allowRemote: false, variants: [
+      { id: "A", modes: ["M4"], dataset: "acceptance-support-validation", acceptance: { mode: "score", threshold: 0.71 }, parameters: retrievalParams({ maxRequests: 160, timeoutMs: 60000, retries: 0 }) },
+      { id: "B", modes: ["M4"], dataset: "acceptance-support-validation", acceptance: { mode: "support", threshold: 0.71 }, parameters: retrievalParams({ maxRequests: 160, timeoutMs: 60000, retries: 0 }) } ] } },
   ],
   fields: {
     support: [
@@ -110,12 +113,14 @@ const catalog = (): any => ({
   modes: ["M0 词项", "M1 BM25", "M2 向量", "M3 BM25 + 向量 RRF", "M4 全候选重排", "M5 词项候选重排", "M6 RRF 候选重排"]
     .map((label, index) => ({ value: `M${index}`, label })),
   datasets: [{ value: "legacy", label: "原检索开发集" }, { value: "acceptance-development", label: "A1 开发集（48 题）" },
-    { value: "acceptance-validation", label: "A1 固定验证集（60 题，非盲测）" }],
+    { value: "acceptance-validation", label: "A1 原分数固定验证集（60 题，已曝光，非盲测）" },
+    { value: "acceptance-support-validation", label: "A1 事实支持固定验证集（60 题，非盲测）" }],
   acceptanceFields: [
-    { key: "mode", label: "证据接收策略", type: "select", options: [{ value: "off", label: "关闭（范围内原始 Top5）" }, { value: "score", label: "按重排分数接收" }],
-      note: "分数策略仅支持 M4/M5/M6；不修改原始排名。" },
+    { key: "mode", label: "证据接收策略", type: "select", options: [{ value: "off", label: "关闭（范围内原始 Top5）" },
+      { value: "score", label: "按重排分数接收" }, { value: "support", label: "分数 + 事实支持判别" }],
+      note: "score/support 仅支持 M4/M5/M6；support 会额外调用模型判断原文是否支持所问事实，增加请求与成本；不修改原始排名。" },
     { key: "threshold", label: "接收分数阈值", type: "number", min: 0, max: 1, step: 0.01,
-      note: "仅分数策略启用时填写。0.8 为开发试值，未经校准不代表上线门槛。" },
+      note: "score/support 都须显式填写。0.71 为开发冻结值，分数不是概率；事实支持策略须另行验证，尚未准入在线。" },
   ],
   limits: { variants: 2, repeat: 3, concurrentJobs: 1 },
   notes: ["所有配置仅作用于本次评测。"],
@@ -544,8 +549,8 @@ const openExperiments = async (booted: Awaited<ReturnType<typeof boot>>, jobs: u
   assert.equal(byField("acceptance-threshold", "A").disabled, true, "off 时阈值禁用");
   assert.equal(byField("acceptance-mode", "B").value, "score");
   assert.equal(byField("acceptance-threshold", "B").disabled, false, "score 时阈值启用");
-  assert.equal(byField("acceptance-threshold", "B").value, "0.8");
-  assert.match(content(root), /接收 off → score 0\.8/, "差异含接收策略");
+  assert.equal(byField("acceptance-threshold", "B").value, "0.71");
+  assert.match(content(root), /接收 off → score 0\.71/, "差异含接收策略");
   // 阈值编辑不重建输入节点。
   const thB = byField("acceptance-threshold", "B");
   thB.value = "0.65";
@@ -558,13 +563,13 @@ const openExperiments = async (booted: Awaited<ReturnType<typeof boot>>, jobs: u
   m0B.checked = true;
   m0B.fire("change");
   await flush();
-  assert.match(content(root), /分数接收仅支持 M4\/M5\/M6/);
+  assert.match(content(root), /score\/support 接收仅支持 M4\/M5\/M6/);
   assert.equal(findClass(root, "primary-button")!.disabled, true, "score 与非 rerank 组合禁提交");
   assert.equal(byMode("M0", "B").checked, true, "不丢字段、不偷偷改模式");
   m0B.checked = false;
   m0B.fire("change");
   await flush();
-  assert.ok(!content(root).includes("分数接收仅支持"), "恢复合法组合后错误消失");
+  assert.ok(!content(root).includes("接收仅支持"), "恢复合法组合后错误消失");
   // A 切 score 无阈值 → 提示显式填写；填 0.5 后恢复；再切回 off。
   const modeA = byField("acceptance-mode", "A");
   modeA.value = "score";
@@ -695,4 +700,98 @@ const openExperiments = async (booted: Awaited<ReturnType<typeof boot>>, jobs: u
   assert.equal(byField("acceptance-threshold", "B").value, "0.8", "历史阈值回填");
   assert.match(content(root), /接收 off → score 0\.8/, "回填后差异含接收策略");
   console.log("PASS 实验调试：v2 接收指标分表、空分母不适用、待 C1 与口径声明、历史 v2 完整回填。");
+}
+
+// support 模式：表单与组合校验同 score、off 往返保留输入、差异/历史/详情不误写 off、USD 独立用量与判别失败可见。
+{
+  const booted = await boot();
+  const { element, find, flush, pendingCount } = booted;
+  const supportJob = job("job-sup", { plannedRuns: 2,
+    config: { version: 2, kind: "retrieval", label: "A1 事实支持固定验证", repeat: 1, allowRemote: true, variants: [
+      { id: "A", modes: ["M4"], dataset: "acceptance-support-validation", acceptance: { mode: "score", threshold: 0.71 }, parameters: retrievalParams({ maxRequests: 160 }) },
+      { id: "B", modes: ["M4"], dataset: "acceptance-support-validation", acceptance: { mode: "support", threshold: 0.71 }, parameters: retrievalParams({ maxRequests: 160 }) }] },
+    results: [
+      { variantId: "A", repetition: 1, kind: "retrieval", status: "completed", runId: "rt-sa", summary: { plannedRows: 60, completedRows: 60, missingRows: 0, groups: [], usage: [] } },
+      { variantId: "B", repetition: 1, kind: "retrieval", status: "completed", runId: "rt-sb", summary: {
+        plannedRows: 60, completedRows: 60, missingRows: 0,
+        groups: [{
+          mode: "M4", corpus: "selected", suite: "standard", planned: 54, missing: 0, succeeded: 54, failed: 0, notApplicable: 0, measured: 54,
+          recallAt5: 0.95, plannedRecallAt5: 0.93, mrrAt5: 0.9, scopeViolations: 0, boundaryFailures: 0,
+          acceptance: {
+            planned: 54, applicablePlanned: 54, measured: 52, missing: 0, failed: 2, notApplicable: 0, deferred: 0,
+            plannedAnswerable: 54, answerableMeasured: 52, recallAt5: 0.8, plannedRecallAt5: 0.77, mrrAt5: 0.75,
+            coveredCases: 50, coverage: 50 / 52, plannedCoverage: 50 / 54,
+            noAnswerFalseAcceptCases: 0, noAnswerDenominator: 0, noAnswerPlanned: 0, noAnswerFalseAcceptRate: null,
+            abstentionFalseAcceptCases: 0, abstentionDenominator: 0, abstentionPlanned: 0, abstentionFalseAcceptRate: null,
+            answerableFalseRejectCases: 1, answerableFalseRejectDenominator: 50, answerableFalseRejectRate: 0.02,
+            scopeViolations: 0, boundaryFailures: 0,
+          },
+        }],
+        usage: [
+          { operation: "rerank", requests: 54, successfulRequests: 54, cacheHits: 6, reportedRequests: 54, knownTokens: 120000, completeTokens: 120000, knownEstimatedCostCny: 0.06, completeEstimatedCostCny: 0.06 },
+          { operation: "support", requests: 96, successfulRequests: 96, cacheHits: 12, reportedRequests: 96, knownTokens: 3000, completeTokens: null, knownEstimatedCostCny: null, completeEstimatedCostCny: null, knownEstimatedCostUsd: 0.001234, completeEstimatedCostUsd: 0.001234 },
+        ],
+      } },
+    ] });
+  await openExperiments(booted, [supportJob]);
+  const root = element("experiments");
+  const byField = (field: string, variant: string) => findAllAttr(root, "data-field", field).find(item => item.attrs.get("data-variant") === variant)!;
+  walk(root).find(item => item.className.split(" ").includes("exp-job"))!.fire("click");
+  await flush(1);
+  respond(find(request => request.path === "/api/experiments/job-sup", "support job detail"), supportJob);
+  await flush();
+  const html = content(root);
+  // 历史摘要不误写 off。
+  assert.match(html, /B M4 · support 0\.71/, "配置快照显示 support 而非 off");
+  assert.match(html, /support（分数 \+ 事实支持判别）实验阈值 0\.71；是否达标见指标/, "详情策略标签");
+  assert.match(html, /判别另行调用模型增加请求/, "提示额外模型请求");
+  assert.match(html, /失败 2/, "判别阶段失败在接收表可见（原始 rerank 失败 0）");
+  // 用量：support 独立行，CNY 未知与 USD 分列。
+  assert.match(html, /事实支持判别 support · 请求 96 · 缓存命中 12/, "support 用量独立成行不重复");
+  assert.match(html, /CNY：已知 未知 · 完整 未知/, "CNY null 不补零");
+  assert.match(html, /USD：已知 \$0\.001234 · 完整 \$0\.001234/, "USD 独立显示");
+  // 载入配置回显 support，差异不误写 off。
+  findAttr(root, "data-action", "load-config")!.fire("click");
+  await flush();
+  assert.equal(byField("acceptance-mode", "B").value, "support", "历史 support 回显");
+  assert.equal(byField("acceptance-threshold", "B").value, "0.71");
+  assert.match(content(root), /接收 score 0\.71 → support 0\.71/, "差异含 support 阈值");
+  // off 往返保留输入行为：B 切 off 移除阈值，切回 support 采纳已输入值。
+  const modeB = byField("acceptance-mode", "B");
+  modeB.value = "off";
+  modeB.fire("change");
+  await flush();
+  assert.equal(byField("acceptance-threshold", "B").disabled, true, "切 off 阈值禁用");
+  modeB.value = "support";
+  byField("acceptance-mode", "B").fire("change");
+  await flush();
+  const thB = byField("acceptance-threshold", "B");
+  assert.equal(thB.disabled, false, "切回 support 阈值启用");
+  assert.match(content(root), /support 0\.71/, "从 off 返回保留已输入阈值");
+  // 组合校验：support 加选 M3 禁提交。
+  const m3B = findAllAttr(root, "data-mode", "M3").find(item => item.attrs.get("data-variant") === "B")!;
+  m3B.checked = true;
+  m3B.fire("change");
+  await flush();
+  assert.match(content(root), /score\/support 接收仅支持 M4\/M5\/M6/);
+  assert.equal(findClass(root, "primary-button")!.disabled, true, "support 与非 rerank 组合禁提交");
+  m3B.checked = false;
+  findAllAttr(root, "data-mode", "M3").find(item => item.attrs.get("data-variant") === "B")!.fire("change");
+  await flush();
+  // 提交体原样带 support。
+  const allow = findAttr(root, "data-field", "allow-remote")!;
+  allow.checked = true;
+  allow.fire("change");
+  await flush();
+  findClass(root, "primary-button")!.fire("click");
+  await flush(1);
+  const post = find(request => request.path === "/api/experiments" && request.options?.method === "POST", "support POST");
+  const body = JSON.parse(post.options?.body || "{}");
+  assert.deepEqual(body.variants[0].acceptance, { mode: "score", threshold: 0.71 });
+  assert.deepEqual(body.variants[1].acceptance, { mode: "support", threshold: 0.71 }, "提交体 support 原样");
+  assert.equal(body.variants[1].dataset, "acceptance-support-validation");
+  respond(post, job("job-sup-2", { status: "completed", config: body }));
+  await flush();
+  assert.equal(pendingCount(), 0);
+  console.log("PASS 实验调试：support 模式表单/校验/回显/差异/提交，USD 独立用量与判别失败可见。");
 }

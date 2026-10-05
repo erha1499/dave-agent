@@ -103,3 +103,6 @@ await import("./acceptance-data-check.ts");
 await import("./evidence-acceptance-check.ts");
 await import("./acceptance-calibrate-check.ts");
 await import("./support-validation-data-check.ts");
+
+await import("./evidence-support-check.ts");
+await import("./evidence-support-runner-check.ts");

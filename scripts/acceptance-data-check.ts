@@ -3,8 +3,9 @@ import { readFile } from "node:fs/promises";
 import { loadAcceptanceDataset, validateAcceptanceQuestions, type AcceptanceQuestion, type AcceptanceSplit } from "./acceptance-data.ts";
 import { scopeDocuments, type RetrievalDocument } from "../src/retrieval-ranking.ts";
 
-const datasets = await Promise.all((["development", "validation"] as const).map(loadAcceptanceDataset));
-for (const [index, split] of (["development", "validation"] as const).entries()) {
+const splits = ["development", "validation", "support-validation"] as const;
+const datasets = await Promise.all(splits.map(loadAcceptanceDataset));
+for (const [index, split] of splits.entries()) {
   const data = datasets[index]!;
   assert.deepEqual(data.corpora.map(c => c.id), ["online", "reference"]);
   assert.deepEqual(data.corpora.map(c => c.documents.length), [9, 36], "8/35 frozen policies plus one inactive fixture per corpus");
@@ -59,5 +60,17 @@ assert.ok(docs.online.find(doc => doc.id === "KB-REFUND-EXPIRED")!.body.includes
 assert.ok(docs.reference.find(doc => doc.id === "RF001")!.body.includes("同样支持过期退"));
 assert.ok(!docs.online.some(doc => doc.id === "RF001"));
 const allQueries = datasets.flatMap(data => data.corpora.flatMap(c => c.questions.map(q => `${c.id}:${q.query.trim()}`)));
-assert.equal(new Set(allQueries).size, 108);
-console.log("A1 data checks passed: 48 development + 60 fixed validation, 8/35 separate policies, exact gold quotations, scope/retired fixtures, freeze hashes and six C1 cases; no model calls.");
+assert.equal(new Set(allQueries).size, 168);
+const freshPayload = JSON.parse(await readFile(new URL("../data/acceptance-support-validation.json", import.meta.url), "utf8"));
+const fresh = datasets[2]!.corpora.flatMap(c => c.questions);
+assert.deepEqual(["standard", "no_answer", "scope", "context"].map(suite => fresh.filter(q => q.suite === suite).length), [30, 18, 12, 0]);
+assert.ok(fresh.every(q => q.deferredReason === undefined));
+assert.deepEqual(fresh.find(q => q.id === "a1-sup-010")?.relevant, ["KB-PRODUCT-LUNCH", "KB-REFUND-PAYMENT"], "both independent price/payment boundary documents are gold");
+assert.deepEqual(fresh.find(q => q.id === "a1-sup-022")?.relevant, ["CY003", "MC001"], "both independent real-time merchant capability policies are gold");
+assert.deepEqual(fresh.find(q => q.id === "a1-sup-008")?.relevant, ["KB-SHOP-DEMO-1"], "explicitly documented absence of policy is an answer to a policy-availability question");
+const missingQuote = structuredClone(freshPayload); missingQuote.questions.find((q: { id: string }) => q.id === "a1-sup-010").evidence.pop();
+assert.throws(() => validateAcceptanceQuestions(missingQuote, "support-validation", docs), /每个 gold/);
+const deferred = structuredClone(freshPayload); deferred.questions[0].deferredReason = "C1";
+assert.throws(() => validateAcceptanceQuestions(deferred, "support-validation", docs), /普通题不得延后/);
+assert.throws(() => validateAcceptanceQuestions(freshPayload, "validation", docs), /split/);
+console.log("A1 data checks passed: 48 development + 60 original fixed validation + 60 fresh fact-support validation; frozen 8/35 policies, scope fixtures, complete gold quotations, unchanged old split hashes and six original C1 cases; no model calls.");

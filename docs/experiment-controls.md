@@ -44,11 +44,47 @@
 }
 ```
 
-示例的 0.8 仅展示参数写法，不代表已选定或合格阈值。数据集枚举为 `legacy`、`acceptance-development`（48 题）、`acceptance-validation`（60 题，6 道待 C1）。`off` 是范围内原始 Top5 的诊断基线，`score` 接收分数不低于 threshold 的原文，最多 5 条；threshold 必须显式提供有限数值 0–1，仅支持 M4/M5/M6。策略开关始终保留 active/门店/套餐过滤。非适用模式、未知参数及 version 1 偷带新字段在执行前拒绝。旧 JSON 不自动迁移或套用新阈值。
+示例的 0.8 仅展示参数写法，不代表已选定或合格阈值。数据集枚举为 `legacy`、`acceptance-development`（48 题）、`acceptance-validation`（原 60 题，已曝光，6 道待 C1）、`acceptance-support-validation`（新 60 题：30 可回答、18 无答案、12 范围题，无 C1 延期）。`off` 是范围内原始 Top5 的诊断基线，`score` 接收分数不低于 threshold 的原文，最多 5 条；`support` 在相同分数筛选后增加事实支持判别。score/support 的 threshold 必须显式提供有限数值 0–1，仅支持 M4/M5/M6。策略开关始终保留 active/门店/套餐过滤。非适用模式、未知参数及 version 1 偷带新字段在执行前拒绝。旧 JSON 不自动迁移或套用新阈值。
 
 策略不读取 gold；gold 仅由评分器在策略执行后读取。缺失分数、失效/越权文档和 provider 错误不会成为已接受证据；失败时的 lexical 结果只用于诊断。每轮快照保存实际阈值、策略版本、模型/指令、文本格式及 corpus hashes，原始排名保持不变。改模型、语料或格式后必须重新校准，rerank 分数不是答案正确概率。
 
 先用开发集校准，冻结后再运行固定验证。只看验证结果改阈值后，该题集不再能提供新的独立验证结论。数据来源与 24 个业务对话准备情况见 [数据说明](./acceptance-data.md)。
+
+### 事实支持模式
+
+工作台 catalog 提供 `support-development` 和 `support-validation` 两个 version 2 预设，均为 `kind: "retrieval"`，对照 `score` 与 `support`。固定的重排阈值 **0.71 是开发配置中的相关性筛选值，不是 71% 的答案正确概率，也不表示已达到上线要求**。预设使用 60 秒请求超时、百炼重试 0 次、单方案单次运行最多 160 个实际远程请求；原配置的 `kind: "support"` 继续表示业务架构评测。
+
+```json
+{
+  "version": 2,
+  "kind": "retrieval",
+  "label": "事实支持固定配置对照",
+  "repeat": 1,
+  "allowRemote": false,
+  "variants": [
+    {
+      "id": "A",
+      "modes": ["M4"],
+      "dataset": "acceptance-support-validation",
+      "parameters": { "timeoutMs": 60000, "retries": 0, "maxRequests": 160 },
+      "acceptance": { "mode": "score", "threshold": 0.71 }
+    },
+    {
+      "id": "B",
+      "modes": ["M4"],
+      "dataset": "acceptance-support-validation",
+      "parameters": { "timeoutMs": 60000, "retries": 0, "maxRequests": 160 },
+      "acceptance": { "mode": "support", "threshold": 0.71 }
+    }
+  ]
+}
+```
+
+每个通过分数筛选的非空候选集，使用项目已配置的 Pi DeepSeek chat 模型发起 **一次批量请求，最多 5 篇原文**。判别器无工具调用，逐篇返回支持与否、连续原文引文和简短理由；所有输入 ID 都必须恰好返回一次，原始排名和重排分数保持不变。候选集为空时不发此请求。support 内部 `maxRetries` 固定为 0，失败不会暗中重试；表单里的 `retries` 控制百炼请求。60 秒是上述预设值，运行时 support 使用该方案实际 `timeoutMs`，快照保存实际配置。
+
+`maxRequests` 是每次运行共用的请求预算，包含 embedding、rerank 和 support 的实际网络尝试；A/B 各自独立，不能把 160 理解为整组上限或金额预算。support 有独立连续失败计数，也使用 `consecutiveFailureLimit`：中间 rerank 成功不会清掉 support 失败，达到限制后以 `consecutive_support_failures` 停止后续请求。缓存命中不消耗新网络预算，缓存键绑定问题、可信范围、原文、模型与判别配置；刷新缓存会重新请求，缓存复用不能算独立模型重复。
+
+比较时使用同版代码、同一冻结配置，按 [新验证集说明](./acceptance-data.md#新一轮事实支持固定验证) 保留非盲测和验证曝光边界。执行记录与结论见 [事实支持结果记录](./a1-support-results.md)；本配置说明不预告成绩，也不改变线上 QQ 知识服务。
 
 CLI 默认仅预览，不调用模型或数据库：
 
@@ -59,6 +95,9 @@ node scripts/experiment.ts --config configs/experiments/retrieval-local.json --r
 node --env-file-if-exists=.env scripts/experiment.ts --preset support-ab --run --allow-remote
 node scripts/experiment.ts --preset acceptance-development --dry-run
 node --env-file-if-exists=.env scripts/experiment.ts --preset acceptance-development --run --allow-remote
+node scripts/experiment.ts --preset support-development --dry-run
+node scripts/experiment.ts --preset support-validation --dry-run
+node --env-file-if-exists=.env scripts/experiment.ts --preset support-validation --run --allow-remote
 ```
 
 配置文件可来自工作台下载或 `configs/experiments/` 示例。CLI 和网页执行共用目录锁及任务记录，执行中的配置不会随表单更改而改变。
@@ -93,6 +132,18 @@ support 的 runId 是现有 MySQL 评测记录，summary 为 `RunAnalysis`（cou
 
 新报告每行另有 `acceptance`（接收原文、拒收原因、分数诊断）与 `acceptedMetrics`；summary.groups[].acceptance 包含成功及计划分母的 Recall、覆盖率、`noAnswerFalseAcceptCases/noAnswerDenominator/noAnswerPlanned`、`answerableFalseRejectCases/answerableFalseRejectDenominator`，以及 `abstentionFalseAcceptCases/abstentionDenominator/abstentionPlanned`。最后一项包括范围题的预期拒答，区别于权限范围违规。误拒分母仅含原始 Top5 已有有效证据的可回答题；缺少观测时 rate 为 null。`deferred/failed/missing` 分列，6 道上下文题留在计划且不发模型请求，不能算通过或成功拒答。旧报告没有接收字段时显示未记录。任务 completed 只说明执行结束，不证明策略达到准入门槛。
 
+support 报告另保存逐行 `supportVerification` 和独立 `supportCalls` 账本。若 rerank 成功但支持判别超时、返回无效或请求预算不足，原始 ranking/metrics 仍保留成功结果，接收阶段为 `acceptance.status: "unavailable"`、`acceptedMetrics: null`，`summary.groups[].acceptance.failed` 增加；不能将其当成功拒答或从计划分母删除。可回答题的计划 Recall 仍承担该失败，成功观测的误拒/误接收分母不混入未完成判别。
+
+`summary.usage` 按 operation 分行：embedding/rerank 的费用在适用区域使用 `knownEstimatedCostCny` / `completeEstimatedCostCny`；support 使用 `knownEstimatedCostUsd` / `completeEstimatedCostUsd`，来源为 Pi 模型目录估算，另有 `costCoverage`。USD 与 CNY 独立展示，未知费用是 null；已报告部分与完整用量分开。格式无效的模型输出也可能已经产生用量，不能把未接收证据当作免费调用。
+
+事实支持效果必须基于实际 verifier 记录评分：
+
+```sh
+node scripts/acceptance-report.ts --report .runtime/retrieval-v2/RUN_ID.json
+```
+
+该入口核验记录与输入/配置的绑定、原文和实际接收结果。`acceptance-calibrate.ts` 可以重放原始分数来校准 score 阈值，**不能从原始分数生成或重放 support 判断**；不能用纯分数校准结果冒充“事实支持模式已验证”。修改候选范围或判别配置后，应取得相匹配的实际判别记录，再用固定验证报告评价。
+
 HTTP 不接受命令或密钥；仅本机 Host/Origin，严格 JSON、请求体上限 32 KiB。任务执行状态和完整配置保存在忽略的 `.runtime/experiments/`。终止后不自动重跑；中断及未执行重复不能算通过。实验目录锁限制同一工作区同时一个实验；关闭工作台会等待当前实验完成，以便清理隔离订单。
 
 正常进程退出自动释放锁，死进程的完整锁元数据可恢复；半写或损坏锁会保守拒绝启动。仅在确认没有实验进程运行后，手动检查并清理 `.runtime/experiments/active.json` 和 `active.lock/`；不要删除历史任务 JSON。没有提供运行中强制取消，以免中断模拟订单清理。
@@ -103,8 +154,8 @@ HTTP 不接受命令或密钥；仅本机 Host/Origin，严格 JSON、请求体�
 
 请求上限按每次检索运行计，不是整组实验的金额预算；重试也计请求。缓存复用可能显著减少请求，但不能据此假设某次调用免费或已取消远程授权要求。付费业务或 M2–M6 必须显式设置 allowRemote=true 才能启动。
 
-## 本轮验收
+## 既有工作台验收记录
 
-2026-10-05，本地 CLI 运行 M0/M1 完成 580 项；工作台配置 A/B（BM25 b 为 0.75 / 0.25）分别完成 580 项，配置下载与载入后参数一致，远程请求均为 0。这里只证明配置与执行、展示的闭环，不声称调参提高了泛化效果。本轮未重新调用付费业务模型或百炼服务，也未重验真实 QQ。
+2026-10-05，此前本地 CLI 运行 M0/M1 完成 580 项；工作台配置 A/B（BM25 b 为 0.75 / 0.25）分别完成 580 项，配置下载与载入后参数一致，远程请求均为 0。这份历史记录只证明配置与执行、展示的闭环，不声称调参提高了泛化效果。当时未调用付费业务模型或百炼服务，也未重验真实 QQ；后续事实支持实验按其独立结果记录说明。
 
 确定性检查覆盖参数实际改变排序/候选/缓存/修复预算，错误组合在凭据读取前拒绝，配置快照不可被表单修改，串行重复与失败缺项，跨进程死锁恢复的活锁保护，HTTP 同源/请求体/非法 URL 边界。前端检查覆盖懒加载、远程调用门控、任务状态竞态、连续参数编辑与统计口径；浏览器验证宽窄屏、JSON 下载、参数复现及本地 A/B。完整检查入口为 `npm run validate`。

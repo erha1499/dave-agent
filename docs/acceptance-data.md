@@ -23,7 +23,7 @@
 `data/acceptance-source.json` 固定三份数据文件的 SHA256 和字节数，同时记录 seed SHA256、参考来源 manifest SHA256、分层数量和测试副本定义。`scripts/acceptance-data.ts` 导出：
 
 ```ts
-loadAcceptanceDataset("development" | "validation"): Promise<V2Dataset>
+loadAcceptanceDataset("development" | "validation" | "support-validation"): Promise<V2Dataset>
 ```
 
 每题保留 `goldRationale`、`expectedBehavior` 和精确的 `evidence[{docId,quote}]`。无答案题另外标注 `relatedButInsufficient`，便于核对“相关政策并不包含答案”，例如到账时效不能支持等待赔偿金额。范围题标注 `scopeCategory` 与禁止引用的文档 ID。不能因为知识库有“联系商家”的泛化建议，就把未录入的精确营养数值、收费标准或赔偿政策判定为已获证据支持。
@@ -37,6 +37,14 @@ node scripts/acceptance-data-check.ts
 ```
 
 校验覆盖冻结哈希、seed 逐字段原文一致、gold 引文存在及可见、无答案近似政策、scope/失效类别、分层数量、C1 保留和开发/验证精确重复问题。该检查不调用模型；它能发现结构和标注自相矛盾，不能替代业务人员对合成数据的语义审阅。数据包本身不代表 A1 已达到上线门槛。
+
+## 新一轮事实支持固定验证
+
+首次固定验证结果已暴露后，新增 `support-validation`，用于在新配置冻结后重新核验事实支持策略。`data/acceptance-support-validation.json` 共 **60 题：可回答 30、无答案 18、范围干扰 12**；线上规则 27 题、参考规则 33 题，不包含 C1 延期题。旧开发集、旧验证集、线上原文及原 source manifest 的字节保持不变。新增 `data/acceptance-support-validation-source.json` 固定新题集 SHA256/字节数，同时绑定四份旧文件哈希，继续复用原 8/35 篇政策及两个 inactive 测试副本。
+
+本轮数据作者只阅读政策原文与数据合同，没有阅读新 verifier 实现或其运行结果。先逐题列出所问事实与条件，再通读同 corpus 的其他文档，检查是否存在独立可支持同一结论的等价证据；等价证据全部列入 gold。无答案题明确记录最接近政策仍缺少的数值、日期、交易状态或业务条件。明确的政策拒绝、能力边界或“政策未录入”的直接描述，能够回答对应问题，不能统一归为无答案；反过来，用户陈述和泛化的联系商家建议不能补出未知事实。
+
+新问句没有与旧两集完全重复，加入条件组合、强前提、历史活动时间、数值边界及能力与实际事实的区分。数据仍出自共享工作区，政策规模有限且主题重叠，**只称 fixed-not-blind，不称独立意图分布或统计泛化证明**。在固定配置后首次使用；如果根据本集结果继续修改策略，该结果就属于开发反馈，需要再次准备未用于调试的数据。数据冻结和 schema 检查不等于模型验收通过。
 
 ## 业务固定验证对话
 

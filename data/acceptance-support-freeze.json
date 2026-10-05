@@ -1,0 +1,65 @@
+{
+  "version": 1,
+  "frozenAt": "2026-10-05T13:03:25.447Z",
+  "decision": "Keep threshold 0.71; add fact-support-v1 after development passes without tuning. No new validation results viewed.",
+  "development": {
+    "runId": "b378d67d-d8fe-4834-975b-7670281406f5",
+    "reportSha256": "19ceaa9fe85e19d6d51a9d660d203e37cf9807cc1fecbbebb25e15070b8c796e"
+  },
+  "acceptance": {
+    "mode": "support",
+    "threshold": 0.71,
+    "version": "score-support-v1",
+    "model": "qwen3-rerank",
+    "serialization": "json-title-tags-body-v1",
+    "support": {
+      "provider": "deepseek",
+      "model": "deepseek-flash",
+      "api": "openai-completions",
+      "endpoint": "https://api.deepseek.com",
+      "timeoutMs": 60000,
+      "temperature": 0,
+      "maxTokens": 2048,
+      "maxRetries": 0,
+      "promptVersion": "fact-support-v1",
+      "promptHash": "3d254e0bca8e14fae05804a0f027c653f5f099e1b91e5fb519088b5aaa04f15a",
+      "serialization": "json-query-id-title-tags-body-v1",
+      "serializationHash": "1d16c5e3ef4647c120fe6ddce72417c9ec618ee41dc77faa447ec214e5749c4a",
+      "pricing": {
+        "currency": "USD",
+        "estimated": true,
+        "source": "Pi model catalog",
+        "rates": {
+          "input": 0.3,
+          "output": 1.2,
+          "cacheRead": 0.006,
+          "cacheWrite": 0
+        }
+      }
+    },
+    "corpusHashes": {
+      "online": "84294287d3ca7585379fa9965fa0a9d8c7f4886011c22119372d36dd32298a5e",
+      "reference": "4e35976e88104de37f38502a336b0186136826ba3444fcf13ac2346bed2190d5"
+    }
+  },
+  "datasetHash": "b664ac540289fdef2513ea721cc7e1e6ad940e8fb1383dde3d33f886d5ff24c3",
+  "files": {
+    "configs/experiments/support-validation.json": "868615a796e8b4fc1434ca14af2e2039b89010c698d125256f733e68a655900a",
+    "src/evidence-support.ts": "8ce66786fad7a2f12c982dd32b2f8ec29e95e5c5a46cb02df9a820da14d6bfba",
+    "src/evidence-acceptance.ts": "5b4f792cb156bd897b1e6eca586b7cc180988f6574a026567549f53bd40199c2",
+    "scripts/retrieval-v2.ts": "5adfb6607017f6775a2fee21c6bff47a24f7e3f3a20ec9fb9ccc1f4dd900e22f",
+    "scripts/acceptance-report.ts": "d896cf0217976edb9ea36bc28b2b3ca7867176c6a2fed763c564bf175740fce4",
+    "data/acceptance-support-validation.json": "c02b791c56865b582db6d62f124876fa6be0e3df063314388e2c40eaff18d031",
+    "data/acceptance-support-validation-source.json": "bbc9035fff6e578c6c56e4e49e7ad88f002b5e2cc5730426e62f4708a7420892"
+  },
+  "targets": {
+    "noAnswerFalseAccepts": 0,
+    "noAnswerPlanned": 18,
+    "acceptedRecallAt5Min": 0.8,
+    "answerableFalseRejectRateMax": 0.1,
+    "scopeViolations": 0,
+    "scopeAbstentionFailures": 0,
+    "incomplete": 0
+  },
+  "disclosure": "Shared workspace fixed validation, not blind or statistically representative. Old exposed validation is regression only."
+}

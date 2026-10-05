@@ -12,6 +12,7 @@ type CalibrationInput = { runId: string; status: string; snapshot: { dataset: V2
 
 // Replay a measured ranking. The production acceptance function never receives labels.
 export function scoreAcceptance(report: CalibrationInput, config: EvidenceAcceptanceConfig) {
+  if (config.mode === "support") throw new Error("事实支持策略必须评分实际判别结果；不能从 raw 分数重放冒充判别。");
   validateV2Dataset(report.snapshot.dataset);
   const groups = report.snapshot.dataset.corpora.map(corpus => {
     let answerable = 0, rawHits = 0, acceptedRecallSum = 0, falseRejects = 0;

@@ -127,16 +127,16 @@ function applyPreset(id) {
   expState.formError = "";
 }
 
-// v2 组合校验：score 仅 M4/M5/M6 且阈值必须显式填写；非法组合只提示禁提交，不偷偷改模式或丢字段。
+// v2 组合校验：score/support 仅 M4/M5/M6 且阈值必须显式填写；非法组合只提示禁提交，不偷偷改模式或丢字段。
 function expComboError(config) {
   if (config.kind !== "retrieval" || config.version !== 2) return "";
   for (const variant of config.variants) {
     if (!variant.dataset) return `方案 ${variant.id} 请选择数据集。`;
     const acceptance = variant.acceptance;
-    if (!acceptance || (acceptance.mode !== "off" && acceptance.mode !== "score")) return `方案 ${variant.id} 的接收策略无效。`;
-    if (acceptance.mode === "score") {
+    if (!acceptance || (acceptance.mode !== "off" && acceptance.mode !== "score" && acceptance.mode !== "support")) return `方案 ${variant.id} 的接收策略无效。`;
+    if (acceptance.mode !== "off") {
       if (!variant.modes.length || variant.modes.some(mode => !["M4", "M5", "M6"].includes(mode)))
-        return `方案 ${variant.id}：分数接收仅支持 M4/M5/M6，请调整模式或改用关闭策略。`;
+        return `方案 ${variant.id}：score/support 接收仅支持 M4/M5/M6，请调整模式或改用关闭策略。`;
       if (typeof acceptance.threshold !== "number" || !Number.isFinite(acceptance.threshold) || acceptance.threshold < 0 || acceptance.threshold > 1)
         return `方案 ${variant.id}：请显式填写 0–1 的接收阈值。`;
     }
@@ -336,25 +336,27 @@ function expV2Fields(variant) {
   const thresholdInput = node("input", { type: "number", min: "0", max: "1", step: "0.01", placeholder: "0–1 显式填写",
     "data-field": "acceptance-threshold", "data-variant": variant.id });
   if (typeof acceptance.threshold === "number") thresholdInput.value = String(acceptance.threshold);
-  thresholdInput.disabled = acceptance.mode !== "score";
+  thresholdInput.disabled = acceptance.mode !== "score" && acceptance.mode !== "support";
   modeSelect.addEventListener("change", () => {
-    if (modeSelect.value === "score") {
-      const value = Number(thresholdInput.value);
-      // off 配置不得携带阈值；切到 score 时只采纳用户已输入的合法值，不偷偷补默认。
-      variant.acceptance = thresholdInput.value !== "" && Number.isFinite(value) && value >= 0 && value <= 1 ? { mode: "score", threshold: value } : { mode: "score" };
-      thresholdInput.disabled = false;
-    } else {
+    if (modeSelect.value === "off") {
       variant.acceptance = { mode: "off" };
       thresholdInput.disabled = true;
+    } else {
+      const value = Number(thresholdInput.value);
+      // off 配置不得携带阈值；切到 score/support 时只采纳用户已输入的合法值，不偷偷补默认。
+      variant.acceptance = thresholdInput.value !== "" && Number.isFinite(value) && value >= 0 && value <= 1
+        ? { mode: modeSelect.value, threshold: value }
+        : { mode: modeSelect.value };
+      thresholdInput.disabled = false;
     }
     renderExpDiff();
     renderExpActions();
   });
   thresholdInput.addEventListener("change", () => {
     const value = Number(thresholdInput.value);
-    if (variant.acceptance?.mode === "score" && thresholdInput.value !== "" && Number.isFinite(value) && value >= 0 && value <= 1)
+    if (variant.acceptance && variant.acceptance.mode !== "off" && thresholdInput.value !== "" && Number.isFinite(value) && value >= 0 && value <= 1)
       variant.acceptance.threshold = value;
-    else if (variant.acceptance?.mode === "score") delete variant.acceptance.threshold;
+    else if (variant.acceptance && variant.acceptance.mode !== "off") delete variant.acceptance.threshold;
     renderExpDiff();
     renderExpActions();
   });
@@ -442,7 +444,8 @@ function expDiffChildren(draft) {
   if (draft.kind === "retrieval" && draft.version === 2) {
     const datasetLabel = value => expState.catalog?.datasets?.find(item => item.value === value)?.label || value || "缺省";
     if (a.dataset !== b.dataset) diffs.push(["数据集", `${datasetLabel(a.dataset)} → ${datasetLabel(b.dataset)}`]);
-    const accLabel = variant => variant.acceptance?.mode === "score" ? `score ${expFmt(variant.acceptance.threshold)}` : variant.acceptance?.mode || "缺省";
+    const accLabel = variant => variant.acceptance?.mode === "score" || variant.acceptance?.mode === "support"
+      ? `${variant.acceptance.mode} ${expFmt(variant.acceptance.threshold)}` : variant.acceptance?.mode || "缺省";
     if (JSON.stringify(a.acceptance ?? null) !== JSON.stringify(b.acceptance ?? null)) diffs.push(["接收", `${accLabel(a)} → ${accLabel(b)}`]);
   }
   for (const key of [...new Set([...Object.keys(a.parameters || {}), ...Object.keys(b.parameters || {})])]) {
@@ -507,7 +510,9 @@ function expJobsPanel() {
 const expConfigSummary = config => !config ? "配置未采集。"
   : `${expKindNames[config.kind] || config.kind}${config.version === 2 ? " v2" : ""} · 重复 ${config.repeat} 次 · ${(config.variants || []).map(variant => {
     if (config.kind === "support") return `${variant.id} ${variant.architecture}`;
-    const acceptance = config.version === 2 ? ` · ${variant.acceptance?.mode === "score" ? `score ${variant.acceptance.threshold}` : "off"}` : "";
+    const acceptance = config.version === 2
+      ? ` · ${variant.acceptance?.mode === "score" || variant.acceptance?.mode === "support" ? `${variant.acceptance.mode} ${variant.acceptance.threshold}` : "off"}`
+      : "";
     return `${variant.id} ${variant.modes.join("+")}${acceptance}`;
   }).join(" 对比 ")}`;
 
@@ -575,7 +580,9 @@ function expRetrievalSummary(summary, variant) {
   const datasetLabel = variant?.dataset ? expState.catalog?.datasets?.find(item => item.value === variant.dataset)?.label || variant.dataset : null;
   const strategy = acceptanceMode === "score"
     ? `证据接收：${datasetLabel ? `${datasetLabel} · ` : ""}score 实验阈值 ${variant.acceptance.threshold}；是否达标见指标`
-    : acceptanceMode === "off" ? `证据接收：${datasetLabel ? `${datasetLabel} · ` : ""}off 诊断基线（范围内原始 Top5）` : null;
+    : acceptanceMode === "support"
+      ? `证据接收：${datasetLabel ? `${datasetLabel} · ` : ""}support（分数 + 事实支持判别）实验阈值 ${variant.acceptance.threshold}；是否达标见指标；判别另行调用模型增加请求`
+      : acceptanceMode === "off" ? `证据接收：${datasetLabel ? `${datasetLabel} · ` : ""}off 诊断基线（范围内原始 Top5）` : null;
   const diag = group => {
     const parts = [["noAnswerNonempty", "非空召回"], ["scopeViolations", "越界"], ["boundaryFailures", "边界失败"]]
       .filter(([key]) => group[key] !== null && group[key] !== undefined)
@@ -649,11 +656,12 @@ function expAcceptanceSection(groups) {
 }
 
 // 用量按 operation 分列：请求/缓存命中/已知 Tokens 与完整量；USD 与 CNY 各自分行，不合并。
+const expUsageOps = { embedding: "向量 embedding", rerank: "重排 rerank", support: "事实支持判别 support" };
 function expUsageLines(usage) {
   if (!Array.isArray(usage) || !usage.length) return [text("span", "用量未采集。")];
   const lines = [];
   for (const item of usage) {
-    lines.push(text("span", `${item.operation} · 请求 ${number(item.requests)} · 缓存命中 ${number(item.cacheHits)} · 已报用量 ${number(item.reportedRequests)} · 已知 Tokens ${number(item.knownTokens)} · 完整 ${item.completeTokens === null || item.completeTokens === undefined ? "未知" : number(item.completeTokens)}`));
+    lines.push(text("span", `${expUsageOps[item.operation] || item.operation} · 请求 ${number(item.requests)} · 缓存命中 ${number(item.cacheHits)} · 已报用量 ${number(item.reportedRequests)} · 已知 Tokens ${number(item.knownTokens)} · 完整 ${item.completeTokens === null || item.completeTokens === undefined ? "未知" : number(item.completeTokens)}`));
     const cost = (known, complete, symbol, code) => known === undefined && complete === undefined ? null
       : `${code}：已知 ${known === null || known === undefined ? "未知" : `${symbol}${known.toFixed(6)}`} · 完整 ${complete === null || complete === undefined ? "未知" : `${symbol}${complete.toFixed(6)}`}`;
     const cny = cost(item.knownEstimatedCostCny, item.completeEstimatedCostCny, "¥", "CNY");

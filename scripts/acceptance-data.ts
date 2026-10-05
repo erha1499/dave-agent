@@ -4,7 +4,7 @@ import { scopeDocuments, type RetrievalDocument } from "../src/retrieval-ranking
 import { loadRetrievalData } from "./retrieval-data.ts";
 import type { V2Dataset, V2Question } from "./retrieval-v2.ts";
 
-export type AcceptanceSplit = "development" | "validation";
+export type AcceptanceSplit = "development" | "validation" | "support-validation";
 export type AcceptanceQuestion = V2Question & {
   corpus: "online" | "reference";
   expectedBehavior: "answer" | "abstain" | "clarify";
@@ -18,6 +18,7 @@ const root = new URL("../", import.meta.url);
 const expectedCounts = {
   development: { total: 48, standard: 24, no_answer: 12, scope: 12, context: 0 },
   validation: { total: 60, standard: 30, no_answer: 12, scope: 12, context: 6 },
+  "support-validation": { total: 60, standard: 30, no_answer: 18, scope: 12, context: 0 },
 } as const;
 const files = ["data/acceptance-online.json", "data/acceptance-development.json", "data/acceptance-validation.json"] as const;
 const hash = (value: string | Buffer) => createHash("sha256").update(value).digest("hex");
@@ -35,7 +36,7 @@ export function validateAcceptanceQuestions(value: unknown, split: AcceptanceSpl
   const seen = new Set<string>();
   const queries = new Set<string>();
   const questions = rows.map((raw): AcceptanceQuestion => {
-    if (!object(raw) || Object.keys(raw).some(key => !keys.includes(key)) || !text(raw.id) || !/^a1-(dev|val)-\d{3}$/.test(raw.id)
+    if (!object(raw) || Object.keys(raw).some(key => !keys.includes(key)) || !text(raw.id) || !/^a1-(dev|val|sup)-\d{3}$/.test(raw.id)
       || !raw.id.startsWith(`a1-${split.slice(0, 3)}-`) || seen.has(raw.id) || !text(raw.query) || raw.query.length > 500
       || (raw.corpus !== "online" && raw.corpus !== "reference") || !text(raw.suite)
       || !["standard", "no_answer", "scope", "context"].includes(raw.suite) || !text(raw.goldRationale)
@@ -86,11 +87,11 @@ export function validateAcceptanceQuestions(value: unknown, split: AcceptanceSpl
 }
 
 export async function loadAcceptanceDataset(split: AcceptanceSplit): Promise<V2Dataset> {
-  if (split !== "development" && split !== "validation") fail("不支持的 split");
+  if (split !== "development" && split !== "validation" && split !== "support-validation") fail("不支持的 split");
   const sourceText = await readFile(new URL("data/acceptance-source.json", root), "utf8");
   const source = JSON.parse(sourceText);
   if (source.version !== 1 || source.validationPolicy !== "fixed-validation-not-blind"
-    || JSON.stringify(source.counts) !== JSON.stringify(expectedCounts) || !object(source.files)
+    || JSON.stringify(source.counts) !== JSON.stringify({ development: expectedCounts.development, validation: expectedCounts.validation }) || !object(source.files)
     || Object.keys(source.files).length !== files.length) fail("来源、冻结声明或数量无效");
   const buffers = await Promise.all(files.map(async path => {
     const buffer = await readFile(new URL(path, root)), meta = source.files[path];
@@ -127,7 +128,36 @@ export async function loadAcceptanceDataset(split: AcceptanceSplit): Promise<V2D
   const validation = validateAcceptanceQuestions(JSON.parse(buffers[2]!.toString()), "validation", documents);
   const developmentQueries = new Set(development.map(q => JSON.stringify([q.corpus, q.query.trim()])));
   if (validation.some(q => developmentQueries.has(JSON.stringify([q.corpus, q.query.trim()])))) fail("开发和固定验证出现完全重复问题");
-  const selected = split === "development" ? development : validation;
-  return { source: { ...source, split, sourceManifestSha256: hash(sourceText), referenceArchive: archive.source },
+  let selected = split === "development" ? development : validation;
+  let selectedSource: unknown = { ...source, split, sourceManifestSha256: hash(sourceText), referenceArchive: archive.source };
+  if (split === "support-validation") {
+    const manifestText = await readFile(new URL("data/acceptance-support-validation-source.json", root), "utf8");
+    const manifest = JSON.parse(manifestText);
+    const path = "data/acceptance-support-validation.json";
+    const bytes = await readFile(new URL(path, root));
+    const sourceKeys = ["version", "createdDate", "split", "name", "validationPolicy", "dataset", "counts", "corpora", "baseFiles", "review"];
+    if (!object(manifest) || Object.keys(manifest).some(key => !sourceKeys.includes(key)) || manifest.version !== 1
+      || manifest.split !== split || manifest.validationPolicy !== "fixed-validation-not-blind" || !object(manifest.dataset)
+      || Object.keys(manifest.dataset).some(key => !["path", "sha256", "bytes"].includes(key))
+      || manifest.dataset.path !== path || manifest.dataset.sha256 !== hash(bytes) || manifest.dataset.bytes !== bytes.length
+      || JSON.stringify(manifest.counts) !== JSON.stringify(expectedCounts[split])) fail("事实支持验证的来源、冻结哈希或数量无效");
+    const baseFiles = Object.fromEntries(files.map((file, index) => [file, hash(buffers[index]!)]));
+    baseFiles["data/acceptance-source.json"] = hash(sourceText);
+    if (!object(manifest.baseFiles) || Object.keys(manifest.baseFiles).length !== Object.keys(baseFiles).length
+      || Object.entries(baseFiles).some(([file, sha]) => (manifest.baseFiles as Record<string, unknown>)[file] !== sha)) fail("事实支持验证绑定的原政策/题集来源已变化");
+    if (!object(manifest.review) || manifest.review.stage !== "frozen-before-new-verifier-evaluation"
+      || manifest.review.isBlind !== false || manifest.review.newVerifierInspected !== false) fail("事实支持验证必须保留非盲测与冻结时点声明");
+    selected = validateAcceptanceQuestions(JSON.parse(bytes.toString()), split, documents);
+    const previous = new Set([...development, ...validation].map(q => JSON.stringify([q.corpus, q.query.trim()])));
+    if (selected.some(q => previous.has(JSON.stringify([q.corpus, q.query.trim()])))) fail("事实支持验证与已有题集完全重复");
+    const corpusCounts = Object.fromEntries((["online", "reference"] as const).map(corpus => {
+      const rows = selected.filter(q => q.corpus === corpus);
+      return [corpus, { standard: rows.filter(q => q.suite === "standard").length, no_answer: rows.filter(q => q.suite === "no_answer").length,
+        scope: rows.filter(q => q.suite === "scope").length, total: rows.length }];
+    }));
+    if (JSON.stringify(manifest.corpora) !== JSON.stringify(corpusCounts)) fail("事实支持验证 corpus 分层数量不符");
+    selectedSource = { ...manifest, sourceManifestSha256: hash(manifestText), baseSource: source, referenceArchive: archive.source };
+  }
+  return { source: selectedSource,
     corpora: (["online", "reference"] as const).map(id => ({ id, documents: documents[id], questions: selected.filter(q => q.corpus === id) })) };
 }

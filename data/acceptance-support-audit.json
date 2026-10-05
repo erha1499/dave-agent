@@ -1,0 +1,50 @@
+{
+  "version": 1,
+  "checkedAt": "2026-10-05T14:31:28.220Z",
+  "freezeSha256": "ef1a13f7f82251650ad47d84a6533eccd4f3c678fb5d90d7b113faf42ee637d3",
+  "resultsSha256": "32588b7a18942c66a1ca3f5dde6816e776e3e8cbaff1d2f0b003e34c6cec8fa4",
+  "checker": {
+    "path": "scripts/acceptance-report.ts",
+    "frozenSha256": "d896cf0217976edb9ea36bc28b2b3ca7867176c6a2fed763c564bf175740fce4",
+    "finalSha256": "f33e7ac48bafbf2d5cba2d66834b41b9f20e952bb546b25d06ad9e4ac598abef",
+    "changes": "Integrity guards only: enforce frozen model/instruction/serialization/corpus/version bindings and actual deferred rows. Missing/deferred forgeries cannot pass. No changes to metrics, targets, model prompt, threshold, labels or decisions."
+  },
+  "allOtherFrozenFilesUnchanged": true,
+  "recomputed": [
+    {
+      "name": "developmentScore",
+      "runId": "b9b9a83e-573b-42f9-8f8b-ca9f4570145f",
+      "totalsHash": "c55a4b6ff81d5f452d4902b38c584a12cdc397ea20c045639d579a1a2019a137",
+      "unchanged": true,
+      "meetsApplicableTargets": true
+    },
+    {
+      "name": "developmentSupport",
+      "runId": "b378d67d-d8fe-4834-975b-7670281406f5",
+      "totalsHash": "c55a4b6ff81d5f452d4902b38c584a12cdc397ea20c045639d579a1a2019a137",
+      "unchanged": true,
+      "meetsApplicableTargets": true
+    },
+    {
+      "name": "validationScore",
+      "runId": "67222a3f-780a-4f78-83e0-1ffc2c36a2aa",
+      "totalsHash": "fe8d3692b0135440ff7337ccacaf8a6d92efcf86eca64ac4c12a741a60a6a9a8",
+      "unchanged": true,
+      "meetsApplicableTargets": false
+    },
+    {
+      "name": "validationSupport",
+      "runId": "7c0b436e-6ff9-4830-9091-e98bfa3b1f28",
+      "totalsHash": "8b538860b91eaf77c8ebed33beb756a3e851a95845f887b3935203b0c09b6b34",
+      "unchanged": true,
+      "meetsApplicableTargets": true
+    },
+    {
+      "name": "exposedRegression",
+      "runId": "0807e90f-4d8a-4052-a9cd-98b2a90f581e",
+      "totalsHash": "7750563c666df511524b002e76d876f666389a93a629d80427058df7677195ef",
+      "unchanged": true,
+      "meetsApplicableTargets": true
+    }
+  ]
+}

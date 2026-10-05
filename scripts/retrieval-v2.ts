@@ -6,6 +6,8 @@ import { BailianBudgetStop, BailianError, contentHash, createBailianClient, vali
 import { scopeDocuments, rankLexical, rankBm25, rankDense, reciprocalRankFusion, serializeRetrievalDocument, resolveRetrievalParameters,
   type RetrievalExperimentParameters, type RetrievalDocument, type RetrievalScope, type RankedDocument } from "../src/retrieval-ranking.ts";
 import { acceptEvidence, evidenceAcceptanceBinding, evidenceAcceptanceVersion, resolveEvidenceAcceptance, type EvidenceAcceptanceConfig, type EvidenceAcceptanceResult } from "../src/evidence-acceptance.ts";
+import { createEvidenceSupportClient, verifyEvidenceSupport, validateEvidenceSupportVerification, evidenceSupportInputHash, applyEvidenceSupport, EvidenceSupportError,
+  type EvidenceSupportClient, type EvidenceSupportAttempt, type EvidenceSupportCandidate, type EvidenceSupportVerification } from "../src/evidence-support.ts";
 import { loadRetrievalData } from "./retrieval-data.ts";
 
 export const retrievalModes = ["M0", "M1", "M2", "M3", "M4", "M5", "M6"] as const;
@@ -16,10 +18,12 @@ export type V2Corpus = { id: string; documents: RetrievalDocument[]; questions: 
 export type V2Dataset = { source: unknown; corpora: V2Corpus[] };
 type Call = { id: string; operation: "embedding" | "rerank"; purpose: "document" | "query" | "ranking"; cache: "hit" | "miss";
   inputHash: string; requestHash: string | null; attempts: BailianAttempt[]; status: "ok" | "failed" };
+export type SupportCall = { id: string; operation: "support"; cache: "hit" | "miss"; inputHash: string;
+  requestHash: string | null; attempts: EvidenceSupportAttempt[]; status: "ok" | "failed" };
 type Metrics = { recallAt1: number; recallAt5: number; mrrAt5: number; mrrRecordedRanking: number; candidateRecall: number };
 export type V2Result = { corpus: string; id: string; suite: V2Question["suite"]; mode: RetrievalMode; query: string; scope: RetrievalScope;
   status: "ok" | "provider_error" | "not_applicable"; candidateIds: string[]; candidateHash: string; ranking: Array<{ id: string; score: number | null }>;
-  relevant: string[]; metrics: Metrics | null; acceptance: EvidenceAcceptanceResult; acceptedMetrics: Metrics | null;
+  supportVerification?: EvidenceSupportVerification; relevant: string[]; metrics: Metrics | null; acceptance: EvidenceAcceptanceResult; acceptedMetrics: Metrics | null;
   acceptedScopePassed: boolean; acceptedBoundaryPassed: boolean; expectedAbstention: boolean; falseRejectEligible: boolean | null; falseRejected: boolean | null; deferredReason: string | null; scopePassed: boolean; boundaryPassed: boolean; forbiddenMatches: string[]; requiredPassed: boolean; empty: boolean | null; durationMs: number; callIds: string[];
   fallback: { mode: "M0"; ranking: string[]; metrics: Metrics | null } | null; error: string | null };
 const root = fileURLToPath(new URL("../", import.meta.url));
@@ -92,7 +96,7 @@ function validRanks(value: unknown, length: number): value is Array<{ index: num
 }
 
 type PlannedCase = Pick<V2Result, "corpus" | "id" | "suite" | "mode"> & { answerable?: boolean; expectedAbstention?: boolean; relevant?: string[]; deferredReason?: string | null };
-export function summarizeV2(results: V2Result[], calls: Call[], plan: PlannedCase[] = results, pricePerMillionCny: number | null = null) {
+export function summarizeV2(results: V2Result[], calls: Call[], plan: PlannedCase[] = results, pricePerMillionCny: number | null = null, supportCalls: SupportCall[] = []) {
   const groups = [...new Set(plan.map(row => JSON.stringify([row.mode, row.corpus, row.suite])))].map(key => {
     const [mode, corpus, suite] = JSON.parse(key) as string[], rows = results.filter(row => row.mode === mode && row.corpus === corpus && row.suite === suite);
     const planned = plan.filter(row => row.mode === mode && row.corpus === corpus && row.suite === suite).length;
@@ -102,7 +106,7 @@ export function summarizeV2(results: V2Result[], calls: Call[], plan: PlannedCas
     const plannedRows = plan.filter(row => row.mode === mode && row.corpus === corpus && row.suite === suite);
     const applicablePlan = plannedRows.filter(row => !row.deferredReason);
     const plannedAnswerable = applicablePlan.filter(row => row.answerable ?? (row.relevant ? row.relevant.length > 0 : ["standard", "hard"].includes(row.suite))).length;
-    const acceptedScored = successful.filter(row => row.acceptedMetrics), acceptedMeasured = successful.filter(row => row.acceptance);
+    const acceptedScored = successful.filter(row => row.acceptedMetrics), acceptedMeasured = successful.filter(row => row.acceptance && row.acceptance.status !== "unavailable");
     const coveredCases = acceptedMeasured.filter(row => row.acceptance.accepted.length > 0).length;
     const falseRejectDenominator = acceptedMeasured.filter(row => row.falseRejectEligible === true).length;
     const falseRejectCases = acceptedMeasured.filter(row => row.falseRejected === true).length;
@@ -121,7 +125,7 @@ export function summarizeV2(results: V2Result[], calls: Call[], plan: PlannedCas
       requiredEvidenceMisses: successful.filter(row => !row.requiredPassed).length,
       noAnswerNonempty: suite === "no_answer" ? successful.filter(row => !row.empty).length : null,
       acceptance: { planned: plannedRows.length, applicablePlanned: applicablePlan.length, measured: acceptedMeasured.length,
-        missing: planned - rows.length, failed: rows.filter(row => row.status === "provider_error").length,
+        missing: planned - rows.length, failed: rows.filter(row => row.status === "provider_error" || (row.status === "ok" && row.acceptance?.status === "unavailable")).length,
         notApplicable: rows.filter(row => row.status === "not_applicable").length, deferred: rows.filter(row => row.deferredReason).length,
         plannedAnswerable, answerableMeasured: acceptedScored.length,
         recallAt5: acceptedScored.length ? acceptedScored.reduce((sum, row) => sum + row.acceptedMetrics!.recallAt5, 0) / acceptedScored.length : null,
@@ -150,12 +154,23 @@ export function summarizeV2(results: V2Result[], calls: Call[], plan: PlannedCas
       knownEstimatedCostCny: knownTokens !== null && pricePerMillionCny !== null ? knownTokens * pricePerMillionCny / 1_000_000 : null,
       completeEstimatedCostCny: attempts.length && attempts.length === known.length && pricePerMillionCny !== null ? knownTokens! * pricePerMillionCny / 1_000_000 : null };
   });
-  return { plannedRows: plan.length, completedRows: results.length, missingRows: plan.length - results.length, groups, usage };
+  const attempts = supportCalls.flatMap(call => call.attempts), known = attempts.filter(attempt => attempt.totalTokens !== null);
+  const costs = attempts.filter(attempt => attempt.costUsd !== null);
+  const knownTokens = known.length ? known.reduce((sum, attempt) => sum + attempt.totalTokens!, 0) : null;
+  const knownCost = costs.length ? costs.reduce((sum, attempt) => sum + attempt.costUsd!, 0) : null;
+  const supportUsage = { operation: "support", requests: attempts.length, successfulRequests: attempts.filter(attempt => attempt.outcome === "ok").length,
+    cacheHits: supportCalls.filter(call => call.cache === "hit").length, reportedRequests: known.length, usageCoverage: attempts.length ? known.length / attempts.length : null,
+    knownTokens, completeTokens: attempts.length && known.length === attempts.length ? knownTokens : null,
+    knownEstimatedCostCny: null, completeEstimatedCostCny: null, knownEstimatedCostUsd: knownCost,
+    completeEstimatedCostUsd: attempts.length && costs.length === attempts.length ? knownCost : null,
+    costCoverage: attempts.length ? costs.length / attempts.length : null };
+  return { plannedRows: plan.length, completedRows: results.length, missingRows: plan.length - results.length, groups,
+    usage: [...usage, ...(supportCalls.length ? [supportUsage] : [])] };
 }
 
 export async function runRetrievalV2(options: { label: string; modes?: RetrievalMode[]; dataset?: V2Dataset; client?: BailianClient;
   allowRemote?: boolean; cacheDir?: string; outputDir?: string; maxRequests?: number; consecutiveFailureLimit?: number;
-  parameters?: Partial<RetrievalExperimentParameters>; acceptance?: EvidenceAcceptanceConfig }) {
+  parameters?: Partial<RetrievalExperimentParameters>; acceptance?: EvidenceAcceptanceConfig; supportClient?: EvidenceSupportClient }) {
   const modes = options.modes ?? ["M0", "M1"];
   if (!modes.length || new Set(modes).size !== modes.length || modes.some(mode => !retrievalModes.includes(mode))
     || !options.label.trim() || options.label.length > 120) throw new Error("检索实验模式或 label 无效。");
@@ -183,12 +198,15 @@ export async function runRetrievalV2(options: { label: string; modes?: Retrieval
   const dataset = validateV2Dataset(options.dataset ?? await loadV2Dataset());
   const needsRemote = modes.some(remoteMode) && dataset.corpora.some(corpus => corpus.questions.some(question => !question.deferredReason));
   const client = needsRemote ? injectedClient ?? createBailianClient({ timeoutMs: parameters.timeoutMs, retries: parameters.retries }) : undefined;
+  const supportClient = needsRemote && acceptanceConfig.mode === "support"
+    ? options.supportClient ?? await createEvidenceSupportClient({ timeoutMs: parameters.timeoutMs }) : undefined;
+  if (supportClient && supportClient.settings.timeoutMs !== parameters.timeoutMs) throw new Error("支持性判别 timeoutMs 与实际 client 不符。");
   const { maxRequests, consecutiveFailureLimit } = parameters;
-  let networkRequests = 0, consecutiveFailures = 0, fatalProviderStatus: number | null = null, stopReason: string | null = null;
+  let networkRequests = 0, consecutiveFailures = 0, supportConsecutiveFailures = 0, fatalProviderStatus: number | null = null, stopReason: string | null = null;
   const controls = {
     beforeAttempt: () => {
-      if (fatalProviderStatus !== null || networkRequests >= maxRequests || consecutiveFailures >= consecutiveFailureLimit) {
-        stopReason = fatalProviderStatus !== null ? "provider_configuration" : networkRequests >= maxRequests ? "max_requests" : "consecutive_provider_failures"; return false;
+      if (fatalProviderStatus !== null || networkRequests >= maxRequests || consecutiveFailures >= consecutiveFailureLimit || supportConsecutiveFailures >= consecutiveFailureLimit) {
+        stopReason = fatalProviderStatus !== null ? "provider_configuration" : networkRequests >= maxRequests ? "max_requests" : supportConsecutiveFailures >= consecutiveFailureLimit ? "consecutive_support_failures" : "consecutive_provider_failures"; return false;
       }
       networkRequests++; return true;
     },
@@ -200,7 +218,7 @@ export async function runRetrievalV2(options: { label: string; modes?: Retrieval
   const origin = client?.settings.endpoints.origin ?? "";
   const pricePerMillionCny = origin === "https://dashscope.aliyuncs.com" || origin.endsWith(".cn-beijing.maas.aliyuncs.com") ? .5 : null;
   const cacheDir = options.cacheDir ?? join(root, ".runtime/retrieval-v2-cache"), outputDir = options.outputDir ?? join(root, ".runtime/retrieval-v2");
-  const runId = randomUUID(), calls: Call[] = [], results: V2Result[] = [];
+  const runId = randomUUID(), calls: Call[] = [], supportCalls: SupportCall[] = [], results: V2Result[] = [];
   const plan = dataset.corpora.flatMap(corpus => corpus.questions.flatMap(question => modes.map(mode => ({ corpus: corpus.id, id: question.id, suite: question.suite, mode, answerable: question.relevant.length > 0, expectedAbstention: question.expectedBehavior === "abstain" || question.suite === "no_answer", deferredReason: question.deferredReason ?? null }))));
   // Deferred questions are materialized before any provider work, even when the request budget stops early.
   for (const corpus of dataset.corpora) for (const question of corpus.questions.filter(question => question.deferredReason)) {
@@ -216,9 +234,10 @@ export async function runRetrievalV2(options: { label: string; modes?: Retrieval
     rrf: { k: parameters.rrfK, window: parameters.rrfWindow }, topN: 5,
     budget: { maxRequests, consecutiveFailureLimit }, pricing: { currency: "CNY", asOf: "2026-10-05", region: "China Beijing", estimated: true,
       perMillionInputTokens: pricePerMillionCny, source: "https://help.aliyun.com/zh/model-studio/model-pricing", note: "Only configured Beijing endpoint; reported total_tokens, not an invoice; other region prices unknown." },
-    context: "query-only", acceptance: { ...acceptanceConfig, version: evidenceAcceptanceVersion, ...evidenceAcceptanceBinding,
+    context: "query-only", acceptance: { ...acceptanceConfig, version: acceptanceConfig.mode === "support" ? "score-support-v1" : evidenceAcceptanceVersion, ...evidenceAcceptanceBinding,
+      support: supportClient?.settings ?? null,
       corpusHashes: Object.fromEntries(dataset.corpora.map(corpus => [corpus.id, contentHash(corpus.documents)])) }, fallback: "diagnostic lexical; excluded from rerank score" };
-  const files = ["src/bailian.ts", "src/evidence-acceptance.ts", "src/retrieval-ranking.ts", "src/knowledge-retrieval.ts", "scripts/retrieval-v2.ts", "scripts/retrieval-data.ts", "package-lock.json"];
+  const files = ["src/bailian.ts", "src/evidence-acceptance.ts", "src/evidence-support.ts", "src/retrieval-ranking.ts", "src/knowledge-retrieval.ts", "scripts/retrieval-v2.ts", "scripts/retrieval-data.ts", "package-lock.json"];
   const snapshot = { datasetHash: contentHash(dataset), dataset, settings,
     checker: { version: 2, scopePassed: "Every ranked document is active and visible to the question scope.",
       boundaryPassed: "No forbidden document in Top5 and every required document in Top5; independent of scopePassed.",
@@ -228,8 +247,8 @@ export async function runRetrievalV2(options: { label: string; modes?: Retrieval
     runtime: { node: process.version, icu: process.versions.icu },
     implementation: Object.fromEntries(await Promise.all(files.map(async file => [file, contentHash(await readFile(join(root, file), "utf8"))]))) };
   const report = { version: 2, runId, label: options.label.trim(), startedAt: new Date().toISOString(), finishedAt: null as string | null,
-    status: "running", stopReason: null as string | null, answerQuality: "not_evaluated", snapshot, plan, calls, results, summary: summarizeV2(results, calls, plan, pricePerMillionCny),
-    measurement: "Offline retrieval development experiment. MRR@5 is comparable; full MRR is only within recorded ranking depth. Candidate recall uses configured candidateTopK except M4's complete scoped input. Timings reuse measured shared query stages and exclude document indexing; cache hits are identified in call ledger. Ledger usage is the actual experiment cost, not independent per-mode production cost. Cache replay is not an independent model repetition. Version 1 scopeViolations mixed authorization scope with forbidden Top5 hits; version 2 separates scopeViolations from boundaryFailures/forbiddenHitCases without removing forbidden or required checks. No answer nonempty is diagnostic. API failures stay in planned denominator. Acceptance off is the scoped raw Top5 diagnostic baseline; score uses the frozen model and serialization binding plus per-corpus hashes. Acceptance never reads labels. Context cases with deferredReason remain planned and not_applicable without provider calls. No live business or QQ changes." };
+    status: "running", stopReason: null as string | null, answerQuality: "not_evaluated", snapshot, plan, calls, supportCalls, results, summary: summarizeV2(results, calls, plan, pricePerMillionCny, supportCalls),
+    measurement: "Offline retrieval development experiment. MRR@5 is comparable; full MRR is only within recorded ranking depth. Candidate recall uses configured candidateTopK except M4's complete scoped input. Timings reuse measured shared query stages and exclude document indexing; cache hits are identified in call ledger. Ledger usage is the actual experiment cost, not independent per-mode production cost. Cache replay is not an independent model repetition. Version 1 scopeViolations mixed authorization scope with forbidden Top5 hits; version 2 separates scopeViolations from boundaryFailures/forbiddenHitCases without removing forbidden or required checks. No answer nonempty is diagnostic. API failures stay in planned denominator. Acceptance off is the scoped raw Top5 diagnostic baseline; score uses the frozen model and serialization binding plus per-corpus hashes. Acceptance never reads labels. Context cases with deferredReason remain planned and not_applicable without provider calls. Support uses one bounded additional model call per nonempty score-gated candidate set; original scores remain unchanged and support failures are excluded from successful acceptance denominators, with planned recall retained. Support usage and cache are separate; costUsd is an estimate from the pinned Pi model catalog, not an invoice. No live business or QQ changes." };
   const path = join(outputDir, `${runId}.json`);
   await atomicJson(path, report);
 
@@ -251,6 +270,35 @@ export async function runRetrievalV2(options: { label: string; modes?: Retrieval
     } catch (error) {
       if (!calls.some(call => call.id === id)) calls.push({ id, operation, purpose, cache: "miss", inputHash, requestHash: null,
         attempts: error instanceof BailianError ? error.attempts : [], status: "failed" });
+      throw error;
+    }
+  }
+
+  async function supported(query: string, scope: RetrievalScope, candidates: EvidenceSupportCandidate[]) {
+    const input = { query, scope, candidates, settings: supportClient!.settings };
+    const inputHash = evidenceSupportInputHash(input);
+    const cachePath = join(cacheDir, `support-${inputHash}.json`), id = randomUUID();
+    if (parameters.cache === "reuse") try {
+      const saved = JSON.parse(await readFile(cachePath, "utf8"));
+      const verification = { value: saved.value, requestHash: saved.requestHash, attempts: [] as EvidenceSupportAttempt[], inputHash };
+      if (saved.version !== 1 || saved.inputHash !== inputHash || saved.valueHash !== contentHash(saved.value)
+        || !validateEvidenceSupportVerification(verification, input)) throw new Error("支持性缓存校验失败；未自动覆盖。");
+      supportCalls.push({ id, operation: "support", cache: "hit", inputHash, requestHash: saved.requestHash, attempts: [], status: "ok" });
+      return { verification, callId: id };
+    } catch (error) { if (!(error && typeof error === "object" && "code" in error && error.code === "ENOENT")) throw error; }
+    if (!controls.beforeAttempt()) throw new BailianBudgetStop([]);
+    try {
+      const response = await verifyEvidenceSupport({ query, scope, candidates, client: supportClient! });
+      if (!validateEvidenceSupportVerification(response, input)) throw new Error("支持性响应校验失败。");
+      supportCalls.push({ id, operation: "support", cache: "miss", inputHash, requestHash: response.requestHash, attempts: response.attempts, status: "ok" });
+      supportConsecutiveFailures = 0;
+      if (parameters.cache === "reuse") await atomicJson(cachePath, { version: 1, inputHash, requestHash: response.requestHash,
+        createdAt: new Date().toISOString(), value: response.value, valueHash: contentHash(response.value) });
+      return { verification: response, callId: id };
+    } catch (error) {
+      if (!supportCalls.some(call => call.id === id)) supportCalls.push({ id, operation: "support", cache: "miss", inputHash,
+        requestHash: null, attempts: error instanceof EvidenceSupportError ? error.attempts : [], status: "failed" });
+      supportConsecutiveFailures++;
       throw error;
     }
   }
@@ -318,13 +366,30 @@ export async function runRetrievalV2(options: { label: string; modes?: Retrieval
           }
         } catch (error) { if (!(error instanceof BailianError) || error instanceof BailianBudgetStop) throw error; status = "provider_error"; errorMessage = error.message; }
         const ranked = ranking.map(row => row.id);
-        const acceptance = acceptEvidence({ config: acceptanceConfig, scope, documents: corpus.documents, ranking, query: question.query, status });
+        let supportVerification: EvidenceSupportVerification | undefined;
+        let supportBudgetStop: BailianBudgetStop | undefined;
+        let acceptance = acceptEvidence({ config: acceptanceConfig, scope, documents: corpus.documents, ranking, query: question.query, status });
+        if (status === "ok" && acceptanceConfig.mode === "support" && acceptance.pendingSupport?.length) {
+          const before = supportCalls.length;
+          try {
+            const { verification, callId } = await supported(question.query, scope, acceptance.pendingSupport);
+            callIds.push(callId); supportVerification = verification;
+            acceptance = applyEvidenceSupport({ prepared: acceptance, verification, query: question.query, settings: supportClient!.settings, scope, documents: corpus.documents });
+          } catch (error) {
+            callIds.push(...supportCalls.slice(before).map(call => call.id));
+            if (error instanceof BailianBudgetStop) supportBudgetStop = error;
+            else if (!(error instanceof EvidenceSupportError)) throw error;
+            acceptance = applyEvidenceSupport({ prepared: acceptance, verification: null, query: question.query, settings: supportClient!.settings, scope, documents: corpus.documents });
+            errorMessage = error.message;
+          }
+        }
+        const acceptanceMeasured = status === "ok" && acceptance.status !== "unavailable";
         const acceptedIds = acceptance.accepted.map(row => row.id), acceptedBoundary = checkV2Boundaries(question, corpus.documents, acceptedIds);
-        const falseRejectEligible = status === "ok" && question.relevant.length ? ranked.slice(0, 5).some(id => question.relevant.includes(id)) : null;
+        const falseRejectEligible = acceptanceMeasured && question.relevant.length ? ranked.slice(0, 5).some(id => question.relevant.includes(id)) : null;
         results.push({ corpus: corpus.id, id: question.id, suite: question.suite, mode, query: question.query, scope, status,
           candidateIds: candidates, candidateHash: contentHash(candidates.map(id => [id, serializeRetrievalDocument(visible.find(doc => doc.id === id)!)])),
-          ranking, relevant: question.relevant, acceptance,
-          acceptedMetrics: status === "ok" ? metrics(question.relevant, acceptedIds, candidates) : null,
+          ranking, relevant: question.relevant, acceptance, ...(supportVerification ? { supportVerification } : {}),
+          acceptedMetrics: acceptanceMeasured ? metrics(question.relevant, acceptedIds, candidates) : null,
           acceptedScopePassed: acceptedBoundary.scopePassed, acceptedBoundaryPassed: acceptedBoundary.boundaryPassed,
           expectedAbstention: question.expectedBehavior === "abstain" || question.suite === "no_answer",
           falseRejectEligible, falseRejected: falseRejectEligible === null ? null : falseRejectEligible && !acceptedIds.some(id => question.relevant.includes(id)), deferredReason: null,
@@ -333,14 +398,15 @@ export async function runRetrievalV2(options: { label: string; modes?: Retrieval
           empty: status === "ok" ? !ranking.length : null,
           durationMs: performance.now() - started + (mode === "M0" || mode === "M5" ? lexicalMs : mode === "M1" ? bm25Ms : mode === "M2" ? denseMs : mode === "M3" || mode === "M6" ? denseMs + bm25Ms + fusionMs : 0), callIds,
           fallback: status === "provider_error" ? { mode: "M0", ranking: lexical, metrics: metrics(question.relevant, lexical, lexical.slice(0, parameters.candidateTopK)) } : null, error: errorMessage });
+        if (supportBudgetStop) throw supportBudgetStop;
       }
-      report.summary = summarizeV2(results, calls, plan, pricePerMillionCny); await atomicJson(path, report);
+      report.summary = summarizeV2(results, calls, plan, pricePerMillionCny, supportCalls); await atomicJson(path, report);
     }
-    report.status = results.some(row => row.status !== "ok" && !row.deferredReason) ? "completed_with_errors" : "completed";
+    report.status = results.some(row => !row.deferredReason && (row.status !== "ok" || row.acceptance.status === "unavailable")) ? "completed_with_errors" : "completed";
   } catch (error) {
     if (error instanceof BailianBudgetStop) { report.status = "budget_stopped"; report.stopReason = stopReason; }
     else { report.status = "failed"; throw new Error(`检索 v2 执行中断；已记录报告 ${runId}，未自动重跑。`); }
-  } finally { report.finishedAt = new Date().toISOString(); report.summary = summarizeV2(results, calls, plan, pricePerMillionCny); await atomicJson(path, report); }
+  } finally { report.finishedAt = new Date().toISOString(); report.summary = summarizeV2(results, calls, plan, pricePerMillionCny, supportCalls); await atomicJson(path, report); }
   return { path, report };
 }
 

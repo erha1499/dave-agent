@@ -37,7 +37,7 @@ assert.equal(acceptance.version, 2); assert.equal(acceptance.kind, "retrieval");
 assert.deepEqual(resolveExperimentConfig(acceptance), acceptance);
 assert.equal(remoteRequired(acceptance), true);
 assert.throws(() => requireExperimentExecution(acceptance), /付费模型/);
-assert.equal(catalog.datasets.length, 3);
+assert.equal(catalog.datasets.length, 4);
 assert.deepEqual(catalog.acceptanceFields.map(field => field.key), ["mode", "threshold"]);
 assert.ok(catalog.fields.retrieval.every(field => !["dataset", "acceptance", "threshold"].includes(field.key)));
 const newVariant = { id: "A", modes: ["M4"], dataset: "acceptance-development", acceptance: { mode: "score", threshold: .8 } };
@@ -58,6 +58,41 @@ for (const threshold of [0, 1]) assert.doesNotThrow(() => resolveExperimentConfi
 assert.doesNotThrow(() => resolveExperimentConfig({ ...acceptance, variants: [{ ...newVariant, modes: ["M0"], acceptance: { mode: "off" } }] }));
 const example = resolveExperimentConfig(JSON.parse(await readFile(new URL("../configs/experiments/acceptance-development.json", import.meta.url), "utf8")));
 assert.deepEqual(example.variants, acceptance.variants);
+const supportDevelopment = catalog.presets.find(p => p.id === "support-development")!.config;
+const supportValidation = catalog.presets.find(p => p.id === "support-validation")!.config;
+for (const [presetId, config, dataset] of [["support-development", supportDevelopment, "acceptance-development"],
+  ["support-validation", supportValidation, "acceptance-support-validation"]] as const) {
+  assert.equal(config.version, 2); assert.equal(config.kind, "retrieval"); assert.equal(config.allowRemote, false);
+  assert.equal(remoteRequired(config), true); assert.throws(() => requireExperimentExecution(config), /付费模型/);
+  assert.deepEqual(resolveExperimentConfig(config), config);
+  assert.deepEqual(config.variants.map(variant => "acceptance" in variant ? variant.acceptance : undefined), [
+    { mode: "score", threshold: .71 }, { mode: "support", threshold: .71 },
+  ]);
+  assert.ok(config.variants.every(variant => "dataset" in variant && variant.dataset === dataset));
+  assert.ok(config.variants.every(variant => variant.parameters.timeoutMs === 60000 && "maxRequests" in variant.parameters
+    && variant.parameters.maxRequests === 160 && variant.parameters.retries === 0));
+  const saved = JSON.parse(await readFile(new URL(`../configs/experiments/${presetId}.json`, import.meta.url), "utf8"));
+  assert.deepEqual(resolveExperimentConfig(saved), config, "CLI file and catalog describe the same experiment");
+}
+assert.deepEqual(catalog.acceptanceFields[0]!.options!.map(option => option.value), ["off", "score", "support"]);
+const supportVariant = { id: "A", modes: ["M4"], dataset: "acceptance-support-validation", acceptance: { mode: "support", threshold: .71 } };
+for (const change of [
+  { dataset: "support-validation" }, { dataset: "../data/acceptance-support-validation.json" },
+  { modes: ["M0"] }, { modes: ["M2", "M4"] },
+  { acceptance: { mode: "support" } }, { acceptance: { mode: "support", threshold: "0.71" } },
+  { acceptance: { mode: "support", threshold: -.01 } }, { acceptance: { mode: "support", threshold: 1.01 } },
+  { acceptance: { mode: "support", threshold: NaN } }, { acceptance: { mode: "support", threshold: Infinity } },
+  { acceptance: { mode: "support", threshold: .71, model: "arbitrary-model" } },
+  { acceptance: { mode: "support", threshold: .71, prompt: "arbitrary-prompt" } },
+]) assert.throws(() => resolveExperimentConfig({ ...supportValidation, variants: [{ ...supportVariant, ...change }] }), ExperimentInputError);
+for (const threshold of [0, 1]) assert.doesNotThrow(() => resolveExperimentConfig({ ...supportValidation,
+  variants: [{ ...supportVariant, modes: ["M4", "M5", "M6"], acceptance: { mode: "support", threshold } }] }));
+assert.throws(() => resolveExperimentConfig({ ...local, variants: [supportVariant] }), ExperimentInputError, "v1 never silently enables support verification");
+const oldValidationFile = JSON.parse(await readFile(new URL("../configs/experiments/acceptance-validation.json", import.meta.url), "utf8"));
+const oldValidation = resolveExperimentConfig(oldValidationFile);
+assert.deepEqual(oldValidation.variants.map(variant => "acceptance" in variant ? variant.acceptance : undefined), [{ mode: "off" }, { mode: "score", threshold: .71 }], "old failed validation retains the original off/score comparison");
+assert.ok(oldValidation.variants.every(variant => "dataset" in variant && variant.dataset === "acceptance-validation"));
+
 
 assert.equal(parseExperimentArgs([]).action, "help");
 assert.equal(parseExperimentArgs(["--preset", "retrieval-local"]).action, "preview");
@@ -71,6 +106,10 @@ const acceptanceCli = await promisify(execFile)(process.execPath, ["scripts/expe
   env: { PATH: process.env.PATH }, maxBuffer: 100_000,
 });
 assert.deepEqual(JSON.parse(acceptanceCli.stdout).config, acceptance, "A1 preview resolves without credentials");
+const supportCli = await promisify(execFile)(process.execPath, ["scripts/experiment.ts", "--preset", "support-validation", "--dry-run"], {
+  env: { PATH: process.env.PATH }, maxBuffer: 100_000,
+});
+assert.deepEqual(JSON.parse(supportCli.stdout).config, supportValidation, "support verifier preview does not read model credentials");
 
 let starts = 0, busy = false;
 const job: ExperimentJob = {
@@ -100,6 +139,9 @@ try {
   assert.equal((await post(JSON.stringify(acceptance))).status, 400, "A1 rerank requires the same explicit opt-in");
   assert.equal((await post(JSON.stringify({ ...acceptance, variants: [{ ...newVariant, modes: ["M1"] }], allowRemote: true }))).status, 400);
   assert.equal((await post(JSON.stringify({ ...acceptance, allowRemote: true }))).status, 202);
+  assert.equal((await post(JSON.stringify(supportValidation))).status, 400);
+  assert.equal((await post(JSON.stringify({ ...supportValidation, allowRemote: true }))).status, 202);
+  assert.equal((await post(JSON.stringify({ ...supportValidation, allowRemote: true, variants: [{ ...supportVariant, modes: ["M0"] }] }))).status, 400);
   assert.equal((await post(JSON.stringify(local), { "X-Experiment-Request": "" })).status, 400);
   assert.equal((await post(JSON.stringify(local), { "Content-Type": "text/plain" })).status, 400);
   assert.equal((await post("not json")).status, 400);
@@ -120,6 +162,6 @@ try {
   assert.match(malformedUrl, /^HTTP\/1.1 400 /, "malformed URL is rejected without exiting the server");
   assert.equal((await fetch(`${base}/api/experiments`)).status, 200);
   assert.equal((await fetch(`${base}/api/runs`, { method: "POST" })).status, 405);
-  assert.equal(starts, 2, "only valid v1/v2 requests reach execution; invalid or cross-origin requests never do");
+  assert.equal(starts, 3, "only valid v1/v2 requests reach execution; invalid or cross-origin requests never do");
 } finally { server.closeAllConnections(); await new Promise<void>(resolve => server.close(() => resolve())); }
 console.log("PASS 实验配置/CLI预览与HTTP执行边界：白名单、组合、远程许可、body上限、同源、串行忙态及历史只读。");
