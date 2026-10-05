@@ -23,6 +23,15 @@ const conditionStatus = { equal: "一致", different: "不同", unknown: "未知
 const changeNames = { same: "状态一致", improved: "失败转通过", regressed: "出现退步", incomplete: "结果不完整" };
 const corpusNames = { selected: "选集", full: "全量" };
 const retrievalSuiteNames = { standard: "常规", hard: "难题" };
+// v2 共同业务计划的三个场景给中文显示名，原 ID 保留在 title 与展开详情中；未知场景原样显示。
+const v2CaseNames = {
+  "scoped-consult": "只读规则咨询",
+  "pending-not-approved": "等待审批的退款请求",
+  "approved-confirm-restart": "批准 · 确认 · 重启恢复",
+};
+const displayCaseName = (id, fallback) => v2CaseNames[id] || fallback || id;
+const actorNames = { agent: "Agent", host: "宿主" };
+const triggerNames = { user: "普通用户", event: "商家事件", confirmation: "用户确认" };
 const ANSWER_NOTE = "回答效果：本轮不评测";
 const number = value => value === null || value === undefined ? "未采集" : new Intl.NumberFormat("zh-CN").format(value);
 const duration = value => value === null || value === undefined ? "未采集" : `${(value / 1000).toFixed(2)} s`;
@@ -317,50 +326,65 @@ function batchPanel(run, batch) {
       noModel ? null : text("span", `已知 Tokens ${number(usage.knownTokens)} · 完整 Tokens ${usage.completeTokens === null ? "未采全" : number(usage.completeTokens)}`),
       noModel ? null : text("span", `已知费用 ${money(usage.knownCostUsd)} · 完整费用 ${usage.completeCostUsd === null ? "未采全" : money(usage.completeCostUsd)}`),
       noModel ? null : text("span", "缺任何一次计划运行时完整批次用量为 null，不补零。")));
-  // 默认只显示四种稳定性概览，避免大量场景把 Recall/MRR 等主要指标顶出首屏；逐场景明细折叠。
+  // 批次属次要诊断：整板默认折叠，摘要保留进度与稳定性短结果；缺次/未完成在摘要警示。
+  // 逐场景明细在折叠内再折叠；缺计划运行、运行未完成或案例跳过时一律标不完整，不展示稳定满分。
   const tally = { always_passed: 0, always_failed: 0, mixed: 0, incomplete: 0 };
   for (const item of batch.cases) tally[item.status in tally ? item.status : "incomplete"]++;
   const overview = [["always_passed", "稳定通过"], ["always_failed", "稳定失败"], ["mixed", "结果波动"], ["incomplete", "不完整"]]
     .map(([status, label]) => [status, label, tally[status]]).filter(([, , n]) => n);
-  return node("section", { class: "panel batch-panel", "aria-label": "批次稳定性" }, heading,
-    node("div", { class: "batch-body" },
-      text("p", summary.join(" · "), "batch-summary"),
-      missing || unfinished ? text("p", "尚有计划运行未开始或未完成，任何场景都不能视为稳定。", "batch-caution") : null,
-      node("div", { class: "batch-runs" }, ...batch.runIds.map(id => node("button", {
-        type: "button", class: `run-id-chip${id === run.id ? " current" : ""}`, title: id === run.id ? "当前运行" : "切换到该次运行",
-        onclick: () => selectRun(id),
-      }, short(id)))),
-      batch.cases.length
-        ? node("div", { class: "batch-overview" }, ...overview.map(([status, label, n]) => node("span", { class: `batch-stat ${status}` }, label, " ", text("strong", String(n)))))
-        : text("p", "没有可汇总的批次场景。", "metric-note"),
-      batch.cases.length
-        ? node("details", { class: "batch-case-list" }, node("summary", {}, `逐场景稳定性 · ${batch.cases.length} 个场景`),
-          node("div", { class: "batch-cases" },
-            node("div", { class: "batch-case-head" }, text("span", "场景"), text("span", "逐次结果"), text("span", "稳定性")),
-            ...batch.cases.map(item => node("div", { class: "batch-case" },
-              text("span", item.id, "batch-case-id mono"),
-              text("span", [`通过 ${item.passed}`, item.failed ? `失败 ${item.failed}` : null, item.skipped ? `跳过 ${item.skipped}` : null, item.missing ? `缺失 ${item.missing}` : null].filter(Boolean).join(" · "), "batch-case-counts"),
-              badge(item.status, stabilityNames[item.status] || item.status)))))
-        : null,
-      text("p", "“结果波动”仅表示观察到通过/失败变化，不估计统计置信区间。", "metric-note")),
-    usageDetails);
+  const caution = missing || unfinished;
+  const statusHint = overview.map(([, label, n]) => `${label} ${n}`).join(" · ");
+  return node("section", { class: "panel batch-panel", "aria-label": "批次稳定性" },
+    node("details", { class: "fold batch-fold" },
+      node("summary", {},
+        text("span", title, "fold-title"),
+        text("span", [...summary, statusHint].filter(Boolean).join(" · "), `fold-hint${caution ? " warn" : ""}`)),
+      node("div", { class: "fold-body" },
+        node("div", { class: "batch-body" },
+          text("p", `批次 ID：${run.batch.id}`, "subtle-id"),
+          caution ? text("p", "尚有计划运行未开始或未完成，任何场景都不能视为稳定。", "batch-caution") : null,
+          node("div", { class: "batch-runs" }, ...batch.runIds.map(id => node("button", {
+            type: "button", class: `run-id-chip${id === run.id ? " current" : ""}`, title: id === run.id ? "当前运行" : "切换到该次运行",
+            onclick: () => selectRun(id),
+          }, short(id)))),
+          batch.cases.length
+            ? node("div", { class: "batch-overview" }, ...overview.map(([status, label, n]) => node("span", { class: `batch-stat ${status}` }, label, " ", text("strong", String(n)))))
+            : text("p", "没有可汇总的批次场景。", "metric-note"),
+          batch.cases.length
+            ? node("details", { class: "batch-case-list" }, node("summary", {}, `逐场景稳定性 · ${batch.cases.length} 个场景`),
+              node("div", { class: "batch-cases" },
+                node("div", { class: "batch-case-head" }, text("span", "场景"), text("span", "逐次结果"), text("span", "稳定性")),
+                ...batch.cases.map(item => node("div", { class: "batch-case" },
+                  text("span", item.id, "batch-case-id mono"),
+                  text("span", [`通过 ${item.passed}`, item.failed ? `失败 ${item.failed}` : null, item.skipped ? `跳过 ${item.skipped}` : null, item.missing ? `缺失 ${item.missing}` : null].filter(Boolean).join(" · "), "batch-case-counts"),
+                  badge(item.status, stabilityNames[item.status] || item.status)))))
+            : null,
+          text("p", "“结果波动”仅表示观察到通过/失败变化，不估计统计置信区间。", "metric-note")),
+        usageDetails)));
 }
 
 // 覆盖与分类：分母来自检查计划；标签是本题集定义的覆盖范围，不代表业务全集。
+// 次要诊断默认折叠，摘要保留检查合计与失败/缺失异常提示。
 function coveragePanel(analysis) {
   if (analysis.scope !== "objective" || !analysis.counts) return null;
+  const checks = analysis.counts.checks;
+  const abnormal = checks.failed || checks.missing;
   return node("section", { class: "panel coverage-panel", "aria-label": "覆盖与分类" },
-    node("div", { class: "panel-heading" }, text("h3", "覆盖与分类"), text("p", "标签为本题集定义的覆盖范围，不代表业务全集")),
-    node("div", { class: "coverage-body" },
-      node("div", { class: "category-summary" }, ...analysis.categories.map(item => node("span", { class: "category-chip" },
-        categoryNames[item.category] || item.category,
-        text("strong", `${item.checks.passed} / ${item.checks.planned}`),
-        item.checks.failed || item.checks.missing ? text("em", [item.checks.failed ? `失败 ${item.checks.failed}` : null, item.checks.missing ? `缺失 ${item.checks.missing}` : null].filter(Boolean).join(" · ")) : null))),
-      analysis.coverage.length ? node("div", { class: "coverage-list" }, ...analysis.coverage.map(item => node("div", { class: "coverage-row" },
-        text("span", item.tag, "coverage-tag"),
-        segmentBar(countsEntries(item.cases), `${item.tag}：${countsLine(item.cases, "场景")}`),
-        text("span", countsLine(item.cases, "场景"), "coverage-counts")))) : text("p", "本题集没有定义覆盖标签。", "metric-note")),
-    node("div", { class: "coverage-foot" }, text("p", `检查合计：${countsLine(analysis.counts.checks, "项")} · 通过率 ${percent(analysis.counts.checks.passRate)}`, "metric-note")));
+    node("details", { class: "fold coverage-fold" },
+      node("summary", {},
+        text("span", "覆盖与分类", "fold-title"),
+        text("span", `检查 ${countsLine(checks, "项")} · 通过率 ${percent(checks.passRate)}`, `fold-hint${abnormal ? " warn" : ""}`)),
+      node("div", { class: "fold-body" },
+        node("div", { class: "coverage-body" },
+          node("div", { class: "category-summary" }, ...analysis.categories.map(item => node("span", { class: "category-chip" },
+            categoryNames[item.category] || item.category,
+            text("strong", `${item.checks.passed} / ${item.checks.planned}`),
+            item.checks.failed || item.checks.missing ? text("em", [item.checks.failed ? `失败 ${item.checks.failed}` : null, item.checks.missing ? `缺失 ${item.checks.missing}` : null].filter(Boolean).join(" · ")) : null))),
+          analysis.coverage.length ? node("div", { class: "coverage-list" }, ...analysis.coverage.map(item => node("div", { class: "coverage-row" },
+            text("span", item.tag, "coverage-tag"),
+            segmentBar(countsEntries(item.cases), `${item.tag}：${countsLine(item.cases, "场景")}`),
+            text("span", countsLine(item.cases, "场景"), "coverage-counts")))) : text("p", "本题集没有定义覆盖标签。", "metric-note")),
+        node("div", { class: "coverage-foot" }, text("p", "标签为本题集定义的覆盖范围，不代表业务全集。", "metric-note")))));
 }
 
 // 用量与耗时：首屏 Tokens 为主；known/complete 分列，null 不补零，无模型请求属不适用。
@@ -417,6 +441,32 @@ function retrievalPanel(retrieval) {
       text("p", "检索指标与工程检查、模型行为分列展示，不合成总分。", "metric-note")));
 }
 
+// 运行级执行分工：归因是同一次执行的另一视角，默认折叠放场景之后。
+// groups 按执行方/触发/组件逐项列出，不造合计，不与 steps 的调用量、Tokens、费用相加。
+// 旧记录 attribution 为 null 或省略时显示未采集，不补零。
+function attributionPanel(analysis) {
+  const attribution = analysis.attribution ?? null;
+  const body = attribution
+    ? [
+        attribution.groups.length ? node("div", { class: "attr-groups" },
+          node("div", { class: "attr-row attr-head" }, ...["执行方", "触发", "组件", "调用", "业务拒绝", "执行错误"].map(label => text("span", label))),
+          ...attribution.groups.map(group => node("div", { class: "attr-row" },
+            text("span", actorNames[group.actor] || group.actor),
+            text("span", triggerNames[group.trigger] || group.trigger),
+            text("span", group.component, "mono"),
+            text("span", String(group.calls), "mono"),
+            text("span", String(group.denied), "mono"),
+            text("span", String(group.errors), "mono")))) : null,
+        text("p", "入口与嵌套服务分别计数，不是可相加的总数；不与执行轨迹的调用量、Tokens、费用重复相加。", "metric-note"),
+        ...(attribution.issues?.length ? [node("ul", { class: "issues-list" }, ...attribution.issues.map(issue => node("li", {}, issue)))] : []),
+      ].filter(Boolean)
+    : [text("p", "该运行没有归因记录（旧记录未采集），不补零。", "metric-note")];
+  return node("section", { class: "panel attribution-panel", "aria-label": "执行分工" },
+    node("details", { class: "fold attr-fold" },
+      node("summary", {}, text("span", "执行分工", "fold-title"), text("span", attribution ? `已记录 ${attribution.spans} 段` : "未采集", "fold-hint")),
+      node("div", { class: "fold-body attr-body" }, ...body)));
+}
+
 function stepNode(step) {
   const status = step.isError ? step.expectedDenial ? badge("passed", "预期身份拒绝") : badge("failed", "执行错误") : badge("passed", "已完成");
   return node("details", { class: "step" },
@@ -432,12 +482,48 @@ function checksNode(checks, onlyFailures = false) {
   return node("ul", { class: "check-list", "aria-label": "检查结果" }, ...items.map(check => node("li", {}, mark(check.status), text("span", check.name), check.reason ? text("span", check.reason, "check-reason") : null)));
 }
 
+const isSpanRecord = span => span !== null && typeof span === "object" && !Array.isArray(span);
+// 明显缺字段或非法 actor/trigger/outcome 的记录：标无效并展示原始 JSON，不标正常、不静默丢弃。
+const spanUsable = span => isSpanRecord(span)
+  && typeof span.component === "string" && typeof span.name === "string"
+  && (span.actor === "agent" || span.actor === "host")
+  && (span.trigger === "user" || span.trigger === "event" || span.trigger === "confirmation")
+  && (span.outcome === "ok" || span.outcome === "denied" || span.outcome === "error");
+
+// 单个归因 span：denied 是已知业务拒绝，error 是执行错误，两者分列；input/output 走 json 文本展示，天然转义。
+function spanNode(span) {
+  if (!spanUsable(span)) {
+    return node("details", { class: "step span invalid" },
+      node("summary", { class: "step-top" }, badge("failed", "归因记录无效")),
+      json(span ?? null));
+  }
+  const outcome = span.outcome === "denied" ? badge("skipped", "业务拒绝") : span.outcome === "error" ? badge("failed", "执行错误") : badge("passed", "正常");
+  return node("details", { class: "step span" },
+    node("summary", { class: "step-top" },
+      text("span", actorNames[span.actor] || span.actor, "step-index"),
+      text("span", `${span.component} · ${span.name}`, "step-name"),
+      outcome,
+      text("span", duration(span.durationMs), "step-timing")),
+    span.input !== undefined ? node("div", {}, text("p", "输入", "step-label"), json(span.input)) : null,
+    span.output !== undefined ? node("div", {}, text("p", "输出", "step-label"), json(span.output)) : null);
+}
+
 function turnNode(turn, compact = false) {
-  // merchant-notification 套件的末轮是商家结果事件而非用户发言，按事件样式展示。
-  const isEvent = turn.question.trimStart().startsWith("[商家结果事件]");
+  const spans = Array.isArray(turn.spans) ? turn.spans : null;
+  // 轮次类型优先依据可信入口 span 的 trigger：event 商家事件、confirmation 用户确认、user 普通用户。
+  // 入口只认非数组对象且 trigger 属于已知三种的记录；未知 trigger 不默认 user，回退到文本判断。
+  // 旧记录无 spans 时沿用问题文本判断商家事件（merchant-notification 套件末轮）。
+  const ingress = spans?.find(span => isSpanRecord(span) && span.component === "qq-ingress"
+    && (span.trigger === "user" || span.trigger === "event" || span.trigger === "confirmation")) ?? null;
+  const trigger = ingress?.trigger ?? null;
+  const legacyEvent = trigger === null && turn.question.trimStart().startsWith("[商家结果事件]");
+  const isEvent = trigger === "event" || legacyEvent;
+  const questionLabel = trigger === "event" ? "商家事件" : trigger === "confirmation" ? "用户确认" : legacyEvent ? "事件" : "用户";
+  // 事件与确认的回执由宿主执行，标宿主；普通用户轮保留 Agent，不因含宿主内部服务 span 误标。
+  const replyLabel = trigger === "event" || trigger === "confirmation" ? "宿主" : "Agent";
   const element = node("div", { class: "turn" },
     node("div", { class: "turn-top" }, text("h4", `第 ${turn.index} 轮`), mark(turn.status), text("span", duration(turn.durationMs), "turn-timing")),
-    node("div", { class: "dialogue" }, text("span", isEvent ? "事件" : "用户", isEvent ? "speaker event-speaker" : "speaker"), text("p", turn.question, isEvent ? "bubble event" : "bubble"), text("span", "Agent", "speaker"), text("p", turn.reply || "此轮没有回复", "bubble answer")),
+    node("div", { class: "dialogue" }, text("span", questionLabel, isEvent ? "speaker event-speaker" : "speaker"), text("p", turn.question, isEvent ? "bubble event" : "bubble"), text("span", replyLabel, "speaker"), text("p", turn.reply || "此轮没有回复", "bubble answer")),
     turn.evidenceIds.length ? node("div", { class: "evidence-line" }, text("span", "实际工具证据"), ...turn.evidenceIds.map(id => text("code", id, "evidence-tag"))) : text("p", "本轮没有返回工具证据", "metric-note"),
     turn.error ? text("p", turn.error, "turn-error") : null,
     checksNode(turn.checks, true));
@@ -445,6 +531,16 @@ function turnNode(turn, compact = false) {
     element.append(
       node("details", { class: "trace" }, node("summary", {}, `已记录检查 · ${turn.checks.filter(check => check.status === "passed").length} / ${turn.checks.length} 通过`), checksNode(turn.checks)),
       node("details", { class: "trace" }, node("summary", {}, `执行轨迹 · ${turn.steps.length} 步`), text("p", `首个文本 ${duration(turn.firstTextMs)}，可能是中间回答；模型步骤仅计响应流，不含请求等待。`, "metric-note"), ...turn.steps.map(stepNode)));
+    // v2 归因 span 是同一次执行的另一视角，逐项展示但不与 steps 计数相加；旧记录无 spans 不渲染、不补零。
+    if (spans) {
+      const noModel = !turn.steps.some(step => step.type === "model");
+      element.append(node("details", { class: "trace" },
+        node("summary", {}, spans.length ? `执行分工 · ${spans.length} 段` : "执行分工"),
+        spans.length
+          ? spans.map(spanNode)
+          : text("p", "暂无归因记录；显式为空不代表模型调用为零。", "metric-note"),
+        noModel ? text("p", "本轮无模型请求。", "metric-note") : null));
+    }
     // observations 是工作流检查保存的精简真实状态与协议证据，原样展开，不参与计分。
     if (turn.observations) {
       const fields = [["before", "前置状态"], ["after", "后置状态"], ["protocol", "协议证据"]].filter(([key]) => turn.observations[key] !== undefined);
@@ -474,15 +570,18 @@ function lazyDetails(className, summary, build, open = false) {
 }
 
 function caseRowNode(row, total) {
-  const name = row.item?.name || row.id;
+  const name = displayCaseName(row.id, row.item?.name);
   const summary = node("summary", {},
-    text("span", name, "case-name"),
+    node("span", { class: "case-name", title: `场景 ID：${row.id}` }, name),
     ...row.tags.map(tag => text("span", tag, "tag-chip")),
     row.analysis ? text("span", `${row.analysis.checks.passed} / ${row.analysis.checks.planned} 检查`, "case-meta") : null,
     text("span", row.item ? `${row.item.turns.length} 轮` : "无执行记录", "case-meta"),
     mark(row.status));
   return lazyDetails("case", summary,
-    () => row.item ? row.item.turns.map(turn => turnNode(turn)) : [text("p", "该场景已计划但没有执行记录，按缺失计入分母。", "metric-note")],
+    () => [
+      name !== row.id ? text("p", row.id, "subtle-id") : null,
+      ...(row.item ? row.item.turns.map(turn => turnNode(turn)) : [text("p", "该场景已计划但没有执行记录，按缺失计入分母。", "metric-note")]),
+    ].filter(Boolean),
     row.failure && row.item && total <= 30);
 }
 
@@ -534,13 +633,15 @@ function snapshotPanel(run, heading = "配置与评测快照") {
 
 function renderDetail(result, analysis, batch) {
   const { run, cases } = result;
+  // 首屏顺序：结论与核心数字 → 场景结果/失败入口 → 次要诊断（批次、覆盖默认折叠；口径问题与报错保持外露）。
   $("run-detail").replaceChildren(
     verdictPanel(run, analysis, cases),
     ...(run.error ? [text("p", run.error, "error-note")] : []),
-    ...[issuesPanel(analysis), batchPanel(run, batch), coveragePanel(analysis)].filter(Boolean),
+    ...[issuesPanel(analysis)].filter(Boolean),
     metricsPanel(run, analysis, cases),
     ...(retrievalPanel(analysis.retrieval) ? [retrievalPanel(analysis.retrieval)] : []),
     casesPanel(run, analysis, cases),
+    ...[attributionPanel(analysis), batchPanel(run, batch), coveragePanel(analysis)].filter(Boolean),
     snapshotPanel(run));
 }
 
@@ -643,7 +744,7 @@ function pairedPanel(comparison, a, b) {
       const tone = row.change === "regressed" ? "bad" : row.change === "improved" ? "good" : "";
       const rowClass = row.change === "regressed" ? "regression" : row.change === "improved" ? "improvement" : "";
       return lazyDetails(`paired-case ${rowClass}`,
-        node("summary", { class: "paired-heading" }, text("span", row.bCase?.name || row.aCase?.name || row.id, "case-name"),
+        node("summary", { class: "paired-heading" }, node("span", { class: "case-name", title: `场景 ID：${row.id}` }, displayCaseName(row.id, row.bCase?.name || row.aCase?.name)),
           ...row.tags.map(tag => text("span", tag, "tag-chip")),
           node("span", { class: "paired-status" }, text("span", "A", "case-meta"), mark(row.baseline), text("span", "→", "case-meta"), text("span", "B", "case-meta"), mark(row.candidate)),
           text("span", changeNames[row.change] || row.change, `change-tag ${tone}`)),

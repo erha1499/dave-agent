@@ -237,6 +237,12 @@ console.log("PASS 评测前端：重置、切换 A/B、刷新后，旧成功/失
   const batchList = findClass(element("run-detail"), "batch-case-list");
   assert.ok(batchList, "批次逐场景明细存在");
   assert.notEqual(batchList.open, true, "批次逐场景明细默认折叠，不顶开主要指标");
+  const batchFold = findClass(element("run-detail"), "batch-fold");
+  assert.ok(batchFold, "批次稳定性整板折叠存在");
+  assert.notEqual(batchFold.open, true, "批次稳定性默认折叠，摘要保留短结果");
+  const coverageFold = findClass(element("run-detail"), "coverage-fold");
+  assert.ok(coverageFold, "覆盖与分类整板折叠存在");
+  assert.notEqual(coverageFold.open, true, "覆盖与分类默认折叠，摘要保留异常提示");
   assert.match(html, /不完整/, "批次概览含不完整计数");
   assert.equal(styleAttrCount(element("run-detail")), 0, "CSP 下不得使用 style 属性（分段条走 CSSOM）");
   assert.equal(styleAttrCount(element("run-list")), 0, "CSP 下侧栏分段条不得使用 style 属性");
@@ -266,6 +272,8 @@ console.log("PASS 评测前端：重置、切换 A/B、刷新后，旧成功/失
   assert.match(legacy, /历史措辞口径，不并入客观分数/);
   assert.match(legacy, /1 \/ 2/);
   assert.ok(!legacy.includes("客观口径"), "历史运行不得展示客观口径徽章");
+  assert.match(legacy, /执行分工未采集/, "旧记录无归因显示未采集，不补零");
+  assert.equal(walk(element("run-detail")).filter(item => item.className.split(" ").includes("span")).length, 0, "旧无 spans 的轮次不渲染归因明细");
   runInContext('selectRun("eng-run")', context);
   await flush();
   respond(find(path => path === "/api/runs/eng-run/analysis", "engineering analysis"), analysisResult("eng-run", {
@@ -550,4 +558,150 @@ for (const outcome of ["success", "detail-failure", "analysis-failure"]) {
   assert.equal(content(element("run-detail")), freshDetail, `旧 A 的 ${outcome} 不得覆盖新详情`);
   assert.equal(content(element("notice")), freshNotice, `旧 A 的 ${outcome} 不得覆盖当前提示`);
   console.log(`PASS 评测前端：同 ID 快速重选的旧 ${outcome} 响应不覆盖当前结果。`);
+}
+
+// v2 中文显示名与归因：trigger 标注、spans 逐项展示不合计、denied/error 分列，空 spans 不补零。
+{
+  const { element, take, find, flush } = await boot();
+  const span = (over: Record<string, unknown>): any => ({
+    id: "s1", parentSpanId: null, actor: "host", trigger: "user", component: "qq-ingress",
+    name: "turn", observedAt: T, durationMs: 100, outcome: "ok", ...over,
+  });
+  respond(take(), { runs: [runRecord("v2-run", { plannedCases: 4, plannedTurns: 4 })] });
+  await flush();
+  respond(find(path => path === "/api/runs/v2-run/analysis", "v2 analysis"), analysisResult("v2-run", {
+    scope: "objective", issues: [],
+    counts: { cases: counts(4, 4, 0, 0, 0), turns: counts(4, 4, 0, 0, 0), checks: counts(4, 4, 0, 0, 0) },
+    cases: [
+      { id: "scoped-consult", tags: ["readonly"], status: "passed", turns: counts(1, 1, 0, 0, 0), checks: counts(1, 1, 0, 0, 0) },
+      { id: "pending-not-approved", tags: ["aftersales"], status: "passed", turns: counts(1, 1, 0, 0, 0), checks: counts(1, 1, 0, 0, 0) },
+      { id: "approved-confirm-restart", tags: ["confirmation"], status: "passed", turns: counts(1, 1, 0, 0, 0), checks: counts(1, 1, 0, 0, 0) },
+      { id: "other-case", tags: [], status: "passed", turns: counts(1, 1, 0, 0, 0), checks: counts(1, 1, 0, 0, 0) },
+    ],
+    attribution: {
+      spans: 5,
+      groups: [
+        { actor: "host", trigger: "event", component: "business-service", calls: 2, denied: 1, errors: 0 },
+        { actor: "agent", trigger: "user", component: "model", calls: 3, denied: 0, errors: 1 },
+      ],
+      providers: [], issues: [],
+    },
+  }));
+  respond(find(path => path === "/api/runs/v2-run", "v2 detail"), {
+    run: runRecord("v2-run", { plannedCases: 4, plannedTurns: 4 }),
+    cases: [
+      evalCase("scoped-consult", { name: "scoped-consult", turns: [turn({ question: "规则咨询", reply: "用户轮回复",
+        steps: [{ index: 1, type: "model", name: "k-test", durationMs: 90, usage: null }],
+        spans: [span({}), span({ id: "s2", actor: "agent", component: "model", name: "k-test", durationMs: 90, input: { a: 1 }, output: { b: 2 } })] })] }),
+      evalCase("pending-not-approved", { name: "pending-not-approved", turns: [turn({ question: "宿主通知批准结果", reply: "事件回执", steps: [],
+        spans: [span({ trigger: "event" }), span({ id: "s3", component: "business-service", name: "propose_refund", outcome: "denied", input: {}, output: {} })] })] }),
+      evalCase("approved-confirm-restart", { name: "approved-confirm-restart", turns: [turn({ question: "确认退款 op-1", reply: "确认回执", steps: [],
+        spans: [span({ trigger: "confirmation" }), span({ id: "s4", component: "confirmation-service", name: "confirm_refund", outcome: "error" })] })] }),
+      evalCase("other-case", { name: "other-case", turns: [turn({ question: "空归因轮", reply: "普通回复", spans: [] })] }),
+    ],
+  });
+  await flush();
+  // 场景正文惰性构建：展开全部案例后再断言轮级内容。
+  for (const item of walk(element("run-detail")).filter(node => node.className.split(" ").includes("case"))) {
+    item.open = true;
+    item.fire("toggle");
+  }
+  const html = content(element("run-detail"));
+  assert.match(html, /只读规则咨询/, "v2 场景显示中文名");
+  assert.match(html, /等待审批的退款请求/, "改后中文名同步");
+  assert.match(html, /批准 · 确认 · 重启恢复/);
+  const nameNode = walk(element("run-detail")).find(item => item.className.split(" ").includes("case-name") && item.attrs.get("title") === "场景 ID：scoped-consult");
+  assert.ok(nameNode, "原 ID 保留在场景名 title 可查");
+  assert.match(html, /other-case/, "未知场景原样显示，不强行中文化");
+  assert.match(html, /商家事件宿主通知批准结果/, "event 轮输入标商家事件（spans 优先于文本猜测）");
+  assert.match(html, /用户确认确认退款/, "confirmation 轮输入标用户确认");
+  assert.match(html, /用户规则咨询/, "user 轮输入仍标用户");
+  assert.match(html, /宿主事件回执/, "event 轮回执标宿主");
+  assert.match(html, /宿主确认回执/, "confirmation 轮回执标宿主");
+  assert.match(html, /Agent用户轮回复/, "user 轮回复保留 Agent，不因宿主服务 span 误标");
+  assert.match(html, /业务拒绝/, "denied 显示业务拒绝");
+  assert.match(html, /执行错误/, "error 显示执行错误");
+  assert.match(html, /执行分工 · 2 段/, "轮级归因折叠存在");
+  assert.match(html, /暂无归因记录/, "空 spans 明确暂无归因记录，不补零");
+  assert.match(html, /本轮无模型请求/, "v2 轮无模型步骤时标注无模型请求");
+  assert.match(html, /已记录 5 段/, "运行级归因折叠摘要");
+  assert.match(html, /不与执行轨迹的调用量、Tokens、费用重复相加/);
+  const attrFold = findClass(element("run-detail"), "attr-fold");
+  assert.ok(attrFold, "运行级执行分工折叠存在");
+  assert.notEqual(attrFold.open, true, "运行级执行分工默认折叠");
+  const rows = walk(element("run-detail")).filter(item => item.className.split(" ").includes("attr-row"));
+  assert.equal(rows.length, 3, "归因 groups 逐项列出：表头 + 2 行，不造合计行");
+  assert.ok(!html.includes("合计"), "执行分工不造合计");
+  console.log("PASS 评测前端：v2 中文名、trigger 标注、轮级/运行级归因折叠（denied/error 分列、不合计），空归因不补零。");
+}
+
+// 坏归因记录：null/原始值/数组/缺字段/非法 actor/trigger/outcome 不崩溃、不标正常、原始 JSON 可查；invalid 口径与归因 issues 外露。
+{
+  const { element, take, find, flush } = await boot();
+  respond(take(), { runs: [runRecord("bad-run", { plannedCases: 1, plannedTurns: 1 })] });
+  await flush();
+  respond(find(path => path === "/api/runs/bad-run/analysis", "bad analysis"), analysisResult("bad-run", {
+    scope: "invalid", issues: ["计划检查 chk-9 没有对应结果。"], counts: null,
+    attribution: { spans: 6, groups: [], providers: [], issues: ["span[3] outcome 非法，已从统计剔除。"] },
+  }));
+  respond(find(path => path === "/api/runs/bad-run", "bad detail"), {
+    run: runRecord("bad-run", { plannedCases: 1, plannedTurns: 1 }),
+    cases: [evalCase("bad-case", { name: "坏归因场景", status: "failed", turns: [turn({
+      question: "<b>payload", reply: "坏记录轮", status: "failed",
+      checks: [{ id: "c1", name: "协议完整", category: "execution", status: "failed", reason: "缺回执" }],
+      spans: [
+        null,
+        "oops",
+        [],
+        { component: "model" },
+        { id: "s9", actor: "agent", trigger: "user", component: "model", name: "k-test", durationMs: 10, outcome: "success", input: { q: "<b>x</b>" } },
+        { id: "s10", actor: "host", trigger: "webhook", component: "qq-ingress", name: "turn", durationMs: 5, outcome: "ok" },
+      ],
+    })] })],
+  });
+  await flush();
+  const html = content(element("run-detail"));
+  assert.match(html, /口径与数据问题/, "invalid 口径问题外露不折叠");
+  assert.match(html, /计划检查 chk-9 没有对应结果/, "后端口径 issue 文本可见");
+  assert.match(html, /span\[3\] outcome 非法/, "归因 issues 可见");
+  assert.match(html, /执行分工 · 6 段/, "坏记录不静默丢弃，逐条列出");
+  assert.match(html, /归因记录无效/, "坏记录标无效");
+  assert.ok(!html.includes("正常"), "坏记录不得标正常");
+  assert.match(html, /"outcome": "success"/, "非法 outcome 的原始 JSON 可展开查看");
+  assert.match(html, /<b>x<\/b>/, "input 以文本展示（textContent 转义）");
+  assert.match(html, /用户<b>payload/, "未知 trigger 不默认 user 标签体系：回退文本判断，不标宿主");
+  assert.match(html, /Agent坏记录轮/, "未知 trigger 轮回复保持 Agent");
+  console.log("PASS 评测前端：坏归因记录不崩溃、不标正常、原始 JSON 可查，invalid 口径与归因 issues 外露。");
+}
+
+// atomic 商家事件：回执由宿主固定生成标宿主，但实际模型步骤保留，不得显示无模型请求；回执生成方标签不等同是否调用模型。
+{
+  const { element, take, find, flush } = await boot();
+  respond(take(), { runs: [runRecord("atomic-run", { plannedCases: 1, plannedTurns: 1 })] });
+  await flush();
+  respond(find(path => path === "/api/runs/atomic-run/analysis", "atomic analysis"), analysisResult("atomic-run", {
+    scope: "objective", issues: [],
+    counts: { cases: counts(1, 1, 0, 0, 0), turns: counts(1, 1, 0, 0, 0), checks: counts(1, 1, 0, 0, 0) },
+    cases: [{ id: "atomic-1", tags: [], status: "passed", turns: counts(1, 1, 0, 0, 0), checks: counts(1, 1, 0, 0, 0) }],
+  }));
+  respond(find(path => path === "/api/runs/atomic-run", "atomic detail"), {
+    run: runRecord("atomic-run", { plannedCases: 1, plannedTurns: 1 }),
+    cases: [evalCase("atomic-1", { name: "atomic-1", turns: [turn({
+      question: "宿主通知原子事件", reply: "商家状态回执", durationMs: 800,
+      steps: [{ index: 1, type: "model", name: "k-test-atomic", durationMs: 600, usage: null }],
+      spans: [{ id: "i1", parentSpanId: null, actor: "host", trigger: "event", component: "qq-ingress", name: "turn", observedAt: T, durationMs: 20, outcome: "ok" }],
+    })] })],
+  });
+  await flush();
+  // passed 场景默认不展开，手动展开后断言轮级内容。
+  for (const item of walk(element("run-detail")).filter(node => node.className.split(" ").includes("case"))) {
+    item.open = true;
+    item.fire("toggle");
+  }
+  const html = content(element("run-detail"));
+  assert.match(html, /商家事件宿主通知原子事件/, "atomic 事件轮输入标商家事件");
+  assert.match(html, /宿主商家状态回执/, "atomic 事件回执标宿主");
+  assert.match(html, /k-test-atomic/, "实际模型步骤保留");
+  assert.ok(!html.includes("本轮无模型请求"), "有实际模型步骤时不得显示无模型请求");
+  console.log("PASS 评测前端：atomic 商家事件回执标宿主，实际模型步骤保留，不误标无模型请求。");
 }

@@ -4,6 +4,12 @@
 
 协作使用本机 `kimi` CLI：以 `--model kimi-code/k3 --prompt` 启动，后续用 `--session <已有会话ID>` 继续同一任务。K3 的模型配置设为 `default_effort = "max"`，实际请求日志应为 `model=k3`、`thinkingEffort=max`。本机 CLI 2.1.1 的 `--prompt` 不能与 `--auto` 或 `--yolo` 合用；通过进程输出取得进度，不再操作桌面 Kimi 窗口。模型/登录配置和会话日志留在本机，不加入仓库。
 
+2026-10-05 v2 首批完成后的前端调整：保持现有灰绿风格和无框架实现，将核心结果、耗时/Tokens及场景列表前移；批次、覆盖和技术口径默认折叠，读取错误/无效口径/配置不一致仍显式可见。依据新 `attribution`/`spans` 展示执行分工，正确区分商家事件、宿主确认与 Agent 回复；归因与旧 steps/usage 不重复相加。详见 API 文档的 v2 增量合同。百炼 M0–M6 仍为离线报告，未接 API，不在页面写死实验数字。
+
+非交互 shell 未必包含 Kimi 的 PATH，本机可直接调用 `/Users/zdl/.kimi-code/bin/kimi`。本轮使用 K3 且确认其 `default_effort=max`；不修改用户默认模型。前端文件由 Kimi 修改，Codex 补接口文档并检查实际页面、窄屏及交互。
+
+本轮验收：`npm run validate` 通过，含 15 组前端回归（新增 v2 标签/归因、无效 span 诊断、atomic 商家事件有模型步骤但回执由宿主生成）。Chrome 1440px 与 390px 检查通过，覆盖版本对比、键盘展开、逐轮执行分工及窄屏标题换行；核心指标从约 989px 前移至 325px，场景列表从约 1222px 前移至 558px（同一默认运行、1440px 视口的页面坐标）。没有新增运行时依赖或重跑付费评测。本机截图与检查日志保存在忽略的 `.runtime/` 中。
+
 请阅读 `docs/evaluation-api.md` 的完整合同及 `plan.md` 第 8.1 节。继续维护现有明亮柔和、简洁的工作台。旧 GET 运行列表与详情兼容；新 GET 提供单运行 analysis、两次 compare 与 batches 稳定性，HTTP 保持只读。
 
 前端交付：

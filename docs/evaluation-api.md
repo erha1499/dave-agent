@@ -8,7 +8,7 @@
 
 ```ts
 type EvalObjectivePlan = {
-  version: 1;
+  version: 1 | 2;
   scope: "objective";
   answerQuality: "not_evaluated";
   cases: Array<{
@@ -62,6 +62,7 @@ type RunAnalysis = {
   execution: { toolCalls: number; toolErrors: number; expectedDenials: number; modelErrors: number };
   timing: { samples: number; durationP50Ms: number | null; durationP95Ms: number | null; measurement: string | null };
   retrieval: RetrievalAnalysis | null;
+  attribution: SupportTraceAnalysis | null;
 };
 
 // 仅 engineering + retrieval-objective-v1 + 有效客观计划提供
@@ -74,6 +75,43 @@ type RetrievalAnalysis = {
   scope: { samples: number; passed: number; failed: number };
 };
 ```
+
+## v2 执行归因（增量字段）
+
+`support-business-v2` 使用 version 2 的共同业务计划。评分仍取 `analysis.counts`，`turn.steps` 仍保留模型与工具记录。新增 `turn.spans` 和 `analysis.attribution` 是同一次执行的另一视角，**不能与 steps 的调用量、Tokens、费用重复相加**。旧记录返回 `attribution:null` 或省略字段时显示未采集，不能补成 0。
+
+```ts
+type EvalSpan = {
+  id: string; parentSpanId: string | null;
+  actor: "agent" | "host";
+  trigger: "user" | "event" | "confirmation";
+  component: string; name: string; observedAt: string; durationMs: number | null;
+  outcome: "ok" | "denied" | "error";
+  input?: unknown; output?: unknown;
+  usage?: {
+    provider: string; model: string; kind: "llm" | "embedding" | "rerank";
+    inputTokens: number | null; outputTokens: number | null; totalTokens: number | null;
+    cost: { currency: "USD" | "CNY"; amount: number; source: "sdk_estimate" | "provider" } | null;
+  };
+};
+type SupportTraceAnalysis = {
+  spans: number;
+  groups: Array<{ actor: string; trigger: string; component: string;
+    calls: number; denied: number; errors: number }>;
+  providers: Array<{ provider: string; model: string; kind: string;
+    requests: number; usageReported: number; knownTokens: number | null;
+    costs: Array<{ currency: string; source: string; reportedRequests: number; knownAmount: number }> }>;
+  issues: string[];
+};
+```
+
+当前组件为 `qq-ingress`（入口）、`model`（模型）、`agent-tool`（模型选择的工具）、`business-service`（宿主业务服务）、`confirmation-service`（宿主确认/展示登记）。`groups.calls` 包括入口和嵌套服务，不是可相加的“总工具数”。`parentSpanId` 当前只有轮级归属，不能画成精确的嵌套调用树。
+
+轮次类型优先依据可信入口 span 的 `trigger`：`event` 是商家事件，`confirmation` 是用户精确确认经宿主执行，`user` 是普通用户请求。v2 的事件和确认回执应标为宿主；其他轮不因含 host 服务 span 就改标宿主。这里标的是最终回执生成方：atomic 商家事件仍可能调用模型，但发送的是宿主固定状态卡，模型步骤仍保留展示。旧轮无 spans 时保留原展示。spans 为空表示显式没有归因记录，不等于模型调用必为零；零模型需依据该轮实际 `steps`。无效归因记录应保留原始文本与诊断，不能让页面崩溃或显示为正常执行。
+
+`denied` 是服务的已知业务拒绝，`error` 是执行错误；两者不决定案例得分。Controller 的正常 `blocked` 不一定产生 denied，不要将 denied 数当全部拦截数。provider 的 requests 只覆盖带有效 usage 对象的 span，缺整个 usage 的 span 不在该分母；宜标“归因中已记录请求”，不可据此声称所有请求用量完整。Tokens 与 costs 都是已知部分，USD/CNY 及 `sdk_estimate`/`provider` 分别显示、不换汇合计，缺价格显示未知。首屏继续使用原 `analysis.usage` 口径，归因明细默认折叠。
+
+M0–M6 的百炼检索报告目前仅位于 `.runtime/retrieval-v2/`，**尚未接入工作台 API**。此合同支持未来 embedding/rerank usage，但页面不能凭开发报告写死 Recall/MRR 或暗示在线业务已使用 rerank。
 
 `missing` 是计划存在但没有记录，`skipped` 是明确跳过。两者均不通过。只统计计划中的检查；额外、重复、错类别或不完整计划会返回 `scope: invalid`、`counts: null` 和原因。没有计划的旧记录返回 `legacy`，不生成客观通过率。模型请求/用量/执行耗时是步骤遥测，可在 legacy 页面显示。
 

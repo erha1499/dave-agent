@@ -272,6 +272,27 @@ main{max-width:1440px;margin:auto;padding:18px 28px 26px}
 summary::-webkit-details-marker{color:var(--muted)}
 .case>summary::-webkit-details-marker,.paired-case>summary::-webkit-details-marker,.step>summary::-webkit-details-marker{display:none}
 
+/* 折叠面板：次要诊断默认收起，摘要保留短结果与异常提示 */
+.fold>summary{display:flex;align-items:center;gap:6px 12px;flex-wrap:wrap;padding:14px 18px;cursor:pointer;list-style:none}
+.fold>summary::-webkit-details-marker{display:none}
+.fold>summary::before{content:"›";color:var(--sage);font:16px var(--mono);width:9px;flex-shrink:0}
+.fold[open]>summary::before{content:"⌄";font-size:13px}
+.fold>summary:hover .fold-title{color:var(--sage-deep)}
+.fold-title{font-size:13px;font-weight:600}
+.fold-hint{font-size:11px;color:var(--muted);overflow-wrap:anywhere;min-width:0}
+.fold-hint.warn{color:#937029;font-weight:600}
+.fold-body{border-top:1px solid var(--line)}
+.batch-body>.subtle-id{margin:0 0 10px}
+
+/* 执行分工：运行级归因网格 */
+.attr-body{padding:13px 18px 15px}
+.attr-groups{margin-bottom:10px}
+.attr-row{display:grid;grid-template-columns:minmax(46px,.6fr) minmax(62px,.8fr) minmax(0,1.6fr) repeat(3,minmax(42px,.5fr));gap:10px;align-items:center;padding:7px 0;border-top:1px dashed var(--line);font-size:11px}
+.attr-row.attr-head{border-top:0;font-size:10px;color:var(--muted);letter-spacing:.08em}
+.attr-row .mono{font-family:var(--mono);overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
+.attr-body .metric-note{margin-top:4px}
+.attr-body .issues-list{margin:10px 0 0;padding-left:18px}
+
 footer{max-width:1440px;margin:auto;padding:0 28px 24px;display:flex;justify-content:space-between;gap:20px;color:var(--muted);font-size:10px}
 
 /* 滚动条 */
@@ -316,7 +337,9 @@ main{padding:12px 16px 22px}
 .metric-value{font-size:18px}
 .category-chip{font-size:9px}
 .case-list{padding:4px 14px 8px}
-.case>summary,.paired-case>summary{gap:8px}
+.case>summary,.paired-case>summary{gap:6px 8px;flex-wrap:wrap}
+/* 场景名占满首行（保留状态标记位），标签与计数移次行，名称不竖排、长 ID 可换行 */
+.case>summary .case-name{flex-basis:calc(100% - 44px);font-size:12px;overflow-wrap:anywhere}
 .case-name{font-size:11px}
 .case-body{padding-left:0}
 .turn{padding-left:11px}
@@ -329,7 +352,7 @@ main{padding:12px 16px 22px}
 .paired-columns,.compare-snapshots{grid-template-columns:1fr}
 .paired-case{padding:0 14px}
 .paired-heading{flex-wrap:wrap}
-.paired-heading .case-name{flex-basis:calc(100% - 24px)}
+.paired-heading .case-name{flex-basis:calc(100% - 24px);overflow-wrap:anywhere}
 .paired-status{margin-left:17px}
 .paired-status .case-meta{display:inline}
 .paired-heading .change-tag{margin-left:auto}
@@ -429,6 +452,15 @@ footer{padding:0 16px 20px;flex-direction:column;gap:5px}
 @media(max-width:760px){
 .verdict-side{flex-direction:row;align-items:center;flex-wrap:wrap}
 .verdict-note{padding:0 15px 13px}
+.fold>summary{padding:12px 14px;gap:4px 9px}
+.fold-hint{font-size:10px;flex-basis:100%;order:3}
+.attr-body{padding:11px 14px 13px}
+.attr-row{grid-template-columns:repeat(3,minmax(0,1fr));gap:4px 8px;padding:8px 0}
+.attr-row.attr-head{display:none}
+/* 窄屏隐藏表头后，三个数值列自带短标签，不留无解释数字 */
+.attr-row:not(.attr-head)>span:nth-child(4)::before{content:"调用 ";color:var(--muted)}
+.attr-row:not(.attr-head)>span:nth-child(5)::before{content:"业务拒绝 ";color:var(--muted)}
+.attr-row:not(.attr-head)>span:nth-child(6)::before{content:"执行错误 ";color:var(--muted)}
 .coverage-row{grid-template-columns:1fr;gap:5px;padding:10px 0}
 .coverage-body{padding:11px 14px 4px}
 .coverage-foot{padding:0 14px 11px}
