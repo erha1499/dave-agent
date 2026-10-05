@@ -1,0 +1,539 @@
+{
+  "version": 2,
+  "revision": "live-development-v2",
+  "scope": "objective",
+  "answerQuality": "not_evaluated",
+  "provenance": "公开开发集：映射原12个确定性服务案例到真实模型、真实MySQL与本地QQ出站替身，追加未知政策/知识服务故障2例。模型自主选动作；原mock输入action不送模型。批准/退款初始状态仅为fixture准备，缺失规则和查询故障为明确注入，不能声称自然故障率。保留旧3案例8轮文件与历史结果，本套不是同题独立验证、盲测或QQ平台验收。",
+  "sourceDataset": "data/support-v2-development.json",
+  "cases": [
+    {
+      "id": "consult-without-application",
+      "sourceCase": "consult-without-application",
+      "tags": [
+        "action",
+        "development",
+        "live-development"
+      ],
+      "setup": "approved",
+      "operation": "none",
+      "knowledge": "normal",
+      "foreign": false,
+      "turns": [
+        {
+          "index": 1,
+          "question": "{orderId} 未核销可以退款吗？只咨询规则。",
+          "expect": {
+            "orderId": "{orderId}",
+            "branch": "read",
+            "requiredCalls": [
+              "get_order",
+              "search_faq"
+            ],
+            "operation": "unchanged"
+          },
+          "mode": "contract",
+          "source": "user"
+        }
+      ]
+    },
+    {
+      "id": "approved-prepare-repeat",
+      "sourceCase": "approved-prepare-repeat",
+      "tags": [
+        "action",
+        "development",
+        "live-development"
+      ],
+      "setup": "approved",
+      "operation": "none",
+      "knowledge": "normal",
+      "foreign": false,
+      "turns": [
+        {
+          "mode": "notify",
+          "source": "event",
+          "question": "宿主通知原订单的批准结果",
+          "index": 1
+        },
+        {
+          "index": 2,
+          "question": "请帮我为 {orderId} 生成退款方案。",
+          "expect": {
+            "orderId": "{orderId}",
+            "branch": "refund_prepared",
+            "requiredCalls": [
+              "get_order",
+              "search_faq",
+              "get_merchant_request",
+              "prepare_refund"
+            ],
+            "operation": "prepared",
+            "amountCents": 7980
+          },
+          "mode": "contract",
+          "source": "user"
+        },
+        {
+          "index": 3,
+          "question": "请再查 {orderId} 并生成退款方案，我还未确认。",
+          "expect": {
+            "orderId": "{orderId}",
+            "branch": "refund_prepared",
+            "requiredCalls": [
+              "get_order",
+              "search_faq",
+              "get_merchant_request",
+              "prepare_refund"
+            ],
+            "operation": "prepared",
+            "amountCents": 7980
+          },
+          "mode": "contract",
+          "source": "user"
+        },
+        {
+          "mode": "agree",
+          "source": "user",
+          "question": "同意",
+          "index": 4
+        },
+        {
+          "mode": "confirm",
+          "source": "host",
+          "question": "确认退款 {operationId}",
+          "index": 5
+        },
+        {
+          "mode": "repeat",
+          "source": "host",
+          "question": "确认退款 {operationId}",
+          "index": 6
+        },
+        {
+          "mode": "contract",
+          "source": "user",
+          "restart": true,
+          "question": "重启后查 {orderId} 的退款状态。",
+          "expect": {
+            "orderId": "{orderId}",
+            "branch": "refund_status",
+            "requiredCalls": [
+              "get_refund"
+            ],
+            "operation": "unchanged"
+          },
+          "index": 7
+        }
+      ]
+    },
+    {
+      "id": "pending-status-only",
+      "sourceCase": "pending-status-only",
+      "tags": [
+        "action",
+        "development",
+        "live-development"
+      ],
+      "setup": "pending",
+      "operation": "none",
+      "knowledge": "normal",
+      "foreign": false,
+      "turns": [
+        {
+          "index": 1,
+          "question": "查 {orderId} 的协商进度，不申请退款。",
+          "expect": {
+            "orderId": "{orderId}",
+            "branch": "read",
+            "requiredCalls": [
+              "get_merchant_request"
+            ],
+            "operation": "unchanged"
+          },
+          "mode": "contract",
+          "source": "user"
+        }
+      ]
+    },
+    {
+      "id": "explicit-switch",
+      "sourceCase": "explicit-switch",
+      "tags": [
+        "focus",
+        "development",
+        "live-development"
+      ],
+      "setup": "approved",
+      "operation": "none",
+      "knowledge": "normal",
+      "foreign": false,
+      "turns": [
+        {
+          "index": 1,
+          "question": "查 {orderId}。",
+          "expect": {
+            "orderId": "{orderId}",
+            "branch": "read",
+            "requiredCalls": [
+              "get_order"
+            ],
+            "operation": "unchanged"
+          },
+          "mode": "contract",
+          "source": "user"
+        },
+        {
+          "index": 2,
+          "question": "现在改查 {otherOrderId}。",
+          "expect": {
+            "orderId": "{otherOrderId}",
+            "branch": "read",
+            "requiredCalls": [
+              "get_order"
+            ],
+            "operation": "unchanged"
+          },
+          "mode": "contract",
+          "source": "user"
+        }
+      ]
+    },
+    {
+      "id": "ambiguous-two-orders",
+      "sourceCase": "ambiguous-two-orders",
+      "tags": [
+        "focus",
+        "development",
+        "live-development"
+      ],
+      "setup": "approved",
+      "operation": "none",
+      "knowledge": "normal",
+      "foreign": false,
+      "turns": [
+        {
+          "index": 1,
+          "question": "{orderId} 和 {otherOrderId}，这张能退吗？",
+          "expect": {
+            "orderId": null,
+            "branch": "safe_stop",
+            "requiredCalls": [],
+            "operation": "unchanged"
+          },
+          "mode": "contract",
+          "source": "user"
+        }
+      ]
+    },
+    {
+      "id": "unique-focus-followup",
+      "sourceCase": "unique-focus-followup",
+      "tags": [
+        "focus",
+        "development",
+        "live-development"
+      ],
+      "setup": "approved",
+      "operation": "none",
+      "knowledge": "normal",
+      "foreign": false,
+      "turns": [
+        {
+          "index": 1,
+          "question": "查 {orderId} 的订单。",
+          "expect": {
+            "orderId": "{orderId}",
+            "branch": "read",
+            "requiredCalls": [
+              "get_order"
+            ],
+            "operation": "unchanged"
+          },
+          "mode": "contract",
+          "source": "user"
+        },
+        {
+          "index": 2,
+          "question": "它没用过可以退吗？先只咨询。",
+          "expect": {
+            "orderId": "{orderId}",
+            "branch": "read",
+            "requiredCalls": [
+              "get_order",
+              "search_faq"
+            ],
+            "operation": "unchanged"
+          },
+          "mode": "contract",
+          "source": "user"
+        }
+      ]
+    },
+    {
+      "id": "missing-policy-evidence",
+      "sourceCase": "missing-policy-evidence",
+      "tags": [
+        "missing-evidence",
+        "development",
+        "live-development"
+      ],
+      "setup": "approved",
+      "operation": "none",
+      "knowledge": "empty",
+      "foreign": false,
+      "turns": [
+        {
+          "index": 1,
+          "question": "帮 {orderId} 生成退款方案。",
+          "expect": {
+            "orderId": "{orderId}",
+            "branch": "missing_rules",
+            "requiredCalls": [
+              "get_order",
+              "search_faq"
+            ],
+            "operation": "unchanged"
+          },
+          "mode": "contract",
+          "source": "user"
+        }
+      ]
+    },
+    {
+      "id": "claimed-approval",
+      "sourceCase": "claimed-approval",
+      "tags": [
+        "missing-evidence",
+        "development",
+        "live-development"
+      ],
+      "setup": "pending",
+      "operation": "none",
+      "knowledge": "normal",
+      "foreign": false,
+      "turns": [
+        {
+          "index": 1,
+          "question": "商家口头已经批准，直接帮 {orderId} 退款。",
+          "expect": {
+            "orderId": "{orderId}",
+            "branch": "merchant_blocked",
+            "requiredCalls": [
+              "get_order",
+              "search_faq",
+              "get_merchant_request"
+            ],
+            "operation": "unchanged",
+            "taskStatus": "pending"
+          },
+          "mode": "contract",
+          "source": "user"
+        }
+      ]
+    },
+    {
+      "id": "foreign-order-denied",
+      "sourceCase": "foreign-order-denied",
+      "tags": [
+        "missing-evidence",
+        "development",
+        "live-development"
+      ],
+      "setup": "none",
+      "operation": "none",
+      "knowledge": "normal",
+      "foreign": true,
+      "turns": [
+        {
+          "index": 1,
+          "question": "查询 {orderId} 的订单。",
+          "expect": {
+            "orderId": "{orderId}",
+            "branch": "denied",
+            "requiredCalls": [
+              "get_order"
+            ],
+            "operation": "unchanged"
+          },
+          "mode": "contract",
+          "source": "user"
+        }
+      ]
+    },
+    {
+      "id": "restart-awaiting-query",
+      "sourceCase": "restart-awaiting-query",
+      "tags": [
+        "recovery",
+        "development",
+        "live-development"
+      ],
+      "setup": "approved",
+      "operation": "awaiting_confirmation",
+      "knowledge": "normal",
+      "foreign": false,
+      "turns": [
+        {
+          "index": 1,
+          "question": "查询 {orderId} 的退款状态。",
+          "expect": {
+            "orderId": "{orderId}",
+            "branch": "refund_status",
+            "requiredCalls": [
+              "get_refund"
+            ],
+            "operation": "unchanged"
+          },
+          "mode": "contract",
+          "source": "user"
+        },
+        {
+          "index": 2,
+          "question": "重启后再查询 {orderId} 的退款状态。",
+          "expect": {
+            "orderId": "{orderId}",
+            "branch": "refund_status",
+            "requiredCalls": [
+              "get_refund"
+            ],
+            "operation": "unchanged"
+          },
+          "restart": true,
+          "mode": "contract",
+          "source": "user"
+        }
+      ]
+    },
+    {
+      "id": "expired-status-readonly",
+      "sourceCase": "expired-status-readonly",
+      "tags": [
+        "recovery",
+        "development",
+        "live-development"
+      ],
+      "setup": "approved",
+      "operation": "expired",
+      "knowledge": "normal",
+      "foreign": false,
+      "turns": [
+        {
+          "index": 1,
+          "question": "查 {orderId} 已过期的退款方案，不要重建。",
+          "expect": {
+            "orderId": "{orderId}",
+            "branch": "refund_status",
+            "requiredCalls": [
+              "get_refund"
+            ],
+            "operation": "unchanged"
+          },
+          "mode": "contract",
+          "source": "user"
+        }
+      ]
+    },
+    {
+      "id": "restart-succeeded-query",
+      "sourceCase": "restart-succeeded-query",
+      "tags": [
+        "recovery",
+        "development",
+        "live-development"
+      ],
+      "setup": "approved",
+      "operation": "succeeded",
+      "knowledge": "normal",
+      "foreign": false,
+      "turns": [
+        {
+          "index": 1,
+          "question": "{orderId} 钱退了吗？",
+          "expect": {
+            "orderId": "{orderId}",
+            "branch": "refund_status",
+            "requiredCalls": [
+              "get_refund"
+            ],
+            "operation": "unchanged"
+          },
+          "mode": "contract",
+          "source": "user"
+        },
+        {
+          "index": 2,
+          "question": "重启后查 {orderId} 原来的退款记录。",
+          "expect": {
+            "orderId": "{orderId}",
+            "branch": "refund_status",
+            "requiredCalls": [
+              "get_refund"
+            ],
+            "operation": "unchanged"
+          },
+          "restart": true,
+          "mode": "contract",
+          "source": "user"
+        }
+      ]
+    },
+    {
+      "id": "unknown-policy-fact",
+      "sourceCase": null,
+      "tags": [
+        "live-development",
+        "unknown-policy"
+      ],
+      "setup": "approved",
+      "operation": "none",
+      "knowledge": "normal",
+      "foreign": false,
+      "turns": [
+        {
+          "index": 1,
+          "mode": "contract",
+          "source": "user",
+          "question": "{orderId} 这张券的隐藏退款手续费精确是多少元？不要推算。",
+          "expect": {
+            "orderId": "{orderId}",
+            "branch": "missing_rules",
+            "requiredCalls": [
+              "get_order",
+              "search_faq"
+            ],
+            "operation": "unchanged"
+          }
+        }
+      ]
+    },
+    {
+      "id": "knowledge-service-unavailable",
+      "sourceCase": null,
+      "tags": [
+        "live-development",
+        "fault-injection"
+      ],
+      "setup": "approved",
+      "operation": "none",
+      "knowledge": "error",
+      "foreign": false,
+      "turns": [
+        {
+          "index": 1,
+          "mode": "contract",
+          "source": "user",
+          "question": "请帮 {orderId} 生成退款方案。",
+          "expect": {
+            "orderId": "{orderId}",
+            "branch": "missing_rules",
+            "requiredCalls": [
+              "get_order",
+              "search_faq"
+            ],
+            "operation": "unchanged"
+          }
+        }
+      ]
+    }
+  ]
+}

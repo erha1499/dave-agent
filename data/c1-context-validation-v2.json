@@ -1,0 +1,776 @@
+{
+  "version": 2,
+  "suiteId": "c1-context-validation-v2-v2",
+  "validationPolicy": "fixed-validation-not-blind",
+  "provenance": "New contextual input contract authored after the first C1 run; original data and artifact remain unchanged. Frozen before running these cases. Shared workspace fixed validation, not blind. No A1 threshold or support-prompt calibration.",
+  "measurement": {
+    "queryOnly": "Original A1 query-only remains clarify/deferred in its original dataset; this new suite evaluates explicit missing-context clarification separately.",
+    "contextual": "Host-supplied typed context must be reauthorized and checked against current order or frozen reference source before retrieval. No case ID, gold or quote may be used to produce an effective query.",
+    "mock": "Default transport substitutes prove wiring, scope, resolution and failure contracts, not actual model decision quality.",
+    "live": "Explicit --live tests real Bailian rerank and DeepSeek support judgments. Order/context fixtures remain controlled; not real model action selection, real MySQL execution, or QQ acceptance.",
+    "reference": "Reference-only topic fixtures never enter production order/database knowledge.",
+    "failures": "Every planned variant retained. Missing capabilities/errors are failed/incomplete, never relabeled clarify after observing outputs."
+  },
+  "actor": {
+    "appId": "TEST_APP",
+    "senderId": "TEST_USER1"
+  },
+  "groupOpenid": "C1_TEST_GROUP",
+  "orderFixtures": {
+    "lunch": {
+      "orderId": "COUPON-1001",
+      "template": "paid_lunch",
+      "owner": "TEST_USER1"
+    },
+    "partial": {
+      "orderId": "COUPON-1005",
+      "template": "partial_dinner",
+      "owner": "TEST_USER1"
+    },
+    "refunded": {
+      "orderId": "COUPON-1004",
+      "template": "refunded_dinner",
+      "owner": "TEST_USER1"
+    },
+    "expired": {
+      "orderId": "COUPON-1003",
+      "template": "expired_lunch",
+      "owner": "TEST_USER1"
+    },
+    "private": {
+      "orderId": "COUPON-1008",
+      "template": "private_meal",
+      "owner": "TEST_USER1"
+    },
+    "other_customer": {
+      "orderId": "COUPON-1002",
+      "template": "paid_lunch",
+      "owner": "TEST_USER2"
+    }
+  },
+  "cases": [
+    {
+      "id": "c1-fresh-001",
+      "corpus": "online",
+      "originalQuery": "那这张已经退过的券，还能再次退款吗？",
+      "queryOnlyExpected": {
+        "resolution": "clarify",
+        "relevant": [],
+        "reason": "Query-only 不含可信焦点/金额来源/唯一话题，保留澄清输入合同。"
+      },
+      "contextualMeaning": "真实焦点已退款，必须查历史状态而非未使用退款规则",
+      "variants": [
+        {
+          "id": "known",
+          "input": {
+            "identity": {
+              "appId": "TEST_APP",
+              "senderId": "TEST_USER1"
+            },
+            "groupOpenid": "C1_TEST_GROUP",
+            "focusOrder": "refunded",
+            "topics": [
+              {
+                "kind": "refund_eligibility",
+                "order": "refunded",
+                "provenance": "successful-host-result",
+                "identity": {
+                  "appId": "TEST_APP",
+                  "senderId": "TEST_USER1"
+                },
+                "groupOpenid": "C1_TEST_GROUP",
+                "priorQuery": "订单 COUPON-1004 已退款后还能再退一遍吗？"
+              }
+            ]
+          },
+          "expected": {
+            "resolution": "resolved",
+            "relevant": [
+              "KB-REFUND-PAYMENT"
+            ],
+            "evidence": [
+              {
+                "docId": "KB-REFUND-PAYMENT",
+                "quote": "已完成退款的订单需以支付和退款历史为准，不得重复退款"
+              }
+            ],
+            "effectiveQueryMustInclude": [
+              "已退款",
+              "退款"
+            ],
+            "reason": "已完成退款订单只能展示历史，不得再次退款。"
+          }
+        },
+        {
+          "id": "missing",
+          "input": {
+            "identity": {
+              "appId": "TEST_APP",
+              "senderId": "TEST_USER1"
+            },
+            "groupOpenid": "C1_TEST_GROUP",
+            "focusOrder": null,
+            "topics": []
+          },
+          "expected": {
+            "resolution": "clarify",
+            "relevant": [],
+            "evidence": [],
+            "effectiveQueryMustInclude": [],
+            "reason": "没有本轮可校验的可信订单/话题，不能仅凭原始指代选择规则。"
+          }
+        },
+        {
+          "id": "ambiguous",
+          "input": {
+            "identity": {
+              "appId": "TEST_APP",
+              "senderId": "TEST_USER1"
+            },
+            "groupOpenid": "C1_TEST_GROUP",
+            "focusOrder": null,
+            "topics": [
+              {
+                "kind": "refund_eligibility",
+                "order": "lunch",
+                "provenance": "successful-host-result",
+                "identity": {
+                  "appId": "TEST_APP",
+                  "senderId": "TEST_USER1"
+                },
+                "groupOpenid": "C1_TEST_GROUP",
+                "priorQuery": "订单 COUPON-1001 的退款申请资格是什么？"
+              },
+              {
+                "kind": "refund_eligibility",
+                "order": "expired",
+                "provenance": "successful-host-result",
+                "identity": {
+                  "appId": "TEST_APP",
+                  "senderId": "TEST_USER1"
+                },
+                "groupOpenid": "C1_TEST_GROUP",
+                "priorQuery": "订单 COUPON-1003 的退款申请资格是什么？"
+              }
+            ]
+          },
+          "expected": {
+            "resolution": "clarify",
+            "relevant": [],
+            "evidence": [],
+            "effectiveQueryMustInclude": [],
+            "reason": "两个已看过订单均可能对应“这个”，宿主没有唯一焦点，不按最近数组位置猜测。"
+          }
+        }
+      ],
+      "originalId": "a1-val-055"
+    },
+    {
+      "id": "c1-fresh-002",
+      "corpus": "online",
+      "originalQuery": "未消费的那份，也是刚才那个实付金额吗？",
+      "queryOnlyExpected": {
+        "resolution": "clarify",
+        "relevant": [],
+        "reason": "Query-only 不含可信焦点/金额来源/唯一话题，保留澄清输入合同。"
+      },
+      "contextualMeaning": "同单唯一未消费份额与宿主先前展示实付单价比较",
+      "variants": [
+        {
+          "id": "known",
+          "input": {
+            "identity": {
+              "appId": "TEST_APP",
+              "senderId": "TEST_USER1"
+            },
+            "groupOpenid": "C1_TEST_GROUP",
+            "focusOrder": "partial",
+            "topics": [
+              {
+                "kind": "remaining_coupon_refund",
+                "order": "partial",
+                "provenance": "successful-host-result",
+                "identity": {
+                  "appId": "TEST_APP",
+                  "senderId": "TEST_USER1"
+                },
+                "groupOpenid": "C1_TEST_GROUP",
+                "priorQuery": "订单 COUPON-1005 用了一张，剩余券退款申请金额按什么计算？"
+              }
+            ],
+            "amountReference": {
+              "order": "partial",
+              "field": "item_paid_unit",
+              "productId": "product-demo-2",
+              "provenance": "successful-host-result"
+            },
+            "couponSelector": "unique_unused"
+          },
+          "expected": {
+            "resolution": "resolved",
+            "relevant": [
+              "KB-REFUND-PARTIAL"
+            ],
+            "evidence": [
+              {
+                "docId": "KB-REFUND-PARTIAL",
+                "quote": "未核销、未过期、未退款部分可申请的金额按对应券的实付单价计算"
+              }
+            ],
+            "effectiveQueryMustInclude": [
+              "剩余",
+              "退款"
+            ],
+            "reason": "唯一可信指代结合本轮授权/状态复读后，才可查询适用原文。",
+            "facts": {
+              "remainingCouponCount": 1,
+              "remainingUnitPaidCents": 5990,
+              "comparisonEqual": true
+            }
+          }
+        },
+        {
+          "id": "missing",
+          "input": {
+            "identity": {
+              "appId": "TEST_APP",
+              "senderId": "TEST_USER1"
+            },
+            "groupOpenid": "C1_TEST_GROUP",
+            "focusOrder": null,
+            "topics": []
+          },
+          "expected": {
+            "resolution": "clarify",
+            "relevant": [],
+            "evidence": [],
+            "effectiveQueryMustInclude": [],
+            "reason": "没有本轮可校验的可信订单/话题，不能仅凭原始指代选择规则。"
+          }
+        },
+        {
+          "id": "ambiguous",
+          "input": {
+            "identity": {
+              "appId": "TEST_APP",
+              "senderId": "TEST_USER1"
+            },
+            "groupOpenid": "C1_TEST_GROUP",
+            "focusOrder": "partial",
+            "topics": [
+              {
+                "kind": "remaining_coupon_refund",
+                "order": "partial",
+                "provenance": "successful-host-result",
+                "identity": {
+                  "appId": "TEST_APP",
+                  "senderId": "TEST_USER1"
+                },
+                "groupOpenid": "C1_TEST_GROUP",
+                "priorQuery": "订单 COUPON-1005 用了一张，剩余券退款申请金额按什么计算？"
+              }
+            ],
+            "couponSelector": "unique_unused"
+          },
+          "expected": {
+            "resolution": "clarify",
+            "relevant": [],
+            "evidence": [],
+            "effectiveQueryMustInclude": [],
+            "reason": "即使剩余券唯一，也缺少“这个金额”的可信来源，不能猜是在比整单还是单券。"
+          }
+        }
+      ],
+      "originalId": "a1-val-056"
+    },
+    {
+      "id": "c1-fresh-003",
+      "corpus": "online",
+      "originalQuery": "另一笔如果还没用过，退款规则也一样吗？",
+      "queryOnlyExpected": {
+        "resolution": "clarify",
+        "relevant": [],
+        "reason": "Query-only 不含可信焦点/金额来源/唯一话题，保留澄清输入合同。"
+      },
+      "contextualMeaning": "原焦点已退款，另一笔实际未使用，不能沿用旧退款状态",
+      "variants": [
+        {
+          "id": "known",
+          "input": {
+            "identity": {
+              "appId": "TEST_APP",
+              "senderId": "TEST_USER1"
+            },
+            "groupOpenid": "C1_TEST_GROUP",
+            "focusOrder": "refunded",
+            "topics": [
+              {
+                "kind": "refund_eligibility",
+                "order": "refunded",
+                "provenance": "successful-host-result",
+                "identity": {
+                  "appId": "TEST_APP",
+                  "senderId": "TEST_USER1"
+                },
+                "groupOpenid": "C1_TEST_GROUP",
+                "priorQuery": "订单 COUPON-1004 已经退过款，还能再退吗？"
+              }
+            ],
+            "alternatives": [
+              "refunded",
+              "lunch"
+            ],
+            "alternativeSource": "successful-host-order-list"
+          },
+          "expected": {
+            "resolution": "resolved",
+            "relevant": [
+              "KB-REFUND-UNUSED"
+            ],
+            "evidence": [
+              {
+                "docId": "KB-REFUND-UNUSED",
+                "quote": "已支付、未核销且尚未过期的团购券可以申请退款"
+              }
+            ],
+            "effectiveQueryMustInclude": [
+              "未核销",
+              "退款"
+            ],
+            "reason": "唯一另一笔是未使用的午餐订单，切换后重新授权读取当前状态。",
+            "facts": {
+              "resolvedOrderId": "COUPON-1001"
+            }
+          }
+        },
+        {
+          "id": "missing",
+          "input": {
+            "identity": {
+              "appId": "TEST_APP",
+              "senderId": "TEST_USER1"
+            },
+            "groupOpenid": "C1_TEST_GROUP",
+            "focusOrder": null,
+            "topics": []
+          },
+          "expected": {
+            "resolution": "clarify",
+            "relevant": [],
+            "evidence": [],
+            "effectiveQueryMustInclude": [],
+            "reason": "没有本轮可校验的可信订单/话题，不能仅凭原始指代选择规则。"
+          }
+        },
+        {
+          "id": "ambiguous",
+          "input": {
+            "identity": {
+              "appId": "TEST_APP",
+              "senderId": "TEST_USER1"
+            },
+            "groupOpenid": "C1_TEST_GROUP",
+            "focusOrder": "lunch",
+            "topics": [
+              {
+                "kind": "refund_eligibility",
+                "order": "lunch",
+                "provenance": "successful-host-result",
+                "identity": {
+                  "appId": "TEST_APP",
+                  "senderId": "TEST_USER1"
+                },
+                "groupOpenid": "C1_TEST_GROUP",
+                "priorQuery": "订单 COUPON-1001 的退款申请资格是什么？"
+              }
+            ],
+            "alternatives": [
+              "lunch",
+              "refunded",
+              "expired"
+            ],
+            "alternativeSource": "successful-host-order-list"
+          },
+          "expected": {
+            "resolution": "clarify",
+            "relevant": [],
+            "evidence": [],
+            "effectiveQueryMustInclude": [],
+            "reason": "焦点以外有两个已授权备选，“另一张”并不唯一，必须让用户选明。"
+          }
+        }
+      ],
+      "originalId": "a1-val-057"
+    },
+    {
+      "id": "c1-fresh-004",
+      "corpus": "online",
+      "originalQuery": "那这张私享券在普通周末到底能不能使用？",
+      "queryOnlyExpected": {
+        "resolution": "clarify",
+        "relevant": [],
+        "reason": "Query-only 不含可信焦点/金额来源/唯一话题，保留澄清输入合同。"
+      },
+      "contextualMeaning": "明确缺失事实，不含“这样”的政策缺失歧义",
+      "variants": [
+        {
+          "id": "known",
+          "input": {
+            "identity": {
+              "appId": "TEST_APP",
+              "senderId": "TEST_USER1"
+            },
+            "groupOpenid": "C1_TEST_GROUP",
+            "focusOrder": "private",
+            "topics": [
+              {
+                "kind": "usage_calendar",
+                "order": "private",
+                "provenance": "successful-host-result",
+                "identity": {
+                  "appId": "TEST_APP",
+                  "senderId": "TEST_USER1"
+                },
+                "groupOpenid": "C1_TEST_GROUP",
+                "priorQuery": "订单 COUPON-1008 的私享套餐使用日期限制是否已经录入？"
+              }
+            ]
+          },
+          "expected": {
+            "resolution": "resolved_no_evidence",
+            "relevant": [],
+            "evidence": [],
+            "effectiveQueryMustInclude": [
+              "私享",
+              "周末"
+            ],
+            "reason": "明确询问私享套餐普通周末可用性，原文没有该事实；已知未录入不能被算成可使用。"
+          }
+        },
+        {
+          "id": "missing",
+          "input": {
+            "identity": {
+              "appId": "TEST_APP",
+              "senderId": "TEST_USER1"
+            },
+            "groupOpenid": "C1_TEST_GROUP",
+            "focusOrder": null,
+            "topics": []
+          },
+          "expected": {
+            "resolution": "clarify",
+            "relevant": [],
+            "evidence": [],
+            "effectiveQueryMustInclude": [],
+            "reason": "没有本轮可校验的可信订单/话题，不能仅凭原始指代选择规则。"
+          }
+        },
+        {
+          "id": "ambiguous",
+          "input": {
+            "identity": {
+              "appId": "TEST_APP",
+              "senderId": "TEST_USER1"
+            },
+            "groupOpenid": "C1_TEST_GROUP",
+            "focusOrder": "lunch",
+            "topics": [
+              {
+                "kind": "usage_calendar",
+                "order": "lunch",
+                "provenance": "successful-host-result",
+                "identity": {
+                  "appId": "TEST_APP",
+                  "senderId": "TEST_USER1"
+                },
+                "groupOpenid": "C1_TEST_GROUP",
+                "priorQuery": "订单 COUPON-1001 对应的云味常规午餐，现有使用日期规则有哪些？"
+              },
+              {
+                "kind": "refund_eligibility",
+                "order": "lunch",
+                "provenance": "successful-host-result",
+                "identity": {
+                  "appId": "TEST_APP",
+                  "senderId": "TEST_USER1"
+                },
+                "groupOpenid": "C1_TEST_GROUP",
+                "priorQuery": "订单 COUPON-1001 的退款申请资格是什么？"
+              }
+            ]
+          },
+          "expected": {
+            "resolution": "clarify",
+            "relevant": [],
+            "evidence": [],
+            "effectiveQueryMustInclude": [],
+            "reason": "同一订单可能在讨论能否使用或退款条件；唯一订单不代表“这样”的话题唯一。"
+          }
+        }
+      ],
+      "originalId": "a1-val-058"
+    },
+    {
+      "id": "c1-fresh-005",
+      "corpus": "reference",
+      "originalQuery": "超过那个时间就一定是退款失败了吗？",
+      "queryOnlyExpected": {
+        "resolution": "clarify",
+        "relevant": [],
+        "reason": "Query-only 不含可信焦点/金额来源/唯一话题，保留澄清输入合同。"
+      },
+      "contextualMeaning": "真实银行卡到账话题加必然失败强前提，不能凭近似时效原文回答",
+      "variants": [
+        {
+          "id": "known",
+          "input": {
+            "identity": {
+              "appId": "TEST_APP",
+              "senderId": "TEST_USER1"
+            },
+            "groupOpenid": "C1_TEST_GROUP",
+            "focusOrder": null,
+            "topics": [
+              {
+                "kind": "refund_arrival",
+                "order": null,
+                "provenance": "successful-host-result",
+                "identity": {
+                  "appId": "TEST_APP",
+                  "senderId": "TEST_USER1"
+                },
+                "groupOpenid": "C1_TEST_GROUP",
+                "paymentChannel": "bank_card",
+                "boundaryWorkingDays": 3,
+                "sourceEvidence": {
+                  "docId": "RF005",
+                  "quote": "银行卡1-3个工作日"
+                },
+                "priorQuery": "银行卡退款一般在1至3个工作日到账吗？"
+              }
+            ]
+          },
+          "expected": {
+            "resolution": "resolved_no_evidence",
+            "relevant": [],
+            "evidence": [],
+            "effectiveQueryMustInclude": [
+              "时间",
+              "银行卡"
+            ],
+            "reason": "超过银行卡常规到账范围不等于已经失败；原文未提供必然失败结论。"
+          }
+        },
+        {
+          "id": "missing",
+          "input": {
+            "identity": {
+              "appId": "TEST_APP",
+              "senderId": "TEST_USER1"
+            },
+            "groupOpenid": "C1_TEST_GROUP",
+            "focusOrder": null,
+            "topics": []
+          },
+          "expected": {
+            "resolution": "clarify",
+            "relevant": [],
+            "evidence": [],
+            "effectiveQueryMustInclude": [],
+            "reason": "没有本轮可校验的可信订单/话题，不能仅凭原始指代选择规则。"
+          }
+        },
+        {
+          "id": "ambiguous",
+          "input": {
+            "identity": {
+              "appId": "TEST_APP",
+              "senderId": "TEST_USER1"
+            },
+            "groupOpenid": "C1_TEST_GROUP",
+            "focusOrder": null,
+            "topics": [
+              {
+                "kind": "refund_arrival",
+                "order": null,
+                "provenance": "successful-host-result",
+                "identity": {
+                  "appId": "TEST_APP",
+                  "senderId": "TEST_USER1"
+                },
+                "groupOpenid": "C1_TEST_GROUP",
+                "paymentChannel": "bank_card",
+                "boundaryWorkingDays": 3,
+                "sourceEvidence": {
+                  "docId": "RF005",
+                  "quote": "银行卡1-3个工作日"
+                },
+                "priorQuery": "银行卡退款一般在1至3个工作日到账吗？"
+              },
+              {
+                "kind": "refund_arrival",
+                "order": null,
+                "provenance": "successful-host-result",
+                "identity": {
+                  "appId": "TEST_APP",
+                  "senderId": "TEST_USER1"
+                },
+                "groupOpenid": "C1_TEST_GROUP",
+                "paymentChannel": "credit_card",
+                "boundaryWorkingDays": 7,
+                "sourceEvidence": {
+                  "docId": "RF005",
+                  "quote": "信用卡3-7个工作日"
+                },
+                "priorQuery": "信用卡退款通常3至7个工作日到账，这个范围是规则记载的吗？"
+              }
+            ]
+          },
+          "expected": {
+            "resolution": "clarify",
+            "relevant": [],
+            "evidence": [],
+            "effectiveQueryMustInclude": [],
+            "reason": "银行卡三工作日与信用卡七工作日均为可信候选，宿主未选择单一到账时限，不能猜测指代。"
+          }
+        }
+      ],
+      "originalId": "a1-val-059"
+    },
+    {
+      "id": "c1-fresh-006",
+      "corpus": "reference",
+      "originalQuery": "距到店不足那个时间，谁来批准改期？",
+      "queryOnlyExpected": {
+        "resolution": "clarify",
+        "relevant": [],
+        "reason": "Query-only 不含可信焦点/金额来源/唯一话题，保留澄清输入合同。"
+      },
+      "contextualMeaning": "从24小时前自由改期续问阈值之内的审批对象",
+      "variants": [
+        {
+          "id": "known",
+          "input": {
+            "identity": {
+              "appId": "TEST_APP",
+              "senderId": "TEST_USER1"
+            },
+            "groupOpenid": "C1_TEST_GROUP",
+            "focusOrder": null,
+            "topics": [
+              {
+                "kind": "appointment_change",
+                "order": null,
+                "provenance": "successful-host-result",
+                "identity": {
+                  "appId": "TEST_APP",
+                  "senderId": "TEST_USER1"
+                },
+                "groupOpenid": "C1_TEST_GROUP",
+                "hoursBefore": 24,
+                "decisionMaker": "merchant",
+                "sourceEvidence": {
+                  "docId": "RS003",
+                  "quote": "通常允许在预约时间24小时前自由改期"
+                },
+                "priorQuery": "预约通常允许在到店24小时前自由改期吗？"
+              }
+            ]
+          },
+          "expected": {
+            "resolution": "resolved",
+            "relevant": [
+              "RS003"
+            ],
+            "evidence": [
+              {
+                "docId": "RS003",
+                "quote": "距预约时间不足24小时的变更需商家同意"
+              }
+            ],
+            "effectiveQueryMustInclude": [
+              "时间",
+              "预约",
+              "24"
+            ],
+            "reason": "唯一话题为预约24小时前自由改期；本轮明确不足该时限，需要商家同意。"
+          }
+        },
+        {
+          "id": "missing",
+          "input": {
+            "identity": {
+              "appId": "TEST_APP",
+              "senderId": "TEST_USER1"
+            },
+            "groupOpenid": "C1_TEST_GROUP",
+            "focusOrder": null,
+            "topics": []
+          },
+          "expected": {
+            "resolution": "clarify",
+            "relevant": [],
+            "evidence": [],
+            "effectiveQueryMustInclude": [],
+            "reason": "没有本轮可校验的可信订单/话题，不能仅凭原始指代选择规则。"
+          }
+        },
+        {
+          "id": "ambiguous",
+          "input": {
+            "identity": {
+              "appId": "TEST_APP",
+              "senderId": "TEST_USER1"
+            },
+            "groupOpenid": "C1_TEST_GROUP",
+            "focusOrder": null,
+            "topics": [
+              {
+                "kind": "redeemed_refund",
+                "order": null,
+                "provenance": "successful-host-result",
+                "identity": {
+                  "appId": "TEST_APP",
+                  "senderId": "TEST_USER1"
+                },
+                "groupOpenid": "C1_TEST_GROUP",
+                "decisionMaker": "merchant",
+                "sourceEvidence": {
+                  "docId": "RF002",
+                  "quote": "须经商家同意后方可办理"
+                },
+                "priorQuery": "已核销订单有特殊售后理由时，退款是否需要商家同意？"
+              },
+              {
+                "kind": "appointment_change",
+                "order": null,
+                "provenance": "successful-host-result",
+                "identity": {
+                  "appId": "TEST_APP",
+                  "senderId": "TEST_USER1"
+                },
+                "groupOpenid": "C1_TEST_GROUP",
+                "hoursBefore": 12,
+                "sourceEvidence": {
+                  "docId": "RS003",
+                  "quote": "距预约时间不足24小时的变更需商家同意"
+                },
+                "priorQuery": "距离预约还有12小时，属于不足24小时的变更，改期需要商家同意吗？"
+              }
+            ]
+          },
+          "expected": {
+            "resolution": "clarify",
+            "relevant": [],
+            "evidence": [],
+            "effectiveQueryMustInclude": [],
+            "reason": "宿主有竞争的话题记录，未发布唯一可信policyTopic；指代必须先澄清，不由模型从两条历史自行选取。"
+          }
+        }
+      ],
+      "originalId": "a1-val-060"
+    }
+  ],
+  "split": "validation-v2"
+}

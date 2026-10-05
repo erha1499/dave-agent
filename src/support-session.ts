@@ -6,10 +6,12 @@ import { defineTool, loadSkillsFromDir, type AgentSession, type ModelRuntime } f
 import { createSession } from "./agent.ts";
 import { merchantSourceKey, type AfterSalesStore } from "./after-sales.ts";
 import type { CouponStore, QQIdentity } from "./coupon-store.ts";
+import type { KnowledgeService } from "./knowledge-service.ts";
 import type { RefundStore } from "./refunds.ts";
 import type { Reply } from "./reply.ts";
 import { parseSupportAction, supportActionParameters } from "./support-action.ts";
-import { SupportController, type SupportCall, type SupportResult } from "./support-controller.ts";
+import { hasAmbiguousOrderReference, SupportController, type SupportCall, type SupportResult, type TrustedPolicyTopic } from "./support-controller.ts";
+import { rememberOrderChoice, selectAlternativeOrder, supportObjectReference, type TrustedAmountReference, type TrustedOrderChoices } from "./support-context.ts";
 import { resolveSupportParameters } from "./support-parameters.ts";
 
 export type SupportPrompt = {
@@ -20,8 +22,11 @@ export type SupportFocus = {
   read: () => Promise<string | undefined>;
   write: (orderId: string | undefined) => Promise<void>;
 };
-type State = { next?: SupportPrompt; result?: SupportResult; focusOrderId?: string; abort?: AbortController; turnError?: boolean; focusUnavailable?: boolean; invalidActions: number };
+type State = { next?: SupportPrompt; result?: SupportResult; focusOrderId?: string; policyTopic?: TrustedPolicyTopic;
+  orderChoices?: TrustedOrderChoices; amountReference?: TrustedAmountReference;
+  abort?: AbortController; turnError?: boolean; focusUnavailable?: boolean; invalidActions: number };
 const sessions = new WeakMap<AgentSession, State>();
+function clearReferences(state: State) { state.policyTopic = undefined; state.orderChoices = undefined; state.amountReference = undefined; }
 
 export function readSupportArchitecture(env: NodeJS.ProcessEnv = process.env): "atomic" | "controller" {
   // Keep the measured V0 as default until the separately versioned candidate clears its gates.
@@ -41,7 +46,10 @@ export function prepareSupportPrompt(session: AgentSession, prompt: SupportPromp
 }
 export const getSupportResult = (session: AgentSession) => sessions.get(session)?.result;
 export const isSupportSession = (session: AgentSession) => sessions.has(session);
-export function cancelSupportTurn(session: AgentSession) { sessions.get(session)?.abort?.abort(); }
+export function cancelSupportTurn(session: AgentSession) {
+  const state = sessions.get(session);
+  if (state) { state.abort?.abort(); clearReferences(state); }
+}
 
 // Only an in-process, successful Controller result can choose a business card.
 export function supportReply(session: AgentSession, text = ""): Reply | undefined {
@@ -58,7 +66,7 @@ export function supportReply(session: AgentSession, text = ""): Reply | undefine
 export async function createSupportSession(
   identity: QQIdentity, store: CouponStore, runtime: ModelRuntime, model: Model<Api>,
   afterSales?: { store: AfterSalesStore; sourceKey: string; refunds?: RefundStore },
-  options: { groupOpenid?: string; focus?: SupportFocus; onCall?: (call: SupportCall) => void; repairBudget?: number } = {},
+  options: { groupOpenid?: string; focus?: SupportFocus; onCall?: (call: SupportCall) => void; repairBudget?: number; knowledge?: KnowledgeService } = {},
 ) {
   const { repairBudget } = resolveSupportParameters(options.repairBudget === undefined ? {} : { repairBudget: options.repairBudget });
   const groupOpenid = options.groupOpenid ?? "cli";
@@ -70,7 +78,7 @@ export async function createSupportSession(
   ]);
   const skills = loadSkillsFromDir({ dir: fileURLToPath(new URL("../skills/shop-support-v2", import.meta.url)), source: "project" });
   if (skills.skills.length !== 1 || skills.diagnostics.length) throw new Error("客服 v2 Skill 加载失败。");
-  const controller = new SupportController({ store, merchant: afterSales?.store, refunds: afterSales?.refunds });
+  const controller = new SupportController({ store, merchant: afterSales?.store, refunds: afterSales?.refunds, knowledge: options.knowledge });
   const state: State = { invalidActions: 0 };
   let turn: ReturnType<SupportController["createTurn"]> | undefined;
   const tools = [defineTool({
@@ -80,17 +88,28 @@ export async function createSupportSession(
     execute: async (_id, { action }) => {
       if (!turn) throw new Error("业务轮次尚未初始化。");
       state.abort?.signal.throwIfAborted();
-      const result = await turn.execute(action);
+      let result: SupportResult;
+      try { result = await turn.execute(action); }
+      catch (error) { clearReferences(state); throw error; }
       state.result = result;
+      state.policyTopic = result.verifiedPolicyTopic;
+      state.amountReference = result.verifiedAmountReference;
+      if (result.outcome === "ready" && result.reply.kind === "order" && result.evidence.order) {
+        state.orderChoices = rememberOrderChoice(state.orderChoices, { sourceKey, groupOpenid }, result.evidence.order.id, result.evidence.requestId);
+      } else state.orderChoices = undefined;
       if (result.verifiedOrderId) {
         state.focusOrderId = result.verifiedOrderId;
         // A failed context write must not turn a prepared operation into a retry.
         try { await options.focus?.write(result.verifiedOrderId); state.focusUnavailable = false; }
-        catch { state.focusOrderId = undefined; state.focusUnavailable = true; }
+        catch { state.focusOrderId = undefined; clearReferences(state); state.focusUnavailable = true; }
       }
-      const { order, rules, task, operation } = result.evidence;
+      const { order, rules, task, operation, amountComparison, displayedPaidUnit } = result.evidence;
       return { content: [{ type: "text", text: JSON.stringify({
-        outcome: result.outcome, reply: result.reply, evidence: { order, rules, task, operation },
+        outcome: result.outcome, reply: result.reply, evidence: { order, rules, task, operation,
+          amountComparison: amountComparison ? { remainingCouponCount: amountComparison.remainingCouponCount,
+            remainingUnitPaidCents: amountComparison.remainingUnitPaidCents, referencePaidCents: amountComparison.referencePaidCents,
+            comparisonEqual: amountComparison.comparisonEqual, refundApproved: false } : undefined,
+          displayedPaidUnit: displayedPaidUnit ? { field: displayedPaidUnit.field, paidCents: displayedPaidUnit.paidCents, productId: displayedPaidUnit.productId } : undefined },
         needsAnswer: result.needsAnswer,
       }) }], details: { action: result.action, outcome: result.outcome } };
     },
@@ -109,41 +128,59 @@ export async function createSupportSession(
       try {
         if (current.groupOpenid !== groupOpenid) throw new Error("会话不能切换可信群路由。");
         if (options.focus && !state.focusUnavailable) {
-          try { state.focusOrderId = await options.focus.read(); }
-          catch { state.focusOrderId = undefined; state.focusUnavailable = true; }
+          try {
+            const focus = await options.focus.read();
+            if (focus !== state.focusOrderId) clearReferences(state);
+            state.focusOrderId = focus;
+          } catch { state.focusOrderId = undefined; clearReferences(state); state.focusUnavailable = true; }
         }
         const explicit = [...new Set(userText.match(/COUPON-\d{4}(?!\d)/g) ?? [])];
-        if (explicit.length > 1 || (explicit.length === 1 && explicit[0] !== state.focusOrderId)) {
+        const objectReference = supportObjectReference(userText);
+        const hasObjectReference = objectReference === "remaining_amount" ? Boolean(state.amountReference)
+          : objectReference === "alternative_order" && Boolean(state.policyTopic && selectAlternativeOrder(state.orderChoices, { sourceKey, groupOpenid }, state.focusOrderId));
+        if (hasAmbiguousOrderReference(userText) && !hasObjectReference || (explicit.length === 1 && explicit[0] !== state.focusOrderId)) {
           state.focusOrderId = undefined;
+          state.policyTopic = undefined;
+          state.amountReference = undefined;
+          if (hasAmbiguousOrderReference(userText)) state.orderChoices = undefined;
           try { await options.focus?.write(undefined); }
           catch { state.focusUnavailable = true; }
         }
         turn = controller.createTurn({
           requestId: current.requestId, identity, sourceKey, userText,
           trustedRoute: { groupOpenid, messageId: current.messageId },
-          focusOrderId: state.focusOrderId, signal: state.abort.signal, onCall: current.onCall ?? options.onCall,
+          focusOrderId: state.focusOrderId, policyTopic: state.policyTopic, orderChoices: state.orderChoices, amountReference: state.amountReference,
+          signal: state.abort.signal, onCall: current.onCall ?? options.onCall,
         });
         return JSON.stringify({ kind: "host_order_reference", orderId: state.focusOrderId ?? null,
-          instruction: "仅用于明确的当前指代，不代表批准或确认。当前消息有订单号时优先explicit；多单/指代不清需clarify。" });
+          policyQuestion: state.policyTopic?.originalQuery ?? null,
+          itemPaidUnit: state.amountReference ? { orderId: state.amountReference.orderId, paidCents: state.amountReference.paidCents } : null,
+          alternativeOrderId: selectAlternativeOrder(state.orderChoices, { sourceKey, groupOpenid }, state.focusOrderId) ?? null,
+          instruction: "仅用于明确的当前指代，不代表批准或确认。当前有订单号用explicit；省略用focus。剩余券金额比较仅在itemPaidUnit存在时选择只读policy/refund_eligibility；另一张仅在alternativeOrderId与policyQuestion存在时选择只读续问，不能生成方案。宿主重新授权并决定对象；缺引用或多义需clarify。policyQuestion只标记话题，不是旧答案或授权。" });
       } catch {
         turn = undefined;
         state.abort.abort();
         state.turnError = true;
+        clearReferences(state);
         return JSON.stringify({ kind: "host_context_unavailable", instruction: "本轮宿主初始化失败，无法执行业务；请稍后重新按订单号查询。" });
       }
     });
   session.subscribe(event => {
     if (event.type !== "message_end" || event.message.role !== "assistant") return;
-    if (event.message.stopReason === "error" || event.message.stopReason === "aborted") state.turnError = true;
+    if (event.message.stopReason === "error" || event.message.stopReason === "aborted") { state.turnError = true; clearReferences(state); }
+    if (event.message.stopReason !== "toolUse" && !state.result) clearReferences(state);
     for (const part of event.message.content) {
       if (part.type !== "toolCall") continue;
       try {
         if (part.name !== "support_action" || Object.keys(part.arguments).length !== 1 || !("action" in part.arguments)) throw new Error();
-        parseSupportAction(part.arguments.action);
+        // Count pure reference/protocol failures in the same bounded repair budget as schema errors.
+        if (turn) turn.validate(part.arguments.action);
+        else parseSupportAction(part.arguments.action);
       } catch { state.invalidActions++; }
     }
     if (state.invalidActions > repairBudget) {
       state.turnError = true;
+      clearReferences(state);
       state.abort?.abort();
       // Do not await settlement inside the synchronous event listener.
       void session.abort().catch(() => {});

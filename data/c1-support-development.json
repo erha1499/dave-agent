@@ -1,0 +1,111 @@
+{
+  "version": 1,
+  "suiteId": "c1-support-development-pairs-v1",
+  "stage": "development-not-validation",
+  "provenance": "Extracted from exposed C1 rule-versus-instance failure modes before executing the revised typed candidate. These six inputs are public developer regression, not blind or fresh end-to-end validation. No unexecuted C1 validation-v3 content was read to author or tune this test.",
+  "measurement": "Direct support classification only; same actual document within each pair. No rerank, context resolver, order read, model action selection or final-answer evaluation. One real typed support request per query, six planned rows including errors. Exact category and supported mapping scored separately.",
+  "cases": [
+    {
+      "id": "c1-pair-001",
+      "pair": "rule-condition",
+      "corpus": "online",
+      "sourceId": "KB-REFUND-EXPIRED",
+      "query": "已过期但未核销的团购券，申请退款之前需要谁确认？",
+      "scope": {
+        "shopId": null,
+        "productId": null
+      },
+      "expected": {
+        "category": "direct_fact",
+        "supported": true,
+        "evidenceQuote": "已过期但未核销的券需要商家确认能否退款、延期以及金额",
+        "reason": "询问政策本身规定的确认主体；原文已给出商家确认这个前提，不要求实例审批结果。"
+      }
+    },
+    {
+      "id": "c1-pair-002",
+      "pair": "rule-condition",
+      "corpus": "online",
+      "sourceId": "KB-REFUND-EXPIRED",
+      "query": "我这笔已过期但未核销的团购券，商家现在已经批准退款了吗？",
+      "scope": {
+        "shopId": null,
+        "productId": null
+      },
+      "expected": {
+        "category": "limitation_only",
+        "supported": false,
+        "evidenceQuote": "已过期但未核销的券需要商家确认能否退款、延期以及金额",
+        "reason": "询问本单是否已经批准；政策前提没有提供实例商家结果。"
+      }
+    },
+    {
+      "id": "c1-pair-003",
+      "pair": "refund-route",
+      "corpus": "reference",
+      "sourceId": "RF001",
+      "query": "未核销且在有效期内的团购券退款，款项按规则退到哪个账户？",
+      "scope": {
+        "shopId": null,
+        "productId": null
+      },
+      "expected": {
+        "category": "direct_fact",
+        "supported": true,
+        "evidenceQuote": "退款将原路退回至原支付账户",
+        "reason": "询问政策规定的退款资金路径，不询问某笔到账事件。"
+      }
+    },
+    {
+      "id": "c1-pair-004",
+      "pair": "refund-route",
+      "corpus": "reference",
+      "sourceId": "RF001",
+      "query": "我这笔未核销团购券的退款，现在已经到账到我的原支付账户了吗？",
+      "scope": {
+        "shopId": null,
+        "productId": null
+      },
+      "expected": {
+        "category": "limitation_only",
+        "supported": false,
+        "evidenceQuote": "退款将原路退回至原支付账户,一般1-3个工作日到账,具体到账时间以支付渠道为准",
+        "reason": "询问本单是否已到账；通用路径和一般时效不证明实际事件已经发生。"
+      }
+    },
+    {
+      "id": "c1-pair-005",
+      "pair": "expiry-source",
+      "corpus": "online",
+      "sourceId": "KB-PRODUCT-LUNCH",
+      "query": "仅凭双人午餐团购券这个名称，就能推断出这张券的具体截止日期吗？",
+      "scope": {
+        "shopId": "shop-demo-1",
+        "productId": "product-demo-1"
+      },
+      "expected": {
+        "category": "boundary_answer",
+        "supported": true,
+        "evidenceQuote": "每张券具体截止时间以订单返回的 expiresAt 为准",
+        "reason": "明确问从名称推断日期是否有依据；原文指定订单 expiresAt 是具体截止时间的依据。"
+      }
+    },
+    {
+      "id": "c1-pair-006",
+      "pair": "expiry-source",
+      "corpus": "online",
+      "sourceId": "KB-PRODUCT-LUNCH",
+      "query": "我这张双人午餐团购券的具体到期日是2026年几月几日？",
+      "scope": {
+        "shopId": "shop-demo-1",
+        "productId": "product-demo-1"
+      },
+      "expected": {
+        "category": "limitation_only",
+        "supported": false,
+        "evidenceQuote": "每张券具体截止时间以订单返回的 expiresAt 为准",
+        "reason": "直接索要本单实际日期；原文只有查询位置，没有 expiresAt 实例值。"
+      }
+    }
+  ]
+}

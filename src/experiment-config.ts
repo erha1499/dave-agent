@@ -66,6 +66,12 @@ export const experimentFields: Record<"support" | "retrieval", Field[]> = {
     { key: "repairBudget", label: "格式修复次数", type: "number", min: 0, max: 2, step: 1, note: "仅 Controller 生效" },
     { key: "merchantEvents", label: "商家通知处理", type: "select", options: [
       { value: "architecture", label: "跟随架构" }, { value: "host", label: "宿主直接处理" }, { value: "model", label: "经过模型" }], note: "最终状态卡始终由宿主生成" },
+    { key: "knowledgeMode", label: "知识检索", type: "select", options: [
+      { value: "lexical", label: "本地词项" }, { value: "m4-support", label: "全候选重排 + 事实支持" }], note: "m4-support 仅 Controller；额外调用百炼和支持性模型" },
+    { key: "knowledgeSupport", label: "事实支持判别", type: "select", options: [
+      { value: "binary", label: "二元基线 v1" }, { value: "typed", label: "分类候选 v2" }], note: "typed 仅用于 m4-support；区分直接事实、可答边界、仅有缺失说明和无关证据" },
+    { key: "knowledgeThreshold", label: "知识接收阈值", type: "number", min: 0, max: 1, step: .01, note: "仅 m4-support；默认冻结值 0.71，分数不是概率" },
+    { key: "knowledgeTimeoutMs", label: "单次知识查询超时（ms）", type: "number", min: 1000, max: 60000, step: 1000, note: "包含读取、重排、支持判别和来源复检；无自动重试" },
   ],
   retrieval: [
     { key: "candidateTopK", label: "候选数 K", type: "number", min: 1, max: 100, step: 1, note: "M5/M6 重排候选及候选召回；M4 使用范围内全部文档" },
@@ -87,6 +93,14 @@ export function experimentCatalog() {
     presets: [
       preset("support-ab", "业务架构 A/B", "support", [{ id: "A", architecture: "atomic" }, { id: "B", architecture: "controller" }]),
       preset("support-controller", "Controller 单方案", "support", [{ id: "A", architecture: "controller" }]),
+      preset("support-knowledge-ab", "Controller 知识检索 A/B", "support", [
+        { id: "A", architecture: "controller", parameters: { knowledgeMode: "lexical" } },
+        { id: "B", architecture: "controller", parameters: { knowledgeMode: "m4-support" } },
+      ]),
+      preset("support-knowledge-profile-ab", "事实支持分类 A/B", "support", [
+        { id: "A", architecture: "controller", parameters: { knowledgeMode: "m4-support", knowledgeSupport: "binary" } },
+        { id: "B", architecture: "controller", parameters: { knowledgeMode: "m4-support", knowledgeSupport: "typed" } },
+      ]),
       preset("retrieval-local", "本地检索 M0 / M1", "retrieval", [{ id: "A", modes: ["M0", "M1"] }]),
       preset("retrieval-rerank", "词项 / 全候选重排", "retrieval", [{ id: "A", modes: ["M0", "M4"] }]),
       preset("retrieval-all", "检索 M0–M6", "retrieval", [{ id: "A", modes: [...experimentModes] }]),
@@ -114,6 +128,6 @@ export function experimentCatalog() {
     ] satisfies Field[],
     modes: ["M0 词项", "M1 BM25", "M2 向量", "M3 BM25 + 向量 RRF", "M4 全候选重排", "M5 词项候选重排", "M6 RRF 候选重排"].map((label, index) => ({ value: experimentModes[index], label })),
     limits: { variants: 2, repeat: 3, concurrentJobs: 1 },
-    notes: ["所有配置仅作用于本次评测，不修改在线 QQ 配置。", "检索是离线实验，固定原始 Recall@5 / MRR@5；A1 另行报告接收后的证据指标，尚未接入线上知识服务。", "原分数验证已曝光且未准入；事实支持策略使用单独的新固定验证集，仍非独立盲测，开发阈值不代表已达标。", "事实支持判别增加模型调用；与重排共用请求预算，费用按真实调用分别报告。", "长期记忆、模型改写开关尚未完成。"],
+    notes: ["所有配置仅作用于本次评测，不修改在线 QQ 配置。", "检索实验单独报告 Recall@5 / MRR@5 和接收后的证据指标；Controller 业务实验可显式比较 lexical 与 m4-support。", "原分数验证已曝光且未准入；事实支持策略使用单独的新固定验证集，仍非独立盲测，开发阈值不代表已达标。", "事实支持判别增加模型调用；离线实验与重排共用请求预算，业务知识服务限制单次查询超时且无重试，费用按真实调用分别报告。", "长期记忆、模型改写开关尚未完成。"],
   };
 }

@@ -74,7 +74,10 @@ async function boot() {
 const T = "2026-01-01T00:00:00Z";
 const counts = (planned: number, passed: number, failed: number, skipped: number, missing: number): any =>
   ({ planned, passed, failed, skipped, missing, passRate: planned ? passed / planned : null });
-const supportParams = (over: Record<string, unknown> = {}): any => ({ timeoutMs: 60000, repairBudget: 1, merchantEvents: "architecture", ...over });
+const supportParams = (over: Record<string, unknown> = {}): any => ({
+  timeoutMs: 60000, repairBudget: 1, merchantEvents: "architecture",
+  knowledgeMode: "lexical", knowledgeThreshold: 0.71, knowledgeTimeoutMs: 15000, knowledgeSupport: "binary", ...over,
+});
 const retrievalParams = (over: Record<string, unknown> = {}): any => ({
   candidateTopK: 20, bm25K1: 1.2, bm25B: 0.75, rrfK: 60, rrfWindow: 20, cache: "reuse",
   timeoutMs: 15000, retries: 1, maxRequests: 1000, consecutiveFailureLimit: 5, ...over,
@@ -86,6 +89,12 @@ const catalog = (): any => ({
       { id: "B", architecture: "controller", parameters: supportParams() }] } },
     { id: "support-controller", name: "Controller 单方案", config: { version: 1, kind: "support", label: "Controller 单方案", repeat: 1, allowRemote: false, variants: [
       { id: "A", architecture: "controller", parameters: supportParams() }] } },
+    { id: "support-knowledge-ab", name: "Controller 知识检索 A/B", config: { version: 1, kind: "support", label: "Controller 知识检索 A/B", repeat: 1, allowRemote: false, variants: [
+      { id: "A", architecture: "controller", parameters: supportParams({ knowledgeMode: "lexical" }) },
+      { id: "B", architecture: "controller", parameters: supportParams({ knowledgeMode: "m4-support" }) }] } },
+    { id: "support-knowledge-profile-ab", name: "Controller 事实支持判别 A/B", config: { version: 1, kind: "support", label: "Controller 事实支持判别 A/B", repeat: 1, allowRemote: false, variants: [
+      { id: "A", architecture: "controller", parameters: supportParams({ knowledgeMode: "m4-support", knowledgeSupport: "binary" }) },
+      { id: "B", architecture: "controller", parameters: supportParams({ knowledgeMode: "m4-support", knowledgeSupport: "typed" }) }] } },
     { id: "retrieval-local", name: "本地检索 M0 / M1", config: { version: 1, kind: "retrieval", label: "本地检索 M0 / M1", repeat: 1, allowRemote: false, variants: [
       { id: "A", modes: ["M0", "M1"], parameters: retrievalParams() } ] } },
     { id: "retrieval-rerank", name: "词项 / 全候选重排", config: { version: 1, kind: "retrieval", label: "词项 / 全候选重排", repeat: 1, allowRemote: false, variants: [
@@ -103,6 +112,12 @@ const catalog = (): any => ({
       { key: "repairBudget", label: "格式修复次数", type: "number", min: 0, max: 2, step: 1, note: "仅 Controller 生效" },
       { key: "merchantEvents", label: "商家通知处理", type: "select", options: [
         { value: "architecture", label: "跟随架构" }, { value: "host", label: "宿主直接处理" }, { value: "model", label: "经过模型" }], note: "最终状态卡始终由宿主生成" },
+      { key: "knowledgeMode", label: "知识检索", type: "select", options: [
+        { value: "lexical", label: "本地词项" }, { value: "m4-support", label: "全候选重排 + 事实支持" }], note: "m4-support 仅 Controller；额外调用百炼和支持性模型" },
+      { key: "knowledgeThreshold", label: "知识接收阈值", type: "number", min: 0, max: 1, step: 0.01, note: "仅 m4-support；默认冻结值 0.71，分数不是概率" },
+      { key: "knowledgeSupport", label: "事实支持判别", type: "select", options: [
+        { value: "binary", label: "二元判断" }, { value: "typed", label: "分类判别（事实/边界/限制/无关）" }], note: "仅 Controller + m4-support 生效" },
+      { key: "knowledgeTimeoutMs", label: "单次知识查询超时（ms）", type: "number", min: 1000, max: 60000, step: 1000, note: "包含读取、重排、支持判别和来源复检；无自动重试" },
     ],
     retrieval: [
       { key: "candidateTopK", label: "候选数 K", type: "number", min: 1, max: 100, step: 1 },
@@ -794,4 +809,179 @@ const openExperiments = async (booted: Awaited<ReturnType<typeof boot>>, jobs: u
   await flush();
   assert.equal(pendingCount(), 0);
   console.log("PASS 实验调试：support 模式表单/校验/回显/差异/提交，USD 独立用量与判别失败可见。");
+}
+
+// Controller 知识检索参数：字段来自 catalog，atomic+m4-support 禁提交不改模式，阈值/超时适用性联动，旧配置缺省兼容。
+{
+  const booted = await boot();
+  const { element, find, flush, pendingCount } = booted;
+  await openExperiments(booted);
+  const root = element("experiments");
+  const byField = (field: string, variant: string) => findAllAttr(root, "data-field", field).find(item => item.attrs.get("data-variant") === variant)!;
+  const preset = findAttr(root, "data-field", "preset")!;
+  preset.value = "support-knowledge-ab";
+  preset.fire("change");
+  await flush();
+  assert.match(content(root), /知识检索/);
+  assert.equal(byField("knowledgeMode", "A").value, "lexical");
+  assert.equal(byField("knowledgeMode", "B").value, "m4-support");
+  assert.equal(byField("knowledgeThreshold", "A").disabled, true, "lexical 方案阈值不适用");
+  assert.equal(byField("knowledgeThreshold", "B").disabled, false, "m4-support 方案阈值启用");
+  assert.equal(byField("knowledgeTimeoutMs", "A").disabled, false, "controller 知识超时生效");
+  assert.match(content(root), /knowledgeMode lexical → m4-support/, "差异含知识检索模式");
+  // A 切到 m4-support：阈值就地启用，不重建输入节点。
+  const modeA = byField("knowledgeMode", "A");
+  modeA.value = "m4-support";
+  modeA.fire("change");
+  await flush();
+  assert.equal(byField("knowledgeMode", "A"), modeA, "模式切换不重建卡片");
+  assert.equal(byField("knowledgeThreshold", "A").disabled, false, "阈值适用性即时更新");
+  // A 切 atomic：整建后知识超时禁用；m4-support 保留但提示禁提交，不偷偷改模式。
+  const archA = byField("architecture", "A");
+  archA.value = "atomic";
+  archA.fire("change");
+  await flush();
+  assert.equal(byField("knowledgeTimeoutMs", "A").disabled, true, "atomic 知识超时不适用");
+  assert.equal(byField("knowledgeMode", "A").value, "m4-support", "非法模式不被偷偷改回");
+  assert.match(content(root), /atomic 仅支持本地词项知识检索；m4-support 请使用 Controller/);
+  assert.equal(findClass(root, "primary-button")!.disabled, true, "atomic+m4-support 禁提交");
+  // 恢复 controller 后错误消失；提交体带知识参数。
+  const archA2 = byField("architecture", "A");
+  archA2.value = "controller";
+  archA2.fire("change");
+  await flush();
+  assert.ok(!content(root).includes("atomic 仅支持本地词项知识检索"), "恢复后错误消失");
+  const allow = findAttr(root, "data-field", "allow-remote")!;
+  allow.checked = true;
+  allow.fire("change");
+  await flush();
+  findClass(root, "primary-button")!.fire("click");
+  await flush(1);
+  const post = find(request => request.path === "/api/experiments" && request.options?.method === "POST", "knowledge POST");
+  const body = JSON.parse(post.options?.body || "{}");
+  assert.equal(body.variants[0].parameters.knowledgeMode, "m4-support", "提交体含知识模式");
+  assert.equal(body.variants[0].parameters.knowledgeThreshold, 0.71);
+  assert.equal(body.variants[0].parameters.knowledgeTimeoutMs, 15000);
+  respond(post, job("job-k1", { status: "completed", config: body }));
+  await flush();
+  assert.equal(pendingCount(), 0);
+  // 旧配置缺省兼容：载入无知识字段的历史配置，不崩溃、显示缺省、提交体不带新知识键。
+  const legacyJob = job("job-old", {
+    config: { version: 1, kind: "support", label: "旧配置复现", repeat: 1, allowRemote: false,
+      variants: [{ id: "A", architecture: "controller", parameters: { timeoutMs: 60000, repairBudget: 1, merchantEvents: "architecture" } }] },
+    results: [{ variantId: "A", repetition: 1, kind: "support", status: "completed", runId: "run-old", summary: supportSummary(3) }],
+  });
+  findAttr(root, "data-action", "refresh-jobs")!.fire("click");
+  await flush(1);
+  respond(find(request => request.path === "/api/experiments", "refresh with legacy"), { jobs: [legacyJob] });
+  await flush();
+  walk(root).find(item => item.className.split(" ").includes("exp-job"))!.fire("click");
+  await flush(1);
+  respond(find(request => request.path === "/api/experiments/job-old", "legacy job detail"), legacyJob);
+  await flush();
+  findAttr(root, "data-action", "load-config")!.fire("click");
+  await flush();
+  assert.equal(byField("knowledgeMode", "A").value, "lexical", "旧配置缺省显示本地词项");
+  assert.equal(byField("knowledgeThreshold", "A").disabled, true, "缺省词项模式阈值不适用");
+  assert.equal(findClass(root, "primary-button")!.disabled, true, "缺省兼容但远程仍需勾选");
+  console.log("PASS 实验调试：知识检索参数、atomic 非法组合禁提交、适用性联动、旧配置缺省兼容。");
+}
+
+// knowledgeSupport 判别类型：仅 Controller + m4-support 生效，其他组合保留配置显示不适用；缺省 binary 兼容。
+{
+  const booted = await boot();
+  const { element, find, flush, pendingCount } = booted;
+  await openExperiments(booted);
+  const root = element("experiments");
+  const byField = (field: string, variant: string) => findAllAttr(root, "data-field", field).find(item => item.attrs.get("data-variant") === variant)!;
+  const preset = findAttr(root, "data-field", "preset")!;
+  preset.value = "support-knowledge-profile-ab";
+  preset.fire("change");
+  await flush();
+  assert.equal(byField("knowledgeSupport", "A").value, "binary");
+  assert.equal(byField("knowledgeSupport", "B").value, "typed");
+  assert.equal(byField("knowledgeSupport", "A").disabled, false, "Controller + m4-support 判别类型生效");
+  assert.match(content(root), /knowledgeSupport binary → typed/, "差异含判别类型");
+  // A 切 lexical：阈值与判别类型就地禁用，不重建节点；切回后启用且配置保留。
+  const modeA = byField("knowledgeMode", "A");
+  modeA.value = "lexical";
+  modeA.fire("change");
+  await flush();
+  assert.equal(byField("knowledgeMode", "A"), modeA, "模式切换不重建卡片");
+  assert.equal(byField("knowledgeThreshold", "A").disabled, true, "lexical 阈值不适用");
+  assert.equal(byField("knowledgeSupport", "A").disabled, true, "lexical 判别类型不适用");
+  modeA.value = "m4-support";
+  byField("knowledgeMode", "A").fire("change");
+  await flush();
+  assert.equal(byField("knowledgeSupport", "A").disabled, false, "切回后判别类型重新启用");
+  assert.equal(byField("knowledgeSupport", "A").value, "binary", "组合变化保留已选配置");
+  // A 切 atomic：判别类型不适用并触发既有禁提交，不偷偷改模式。
+  const archA = byField("architecture", "A");
+  archA.value = "atomic";
+  archA.fire("change");
+  await flush();
+  assert.equal(byField("knowledgeSupport", "A").disabled, true, "atomic 判别类型不适用");
+  assert.equal(byField("knowledgeSupport", "A").value, "binary", "配置保留不被改写");
+  assert.equal(findClass(root, "primary-button")!.disabled, true, "atomic+m4-support 仍禁提交");
+  const archA2 = byField("architecture", "A");
+  archA2.value = "controller";
+  archA2.fire("change");
+  await flush();
+  // 非法 typed+lexical：明确原因、禁提交、保留可操作改回 binary 修复；合法 lexical+binary 显示不适用。
+  const profileA = byField("knowledgeSupport", "A");
+  profileA.value = "typed";
+  profileA.fire("change");
+  await flush();
+  const modeA2 = byField("knowledgeMode", "A");
+  modeA2.value = "lexical";
+  modeA2.fire("change");
+  await flush();
+  assert.match(content(root), /typed 事实支持判别需 Controller \+ m4-support 知识检索；请改回 binary 或调整组合/, "非法组合明确原因");
+  assert.equal(findClass(root, "primary-button")!.disabled, true, "typed+lexical 禁提交");
+  assert.equal(byField("knowledgeSupport", "A").disabled, false, "非法值保留可操作以修正");
+  assert.equal(byField("knowledgeSupport", "A").value, "typed", "不偷偷改参数");
+  const profileFix = byField("knowledgeSupport", "A");
+  profileFix.value = "binary";
+  profileFix.fire("change");
+  await flush();
+  assert.ok(!content(root).includes("typed 事实支持判别需"), "改回 binary 后错误消失");
+  assert.equal(byField("knowledgeSupport", "A").disabled, true, "合法 lexical+binary 显示不适用");
+  const modeA3 = byField("knowledgeMode", "A");
+  modeA3.value = "m4-support";
+  modeA3.fire("change");
+  await flush();
+  assert.equal(byField("knowledgeSupport", "A").disabled, false, "回到合法组合重新启用");
+  // 提交体带判别类型。
+  const allow = findAttr(root, "data-field", "allow-remote")!;
+  allow.checked = true;
+  allow.fire("change");
+  await flush();
+  findClass(root, "primary-button")!.fire("click");
+  await flush(1);
+  const post = find(request => request.path === "/api/experiments" && request.options?.method === "POST", "profile POST");
+  const body = JSON.parse(post.options?.body || "{}");
+  assert.equal(body.variants[0].parameters.knowledgeSupport, "binary", "提交体含 binary 判别");
+  assert.equal(body.variants[1].parameters.knowledgeSupport, "typed", "提交体含 typed 判别");
+  respond(post, job("job-p1", { status: "completed", config: body }));
+  await flush();
+  assert.equal(pendingCount(), 0);
+  // 旧缺省 binary 兼容：载入无 knowledgeSupport 的历史配置，显示缺省且不适用（词项模式）。
+  const legacyJob = job("job-old-p", {
+    config: { version: 1, kind: "support", label: "旧词项配置", repeat: 1, allowRemote: false,
+      variants: [{ id: "A", architecture: "controller", parameters: { timeoutMs: 60000, repairBudget: 1, merchantEvents: "architecture" } }] },
+    results: [{ variantId: "A", repetition: 1, kind: "support", status: "completed", runId: "run-old-p", summary: supportSummary(3) }],
+  });
+  findAttr(root, "data-action", "refresh-jobs")!.fire("click");
+  await flush(1);
+  respond(find(request => request.path === "/api/experiments", "refresh legacy profile"), { jobs: [legacyJob] });
+  await flush();
+  walk(root).find(item => item.className.split(" ").includes("exp-job"))!.fire("click");
+  await flush(1);
+  respond(find(request => request.path === "/api/experiments/job-old-p", "legacy profile detail"), legacyJob);
+  await flush();
+  findAttr(root, "data-action", "load-config")!.fire("click");
+  await flush();
+  assert.equal(byField("knowledgeSupport", "A").value, "binary", "旧配置缺省显示二元判断");
+  assert.equal(byField("knowledgeSupport", "A").disabled, true, "词项旧配置判别类型不适用但配置保留");
+  console.log("PASS 实验调试：knowledgeSupport 适用性联动、组合保留配置、提交体新参数、旧缺省 binary 兼容。");
 }

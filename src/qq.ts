@@ -15,6 +15,8 @@ import { RefundStore, readRefundDatabaseConfig } from "./refunds.ts";
 import { confirmRefundReply, markRefundReplyPresented } from "./refund-entry.ts";
 import { dispatchMerchantNotifications } from "./merchant-notifications.ts";
 import { createSupportSession, readSupportArchitecture } from "./support-session.ts";
+import { createKnowledgeService } from "./knowledge-service.ts";
+import { readKnowledgeParameters, resolveSupportRunParameters } from "./support-parameters.ts";
 
 // Remove the leading transport mention/spaces (QQ may already have removed the mention).
 // Stripping embedded mentions/faces or trimming
@@ -60,11 +62,14 @@ export function readQQConfig(env: NodeJS.ProcessEnv = process.env) {
 }
 
 async function main() {
+  const architecture = readSupportArchitecture();
+  const parameters = resolveSupportRunParameters(architecture, readKnowledgeParameters());
   const { options, allowedGroups } = readQQConfig();
   const replyFormat = readQQReplyFormat();
   const replyButtons = readQQReplyButtons();
-  const architecture = readSupportArchitecture();
   const store = new CouponStore(createPool(readDatabaseConfig()));
+  const knowledge = architecture === "controller" ? createKnowledgeService(store, { mode: parameters.knowledgeMode,
+    supportProfile: parameters.knowledgeSupport, threshold: parameters.knowledgeThreshold, timeoutMs: parameters.knowledgeTimeoutMs }) : undefined;
   let afterSales: AfterSalesStore | undefined;
   let refunds: RefundStore | undefined;
   let stopMerchant: (() => Promise<void>) | undefined;
@@ -113,7 +118,7 @@ async function main() {
           store: afterSales, sourceKey: merchantSourceKey(identity, msg.groupOpenid!), refunds,
         } : undefined;
         return architecture === "controller"
-          ? createSupportSession(identity, store, modelRuntime, model, business, { groupOpenid: msg.groupOpenid! })
+          ? createSupportSession(identity, store, modelRuntime, model, business, { groupOpenid: msg.groupOpenid!, knowledge })
           : createCouponSession(identity, store, modelRuntime, model, business);
       },
       async (target, _text, reply, requesterId) => {
@@ -146,7 +151,7 @@ async function main() {
       if (afterSales && !stopMerchant) stopMerchant = startMockMerchant(afterSales, {
         afterProcess: () => dispatchMerchantNotifications(afterSales!, agent, options.appId, allowedGroups),
       });
-      console.log(`[qq] ${options.transport} 团购券客服已就绪；architecture=${architecture}；模型 ${model.provider}/${model.id}；${refunds ? "模拟协商与模拟退款已启用，无真实资金操作" : afterSales ? "模拟商家协商已启用，订单/资金只读" : "只读咨询"}。`);
+      console.log(`[qq] ${options.transport} 团购券客服已就绪；architecture=${architecture}；knowledge=${parameters.knowledgeMode}；模型 ${model.provider}/${model.id}；${refunds ? "模拟协商与模拟退款已启用，无真实资金操作" : afterSales ? "模拟商家协商已启用，订单/资金只读" : "只读咨询"}。`);
     });
     const controller = new AbortController();
     const stop = () => controller.abort();

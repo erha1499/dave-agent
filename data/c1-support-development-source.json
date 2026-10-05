@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "stage": "fixed-before-support-development-execution",
+  "createdDate": "2026-10-06",
+  "dataset": {
+    "path": "data/c1-support-development.json",
+    "sha256": "fda5404be9fdf413661d16f54b9353c0ec973ab29e195d3d95f89ad079d8f56d",
+    "bytes": 4485
+  },
+  "counts": {
+    "pairs": 3,
+    "questions": 6,
+    "direct_fact": 2,
+    "boundary_answer": 1,
+    "limitation_only": 3,
+    "accepted": 3,
+    "rejected": 3
+  },
+  "baseFiles": {
+    "data/acceptance-online.json": "5f97b7f4e77cd1695a38ef9b0c42e53f52f40f7ae869a39fcdcdae5ae8971b72",
+    "data/acceptance-validation.json": "0ead08f6c37cf43be8d84b47557692e3ac2cc264fe37994f2f030cddf7d50592",
+    "data/reference/kefu-harness/data/knowledge/docs.jsonl": "d3cd80ba76fdc82e57c1eefdc66a20987f09bc9b3dd0fbd1287c709146217fae",
+    "data/reference/kefu-harness/source.json": "42c6791ca2edfabcb98d9c49c2cd063c81e7705c29e94a6c1858357000c1d5cf"
+  },
+  "review": {
+    "isBlind": false,
+    "beforeExecution": true,
+    "sourcePerPair": "Same actual complete document and scope; only requested fact changes.",
+    "noV3InputUsed": true
+  }
+}

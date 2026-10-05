@@ -13,6 +13,8 @@ import { confirmRefundReply, markRefundReplyPresented } from "./refund-entry.ts"
 import { renderReply, type Reply } from "./reply.ts";
 import { replyFromTools } from "./reply-from-tools.ts";
 import { cancelSupportTurn, createSupportSession, getSupportResult, prepareSupportPrompt, readSupportArchitecture, supportReply } from "./support-session.ts";
+import { createKnowledgeService } from "./knowledge-service.ts";
+import { readKnowledgeParameters, resolveSupportRunParameters } from "./support-parameters.ts";
 
 export async function runCliPrompt(
   session: AgentSession, text: string, write: (text: string) => Promise<void>,
@@ -41,9 +43,13 @@ export async function runCliPrompt(
 }
 
 async function main() {
+  const architecture = readSupportArchitecture();
+  const parameters = resolveSupportRunParameters(architecture, readKnowledgeParameters());
   const senderId = process.env.CLI_DEMO_USER || "TEST_USER1";
   if (!["TEST_USER1", "TEST_USER2"].includes(senderId)) throw new Error("CLI_DEMO_USER 仅支持 TEST_USER1 或 TEST_USER2 合成身份。");
   const store = new CouponStore(createPool(readDatabaseConfig()));
+  const knowledge = architecture === "controller" ? createKnowledgeService(store, { mode: parameters.knowledgeMode,
+    supportProfile: parameters.knowledgeSupport, threshold: parameters.knowledgeThreshold, timeoutMs: parameters.knowledgeTimeoutMs }) : undefined;
   const afterSales = process.env.AFTER_SALES_DB_PASSWORD
     ? new AfterSalesStore(createPool(readAfterSalesDatabaseConfig())) : undefined;
   const refunds = process.env.REFUND_DB_PASSWORD ? new RefundStore(createPool(readRefundDatabaseConfig())) : undefined;
@@ -59,10 +65,9 @@ async function main() {
     const { modelRuntime, model } = await createConfiguredModelRuntime();
     const identity = { appId: "TEST_APP", senderId };
     const sourceKey = merchantSourceKey(identity, "cli");
-    const architecture = readSupportArchitecture();
     const business = afterSales ? { store: afterSales, sourceKey, refunds } : undefined;
     const session = architecture === "controller"
-      ? await createSupportSession(identity, store, modelRuntime, model, business)
+      ? await createSupportSession(identity, store, modelRuntime, model, business, { knowledge })
       : await createCouponSession(identity, store, modelRuntime, model, business);
     const input = createInterface({ input: stdin, output: stdout });
     console.log(`团购券客服演示（${senderId}）：券单 COUPON-1001${afterSales ? "；模拟协商 COUPON-2001 / 2002 / 2003" : "，只读咨询"}；输入 /exit 退出。全部是模拟数据。`);

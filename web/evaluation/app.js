@@ -496,6 +496,108 @@ const spanUsable = span => isSpanRecord(span)
   && (span.trigger === "user" || span.trigger === "event" || span.trigger === "confirmation")
   && (span.outcome === "ok" || span.outcome === "denied" || span.outcome === "error");
 
+// provider 子 span 的用量行：CNY/USD 与来源分列，缺费用显示未知，不与父 span 或 steps 重复汇总。
+function spanUsageLine(usage) {
+  if (!usage || typeof usage !== "object" || Array.isArray(usage)) return null;
+  const cost = usage.cost && typeof usage.cost === "object" ? usage.cost : null;
+  const costText = !cost ? "费用未知"
+    : `${cost.currency === "CNY" ? "CNY" : "USD"} ${cost.amount === null || cost.amount === undefined ? "未知" : `${cost.currency === "CNY" ? "¥" : "$"}${Number(cost.amount).toFixed(6)}`}（${cost.source || "估算"}）`;
+  return text("p", `${usage.kind || "provider"} · 输入 ${number(usage.inputTokens)} · 输出 ${number(usage.outputTokens)} · 合计 ${number(usage.totalTokens)} · ${costText}`, "step-usage");
+}
+
+const knowledgeModeNames = { lexical: "本地词项", "m4-support": "全候选重排 + 事实支持" };
+const knowledgeStatus = { accepted: ["passed", "接受"], rejected: ["skipped", "拒收"], unavailable: ["failed", "不可用"] };
+const knowledgeReasons = { invalid_input: "输入无效", aborted: "已中止", timeout: "查询超时", database_unavailable: "数据库不可用", provider_unavailable: "模型服务不可用", source_changed: "来源已变化" };
+const knowledgeRejectReasons = {
+  provider_unavailable: "模型服务不可用", not_applicable: "不适用", no_candidates: "无候选", unknown_document: "未知文档",
+  inactive_document: "文档已停用", out_of_scope: "超出授权范围", duplicate_document: "重复文档", missing_score: "缺少分数",
+  invalid_score: "分数无效", below_threshold: "低于阈值", top_k_limit: "超出条数上限",
+  support_verification_required: "待支持判别", unsupported: "事实不支持", support_unavailable: "支持判别不可用",
+};
+const knowledgeStageNames = { read: "读取", rerank: "重排", support: "支持判别", recheck: "复检" };
+const knowledgeVerdictCategories = { direct_fact: "事实或规则", boundary_answer: "明确安全边界问题的回答", limitation_only: "仅说明缺失或需核实", unrelated: "无关" };
+const knowledgeMs = value => value === null || value === undefined || !Number.isFinite(value) ? "未知" : `${Math.round(value)} ms`;
+const knowledgeMoney = (value, symbol) => value === null || value === undefined || !Number.isFinite(value) ? "未知" : `${symbol}${value.toFixed(6)}`;
+
+// 单次知识取证：首层方案/状态/范围短值/来源/耗时；细节折叠可信上下文、原文、拒收原因、阶段时延与分列成本。
+// scope 拒绝属授权判定，不作幻觉结论；阈值是分数门限不是概率。来源正文一律 textContent，防注入。
+// 来源版本只取本轮 trace.sources（实际接受原文 sha256）；policyTopic.sources 属历史话题，不充当本轮版本。
+function knowledgeNode(span) {
+  const knowledge = span.knowledge && typeof span.knowledge === "object" ? span.knowledge : {};
+  const context = knowledge.context && typeof knowledge.context === "object" ? knowledge.context : {};
+  const trace = knowledge.trace && typeof knowledge.trace === "object" ? knowledge.trace : {};
+  const [tone, label] = knowledgeStatus[trace.status] || ["flat", trace.status || "未知"];
+  const modeLabel = trace.mode === "m4-support"
+    ? `m4-support · 阈值 ${trace.threshold === null || trace.threshold === undefined ? "未记录" : trace.threshold}`
+    : knowledgeModeNames[trace.mode] || trace.mode || span.name;
+  const scopeLabel = trace.scope?.shopId ? trace.scope.productId ? `${short(trace.scope.shopId)} + ${short(trace.scope.productId)}` : short(trace.scope.shopId) : "全局";
+  const traceSources = Array.isArray(trace.sources) ? trace.sources.filter(source => source && typeof source === "object") : null;
+  const versionOf = id => {
+    const found = traceSources?.find(source => source.sourceId === id);
+    return found?.version ? short(found.version) : "未记录";
+  };
+  const topicSources = context.policyTopic && Array.isArray(context.policyTopic.sources) ? context.policyTopic.sources.length : 0;
+  const rawAccepted = Array.isArray(trace.acceptance?.accepted) ? trace.acceptance.accepted : [];
+  const rawRejected = Array.isArray(trace.acceptance?.rejected) ? trace.acceptance.rejected : [];
+  const accepted = rawAccepted.filter(doc => doc && typeof doc === "object");
+  const rejected = rawRejected.filter(item => item && typeof item === "object");
+  // 判别明细：supportVerification 为对象 {value, requestHash, inputHash, attempts}，value 是逐文档模型判断。
+  // 容器非对象或 value 非数组属记录异常，明确诊断、不默默兼容；binary 旧条目没有 category 标“二元判断”；未请求/失败不记为不支持。
+  const verification = trace.supportVerification;
+  const verificationInvalid = verification !== null && verification !== undefined
+    && (typeof verification !== "object" || Array.isArray(verification) || !Array.isArray(verification.value));
+  const rawVerdicts = !verificationInvalid && verification ? verification.value : [];
+  const verdicts = rawVerdicts.filter(item => item && typeof item === "object");
+  const dropped = rawAccepted.length - accepted.length + (rawRejected.length - rejected.length) + (rawVerdicts.length - verdicts.length);
+  const rawProfile = trace.supportProfile ?? trace.settings?.support?.profile;
+  const promptVersion = trace.settings?.support?.promptVersion;
+  const profileLabel = rawProfile === "typed" ? "typed 分类判别"
+    : rawProfile === "binary" || promptVersion === "fact-support-v1" ? "binary 二元判断" : "未知";
+  const usage = trace.usage && typeof trace.usage === "object" ? trace.usage : {};
+  const stages = Array.isArray(trace.stages) ? trace.stages.filter(stage => stage && typeof stage === "object") : [];
+  return node("div", { class: "knowledge-call" },
+    node("p", { class: "knowledge-head" },
+      badge(tone, label),
+      text("span", `${span.name} · ${modeLabel} · 范围 ${scopeLabel} · 耗时 ${duration(trace.durationMs)}`)),
+    text("p", accepted.length
+      ? `来源 ${accepted.map(doc => `${doc.id} · 版本 ${versionOf(doc.id)}`).join("、")}`
+      : "无被接受来源", "knowledge-line"),
+    node("details", { class: "trace" },
+      node("summary", {}, "取证细节"),
+      text("p", `原始问题：${context.originalQuery ?? trace.originalQuery ?? "未记录"}`, "knowledge-line"),
+      context.modelQuestion ? text("p", `模型建议问题（仅审计）：${context.modelQuestion}`, "knowledge-line") : null,
+      text("p", `实际检索问题（宿主构造）：${context.effectiveQuery ?? trace.query ?? "未记录"}`, "knowledge-line"),
+      text("p", `实际范围：shopId ${trace.scope?.shopId ?? "全局"} · productId ${trace.scope?.productId ?? "未限定"}`, "knowledge-line"),
+      context.facts ? text("p", `可信事实：${context.facts.orderId} · ${context.facts.status} · ${context.facts.productName} · 退款状态 ${context.facts.refundState} · 截止 ${date(context.facts.asOf)}`, "knowledge-line") : null,
+      context.policyTopic ? text("p", `可信话题（历史话题，不作本轮版本依据）：来源 ${topicSources} 条 · 范围 ${context.policyTopic.scope?.shopId || "全局"}${context.policyTopic.scope?.productId ? ` + ${context.policyTopic.scope.productId}` : ""}`, "knowledge-line") : null,
+      accepted.length
+        ? node("div", { class: "knowledge-docs" }, ...accepted.map(doc => node("div", { class: "knowledge-doc" },
+          text("p", `${doc.title || doc.id}${doc.score === null || doc.score === undefined ? "" : ` · 分数 ${doc.score}`}`, "knowledge-doc-title"),
+          text("p", doc.body ?? "", "knowledge-doc-body"))))
+        : null,
+      trace.reason ? text("p", `失败原因：${knowledgeReasons[trace.reason] || trace.reason}`, "knowledge-line") : null,
+      rejected.length
+        ? node("ul", { class: "check-list" }, ...rejected.map(item => node("li", {},
+          text("span", `${item.id ?? "—"} · ${knowledgeRejectReasons[item.reason] || item.reason || "未记录"}`))))
+        : null,
+      rawProfile || promptVersion ? text("p", `判别配置：${profileLabel}${promptVersion ? ` · prompt ${promptVersion}` : ""}`, "knowledge-line") : null,
+      verificationInvalid ? text("p", "判别明细记录异常，无法解析。", "knowledge-line") : null,
+      verdicts.length
+        ? node("details", { class: "trace" },
+          node("summary", {}, `判别明细 · ${verdicts.length} 条`),
+          node("ul", { class: "check-list" }, ...verdicts.map(item => node("li", {},
+            text("span", `${item.id ?? "—"} · ${item.category ? knowledgeVerdictCategories[item.category] || item.category : "二元判断"} · ${item.supported === true ? "支持" : item.supported === false ? "不支持" : "未知"}`),
+            item.quote ? text("span", ` 引用：${item.quote}`) : null,
+            item.reason ? text("span", ` 原因：${item.reason}`) : null))),
+          text("p", "宿主仅接受事实或规则与明确安全边界问题的回答；仅说明缺失或无关内容不作为具体事实证据；未请求或失败不记为不支持。", "knowledge-line"))
+        : null,
+      dropped ? text("p", `另有 ${dropped} 条取证记录无法解析。`, "knowledge-line") : null,
+      text("p", "范围拒绝属授权判定，不作幻觉结论；阈值是分数门限，不是概率。", "knowledge-line"),
+      stages.length ? text("p", `阶段时延：${stages.map(stage => `${knowledgeStageNames[stage.name] || stage.name || "未知"} ${knowledgeMs(stage.durationMs)}`).join(" · ")}`, "knowledge-line knowledge-stages") : null,
+      text("p", `成本（估算）：重排 Tokens ${usage.rerankTokens === null || usage.rerankTokens === undefined ? "未知" : number(usage.rerankTokens)} · 支持 Tokens ${usage.supportTokens === null || usage.supportTokens === undefined ? "未知" : number(usage.supportTokens)} · CNY ${knowledgeMoney(usage.estimatedCny, "¥")} · USD ${knowledgeMoney(usage.estimatedUsd, "$")} · 缺量调用 ${usage.incompleteCalls === null || usage.incompleteCalls === undefined ? "未知" : usage.incompleteCalls}`, "knowledge-line")),
+    node("details", { class: "trace" }, node("summary", {}, "原始 trace JSON"), json(knowledge)));
+}
+
 // 单个归因 span：denied 是已知业务拒绝，error 是执行错误，两者分列；input/output 走 json 文本展示，天然转义。
 function spanNode(span) {
   if (!spanUsable(span)) {
@@ -511,7 +613,8 @@ function spanNode(span) {
       outcome,
       text("span", duration(span.durationMs), "step-timing")),
     span.input !== undefined ? node("div", {}, text("p", "输入", "step-label"), json(span.input)) : null,
-    span.output !== undefined ? node("div", {}, text("p", "输出", "step-label"), json(span.output)) : null);
+    span.output !== undefined ? node("div", {}, text("p", "输出", "step-label"), json(span.output)) : null,
+    spanUsageLine(span.usage));
 }
 
 function turnNode(turn, compact = false) {
@@ -546,6 +649,13 @@ function turnNode(turn, compact = false) {
           ? spans.map(spanNode)
           : text("p", "暂无归因记录；显式为空不代表模型调用为零。", "metric-note"),
         noModel ? text("p", "本轮无模型请求。", "metric-note") : null));
+      // 知识取证：一轮可能有多次 FAQ 调用，逐次展示；旧记录无 knowledge 不渲染。
+      const knowledgeSpans = spans.filter(span => isSpanRecord(span) && span.knowledge && typeof span.knowledge === "object");
+      if (knowledgeSpans.length) {
+        element.append(node("details", { class: "trace" },
+          node("summary", {}, `知识取证 · ${knowledgeSpans.length} 次`),
+          ...knowledgeSpans.map(knowledgeNode)));
+      }
     }
     // observations 是工作流检查保存的精简真实状态与协议证据，原样展开，不参与计分。
     if (turn.observations) {

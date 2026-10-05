@@ -1,6 +1,6 @@
 # 实验配置与调试
 
-统一入口使用方案预设和参数白名单，不修改 `.env` 或运行中的 QQ。现有六项业务授权/确认约束始终生效。业务评测用隔离的模拟订单，检索仍是离线实验；M0–M6 及 A1 接收策略不代表线上知识服务已切换。
+统一入口使用方案预设和参数白名单，不修改 `.env` 或运行中的 QQ。现有六项业务授权/确认约束始终生效。业务评测用隔离的模拟订单；M0–M6 与 A1 保留离线实验入口，C1 另提供 Controller 在线知识服务候选，默认配置不自动切换。
 
 ## 配置
 
@@ -25,6 +25,30 @@
 检索方案改为 `kind: "retrieval"`，每个 variant 使用 `modes: ["M0", "M4"]` 替代 architecture。参数含 candidateTopK、bm25K1/bm25B、rrfK/rrfWindow、cache、timeoutMs、retries、maxRequests、consecutiveFailureLimit。默认及边界由共享校验器提供。M4 始终使用可见范围内全部候选；Recall@5 / MRR@5 固定。cache=refresh 不读取或写入持久结果缓存，复用缓存的运行不能声称为独立模型重复或生产延迟。
 
 模型固定为现有业务模型配置及百炼 text-embedding-v4 1024 维、qwen3-rerank。没有任意模型、API URL、系统提示词、命令、文件路径或环境变量表单。长期记忆和模型改写暂未实现。
+
+### C1 业务知识服务开关
+
+`support-knowledge-ab` 是 `kind: "support"`、version 1 业务预设，两个方案都使用 Controller：A 为 lexical，B 为 M4 全候选重排 + 事实支持判别。它调用真实业务模型和 MySQL 中隔离的模拟订单；预设下载与预览不产生模型调用。
+
+| 参数 | 默认值与边界 | 实际作用 |
+| --- | --- | --- |
+| `knowledgeMode` | `lexical` / `m4-support`，默认 `lexical` | Controller 查询知识时采用词项排名或重排加支持性判别；atomic + m4-support 在启动前拒绝。 |
+| `knowledgeSupport` | `binary` / `typed`，默认 `binary` | binary 保持 A1 的二元判断；typed 区分事实/规则、明确边界问题、仅信息缺失和无关证据。typed 仅适用于 Controller + m4-support，非法组合启动前拒绝。实际 Prompt 版本写入 trace，类别不代表已获业务授权。 |
+| `knowledgeThreshold` | 0–1，默认 0.71 | 仅 m4-support 的相关性预筛；分数不是概率。变更后属于新实验配置。 |
+| `knowledgeTimeoutMs` | 1000–60000，默认 15000 毫秒 | Controller 单次知识查询的总等待上限，含读取、重排、支持判别与来源复检；零自动重试。 |
+
+旧业务配置省略新字段时仍使用 lexical。知识为空时返回未知/澄清，超时或调用失败标为不可用；不会把未经验证的 lexical 结果作为 m4-support 失败后的可信证据。当前查询在读取和异步处理后复检语料，记录原始问题、实际检索问题、可信范围、配置、原文版本、拒收原因及实际用量。超时停止宿主等待和后续阶段；已经发出的提供商请求可能继续至其请求超时，未收到的用量显示未知。
+
+```sh
+node scripts/experiment.ts --preset support-knowledge-ab --dry-run
+node --env-file-if-exists=.env scripts/experiment.ts --preset support-knowledge-ab --run --allow-remote
+```
+
+`support-knowledge-profile-ab` 在相同 Controller / m4-support / 0.71 下只对照 binary 与 typed，适合分离判别方案本身的收益。可以通过工作台调整阈值并下载完整 JSON；不应一边改阈值、一边改判别方案后把全部收益归给单一组件。预设是对照入口，不表示其中的值已经是最终推荐。已曝光开发题上的选择与新固定验证分别见 [C1 上下文结果](./c1-context-results.md)，端到端业务证据见 [C1 业务结果](./c1-business-results.md)。
+
+CLI / QQ 分别读取 `KNOWLEDGE_MODE`、`KNOWLEDGE_SUPPORT`、`KNOWLEDGE_THRESHOLD`、`KNOWLEDGE_TIMEOUT_MS`；未配置仍为 lexical / binary。环境变量只在进程启动时读取，实验表单不会修改运行中的 QQ。
+
+CLI/QQ 正式入口分别读取 `KNOWLEDGE_MODE`、`KNOWLEDGE_THRESHOLD`、`KNOWLEDGE_TIMEOUT_MS`，Controller 通过 `SUPPORT_ARCHITECTURE=controller` 显式选择。实验表单只控制本次评测，不修改环境文件或正在运行的 QQ。确认、身份与金额边界不受上述开关影响。
 
 ### A1 配置 version 2
 

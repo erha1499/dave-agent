@@ -88,10 +88,11 @@ type EvalSpan = {
   component: string; name: string; observedAt: string; durationMs: number | null;
   outcome: "ok" | "denied" | "error";
   input?: unknown; output?: unknown;
+  knowledge?: { context: SupportKnowledgeContext; trace: KnowledgeTrace };
   usage?: {
     provider: string; model: string; kind: "llm" | "embedding" | "rerank";
     inputTokens: number | null; outputTokens: number | null; totalTokens: number | null;
-    cost: { currency: "USD" | "CNY"; amount: number; source: "sdk_estimate" | "provider" } | null;
+    cost: { currency: "USD" | "CNY"; amount: number; source: "sdk_estimate" | "provider" | "price_estimate" } | null;
   };
 };
 type SupportTraceAnalysis = {
@@ -105,7 +106,15 @@ type SupportTraceAnalysis = {
 };
 ```
 
-当前组件为 `qq-ingress`（入口）、`model`（模型）、`agent-tool`（模型选择的工具）、`business-service`（宿主业务服务）、`confirmation-service`（宿主确认/展示登记）。`groups.calls` 包括入口和嵌套服务，不是可相加的“总工具数”。`parentSpanId` 当前只有轮级归属，不能画成精确的嵌套调用树。
+当前组件为 `qq-ingress`（入口）、`model`（模型）、`agent-tool`（模型选择的工具）、`business-service`（宿主业务服务）、`confirmation-service`（宿主确认/展示登记），C1 增加 `knowledge-rerank`、`knowledge-support`（知识服务的提供商调用）。`groups.calls` 包括入口和嵌套服务，不是可相加的“总工具数”。旧 `parentSpanId` 只有轮级归属；C1 知识提供商调用才明确以所属 `search_faq` 为父节点，不能替历史记录补造嵌套关系。
+
+C1 的 `business-service/search_faq` 保留 `output: documents[]`，附加 `knowledge`：`context` 记录用户原始问题、模型建议问题、宿主实际检索问题、订单来源、重新授权后的范围和事实，以及可用的可信话题/对象引用；模型建议问题只用于审计，不构成业务身份或范围。`trace` 记录实际模式、阈值、范围、原始排名、接收/拒收原文及版本、语料前后哈希、失败原因、配置、阶段时间与用量。完整类型以 `src/support-controller.ts`、`src/knowledge-service.ts` 为准。
+
+`trace.supportProfile` 记录 binary / typed；`settings.support.promptVersion` 标识实际判别 Prompt 版本。成功返回的 `supportVerification.value[]` 包含 `id/supported/quote/reason`，typed 另有 `category`：`direct_fact`（事实或适用规则）、`boundary_answer`（明确边界问题的答案）、`limitation_only`（仅说明信息缺失或需核实）、`unrelated`（无关）。宿主只接收前两类，并校验实际原文引文。没有发请求、失败或旧记录没有字段均不等于 `supported:false`；不能从历史 binary 判断反推 typed 分类。接收规则证据也不代表本单已批准、退款已执行或资金已到账。
+
+`trace.status` 的 `accepted`、`rejected`、`unavailable` 分别表示接收到证据、未接收到证据、服务未完成；拒收本身不能证明案例通过。`stages` 可选，旧记录缺少时显示未采集。`sources` 记录本次实际接受文档的 sourceId 和规范文档 SHA-256，不能以历史话题中的同 ID 版本替代；拒收或不可用时为空。`supportVerification` 仅在真实判别完成时保存输入/请求绑定及 supported/quote/reason，失败或未调用不补造；若随后原文变化，该旧输入判别仍可审计，但最终 sources 为空且状态不可用。工作台按逐次查询展示来源与原文、实际 scope 和 original/effective query；金额事实与退款授权仍分别检查。
+
+知识提供商请求只在相应子 span 填 `usage`，其父 `search_faq` 不重复填，且不加入 Agent 的 `steps`。人民币 `price_estimate` 按适用区域与版本价目估算，美元 `sdk_estimate` 按 Pi 模型目录估算；超时未回传的用量保留 null。旧 `analysis.usage` 继续只代表 Agent 模型步骤，业务总成本比较应使用带知识调用的归因明细，按币种分别报告。
 
 轮次类型优先依据可信入口 span 的 `trigger`：`event` 是商家事件，`confirmation` 是用户精确确认经宿主执行，`user` 是普通用户请求。v2 的事件和确认回执应标为宿主；其他轮不因含 host 服务 span 就改标宿主。这里标的是最终回执生成方：atomic 商家事件仍可能调用模型，但发送的是宿主固定状态卡，模型步骤仍保留展示。旧轮无 spans 时保留原展示。spans 为空表示显式没有归因记录，不等于模型调用必为零；零模型需依据该轮实际 `steps`。无效归因记录应保留原始文本与诊断，不能让页面崩溃或显示为正常执行。
 

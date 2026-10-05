@@ -209,6 +209,16 @@ main{max-width:1440px;margin:auto;padding:18px 28px 26px}
 .step-usage{font:9px var(--mono);margin-top:8px;color:var(--muted)}
 .turn-error,.error-note{margin:10px 0;color:#b04a3f;background:#f9ece9;border:1px solid #eed0ca;border-radius:var(--radius);padding:8px 11px;font-size:11px;overflow-wrap:anywhere}
 
+/* 知识取证 */
+.knowledge-call{margin-top:8px;padding:9px 12px;background:#fff;border:1px solid var(--line);border-radius:var(--radius);display:grid;gap:6px}
+.knowledge-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:11px}
+.knowledge-line{font-size:11px;color:var(--muted);overflow-wrap:anywhere}
+.knowledge-docs{display:grid;gap:6px}
+.knowledge-doc{font-size:11px;background:var(--panel-soft);border:1px solid var(--line);border-radius:8px;padding:7px 10px;display:grid;gap:3px}
+.knowledge-doc-title{font-weight:600;overflow-wrap:anywhere}
+.knowledge-doc-body{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.7;color:#4c5a50}
+.knowledge-stages{font:10px var(--mono);font-variant-numeric:tabular-nums}
+
 /* 快照 */
 .snapshot{padding:15px 18px}
 .snapshot-grid{display:grid;grid-template-columns:118px minmax(0,1fr);gap:7px 12px;margin:14px 0;font-size:11px}

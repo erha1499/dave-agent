@@ -142,7 +142,7 @@ export function analyzeSupportSpans(spans: EvalSpan[]): SupportTraceAnalysis {
     if (usage.totalTokens !== null) { provider.usageReported++; provider.knownTokens = (provider.knownTokens ?? 0) + usage.totalTokens; }
     if (usage.cost !== null) {
       const cost = usage.cost;
-      if (!object(cost) || !["USD", "CNY"].includes(cost.currency) || !["sdk_estimate", "provider"].includes(cost.source) || !Number.isFinite(cost.amount) || cost.amount < 0) {
+      if (!object(cost) || !["USD", "CNY"].includes(cost.currency) || !["sdk_estimate", "provider", "price_estimate"].includes(cost.source) || !Number.isFinite(cost.amount) || cost.amount < 0) {
         issues.push(`provider cost 无效：${span.id}`);
       } else {
         let total = provider.costs.find(item => item.currency === cost.currency && item.source === cost.source);

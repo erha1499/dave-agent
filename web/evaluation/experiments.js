@@ -127,8 +127,20 @@ function applyPreset(id) {
   expState.formError = "";
 }
 
-// v2 组合校验：score/support 仅 M4/M5/M6 且阈值必须显式填写；非法组合只提示禁提交，不偷偷改模式或丢字段。
+// 组合校验：support 的 atomic+m4-support 非法；v2 检索 score/support 仅 M4/M5/M6 且阈值显式填写。
+// 非法组合只提示禁提交，不偷偷改模式或丢字段。
 function expComboError(config) {
+  if (config.kind === "support") {
+    for (const variant of config.variants) {
+      if (variant.architecture === "atomic" && variant.parameters?.knowledgeMode === "m4-support")
+        return `方案 ${variant.id}：atomic 仅支持本地词项知识检索；m4-support 请使用 Controller。`;
+      // typed 仅在 Controller + m4-support 合法；非法组合提示修正路径，不偷偷改参数。
+      if (variant.parameters?.knowledgeSupport === "typed"
+        && (variant.architecture !== "controller" || (variant.parameters?.knowledgeMode ?? "lexical") !== "m4-support"))
+        return `方案 ${variant.id}：typed 事实支持判别需 Controller + m4-support 知识检索；请改回 binary 或调整组合。`;
+    }
+    return "";
+  }
   if (config.kind !== "retrieval" || config.version !== 2) return "";
   for (const variant of config.variants) {
     if (!variant.dataset) return `方案 ${variant.id} 请选择数据集。`;
@@ -401,22 +413,58 @@ function expModeChip(variant, mode) {
 // 高级参数默认折叠，按 catalog 字段渲染；切换预设已重置为默认配置。
 function expAdvancedNode(draft, variant) {
   const fields = expState.catalog.fields?.[draft.kind] || [];
+  const controls = new Map();
+  const rows = fields.map(field => expParamRow(draft, variant, field, controls));
   return node("details", { class: "metric-details exp-advanced" },
     node("summary", {}, `高级参数 · ${fields.length} 项`),
-    node("div", { class: "exp-params" }, ...fields.map(field => expParamRow(draft, variant, field))));
+    node("div", { class: "exp-params" }, ...rows));
 }
 
-function expParamRow(draft, variant, field) {
+function expParamRow(draft, variant, field, controls) {
   const params = variant.parameters || (variant.parameters = {});
-  // atomic 没有格式修复环节，修复次数不适用；Controller 隐藏 merchantEvents 的 model 选项。
-  const notApplicable = field.key === "repairBudget" && draft.kind === "support" && variant.architecture === "atomic";
+  // 参数适用性：repairBudget 仅 Controller；knowledgeTimeoutMs 仅 Controller 知识服务；knowledgeThreshold 仅 m4-support；
+  // knowledgeSupport 仅 Controller + m4-support。值非法（typed 落在非法组合）时保持可操作以便改回 binary；
+  // 值合法但不适用（如 lexical+binary）才禁用显示。旧配置缺省值按 catalog 默认处理。
+  const repairNA = field.key === "repairBudget" && draft.kind === "support" && variant.architecture === "atomic";
+  const timeoutNA = field.key === "knowledgeTimeoutMs" && draft.kind === "support" && variant.architecture === "atomic";
+  const thresholdNA = field.key === "knowledgeThreshold" && draft.kind === "support" && (params.knowledgeMode ?? "lexical") !== "m4-support";
+  const profileApplicable = variant.architecture === "controller" && (params.knowledgeMode ?? "lexical") === "m4-support";
+  const profileNA = field.key === "knowledgeSupport" && draft.kind === "support" && !profileApplicable && (params.knowledgeSupport ?? "binary") !== "typed";
+  const notApplicable = repairNA || timeoutNA || thresholdNA || profileNA;
   let control;
   if (field.type === "select") {
     control = node("select", { "data-field": field.key, "data-variant": variant.id });
     const options = (field.options || []).filter(option => !(field.key === "merchantEvents" && variant.architecture === "controller" && option.value === "model"));
     control.append(...options.map(option => node("option", { value: option.value }, option.label)));
     control.value = params[field.key] ?? options[0]?.value ?? "";
-    control.addEventListener("change", () => { params[field.key] = control.value; renderExpDiff(); renderExpRemote(); });
+    control.addEventListener("change", () => {
+      params[field.key] = control.value;
+      // knowledgeMode 即时驱动阈值/判别类型适用性：只改 disabled 与行样式，不重建卡片，保留焦点与展开态。
+      if (field.key === "knowledgeMode") {
+        const linkedThreshold = controls.get("knowledgeThreshold");
+        if (linkedThreshold) {
+          const na = control.value !== "m4-support";
+          linkedThreshold.control.disabled = na;
+          linkedThreshold.row.className = `exp-param${na ? " disabled" : ""}`;
+        }
+        const linkedProfile = controls.get("knowledgeSupport");
+        if (linkedProfile) {
+          const applicable = variant.architecture === "controller" && control.value === "m4-support";
+          const na = !applicable && linkedProfile.control.value !== "typed";
+          linkedProfile.control.disabled = na;
+          linkedProfile.row.className = `exp-param${na ? " disabled" : ""}`;
+        }
+      }
+      if (field.key === "knowledgeSupport") {
+        const applicable = variant.architecture === "controller" && (params.knowledgeMode ?? "lexical") === "m4-support";
+        const na = !applicable && control.value !== "typed";
+        control.disabled = na;
+        row.className = `exp-param${na ? " disabled" : ""}`;
+      }
+      renderExpDiff();
+      renderExpRemote();
+      renderExpActions();
+    });
   } else {
     control = node("input", { type: "number", min: String(field.min), max: String(field.max), step: String(field.step), "data-field": field.key, "data-variant": variant.id });
     if (params[field.key] !== undefined && params[field.key] !== null) control.value = String(params[field.key]);
@@ -429,9 +477,14 @@ function expParamRow(draft, variant, field) {
     });
   }
   if (notApplicable) control.disabled = true;
-  return node("label", { class: `exp-param${notApplicable ? " disabled" : ""}` },
+  const note = repairNA ? "仅 Controller 生效，atomic 不适用"
+    : timeoutNA ? "仅 Controller 知识服务生效，atomic 不适用"
+    : field.note || "";
+  const row = node("label", { class: `exp-param${notApplicable ? " disabled" : ""}` },
     text("span", field.label, "exp-field-label"), control,
-    text("small", notApplicable ? "仅 Controller 生效，atomic 不适用" : field.note || "", "exp-note"));
+    note ? text("small", note, "exp-note") : null);
+  controls.set(field.key, { control, row });
+  return row;
 }
 
 // 参数差异：改动的键以 A → B 短标签列出；完整 JSON 折叠诊断。返回槽位子节点，便于局部刷新。

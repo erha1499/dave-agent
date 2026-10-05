@@ -705,3 +705,203 @@ for (const outcome of ["success", "detail-failure", "analysis-failure"]) {
   assert.ok(!html.includes("本轮无模型请求"), "有实际模型步骤时不得显示无模型请求");
   console.log("PASS 评测前端：atomic 商家事件回执标宿主，实际模型步骤保留，不误标无模型请求。");
 }
+
+// 知识取证：accepted/rejected/unavailable 逐次展示、来源版本短值、scope 拒绝不作幻觉、CNY/USD 分列、旧记录不受影响。
+{
+  const { element, take, find, flush } = await boot();
+  const span = (over: Record<string, unknown>): any => ({
+    id: "s1", parentSpanId: "t1", actor: "host", trigger: "user", component: "business-service", name: "search_faq",
+    observedAt: T, durationMs: 1240, outcome: "ok", ...over,
+  });
+  const knowledgeAccepted = {
+    context: {
+      originalQuery: "券快过期能退吗", modelQuestion: "团购券临期退款规则", effectiveQuery: "临期退款规则",
+      orderSource: "current_explicit", scopeSource: "fresh_order",
+      facts: { orderId: "COUPON-1234", asOf: T, status: "paid", productId: "product-1", productName: "双人午餐券", refundState: "none" },
+      policyTopic: { requestId: "r1", sourceKey: "k1", groupOpenid: "g1", originalQuery: "券快过期能退吗", orderId: "COUPON-1234",
+        scope: { shopId: "shop-demo-long-id-0001", productId: "product-demo-long-0001" },
+        sources: [{ sourceId: "KB-REFUND-EXPIRED", version: "a".repeat(64) }] },
+    },
+    trace: {
+      mode: "m4-support", threshold: 0.71, query: "临期退款规则", originalQuery: "券快过期能退吗",
+      scope: { shopId: "shop-demo-long-id-0001", productId: "product-demo-long-0001" }, status: "accepted", reason: null,
+      rawRanking: [{ id: "KB-REFUND-EXPIRED", score: 0.92 }],
+      acceptance: { version: "score-support-v1", config: { mode: "support", threshold: 0.71 }, status: "accepted",
+        accepted: [{ id: "KB-REFUND-EXPIRED", title: "临期券退款规则", body: "到期前 72 小时内<b>未核销</b>可退。", tags: ["退款"], score: 0.92, rank: 1 }, null],
+        rejected: [], diagnostics: { topScore: 0.92, scoreGap: null, candidates: [] } },
+      sources: [{ sourceId: "KB-REFUND-EXPIRED", version: "b".repeat(64) }],
+      sourceHashes: { before: "b1", after: "b1" }, durationMs: 1240, calls: [],
+      usage: { rerankTokens: 1200, supportTokens: 800, estimatedCny: 0.0006, estimatedUsd: 0.00008, incompleteCalls: 0 },
+      pricing: { estimated: true },
+      settings: { support: { promptVersion: "fact-support-typed-v2", profile: "typed" }, serialization: "json-title-tags-body-v1" },
+      // 结构取自真实 run 990dac49 首个 case 的知识 trace（脱敏）：对象容器 {value, requestHash, inputHash, attempts}。
+      supportVerification: {
+        requestHash: "2e0a54caa785947f", inputHash: "9f1c2d",
+        attempts: [{ operation: "support", provider: "deepseek", model: "deepseek-flash", attempt: 1, durationMs: 1671, outcome: "ok",
+          totalTokens: 1771, inputTokens: 857, outputTokens: 402, cacheReadTokens: 512, cacheWriteTokens: 0, costUsd: 0.000742 }],
+        value: [
+          { id: "KB-REFUND-EXPIRED", supported: true, category: "direct_fact", quote: "到期前 72 小时内未核销可退", reason: "原文直接给出临期退款规则。" },
+          { id: "KB-OTHER", supported: false, category: "limitation_only", quote: "需联系商家核实", reason: "仅说明缺失" },
+          { id: "KB-UNRELATED", supported: false, category: "unrelated", quote: null, reason: "与问题无关" },
+          { id: "KB-PENDING", supported: null, quote: null, reason: "请求未完成" },
+          null,
+        ],
+      },
+      stages: [{ name: "read", observedAt: T, durationMs: 5 }, null, "oops", { name: "rerank", observedAt: T, durationMs: 310 },
+        { name: "support", observedAt: T, durationMs: 900 }, { name: "recheck", observedAt: T, durationMs: 25 }],
+    },
+  };
+  const knowledgeRejected = {
+    context: { originalQuery: "别的店能用吗", modelQuestion: null, effectiveQuery: "别的店能用吗", orderSource: "verified_focus", scopeSource: "global", facts: null, policyTopic: null },
+    trace: {
+      mode: "lexical", threshold: null, query: "别的店能用吗", originalQuery: "别的店能用吗",
+      scope: { shopId: "shop-1", productId: "product-1" }, status: "rejected", reason: null,
+      rawRanking: [{ id: "KB-OTHER-SHOP", score: null }],
+      acceptance: { version: "score-gate-v1", config: { mode: "off" }, status: "rejected", accepted: [],
+        rejected: [{ id: "KB-OTHER-SHOP", rank: 1, reason: "out_of_scope" }], diagnostics: { topScore: null, scoreGap: null, candidates: [] } },
+      sourceHashes: { before: "b1", after: "b1" }, durationMs: 8, calls: [],
+      usage: { rerankTokens: null, supportTokens: null, estimatedCny: null, estimatedUsd: null, incompleteCalls: 0 },
+      stages: [{ name: "read", observedAt: T, durationMs: 8 }],
+    },
+  };
+  const knowledgeUnavailable = {
+    context: { originalQuery: "退款规则", modelQuestion: null, effectiveQuery: "退款规则", orderSource: "none", scopeSource: "global", facts: null, policyTopic: null },
+    trace: {
+      mode: "m4-support", threshold: 0.71, query: "退款规则", originalQuery: "退款规则",
+      scope: { shopId: "shop-1", productId: null }, status: "unavailable", reason: "timeout",
+      rawRanking: [], acceptance: null, sourceHashes: { before: "b1", after: null }, durationMs: 15000, calls: [],
+      usage: { rerankTokens: 0, supportTokens: null, estimatedCny: null, estimatedUsd: null, incompleteCalls: 2 },
+      stages: [{ name: "read", observedAt: T, durationMs: 4 }, { name: "rerank", observedAt: T, durationMs: 14996 }],
+      // 异常容器：顶层数组不是实际后端合同，必须诊断而非默默兼容。
+      supportVerification: [{ id: "KB-WRONG-SHAPE", supported: true }],
+    },
+  };
+  // 首次无 policyTopic 的接受：版本只来自本轮 trace.sources。
+  const knowledgeAcceptedFresh = {
+    context: { originalQuery: "新规能退吗", modelQuestion: null, effectiveQuery: "新规能退吗", orderSource: "current_explicit", scopeSource: "fresh_order", facts: null, policyTopic: null },
+    trace: {
+      mode: "m4-support", threshold: 0.71, query: "新规能退吗", originalQuery: "新规能退吗",
+      scope: { shopId: "shop-1", productId: "product-1" }, status: "accepted", reason: null,
+      rawRanking: [{ id: "KB-NEW-RULE", score: 0.88 }],
+      acceptance: { version: "score-support-v1", config: { mode: "support", threshold: 0.71 }, status: "accepted",
+        accepted: [{ id: "KB-NEW-RULE", title: "新规退款", body: "新规正文", tags: [], score: 0.88, rank: 1 }],
+        rejected: [], diagnostics: { topScore: 0.88, scoreGap: null, candidates: [] } },
+      sources: [{ sourceId: "KB-NEW-RULE", version: "c".repeat(64) }],
+      sourceHashes: { before: "b1", after: "b1" }, durationMs: 900, calls: [],
+      settings: { support: { promptVersion: "fact-support-v2-typed", profile: "typed" } },
+      usage: { rerankTokens: 900, supportTokens: 600, estimatedCny: 0.0004, estimatedUsd: 0.00006, incompleteCalls: 0 },
+      stages: [{ name: "read", observedAt: T, durationMs: 3 }],
+    },
+  };
+  // 旧 trace 无 sources 字段：版本显示未记录，policyTopic 旧版本不充当本轮版本。
+  const knowledgeLegacyTrace = {
+    context: {
+      originalQuery: "旧规则能退吗", modelQuestion: null, effectiveQuery: "旧规则能退吗", orderSource: "current_explicit", scopeSource: "fresh_order", facts: null,
+      policyTopic: { requestId: "r2", sourceKey: "k2", groupOpenid: "g1", originalQuery: "旧规则能退吗", orderId: "COUPON-1234",
+        scope: { shopId: "shop-1", productId: "product-1" }, sources: [{ sourceId: "KB-OLD-DOC", version: "a".repeat(64) }] },
+    },
+    trace: {
+      mode: "lexical", threshold: null, query: "旧规则能退吗", originalQuery: "旧规则能退吗",
+      scope: { shopId: "shop-1", productId: "product-1" }, status: "accepted", reason: null,
+      rawRanking: [{ id: "KB-OLD-DOC", score: null }],
+      acceptance: { version: "score-gate-v1", config: { mode: "off" }, status: "accepted",
+        accepted: [{ id: "KB-OLD-DOC", title: "旧规退款", body: "旧规正文", tags: [], score: null, rank: 1 }],
+        rejected: [], diagnostics: { topScore: null, scoreGap: null, candidates: [] } },
+      sourceHashes: { before: "b1", after: "b1" }, durationMs: 6, calls: [],
+      settings: { support: { promptVersion: "fact-support-v1" } },
+      supportVerification: { requestHash: "ab12cd", inputHash: "ef3456", attempts: [],
+        value: [{ id: "KB-OLD-DOC", supported: true, quote: "旧规正文引文", reason: null }] },
+      usage: { rerankTokens: null, supportTokens: null, estimatedCny: null, estimatedUsd: null, incompleteCalls: 0 },
+      stages: [{ name: "read", observedAt: T, durationMs: 6 }],
+    },
+  };
+  respond(take(), { runs: [runRecord("k-run", { plannedCases: 2, plannedTurns: 3 })] });
+  await flush();
+  respond(find(path => path === "/api/runs/k-run/analysis", "knowledge analysis"), analysisResult("k-run", {
+    scope: "objective", issues: [],
+    counts: { cases: counts(2, 2, 0, 0, 0), turns: counts(3, 3, 0, 0, 0), checks: counts(2, 2, 0, 0, 0) },
+    cases: [
+      { id: "k1", tags: [], status: "passed", turns: counts(2, 2, 0, 0, 0), checks: counts(1, 1, 0, 0, 0) },
+      { id: "k2", tags: [], status: "passed", turns: counts(1, 1, 0, 0, 0), checks: counts(1, 1, 0, 0, 0) },
+    ],
+  }));
+  respond(find(path => path === "/api/runs/k-run", "knowledge detail"), {
+    run: runRecord("k-run", { plannedCases: 2, plannedTurns: 3 }),
+    cases: [
+      evalCase("k1", { name: "知识取证场景", turns: [
+        turn({ index: 1, question: "券快过期能退吗", reply: "可退", steps: [{ index: 1, type: "model", name: "k-test", durationMs: 900, usage: null }],
+          spans: [
+            span({ id: "k-span-1", knowledge: knowledgeAccepted }),
+            span({ id: "k-span-2", knowledge: knowledgeRejected, durationMs: 8 }),
+            { id: "p1", parentSpanId: "k-span-1", actor: "host", trigger: "user", component: "knowledge-rerank", name: "rerank", observedAt: T, durationMs: 310, outcome: "ok",
+              usage: { provider: "bailian", model: "qwen3-rerank", kind: "rerank", inputTokens: 1200, outputTokens: 0, totalTokens: 1200, cost: { currency: "CNY", amount: 0.0006, source: "price_estimate" } } },
+            { id: "p2", parentSpanId: "k-span-1", actor: "host", trigger: "user", component: "knowledge-support", name: "support", observedAt: T, durationMs: 900, outcome: "ok",
+              usage: { provider: "pi", model: "k-test", kind: "llm", inputTokens: 700, outputTokens: 100, totalTokens: 800, cost: { currency: "USD", amount: 0.00008, source: "sdk_estimate" } } },
+            { id: "p3", parentSpanId: "k-span-1", actor: "host", trigger: "user", component: "knowledge-support", name: "support", observedAt: T, durationMs: 100, outcome: "error",
+              usage: { provider: "pi", model: "k-test", kind: "llm", inputTokens: null, outputTokens: null, totalTokens: null, cost: null } },
+          ] }),
+        turn({ index: 2, question: "退款规则", reply: "稍候", steps: [{ index: 1, type: "model", name: "k-test", durationMs: 500, usage: null }],
+          spans: [
+            span({ id: "k-span-3", knowledge: knowledgeUnavailable, durationMs: 15000 }),
+            span({ id: "k-span-4", knowledge: knowledgeAcceptedFresh, durationMs: 900 }),
+            span({ id: "k-span-5", knowledge: knowledgeLegacyTrace, durationMs: 6 }),
+          ] }),
+      ] }),
+      evalCase("k2", { name: "旧记录场景", turns: [turn({ question: "旧问题", reply: "旧回答" })] }),
+    ],
+  });
+  await flush();
+  for (const item of walk(element("run-detail")).filter(node => node.className.split(" ").includes("case"))) {
+    item.open = true;
+    item.fire("toggle");
+  }
+  const html = content(element("run-detail"));
+  assert.match(html, /知识取证 · 2 次/, "一轮多个 FAQ 调用合并成区");
+  assert.match(html, /知识取证 · 3 次/, "第二轮三次调用");
+  assert.match(html, /m4-support · 阈值 0\.71/, "方案与阈值");
+  assert.match(html, /本地词项/, "lexical 方案");
+  assert.match(html, /接受/);
+  assert.match(html, /拒收/);
+  assert.match(html, /不可用/);
+  assert.match(html, /查询超时/, "unavailable 原因中文");
+  assert.match(html, /范围 shop-demo- \+ product-de/, "首行范围短值");
+  assert.match(html, /shopId shop-demo-long-id-0001 · productId product-demo-long-0001/, "细节给完整范围 ID");
+  assert.match(html, /KB-REFUND-EXPIRED · 版本 bbbbbbbbbb/, "本轮 trace.sources 版本");
+  assert.ok(!html.includes("版本 aaaaaaaaaa"), "policyTopic 上轮旧版本不得作为展示版本（原始 JSON 保留）");
+  assert.match(html, /KB-NEW-RULE · 版本 cccccccccc/, "无 policyTopic 也显示本轮版本");
+  assert.match(html, /KB-OLD-DOC · 版本 未记录/, "旧 trace 无 sources 字段显示版本未记录");
+  assert.match(html, /模型建议问题（仅审计）/, "模型建议问题仅审计，不暗示已采用");
+  assert.match(html, /实际检索问题（宿主构造）/, "实际查询由宿主构造");
+  assert.match(html, /另有 2 条取证记录无法解析/, "坏历史条目显示缺失信息");
+  assert.match(html, /判别明细 · 4 条/, "typed 判别明细折叠");
+  assert.match(html, /KB-REFUND-EXPIRED · 事实或规则 · 支持/, "direct_fact 标事实或规则，不限已发生事实");
+  assert.match(html, /KB-OTHER · 仅说明缺失或需核实 · 不支持/, "仅说明缺失类别");
+  assert.match(html, /KB-UNRELATED · 无关 · 不支持/, "无关类别");
+  assert.match(html, /引用：需联系商家核实/, "实际 quote 可见");
+  assert.match(html, /KB-PENDING · 二元判断 · 未知/, "未完成不记为不支持");
+  assert.match(html, /KB-OLD-DOC · 二元判断 · 支持/, "binary 旧记录不反推类别");
+  assert.match(html, /判别配置：typed 分类判别 · prompt fact-support-typed-v2/, "trace 显示实际 prompt 版本");
+  assert.match(html, /prompt fact-support-v2-typed/, "旧 typed 版本保留显示");
+  assert.match(html, /判别配置：binary 二元判断 · prompt fact-support-v1/, "fact-support-v1 识别为 binary");
+  assert.match(html, /宿主仅接受事实或规则与明确安全边界问题的回答/, "接受口径说明");
+  assert.match(html, /判别明细记录异常，无法解析/, "顶层数组等非合同容器明确诊断，不默默兼容");
+  const verdictFolds = walk(element("run-detail")).filter(item => item.textContent.startsWith("判别明细 · "));
+  assert.equal(verdictFolds.length, 2, "无 supportVerification 的旧记录不伪造判别明细");
+  const profileLines = walk(element("run-detail")).filter(item => item.textContent.startsWith("判别配置："));
+  assert.equal(profileLines.length, 3, "有记录的判别配置按实际版本显示");
+  assert.match(html, /临期券退款规则/, "被接受原文标题");
+  assert.match(html, /到期前 72 小时内<b>未核销<\/b>可退。/, "来源正文按文本展示（textContent 防注入）");
+  assert.match(html, /超出授权范围/, "scope 拒绝原因中文");
+  assert.match(html, /范围拒绝属授权判定，不作幻觉结论/, "不把 scope 拒绝叫模型幻觉");
+  assert.match(html, /读取 5 ms · 重排 310 ms · 支持判别 900 ms · 复检 25 ms/, "阶段时延（坏条目剔除）");
+  assert.match(html, /CNY ¥0\.000600 · USD \$0\.000080/, "成本 CNY/USD 分列");
+  assert.match(html, /CNY 未知 · USD 未知/, "未知费用明确显示未知，不补零");
+  assert.match(html, /支持 Tokens 未知/, "未知 Tokens 不补零");
+  assert.match(html, /缺量调用 2/);
+  assert.match(html, /CNY ¥0\.000600（price_estimate）/, "provider 子 span CNY 估算");
+  assert.match(html, /USD \$0\.000080（sdk_estimate）/, "provider 子 span USD 估算");
+  assert.match(html, /费用未知/, "缺 cost 显示未知");
+  const knowledgeRegions = walk(element("run-detail")).filter(item => item.textContent.startsWith("知识取证 · "));
+  assert.equal(knowledgeRegions.length, 2, "旧记录无 knowledge 不渲染取证区");
+  console.log("PASS 评测前端：知识取证三态展示、本轮版本来源、scope 拒绝不作幻觉、成本分列、旧记录与坏条目兼容。");
+}

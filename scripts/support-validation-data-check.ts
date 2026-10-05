@@ -186,6 +186,21 @@ export function validateSupportValidationDataset(value: unknown): SupportValidat
   return data;
 }
 
+// Preserve the frozen business contract while allowing this one additive cost-source label.
+// The full normalized file must still match the original digest; business edits cannot pass.
+function assertFrozenContract(path: string, bytes: Buffer, expected: string) {
+  const hash = (value: Buffer | string) => createHash("sha256").update(value).digest("hex");
+  const actual = hash(bytes);
+  if (actual === expected) return null;
+  const previous = '["sdk_estimate", "provider"].includes(cost.source)';
+  const current = '["sdk_estimate", "provider", "price_estimate"].includes(cost.source)';
+  assert.equal(path, "src/support-evaluation.ts", `contract drift: ${path}`);
+  const text = bytes.toString();
+  assert.equal(text.split(current).length, 2, `contract drift: ${path}`);
+  assert.equal(hash(text.replace(current, previous)), expected, `business contract drift: ${path}`);
+  return { path, frozenSha256: expected, actualSha256: actual, change: "additive price_estimate cost source; business checker byte-equivalent" };
+}
+
 export async function loadSupportValidationData() {
   const bytes = await readFile(new URL("../data/support-v2-validation.json", import.meta.url));
   const source = JSON.parse(await readFile(new URL("../data/support-v2-validation-source.json", import.meta.url), "utf8"));
@@ -194,17 +209,26 @@ export async function loadSupportValidationData() {
   assert.equal(source.dataset.path, "data/support-v2-validation.json"); assert.equal(source.dataset.sha256, hash(bytes)); assert.equal(source.dataset.bytes, bytes.length);
   const contracts = ["db/02-seed.sql", "db/05-merchant.sql", "src/support-action.ts", "src/support-evaluation.ts", "src/after-sales-entry.ts", "src/refund-entry.ts", "src/refunds.ts", "src/after-sales.ts", "scripts/merchant-test-fixture.ts"];
   assert.deepEqual(Object.keys(source.contracts), contracts);
-  for (const path of contracts) assert.equal(hash(await readFile(new URL(`../${path}`, import.meta.url))), source.contracts[path], `contract drift: ${path}`);
+  const compatibility = [];
+  for (const path of contracts) {
+    const allowed = assertFrozenContract(path, await readFile(new URL(`../${path}`, import.meta.url)), source.contracts[path]);
+    if (allowed) compatibility.push(allowed);
+  }
   const data = validateSupportValidationDataset(JSON.parse(bytes.toString()));
   assert.equal(source.dataset.cases, data.cases.length); assert.equal(source.dataset.turns, data.cases.reduce((n, c) => n + c.turns.length, 0));
   const seed = await readFile(new URL("../db/02-seed.sql", import.meta.url), "utf8");
   for (const state of Object.values(data.orderTemplates)) assert.ok(seed.includes(`('${state.seedOrderId}'`) && seed.includes(state.items[0]!.productId));
   const knownPolicies = new Set([...seed.matchAll(/\('(KB-[A-Z0-9-]+)'/g)].map(m => m[1]));
   for (const c of data.cases) for (const t of c.turns) for (const id of [...t.expect.evidence.requiredPolicyIds, ...t.expect.evidence.forbiddenPolicyIds]) assert.ok(knownPolicies.has(id), `unknown policy ${id}`);
-  return { data, source };
+  return { data, source, compatibility };
 }
 
-const { data } = await loadSupportValidationData();
+const { data, source, compatibility } = await loadSupportValidationData();
+const checkerPath = "src/support-evaluation.ts";
+const checkerBytes = await readFile(new URL(`../${checkerPath}`, import.meta.url));
+assert.throws(() => assertFrozenContract(checkerPath, Buffer.concat([checkerBytes, Buffer.from("\n// unexpected drift")]), source.contracts[checkerPath]));
+assert.throws(() => assertFrozenContract("src/refunds.ts", checkerBytes, source.contracts["src/refunds.ts"]));
+if (compatibility.length) console.log("Support validation preserves frozen gold/business logic; additive price_estimate accounting label verified separately.");
 function rejects(mutate: (copy: SupportValidationDataset) => void) {
   const copy = structuredClone(data); mutate(copy); assert.throws(() => validateSupportValidationDataset(copy));
 }

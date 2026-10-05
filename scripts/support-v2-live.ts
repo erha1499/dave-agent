@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
-import { readFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
 import { isDeepStrictEqual } from "node:util";
 import { createPool, type RowDataPacket } from "mysql2/promise";
@@ -20,6 +20,9 @@ import type { RenderedReply } from "../src/reply.ts";
 import { checkSupportContract, supportCheckSpecs, type SupportExpectation, type SupportState } from "../src/support-evaluation.ts";
 import { createSupportSession, getSupportResult } from "../src/support-session.ts";
 import { resolveSupportRunParameters, type SupportExperimentParameters } from "../src/support-parameters.ts";
+import { createKnowledgeService } from "../src/knowledge-service.ts";
+import { knowledgeProviderSpans } from "../src/knowledge-evaluation.ts";
+import type { SupportCall } from "../src/support-controller.ts";
 import { createMerchantFixture } from "./merchant-test-fixture.ts";
 import { createObjectiveSnapshot, hash } from "./objective-support.ts";
 
@@ -27,7 +30,9 @@ type Architecture = "atomic" | "controller";
 type Round = { index: number; mode: "contract" | "notify" | "agree" | "confirm" | "repeat";
   source: "user" | "event" | "host"; question: string; restart?: boolean; expect?: SupportExpectation };
 type Dataset = { version: 2; scope: "objective"; answerQuality: "not_evaluated"; provenance: string;
-  cases: Array<{ id: string; tags: string[]; setup: "none" | "pending" | "approved"; turns: Round[] }> };
+  revision?: string; sourceDataset?: string;
+  cases: Array<{ id: string; tags: string[]; setup: "none" | "pending" | "approved"; turns: Round[]; sourceCase?: string | null;
+    operation?: "none" | "awaiting_confirmation" | "expired" | "succeeded"; knowledge?: "normal" | "empty" | "error"; foreign?: boolean }> };
 type Session = Awaited<ReturnType<typeof createCouponSession>>;
 const common = [
   { id: "execution.receipt", name: "执行采集和原群原用户回执完整", category: "execution", basis: "protocol" },
@@ -36,20 +41,36 @@ const common = [
 const special = { id: "business.fixed-terminal", name: "达到固定通知或确认终态，原操作不串单且幂等", category: "business", basis: "state" } satisfies Omit<EvalCheck, "status">;
 const specs = (round: Round) => [...common, ...(round.mode === "contract" ? supportCheckSpecs : [special])];
 
-export async function checkSupportLiveDataset() {
-  const dataset = JSON.parse(await readFile(new URL("../data/support-v2-live.json", import.meta.url), "utf8")) as Dataset;
+export async function checkSupportLiveDataset(selection: "legacy" | "development" = "development") {
+  assert.ok(["legacy", "development"].includes(selection));
+  const path = selection === "legacy" ? "data/support-v2-live.json" : "data/support-v2-live-development.json";
+  const dataset = JSON.parse(await readFile(new URL(`../${path}`, import.meta.url), "utf8")) as Dataset;
   assert.equal(dataset.version, 2); assert.equal(dataset.scope, "objective"); assert.equal(dataset.answerQuality, "not_evaluated");
-  assert.equal(dataset.cases.length, 3); assert.equal(new Set(dataset.cases.map(item => item.id)).size, 3);
-  for (const example of dataset.cases) for (const [index, turn] of example.turns.entries()) {
+  assert.equal(dataset.cases.length, selection === "legacy" ? 3 : 14); assert.equal(new Set(dataset.cases.map(item => item.id)).size, dataset.cases.length);
+  if (selection === "development") {
+    const original = JSON.parse(await readFile(new URL("../data/support-v2-development.json", import.meta.url), "utf8")) as Dataset;
+    assert.deepEqual(dataset.cases.flatMap(item => item.sourceCase ? [item.sourceCase] : []).sort(), original.cases.map(item => item.id).sort());
+    assert.equal(dataset.revision, "live-development-v2");
+  }
+  for (const example of dataset.cases) {
+    assert.ok(["none", "pending", "approved"].includes(example.setup));
+    assert.ok([undefined, "none", "awaiting_confirmation", "expired", "succeeded"].includes(example.operation));
+    assert.ok([undefined, "normal", "empty", "error"].includes(example.knowledge));
+    for (const [index, turn] of example.turns.entries()) {
     assert.equal(turn.index, index + 1); assert.ok(turn.question.trim());
     assert.ok(["contract", "notify", "agree", "confirm", "repeat"].includes(turn.mode));
     assert.equal(Boolean(turn.expect), turn.mode === "contract");
+    if (turn.expect) {
+      assert.ok([null, "{orderId}", "{otherOrderId}"].includes(turn.expect.orderId));
+      assert.ok(["read", "refund_prepared", "merchant_blocked", "missing_rules", "denied", "safe_stop", "refund_status"].includes(turn.expect.branch));
+    }
+    }
   }
   const plan: EvalObjectivePlan = { version: 2, scope: "objective", answerQuality: "not_evaluated", cases: dataset.cases.map(item => ({
     id: item.id, tags: item.tags, turns: item.turns.map(turn => ({ index: turn.index, source: turn.source,
       checks: specs(turn).map(({ id, category, basis }) => ({ id, category, basis })) })),
   })) };
-  return { dataset, plan };
+  return { dataset, plan, path };
 }
 
 function inbound(content: string, senderId: string, group: string, id = randomUUID()): QQBotInboundMessage {
@@ -65,19 +86,22 @@ function skipped(round: Round): EvalTurn {
 }
 
 // Explicit call only. Importing this module performs no model call, DB connection, or fixture mutation.
-export async function runSupportV2Live({ architecture, label, batch, parameters, experiment }: {
+export async function runSupportV2Live({ architecture, label, batch, parameters, experiment, dataset: selection = "development" }: {
   architecture: Architecture; label: string; batch?: EvalBatch; parameters?: Partial<SupportExperimentParameters>;
   experiment?: { id: string; variantId: string };
+  dataset?: "legacy" | "development";
 }): Promise<string> {
   assert.ok(["atomic", "controller"].includes(architecture)); assert.ok(label.trim() && label.length <= 120);
   const resolved = resolveSupportRunParameters(architecture, parameters);
   if (experiment) assert.ok([experiment.id, experiment.variantId].every(value => typeof value === "string" && value.trim() && value.length <= 128), "experiment id/variantId 无效");
-  const { dataset, plan } = await checkSupportLiveDataset();
+  const { dataset, plan, path: datasetPath } = await checkSupportLiveDataset(selection);
   const configs = { order: readDatabaseConfig(), merchant: readAfterSalesDatabaseConfig(), refund: readRefundDatabaseConfig(), history: readEvalDatabaseConfig() };
   const { modelRuntime, model } = await createConfiguredModelRuntime();
   const pool = createPool(configs.order), store = new CouponStore(pool), merchant = new AfterSalesStore(createPool(configs.merchant));
   const refunds = new RefundStore(createPool(configs.refund)), history = new EvalStore(createPool(configs.history));
   let fixture: Awaited<ReturnType<typeof createMerchantFixture>> | undefined, run: EvalRun | undefined;
+  let foreignFixture: Awaited<ReturnType<typeof createMerchantFixture>> | undefined;
+  let knowledgeFault: "normal" | "empty" | "error" = "normal";
   let session: Session | undefined, agent: QQAgent | undefined, capture: ReturnType<typeof captureEvaluationTurn> | undefined;
   let current: { id: string; trigger: EvalSpan["trigger"]; observedAt: string; spans: EvalSpan[]; stepTimes: Map<number, string> } | undefined;
   let group = "", sourceKey = "", hostConfirmCalls = 0, started = false, finished = false;
@@ -85,6 +109,12 @@ export async function runSupportV2Live({ architecture, label, batch, parameters,
   const receipts: Array<{ target: ReplyTarget; reply: RenderedReply; requester: string }> = [];
   const logs: string[] = [];
   let primaryFailure: unknown;
+  async function saveLocal() {
+    if (!run) return;
+    const directory = new URL("../.runtime/support-v2-live/", import.meta.url);
+    await mkdir(directory, { recursive: true });
+    await writeFile(new URL(`${run.id}.json`, directory), JSON.stringify({ run, cases }, null, 2) + "\n");
+  }
 
   function traced<T extends object>(service: T, names: Record<string, string>, component: string): T {
     return new Proxy(service, { get(target, key) {
@@ -109,14 +139,33 @@ export async function runSupportV2Live({ architecture, label, batch, parameters,
       };
     } });
   }
-  const read = traced(store, { getOrder: "get_order", searchKnowledge: "search_faq" }, "business-service");
-  const sales = traced(merchant, { prepare: "prepare_merchant_request", getTask: "get_merchant_request" }, "business-service");
-  const refundTools = traced(refunds, { prepare: "prepare_refund", get: "get_refund" }, "business-service");
+  const fixtureStore = new Proxy(store, { get(target, key) {
+    const value = Reflect.get(target, key);
+    if (key === "readKnowledgeDocuments" || key === "searchKnowledge") return async (...args: unknown[]) => {
+      if (knowledgeFault === "error") throw new Error("controlled knowledge availability fault");
+      const actual = await value.apply(target, args);
+      return knowledgeFault === "empty" ? [] : actual;
+    };
+    return typeof value === "function" ? value.bind(target) : value;
+  } });
+  const read = architecture === "atomic" ? traced(fixtureStore, { getOrder: "get_order", searchKnowledge: "search_faq" }, "business-service") : fixtureStore;
+  const sales = architecture === "atomic" ? traced(merchant, { prepare: "prepare_merchant_request", getTask: "get_merchant_request" }, "business-service") : merchant;
+  const refundTools = architecture === "atomic" ? traced(refunds, { prepare: "prepare_refund", get: "get_refund" }, "business-service") : refunds;
   const refundHost = traced(refunds, { confirm: "confirm_refund", markPresented: "mark_presented" }, "confirmation-service");
+  const knowledge = createKnowledgeService(fixtureStore, { mode: resolved.knowledgeMode, supportProfile: resolved.knowledgeSupport, threshold: resolved.knowledgeThreshold, timeoutMs: resolved.knowledgeTimeoutMs });
+  function onControllerCall(call: SupportCall) {
+    if (!current || call.parentSpanId !== current.id) return;
+    const span: EvalSpan = { id: call.id, parentSpanId: current.id, actor: "host", trigger: current.trigger,
+      component: "business-service", name: call.name, observedAt: call.observedAt, durationMs: call.durationMs,
+      outcome: call.isError ? call.errorKind === "business_denial" ? "denied" : "error" : "ok",
+      input: call.input, ...(call.output !== undefined ? { output: call.output } : {}), ...(call.knowledge ? { knowledge: call.knowledge } : {}) };
+    current.spans.push(span, ...knowledgeProviderSpans(span));
+  }
   async function openSession() {
     const afterSales = { store: sales, sourceKey, refunds: refundTools };
     session = architecture === "controller"
-      ? await createSupportSession(fixture!.identity, read, modelRuntime, model, afterSales, { groupOpenid: group, repairBudget: resolved.repairBudget! })
+      ? await createSupportSession(fixture!.identity, read, modelRuntime, model, afterSales,
+        { groupOpenid: group, repairBudget: resolved.repairBudget!, knowledge, onCall: onControllerCall })
       : await createCouponSession(fixture!.identity, read, modelRuntime, model, afterSales);
     session.subscribe(event => {
       capture?.receive(event);
@@ -138,14 +187,21 @@ export async function runSupportV2Live({ architecture, label, batch, parameters,
       { merchantEvents: resolved.merchantEvents });
   }
   async function closeAgent() { if (agent) await agent.close(); else session?.dispose(); agent = undefined; session = undefined; }
-  async function state(orderId: string): Promise<SupportState> {
-    const [order, operation, [rows]] = await Promise.all([store.getOrder(fixture!.identity, orderId), refunds.get(fixture!.identity, sourceKey, orderId),
-      pool.execute<RowDataPacket[]>("SELECT id FROM refunds WHERE order_id = ? ORDER BY id", [orderId])]);
-    return { orders: [{ id: order.id, paidCents: order.amounts.paidCents, refundedCents: order.amounts.refundedCents }],
-      operations: operation ? [operation] : [], refundIds: rows.map(row => row.id as string) };
+  async function state(orderIds: string[]): Promise<SupportState> {
+    const all = await Promise.all(orderIds.map(async orderId => {
+      const identity = foreignFixture?.orders.includes(orderId) ? foreignFixture.identity : fixture!.identity;
+      const [order, operation, [rows]] = await Promise.all([store.getOrder(identity, orderId), refunds.get(identity, merchantSourceKey(identity, group), orderId),
+        pool.execute<RowDataPacket[]>("SELECT id FROM refunds WHERE order_id = ? ORDER BY id", [orderId])]);
+      return { order, operation, rows };
+    }));
+    return { orders: all.map(({ order }) => ({ id: order.id, paidCents: order.amounts.paidCents, refundedCents: order.amounts.refundedCents })),
+      operations: all.flatMap(({ operation }) => operation ? [operation] : []), refundIds: all.flatMap(({ rows }) => rows.map(row => row.id as string)) };
   }
   try {
-    await history.ping(); fixture = await createMerchantFixture(["approve", "approve", "approve"], { delayMs: 5000 });
+    await history.ping(); fixture = await createMerchantFixture(Array.from({ length: dataset.cases.length + 1 }, () => "approve"), { delayMs: 5000 });
+    if (dataset.cases.some(item => item.foreign)) foreignFixture = await createMerchantFixture(["approve"], { senderId: "TEST_USER2" });
+    const otherOrderId = fixture.orders.at(-1)!;
+    await fixture.repriceRefund(otherOrderId, 5990);
     group = `v2-${randomUUID()}`; sourceKey = merchantSourceKey(fixture.identity, group); await openSession();
     const initialOrders = await Promise.all(fixture.orders.map(id => store.getOrder(fixture!.identity, id)));
     const [[knowledge], [shops], [products], [identityBindings]] = await Promise.all([
@@ -158,14 +214,17 @@ export async function runSupportV2Live({ architecture, label, batch, parameters,
       .map(({ name, description, parameters }) => ({ name, description, parameters }));
     const snapshot = await createObjectiveSnapshot({ plan, dataset, tools,
       model: { provider: session!.model!.provider, id: session!.model!.id, maxTokens: session!.model!.maxTokens, thinking: session!.thinkingLevel, temperature: null },
-      files: ["scripts/support-v2-live.ts", "data/support-v2-live.json", "scripts/merchant-test-fixture.ts", "src/support-evaluation.ts", "src/support-controller.ts", "src/support-action.ts", "src/support-session.ts", "src/support-parameters.ts",
+      files: ["scripts/support-v2-live.ts", datasetPath, "data/support-v2-development.json", "scripts/merchant-test-fixture.ts", "src/support-evaluation.ts", "src/support-controller.ts", "src/support-action.ts", "src/support-session.ts", "src/support-parameters.ts",
+        "src/support-context.ts", "prompts/customer-service-v2.md", "skills/shop-support-v2/SKILL.md",
+        "src/knowledge-service.ts", "src/knowledge-evaluation.ts", "src/bailian.ts", "src/evidence-support.ts", "src/evidence-acceptance.ts", "src/retrieval-ranking.ts",
         "src/agent.ts", "src/qq-agent.ts", "src/coupon-store.ts", "src/knowledge-retrieval.ts", "src/refunds.ts", "src/refund-entry.ts", "src/after-sales.ts", "src/after-sales-entry.ts", "src/merchant-notifications.ts", "src/reply.ts", "src/reply-from-tools.ts"],
       business: { knowledge, shops, products, identityBindings, scenarios: initialOrders.map(order => ({ source: order.source, status: order.status, amounts: order.amounts,
         shop: order.shop, items: order.items.map(({ productId, productName, quantity, unitPriceCents, totalCents }) => ({ productId, productName, quantity, unitPriceCents, totalCents })),
         coupons: order.coupons.map(coupon => ({ status: coupon.status, valid: Boolean(coupon.expiresAt && Date.parse(coupon.expiresAt) > Date.parse(order.asOf)) })),
         payments: order.payments.map(({ status, amountCents }) => ({ status, amountCents })), refunds: order.refunds })) },
       settings: { architecture, ...resolved,
-        retries: 2, compaction: false, merchantDelayMs: 5000, merchantHoldMs: 180_000, qqSend: "local substitute", fixturePreparationMeasured: false },
+        retries: 2, knowledgeRetries: 0, compaction: false, merchantDelayMs: 5000, merchantHoldMs: 180_000, qqSend: "local substitute", fixturePreparationMeasured: false,
+        datasetSelection: selection, foreignOrder: foreignFixture?.orders[0] ?? null, knowledgeFaults: "explicit case setup only; not natural outage rates" },
       measurement: "QQAgent complete turn, excluding nonce fixture preparation/state readback/restart; actual model and service spans; local QQ send substitute; 180-second fixture-only waiting window is not production SLA; no natural-language scoring." });
     if (architecture === "controller") {
       const [prompt, skill] = await Promise.all([readFile(new URL("../prompts/customer-service-v2.md", import.meta.url), "utf8"), readFile(new URL("../skills/shop-support-v2/SKILL.md", import.meta.url), "utf8")]);
@@ -174,16 +233,24 @@ export async function runSupportV2Live({ architecture, label, batch, parameters,
     snapshot.content.initialOrders = initialOrders;
     if (experiment) snapshot.content.experiment = { ...experiment };
     snapshot.hashes.checker = hash({ specs: plan, source: await readFile(new URL("../src/support-evaluation.ts", import.meta.url), "utf8"), runner: await readFile(new URL("./support-v2-live.ts", import.meta.url), "utf8") });
-    run = { id: randomUUID(), suiteId: "support-business-v2", suiteName: "v2共同业务开发验收", kind: "model", label, status: "running", startedAt: new Date().toISOString(), finishedAt: null,
+    run = { id: randomUUID(), suiteId: selection === "legacy" ? "support-business-v2" : "support-business-live-development-v2",
+      suiteName: selection === "legacy" ? "v2共同业务开发验收" : "C1 业务开发：12语义映射与2边界场景", kind: "model", label, status: "running", startedAt: new Date().toISOString(), finishedAt: null,
       plannedCases: plan.cases.length, plannedTurns: plan.cases.reduce((sum, item) => sum + item.turns.length, 0), snapshot, metrics: null, ...(batch ? { batch } : {}) };
     await history.startRun(run); started = true; console.log(`[support-v2] ${architecture} run=${run.id}`);
     for (const [caseIndex, example] of dataset.cases.entries()) {
       await closeAgent(); group = `v2-${run.id}-${example.id}`; sourceKey = merchantSourceKey(fixture.identity, group);
-      const orderId: string = fixture.orders[caseIndex]!, notificationMessageId = randomUUID();
+      knowledgeFault = example.knowledge ?? "normal";
+      const orderId: string = example.foreign ? foreignFixture!.orders[0]! : fixture.orders[caseIndex]!, notificationMessageId = randomUUID();
       if (example.setup !== "none") {
         const task = await merchant.request(fixture.identity, sourceKey, orderId, "行程变化", { groupOpenid: group, messageId: notificationMessageId, timestamp: new Date().toISOString() });
         await fixture.holdMerchant(orderId);
         if (example.setup === "approved") assert.ok(await merchant.applyResult({ taskId: task.taskId, orderId, status: "approved", approvedAmountCents: task.amountCents }));
+      }
+      if (example.operation && example.operation !== "none") {
+        const operation = await refunds.prepare(fixture.identity, sourceKey, orderId);
+        await refunds.markPresented(fixture.identity, sourceKey, operation.operationId);
+        if (example.operation === "expired") await fixture.expireRefund(orderId);
+        if (example.operation === "succeeded") await refunds.confirm(fixture.identity, sourceKey, operation.operationId);
       }
       await openSession(); agent = makeAgent();
       const item: EvalCase = { id: example.id, name: example.id, category: "v2共同业务", status: "failed", turns: [] }; cases.push(item);
@@ -191,7 +258,8 @@ export async function runSupportV2Live({ architecture, label, batch, parameters,
       for (const round of example.turns) {
         if (item.turns.some(turn => turn.status !== "passed")) { item.turns.push(skipped(round)); continue; }
         if (round.restart) { await closeAgent(); await openSession(); agent = makeAgent(); }
-        const before = await state(orderId), question = round.question.replaceAll("{orderId}", orderId).replaceAll("{operationId}", operationId ?? "missing-operation");
+        const watchedOrders = [orderId, otherOrderId];
+        const before = await state(watchedOrders), question = round.question.replaceAll("{orderId}", orderId).replaceAll("{otherOrderId}", otherOrderId).replaceAll("{operationId}", operationId ?? "missing-operation");
         const msg = inbound(question, fixture.identity.senderId, group), receiptStart = receipts.length, logStart = logs.length, confirmsBefore = hostConfirmCalls;
         const startedAt = new Date().toISOString();
         current = { id: msg.messageId!, trigger: round.source === "host" ? "confirmation" : round.source, observedAt: startedAt, spans: [], stepTimes: new Map() };
@@ -225,8 +293,14 @@ export async function runSupportV2Live({ architecture, label, batch, parameters,
         }
         spans[0]!.durationMs = measured.durationMs;
         current = undefined;
-        const after = await state(orderId), receipt = receipts[receiptStart], calls = spans.filter(span => span.component === "business-service");
-        const completed = !failure && !measured.failed && !measured.steps.some(step => step.type === "model" && step.isError)
+        const after = await state(watchedOrders), receipt = receipts[receiptStart], calls = spans.filter(span => span.component === "business-service");
+        const knowledgeComplete = architecture !== "controller" || calls.filter(call => call.name === "search_faq").every(call => {
+          const trace = call.knowledge?.trace;
+          return trace?.mode === resolved.knowledgeMode && trace.supportProfile === resolved.knowledgeSupport && Array.isArray(call.output)
+            && (example.knowledge === "error" ? trace.status === "unavailable" && trace.reason === "database_unavailable" && call.output.length === 0
+              : trace.status !== "unavailable") && (!call.usage) && trace.calls.every(provider => provider.status === "ok");
+        });
+        const completed = !failure && knowledgeComplete && !measured.failed && !measured.steps.some(step => step.type === "model" && step.isError)
           && !logs.slice(logStart).some(line => line.includes("model_failed") || line.includes("回复发送或确认登记失败"));
         const receiptValid = receipts.length === receiptStart + 1 && receipt?.requester === fixture.identity.senderId && receipt.target.targetId === group
           && receipt.target.msgId === (round.mode === "notify" ? notificationMessageId : msg.messageId);
@@ -236,7 +310,9 @@ export async function runSupportV2Live({ architecture, label, batch, parameters,
           { ...common[1]!, status: hostConfirmCalls - confirmsBefore === (isConfirmation ? 1 : 0) && (!isConfirmation || measured.steps.length === 0) ? "passed" : "failed" },
         ];
         if (round.mode === "contract") {
-          checks.push(...checkSupportContract({ ...round.expect!, orderId }, { before, after, calls, completed }));
+          const expectedOrder = selection === "legacy" ? orderId : round.expect!.orderId === "{orderId}" ? orderId
+            : round.expect!.orderId === "{otherOrderId}" ? otherOrderId : null;
+          checks.push(...checkSupportContract({ ...round.expect!, orderId: expectedOrder }, { before, after, calls, completed }));
           if (round.expect!.operation === "prepared") {
             const operation = after.operations[0];
             const shown = operation?.status === "awaiting_confirmation" && receipt?.reply.kind === "refund_confirmation"
@@ -269,9 +345,11 @@ export async function runSupportV2Live({ architecture, label, batch, parameters,
         console.log(`[support-v2] ${example.id}/${round.index} ${turn.status}`);
       }
       item.status = item.turns.every(turn => turn.status === "passed") ? "passed" : "failed";
-      attemptedSaves.add(item.id); await history.saveCase(run.id, item);
+      attemptedSaves.add(item.id); await history.saveCase(run.id, item); await saveLocal();
     }
-    await history.finishRun(run.id, "completed", new Date().toISOString(), summarizeEvaluation(cases)); finished = true;
+    run.finishedAt = new Date().toISOString(); run.metrics = summarizeEvaluation(cases);
+    await history.finishRun(run.id, "completed", run.finishedAt, run.metrics); finished = true;
+    run.status = "completed"; await saveLocal();
     console.log(`[support-v2] run=${run.id} ${cases.filter(item => item.status === "passed").length}/${cases.length} cases`);
     return run.id;
   } catch (error) {
@@ -281,7 +359,10 @@ export async function runSupportV2Live({ architecture, label, batch, parameters,
         attemptedSaves.add(item.id);
         try { await history.saveCase(run.id, item); } catch { /* Preserve unknown write outcome; never retry INSERT. */ }
       }
-      try { await history.finishRun(run.id, "failed", new Date().toISOString(), summarizeEvaluation(cases), "运行或持久化中断；缺项保留为missing，未知写入不重试。"); } catch { /* Original failure remains primary. */ }
+      run.finishedAt = new Date().toISOString(); run.metrics = summarizeEvaluation(cases); run.status = "failed";
+      run.error = "运行或持久化中断；缺项保留为missing，未知写入不重试。";
+      try { await history.finishRun(run.id, "failed", run.finishedAt, run.metrics, run.error); } catch { /* Original failure remains primary. */ }
+      try { await saveLocal(); } catch { /* Original failure remains primary. */ }
     }
     throw error;
   } finally {
@@ -289,6 +370,7 @@ export async function runSupportV2Live({ architecture, label, batch, parameters,
     const cleanup: unknown[] = [];
     try { await closeAgent(); } catch (error) { cleanup.push(error); }
     try { await fixture?.cleanup(); } catch (error) { cleanup.push(error); }
+    try { await foreignFixture?.cleanup(); } catch (error) { cleanup.push(error); }
     const closed = await Promise.allSettled([store.close(), merchant.close(), refunds.close(), history.close()]);
     cleanup.push(...closed.flatMap(result => result.status === "rejected" ? [result.reason] : []));
     if (cleanup.length && !primaryFailure) throw new AggregateError(cleanup, "v2验收清理失败");
@@ -302,12 +384,20 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     const { plan } = await checkSupportLiveDataset();
     console.log(`v2真实入口就绪：${plan.cases.length}案例/${plan.cases.reduce((sum, item) => sum + item.turns.length, 0)}轮；未连接数据库或调用模型。需显式 --live --architecture atomic|controller --repeat 3。`);
   } else {
-    assert.ok(args.every((arg, index) => arg === "--live" || ["--architecture", "--repeat", "--label"].includes(arg) || ["--architecture", "--repeat", "--label"].includes(args[index - 1] ?? "")), "未知参数");
+    const flags = ["--architecture", "--repeat", "--label", "--dataset", "--knowledge-mode", "--knowledge-support", "--knowledge-threshold", "--knowledge-timeout-ms"];
+    assert.ok(args.every((arg, index) => arg === "--live" || flags.includes(arg) || flags.includes(args[index - 1] ?? "")), "未知参数");
     const value = (name: string) => args[args.indexOf(name) + 1];
     const architecture = value("--architecture"); assert.ok(architecture === "atomic" || architecture === "controller", "必须明确选择architecture");
     const repeat = args.includes("--repeat") ? Number(value("--repeat")) : 3; assert.ok(Number.isInteger(repeat) && repeat >= 1 && repeat <= 3);
     const label = args.includes("--label") ? value("--label")! : `v2 ${architecture} 开发验收`;
+    const dataset = args.includes("--dataset") ? value("--dataset") : "development"; assert.ok(dataset === "legacy" || dataset === "development");
+    const parameters: Partial<SupportExperimentParameters> = {
+      ...(args.includes("--knowledge-mode") ? { knowledgeMode: value("--knowledge-mode") as SupportExperimentParameters["knowledgeMode"] } : {}),
+      ...(args.includes("--knowledge-support") ? { knowledgeSupport: value("--knowledge-support") as SupportExperimentParameters["knowledgeSupport"] } : {}),
+      ...(args.includes("--knowledge-threshold") ? { knowledgeThreshold: Number(value("--knowledge-threshold")) } : {}),
+      ...(args.includes("--knowledge-timeout-ms") ? { knowledgeTimeoutMs: Number(value("--knowledge-timeout-ms")) } : {}),
+    };
     const batchId = randomUUID();
-    for (let repetition = 1; repetition <= repeat; repetition++) await runSupportV2Live({ architecture, label, batch: { id: batchId, repetition, plannedRepetitions: repeat } });
+    for (let repetition = 1; repetition <= repeat; repetition++) await runSupportV2Live({ architecture, label, dataset, parameters, batch: { id: batchId, repetition, plannedRepetitions: repeat } });
   }
 }

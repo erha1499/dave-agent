@@ -1,4 +1,5 @@
 // Shared contract for the CLI evaluator, MySQL history and local read-only workbench.
+import type { SupportCall } from "./support-controller.ts";
 export type EvalStatus = "passed" | "failed" | "skipped";
 export type EvalCheck = {
   id: string;
@@ -34,10 +35,11 @@ export type EvalSpan = {
   component: string; name: string; observedAt: string; durationMs: number | null;
   outcome: "ok" | "denied" | "error";
   input?: unknown; output?: unknown;
+  knowledge?: SupportCall["knowledge"];
   usage?: {
     provider: string; model: string; kind: "llm" | "embedding" | "rerank";
     inputTokens: number | null; outputTokens: number | null; totalTokens: number | null;
-    cost: { currency: "USD" | "CNY"; amount: number; source: "sdk_estimate" | "provider" } | null;
+    cost: { currency: "USD" | "CNY"; amount: number; source: "sdk_estimate" | "provider" | "price_estimate" } | null;
   };
 };
 export type EvalStep = {

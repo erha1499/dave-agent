@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "kind": "support",
+  "label": "Controller 知识检索 A/B",
+  "repeat": 1,
+  "allowRemote": false,
+  "variants": [
+    { "id": "A", "architecture": "controller", "parameters": { "knowledgeMode": "lexical", "knowledgeThreshold": 0.71, "knowledgeTimeoutMs": 15000 } },
+    { "id": "B", "architecture": "controller", "parameters": { "knowledgeMode": "m4-support", "knowledgeThreshold": 0.71, "knowledgeTimeoutMs": 15000 } }
+  ]
+}

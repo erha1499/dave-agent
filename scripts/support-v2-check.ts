@@ -116,6 +116,8 @@ assert.ok(analyzeSupportSpans([root, { ...host, parentSpanId: "missing" }]).issu
 assert.ok(analyzeSupportSpans([root, root]).issues.length);
 assert.ok(analyzeSupportSpans([{ ...root, parentSpanId: "service" }, host]).issues.length);
 assert.equal(plan.version, 2);
-const live = await checkSupportLiveDataset();
+const live = await checkSupportLiveDataset("legacy");
 assert.equal(live.plan.cases.length, 3); assert.equal(live.plan.cases.reduce((sum, item) => sum + item.turns.length, 0), 8);
+const expanded = await checkSupportLiveDataset();
+assert.equal(expanded.plan.cases.length, 14); assert.equal(expanded.plan.cases.reduce((sum, item) => sum + item.turns.length, 0), 24);
 console.log(`v2 共同契约工程检查通过：12 开发案例 × 2 服务架构，${rounds} 轮；覆盖拒绝替代成功、错误范围、分层归因和币种分列。未运行模型、数据库或 QQ。`);

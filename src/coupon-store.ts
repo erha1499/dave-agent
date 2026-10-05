@@ -1,5 +1,6 @@
 import type { Pool, PoolConnection, PoolOptions, RowDataPacket } from "mysql2/promise";
 import { rankKnowledge } from "./knowledge-retrieval.ts";
+import type { RetrievalDocument } from "./retrieval-ranking.ts";
 
 export type QQIdentity = { appId: string; senderId: string };
 const unavailableOrder = "未找到当前客户可查询的订单，请核对订单号或联系人工客服。";
@@ -131,6 +132,13 @@ export class CouponStore {
 
   async searchKnowledge(query: string, shopId?: string, productId?: string) {
     if (!query.trim() || query.length > 500) throw new Error("请输入 1–500 字的规则查询。");
+    return rankKnowledge(query, await this.readKnowledgeDocuments(shopId, productId)).slice(0, 5).map(document => ({
+      source: "demo-knowledge" as const, sourceId: document.id, title: document.title, body: document.body,
+      scope: { shopId: document.shopId, productId: document.productId ?? null },
+    }));
+  }
+
+  async readKnowledgeDocuments(shopId?: string, productId?: string): Promise<RetrievalDocument[]> {
     if ([shopId, productId].some((id) => id !== undefined && !/^[A-Za-z0-9_-]{1,64}$/.test(id)) || (productId && !shopId)) {
       throw new Error("请提供有效且关联的门店和套餐标识。");
     }
@@ -146,15 +154,12 @@ export class CouponStore {
       AND (shop_id IS NULL OR shop_id = ?) AND (product_id IS NULL OR product_id = ?)
       ORDER BY id LIMIT 201`, [shopId ?? null, productId ?? null]);
     if (rows.length > 200) throw new Error(databaseFailure);
-    const documents = rows.map((row) => {
+    return rows.map((row) => {
       let tags: unknown;
       try { tags = typeof row.tags === "string" ? JSON.parse(row.tags) : row.tags; } catch { throw new Error(databaseFailure); }
       if (!Array.isArray(tags) || tags.some((tag) => typeof tag !== "string")) throw new Error(databaseFailure);
-      return { id: String(row.id), tags: tags as string[], title: row.title as string, body: row.body as string, row };
+      return { id: String(row.id), tags: tags as string[], title: row.title as string, body: row.body as string,
+        shopId: row.shop_id as string | null, productId: row.product_id as string | null, status: "active" as const };
     });
-    return rankKnowledge(query, documents).slice(0, 5).map(({ row }) => ({
-      source: "demo-knowledge" as const, sourceId: row.id as string, title: row.title as string, body: row.body as string,
-      scope: { shopId: row.shop_id as string | null, productId: row.product_id as string | null },
-    }));
   }
 }

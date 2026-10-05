@@ -12,18 +12,31 @@ import { createSupportSession, getSupportResult, isSupportSession, prepareSuppor
   type SupportFocus } from "../src/support-session.ts";
 import type { SupportAction } from "../src/support-action.ts";
 import type { SupportCall } from "../src/support-controller.ts";
-import { resolveSupportParameters, resolveSupportRunParameters, type SupportExperimentParameters } from "../src/support-parameters.ts";
+import { readKnowledgeParameters, resolveSupportParameters, resolveSupportRunParameters, type SupportExperimentParameters } from "../src/support-parameters.ts";
 import { runSupportV2Live } from "./support-v2-live.ts";
 
-assert.deepEqual(resolveSupportParameters(), { timeoutMs: 60_000, repairBudget: 1, merchantEvents: "architecture" });
+const knowledgeDefaults = { knowledgeMode: "lexical", knowledgeSupport: "binary", knowledgeThreshold: .71, knowledgeTimeoutMs: 15_000 };
+assert.deepEqual(resolveSupportParameters(), { timeoutMs: 60_000, repairBudget: 1, merchantEvents: "architecture", ...knowledgeDefaults });
 assert.deepEqual(resolveSupportParameters({ timeoutMs: 10_000, repairBudget: 0, merchantEvents: "host" }),
-  { timeoutMs: 10_000, repairBudget: 0, merchantEvents: "host" });
+  { timeoutMs: 10_000, repairBudget: 0, merchantEvents: "host", ...knowledgeDefaults });
 assert.deepEqual(resolveSupportParameters({ timeoutMs: 120_000, repairBudget: 2, merchantEvents: "model" }),
-  { timeoutMs: 120_000, repairBudget: 2, merchantEvents: "model" });
-assert.deepEqual(resolveSupportRunParameters("atomic"), { timeoutMs: 60_000, repairBudget: null, merchantEvents: "model" });
-assert.deepEqual(resolveSupportRunParameters("controller"), { timeoutMs: 60_000, repairBudget: 1, merchantEvents: "host" });
+  { timeoutMs: 120_000, repairBudget: 2, merchantEvents: "model", ...knowledgeDefaults });
+assert.deepEqual(resolveSupportRunParameters("atomic"), { timeoutMs: 60_000, repairBudget: null, merchantEvents: "model", ...knowledgeDefaults });
+assert.deepEqual(resolveSupportRunParameters("controller"), { timeoutMs: 60_000, repairBudget: 1, merchantEvents: "host", ...knowledgeDefaults });
 assert.deepEqual(resolveSupportRunParameters("atomic", { merchantEvents: "host", repairBudget: 2 }),
-  { timeoutMs: 60_000, repairBudget: null, merchantEvents: "host" });
+  { timeoutMs: 60_000, repairBudget: null, merchantEvents: "host", ...knowledgeDefaults });
+assert.deepEqual(readKnowledgeParameters({}), knowledgeDefaults);
+assert.deepEqual(readKnowledgeParameters({ KNOWLEDGE_MODE: "m4-support", KNOWLEDGE_THRESHOLD: "0.8", KNOWLEDGE_TIMEOUT_MS: "12000" }),
+  { knowledgeMode: "m4-support", knowledgeSupport: "binary", knowledgeThreshold: .8, knowledgeTimeoutMs: 12_000 });
+assert.equal(readKnowledgeParameters({ KNOWLEDGE_MODE: "m4-support", KNOWLEDGE_SUPPORT: "typed" }).knowledgeSupport, "typed");
+for (const env of [{ KNOWLEDGE_MODE: "typo" }, { KNOWLEDGE_THRESHOLD: "NaN" }, { KNOWLEDGE_THRESHOLD: "1.01" },
+  { KNOWLEDGE_THRESHOLD: "0x1" }, { KNOWLEDGE_TIMEOUT_MS: "0" }, { KNOWLEDGE_TIMEOUT_MS: "1.1" }, { KNOWLEDGE_TIMEOUT_MS: "60001" },
+  { KNOWLEDGE_SUPPORT: "typed" }, { KNOWLEDGE_SUPPORT: "invalid" }]) {
+  assert.throws(() => readKnowledgeParameters(env));
+}
+assert.throws(() => resolveSupportRunParameters("atomic", { knowledgeMode: "m4-support" }), /atomic 仅支持 lexical/);
+assert.equal(resolveSupportRunParameters("controller", { knowledgeMode: "m4-support" }).knowledgeMode, "m4-support");
+assert.equal(resolveSupportRunParameters("controller", { knowledgeMode: "m4-support", knowledgeSupport: "typed" }).knowledgeSupport, "typed");
 assert.throws(() => resolveSupportRunParameters("unknown" as "atomic"), /业务架构/);
 assert.throws(() => resolveSupportRunParameters("controller", { merchantEvents: "model" }), /controller 仅支持宿主/);
 const originalEnv = process.env;
@@ -34,14 +47,17 @@ process.env = new Proxy(originalEnv, { get(target, key) {
 } });
 try {
   await assert.rejects(runSupportV2Live({ architecture: "controller", label: "invalid combination preflight", parameters: { merchantEvents: "model" } }), /controller 仅支持宿主/);
+  await assert.rejects(runSupportV2Live({ architecture: "atomic", label: "invalid knowledge preflight", parameters: { knowledgeMode: "m4-support" } }), /atomic 仅支持 lexical/);
   assert.equal(credentialReads, 0);
 } finally { process.env = originalEnv; }
 for (const input of [null, [], { timeoutMs: 9999 }, { timeoutMs: 120001 }, { timeoutMs: 60_000.5 }, { timeoutMs: "60000" },
   { timeoutMs: Infinity }, { repairBudget: -1 }, { repairBudget: 3 }, { repairBudget: 0.5 }, { repairBudget: null },
-  { merchantEvents: "typo" }, { merchantEvents: undefined }, { unauthorized: true }]) {
+  { merchantEvents: "typo" }, { merchantEvents: undefined }, { unauthorized: true }, { knowledgeMode: "typo" }, { knowledgeSupport: "typo" }, { knowledgeSupport: "typed" },
+  { knowledgeThreshold: NaN }, { knowledgeThreshold: -1 }, { knowledgeThreshold: 1.01 }, { knowledgeThreshold: "0.71" },
+  { knowledgeTimeoutMs: 0 }, { knowledgeTimeoutMs: 60001 }, { knowledgeTimeoutMs: 1000.1 }]) {
   const parameters = input as Partial<SupportExperimentParameters>;
   assert.throws(() => resolveSupportParameters(parameters));
-  await assert.rejects(runSupportV2Live({ architecture: "controller", label: "invalid preflight", parameters }), /业务实验参数|timeoutMs|repairBudget|merchantEvents/);
+  await assert.rejects(runSupportV2Live({ architecture: "controller", label: "invalid preflight", parameters }), /业务实验参数|timeoutMs|repairBudget|merchantEvents|knowledge/);
 }
 console.log("[support-session] experiment defaults, bounds and invalid runner preflight without services PASS");
 
@@ -156,6 +172,23 @@ try {
   assert.doesNotMatch(JSON.stringify(latestTool.content), /trustedRoute|groupOpenid|session_user|SESSION_TEST|actualCalls/);
   console.log("[support-session] real before-start, one typed tool, focus and private host trace PASS");
 
+  const beforeReferenceRepair = calls.length;
+  const referenceRepair = await run("它还没用过，可以退款吗？只咨询。", [
+    choose({ kind: "refund_eligibility", orderRef: explicit(), question: "退款资格" }, orderId),
+    choose({ kind: "refund_eligibility", orderRef: { kind: "focus" }, question: "它还没用过，可以退款吗？只咨询。" }, orderId), finish,
+  ]);
+  assert.deepEqual(referenceRepair.map(result => result.isError), [true, false]);
+  assert.deepEqual(calls.slice(beforeReferenceRepair), [`order:${orderId}`, "faq"]);
+  assert.equal(getSupportResult(session)?.outcome, "ready");
+  const beforeBadReferences = calls.length, modelBeforeBadReferences = faux.state.callCount;
+  const badReference = choose({ kind: "order", orderRef: explicit() }, orderId);
+  const exhaustedReferences = await run("再查一下这张券。", [badReference, badReference, choose({ kind: "order", orderRef: { kind: "focus" } }), finish], 2);
+  assert.ok(exhaustedReferences.every(result => result.isError));
+  assert.equal(calls.length, beforeBadReferences); assert.equal(faux.state.callCount, modelBeforeBadReferences + 2);
+  assert.equal(getSupportResult(session), undefined, "invalid reference repairs consume the same per-turn budget as schema repairs");
+  faux.setResponses([]);
+  console.log("[support-session] current-text reference error repairs to focus once; repeated invalid references exhaust budget before services PASS");
+
   const beforePrepare = prepares;
   const duplicate = { kind: "refund_prepare" as const, orderRef: explicit() };
   const duplicateResults = await run(`请给 ${orderId} 生成退款方案`, [context => {
@@ -168,7 +201,34 @@ try {
   const conflicts = await run(`查询 ${orderId}`, [choose({ kind: "order", orderRef: explicit() }), choose({ kind: "refund_prepare", orderRef: explicit() }), finish]);
   assert.deepEqual(conflicts.map(result => result.isError), [false, true]);
   assert.equal(prepares, beforePrepare + 1); assert.equal(getSupportResult(session)?.action.kind, "order");
+  const beforePreparedConflict = prepares, callsBeforePreparedConflict = calls.length;
+  const preparedConflict = await run(`为 ${orderId} 生成退款方案。`, [
+    choose({ kind: "refund_prepare", orderRef: explicit() }), choose({ kind: "refund_status", orderRef: explicit() }), finish,
+  ]);
+  assert.deepEqual(preparedConflict.map(result => result.isError), [false, true]);
+  assert.equal(prepares, beforePreparedConflict + 1);
+  assert.deepEqual(calls.slice(callsBeforePreparedConflict), [`order:${orderId}`, "faq", `task:${orderId}`, `prepare:${orderId}`]);
+  assert.equal(supportReply(session)?.kind, "refund_confirmation", "conflicting correction cannot replace or rerun a prepared operation");
   console.log("[support-session] duplicate action executes once and conflicts cannot add mutations PASS");
+
+  const originalRefundGet = refunds.get;
+  refunds.get = async (...args) => {
+    const found = await originalRefundGet(...args); assert.ok(found);
+    return { ...found, expiresAt: "2000-01-01T00:00:00.000Z" };
+  };
+  const beforeExpiredStatus = calls.length, preparationsBeforeStatus = prepares;
+  await run(`查询 ${orderId} 已过期的退款方案，不要重建。`, [choose({ kind: "refund_status", orderRef: explicit() }), finish]);
+  assert.deepEqual(calls.slice(beforeExpiredStatus), [`order:${orderId}`, `refund:${orderId}`]);
+  assert.equal(getSupportResult(session)?.evidence.operation?.expiresAt, "2000-01-01T00:00:00.000Z"); assert.equal(prepares, preparationsBeforeStatus);
+  refunds.get = originalRefundGet;
+  const beforeOrderStatus = calls.length;
+  await run(`查询 ${orderId} 订单和券的状态。`, [choose({ kind: "order", orderRef: explicit() }), finish]);
+  assert.deepEqual(calls.slice(beforeOrderStatus), [`order:${orderId}`]);
+  const beforeRebuild = calls.length;
+  await run(`请重新生成 ${orderId} 的退款方案。`, [choose({ kind: "refund_prepare", orderRef: explicit() }), finish]);
+  assert.deepEqual(calls.slice(beforeRebuild), [`order:${orderId}`, "faq", `task:${orderId}`, `prepare:${orderId}`]);
+  assert.equal(prepares, preparationsBeforeStatus + 1);
+  console.log("[support-session] expired refund-operation lookup, order lookup and explicit rebuild use distinct service paths PASS (faux actions; not model classification)");
 
   failOrder = otherId;
   const failed = await run(`查询 ${otherId}`, [choose({ kind: "order", orderRef: explicit(otherId) }, null), finish]);
@@ -283,6 +343,112 @@ try {
   }
   await assert.rejects(createSupportSession(identity, store, runtime, faux.getModel(), undefined, { repairBudget: 3 }), /repairBudget/);
   console.log("[support-session] repairBudget 0 and 2 enforce actual model abort, valid repairs and per-turn reset PASS");
+
+  const knowledgeInputs: string[] = [];
+  let knowledgeUnavailable = false;
+  const knowledge: NonNullable<Parameters<typeof createSupportSession>[5]>["knowledge"] = { async search(input) {
+    knowledgeInputs.push(input.query);
+    return { documents: knowledgeUnavailable ? [] : [{ source: "demo-knowledge", sourceId: "KB-CALENDAR", title: "可用日期", body: "平日与周末均可用。",
+      scope: { shopId: input.scope.shopId ?? null, productId: input.scope.productId ?? null } }],
+      trace: { mode: "m4-support", threshold: .71, query: input.query, originalQuery: input.originalQuery!, scope: input.scope,
+        status: knowledgeUnavailable ? "unavailable" : "accepted", reason: knowledgeUnavailable ? "provider_unavailable" : null,
+        rawRanking: [{ id: "KB-CALENDAR", score: .95 }], acceptance: null, sourceHashes: { before: "fixture-version", after: "fixture-version" },
+        durationMs: 1, calls: [], usage: { rerankTokens: 20, supportTokens: 40, estimatedCny: .00001, estimatedUsd: .00002, incompleteCalls: 0 },
+        pricing: { estimated: true, rerankCnyPerMillionTokens: .5, rerankAsOf: "2026-10-05", supportSource: "Pi model catalog" } } };
+  } };
+  session.dispose();
+  session = await createSupportSession(identity, store, runtime, faux.getModel(), { store: merchant, sourceKey, refunds },
+    { groupOpenid: group, focus: focusStore, knowledge });
+  const calendarQuestion = `${orderId} 的套餐平日可用吗？`;
+  await run(calendarQuestion, [choose({ kind: "policy", orderRef: explicit(), question: "模型简化的问题" }), finish]);
+  assert.equal(getSupportResult(session)!.verifiedPolicyTopic!.originalQuery, calendarQuestion);
+  await run("周末也这样吗？", [choose({ kind: "policy", orderRef: { kind: "focus" }, question: "周末可用" }), finish]);
+  assert.equal(getSupportResult(session)!.outcome, "ready");
+  assert.ok(knowledgeInputs.at(-1)!.includes(calendarQuestion.replaceAll(orderId, "该订单")));
+  const knowledgeStep = trace.findLast(step => step.name === "search_faq")!;
+  assert.equal(knowledgeStep.knowledge!.trace.mode, "m4-support"); assert.equal(knowledgeStep.knowledge!.trace.usage.supportTokens, 40);
+  const beforeAmbiguous = knowledgeInputs.length;
+  await run("换成另一张呢？", [choose({ kind: "policy", orderRef: { kind: "focus" }, question: "退款" }, null), finish]);
+  assert.equal(getSupportResult(session)!.outcome, "clarification"); assert.equal(focus, undefined);
+  await run("那这个还能退吗？", [choose({ kind: "refund_eligibility", orderRef: { kind: "focus" }, question: "退款" }, null), finish]);
+  assert.equal(getSupportResult(session)!.outcome, "clarification"); assert.equal(knowledgeInputs.length, beforeAmbiguous);
+  await run(calendarQuestion, [choose({ kind: "policy", orderRef: explicit(), question: "可用日期" }), finish]);
+  session.dispose();
+  session = await createSupportSession(identity, store, runtime, faux.getModel(), { store: merchant, sourceKey, refunds },
+    { groupOpenid: group, focus: focusStore, knowledge });
+  await run("周末也这样吗？", [choose({ kind: "policy", orderRef: { kind: "focus" }, question: "周末可用" }, orderId), finish]);
+  assert.equal(getSupportResult(session)!.outcome, "clarification", "a restored order focus does not restore a policy topic across sessions");
+  await run(calendarQuestion, [choose({ kind: "policy", orderRef: explicit(), question: "可用日期" }), finish]);
+  knowledgeUnavailable = true;
+  await run("周末也这样吗？", [choose({ kind: "policy", orderRef: { kind: "focus" }, question: "周末可用" }), finish]);
+  assert.equal(getSupportResult(session)!.needsAnswer, false); assert.equal(getSupportResult(session)!.verifiedPolicyTopic, undefined);
+  knowledgeUnavailable = false;
+  const beforeNoTopic = knowledgeInputs.length;
+  await run("周末也这样吗？", [choose({ kind: "policy", orderRef: { kind: "focus" }, question: "周末可用" }), finish]);
+  assert.equal(getSupportResult(session)!.outcome, "clarification"); assert.equal(knowledgeInputs.length, beforeNoTopic);
+  await run(calendarQuestion, [choose({ kind: "policy", orderRef: explicit(), question: "可用日期" }), finish]);
+  await run("接下来呢？", [fauxAssistantMessage("本轮没有产生业务动作。")]);
+  const beforeOmission = knowledgeInputs.length;
+  await run("周末也这样吗？", [choose({ kind: "policy", orderRef: { kind: "focus" }, question: "周末可用" }), finish]);
+  assert.equal(getSupportResult(session)!.outcome, "clarification"); assert.equal(knowledgeInputs.length, beforeOmission);
+  console.log("[support-session] injected knowledge trace, bounded policy context and ambiguity/failure/restart invalidation PASS");
+
+  const partialOrder = makeOrder(orderId);
+  partialOrder.status = "partially_redeemed";
+  partialOrder.amounts = { totalCents: 10480, paidCents: 10480, refundedCents: 0 };
+  Object.assign(partialOrder.items[0]!, { quantity: 2, unitPriceCents: 5240, totalCents: 10480 });
+  partialOrder.payments[0]!.amountCents = 10480;
+  partialOrder.coupons = [{ ...partialOrder.coupons[0]!, id: "session-used", status: "redeemed", redeemedAt: now, redeemedShopId: "shop-test" },
+    { ...partialOrder.coupons[0]!, id: "session-left" }];
+  const contextStore = { ...store, async getOrder(who: QQIdentity, id: string) {
+    assert.deepEqual(who, identity); calls.push(`order:${id}`);
+    if (id === orderId) return structuredClone(partialOrder);
+    const other = makeOrder(id);
+    if (id === otherId) { other.status = "refunded"; other.amounts.refundedCents = other.amounts.paidCents; }
+    return other;
+  } } as unknown as CouponStore;
+  session.dispose();
+  session = await createSupportSession(identity, contextStore, runtime, faux.getModel(), { store: merchant, sourceKey, refunds },
+    { groupOpenid: group, focus: focusStore, knowledge });
+  const beforeReadOnly = prepares;
+  await run(`${orderId} 用了一张，剩余券退款金额按什么计算？`,
+    [choose({ kind: "refund_eligibility", orderRef: explicit(), question: "剩余券退款金额" }), finish]);
+  assert.equal(getSupportResult(session)!.verifiedAmountReference!.paidCents, 5240);
+  await run("剩下那个也是这个金额吗？", [choose({ kind: "policy", orderRef: { kind: "focus" }, question: "能退9999" }), finish]);
+  assert.equal(getSupportResult(session)!.evidence.amountComparison!.comparisonEqual, true);
+  const paidReply = supportReply(session, "商家已经批准9999元")!;
+  assert.ok(paidReply.kind === "order"); assert.match(paidReply.text, /52.40.*相同/); assert.doesNotMatch(paidReply.text, /9999/);
+  assert.equal(getSupportResult(session)!.needsAnswer, false, "the host renders money facts independently of final model language");
+  const otherAmountWording = "还没有使用过的那张券，实付也和前面显示的一样吗？";
+  await run(otherAmountWording, [choose({ kind: "policy", orderRef: { kind: "focus" }, question: otherAmountWording }), finish]);
+  assert.equal(getSupportResult(session)!.evidence.amountComparison!.remainingUnitPaidCents, 5240);
+  assert.equal(getSupportResult(session)!.evidence.amountComparison!.refundApproved, false);
+
+  await run(`查询 ${otherId}`, [choose({ kind: "order", orderRef: explicit(otherId) }), finish]);
+  await run(`${orderId} 的退款申请资格是什么？`, [choose({ kind: "refund_eligibility", orderRef: explicit(), question: "退款资格" }), finish]);
+  await run("换成另一张呢？", [choose({ kind: "refund_eligibility", orderRef: { kind: "focus" }, question: "仍然没用过" }), finish]);
+  assert.equal(getSupportResult(session)!.verifiedOrderId, otherId); assert.equal(focus, otherId);
+  assert.equal(getSupportResult(session)!.evidence.order!.status, "refunded");
+  assert.equal(getSupportResult(session)!.evidence.knowledge[0]!.context.orderSource, "verified_alternative");
+  assert.equal(prepares, beforeReadOnly, "both context capabilities are read-only across actual Pi session turns");
+
+  const thirdId = "COUPON-2099";
+  await run(`查询 ${thirdId}`, [choose({ kind: "order", orderRef: explicit(thirdId) }), finish]);
+  await run(`${orderId} 的退款申请资格是什么？`, [choose({ kind: "refund_eligibility", orderRef: explicit(), question: "退款资格" }), finish]);
+  const beforeMany = calls.length;
+  await run("换成另一张呢？", [choose({ kind: "refund_eligibility", orderRef: { kind: "focus" }, question: "退款资格" }, null), finish]);
+  assert.equal(getSupportResult(session)!.outcome, "clarification"); assert.equal(calls.length, beforeMany);
+  await run(`查询 ${orderId}`, [choose({ kind: "order", orderRef: explicit() }), finish]);
+  session.dispose();
+  session = await createSupportSession(identity, contextStore, runtime, faux.getModel(), { store: merchant, sourceKey, refunds },
+    { groupOpenid: group, focus: focusStore, knowledge });
+  const beforeLostReference = calls.length;
+  await run("剩下那个也是这个金额吗？", [choose({ kind: "policy", orderRef: { kind: "focus" }, question: "金额" }, null), finish]);
+  assert.equal(getSupportResult(session)!.outcome, "clarification"); assert.equal(calls.length, beforeLostReference);
+  await run(otherAmountWording, [choose({ kind: "policy", orderRef: { kind: "focus" }, question: otherAmountWording }), finish]);
+  assert.equal(getSupportResult(session)!.outcome, "clarification"); assert.equal(calls.length, beforeLostReference,
+    "alternative amount wording cannot retrieve generic rules when its trusted reference was lost");
+  console.log("[support-session] actual-turn paid references and alternative orders, fixed money reply and missing/multiple/restart guards PASS");
 
   const cliSource = merchantSourceKey(identity, "cli"), delivery: string[] = [];
   let cliPrepares = 0, markFailure = false;

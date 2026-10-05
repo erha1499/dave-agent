@@ -26,7 +26,7 @@
 
 ## 本地运行
 
-v2 候选已提供 `SUPPORT_ARCHITECTURE=controller npm start`（QQ 同样支持），将六项模型工具收敛为 `support_action`，由宿主核验并执行内部依赖；精确确认继续走既有事务入口，商家通知使用固定卡且不调用模型。默认仍为 `atomic`。百炼目前用于离线检索选型，未替换在线知识服务；实测结果和待完成门槛见 [v2 实施记录](./docs/v2-implementation-results.md)。
+v2 候选已提供 `SUPPORT_ARCHITECTURE=controller npm start`（QQ 同样支持），将六项模型工具收敛为 `support_action`，由宿主核验并执行内部依赖；精确确认继续走既有事务入口，商家通知使用固定卡且不调用模型。默认仍为 `atomic` + lexical。C1 已接入可配置的百炼重排与事实支持判别，并增加授权订单指代、知识来源版本和独立费用归因；候选效果与失败分别记录在 [上下文结果](./docs/c1-context-results.md) 和 [真实模型业务回归](./docs/c1-business-results.md)。开关及复现见 [实验配置](./docs/experiment-controls.md#c1-业务知识服务开关)，持久会话恢复与最终选型继续按 [计划](./plan.md) 推进。
 
 调试方案可使用工作台的“实验调试”，或 `node scripts/experiment.ts --preset retrieval-local --dry-run` 预览完整参数，加 `--run` 执行。业务与远程检索需显式允许模型调用；可下载 JSON 配置供 CLI 复现。开关包括架构、通知方式、格式修复预算、候选数、BM25/RRF、缓存和请求预算，详见 [实验配置说明](./docs/experiment-controls.md)。
 

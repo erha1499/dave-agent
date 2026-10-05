@@ -106,3 +106,4 @@ await import("./support-validation-data-check.ts");
 
 await import("./evidence-support-check.ts");
 await import("./evidence-support-runner-check.ts");
+await import("./knowledge-service-check.ts");

@@ -1,0 +1,1235 @@
+{
+  "version": 3,
+  "suiteId": "c1-context-validation-v3",
+  "split": "validation-v3",
+  "validationPolicy": "fixed-validation-not-blind",
+  "provenance": "Authored after original, development and validation-v2 were exposed; those files and scores remain unchanged. Fixed before any execution of this dataset or future typed-model results. Shared workspace, not blind, synthetic orders and limited policy corpus; no statistical generalization.",
+  "measurement": {
+    "queryOnly": "Original A1 query-only remains clarify/deferred in its original dataset; this new suite evaluates explicit missing-context clarification separately.",
+    "contextual": "Host-supplied typed context must be reauthorized and checked against current order or frozen reference source before retrieval. No case ID, gold or quote may be used to produce an effective query.",
+    "mock": "Default transport substitutes prove wiring, scope, resolution and failure contracts, not actual model decision quality.",
+    "live": "Explicit --live tests real Bailian rerank and DeepSeek support judgments. Order/context fixtures remain controlled; not real model action selection, real MySQL execution, or QQ acceptance.",
+    "reference": "Reference-only topic fixtures never enter production order/database knowledge.",
+    "failures": "Every planned variant retained. Missing capabilities/errors are failed/incomplete, never relabeled clarify after observing outputs.",
+    "classification": "Direct facts (including explicit negative rules), explicit questions about whether evidence is sufficient, and direct missing facts are separate strata. Limitation text alone cannot answer a concrete requested fact. No ambiguous absolute-failure question is used.",
+    "admission": "Keep failures and warmup errors in all planned denominators. Six core known variants + two boundary positives; four concrete missing-fact negatives; twelve contextual clarifications and twelve query-only clarifications. Same .80 accepted recall, zero false accepts/scope violations/incomplete, false reject <=.10, all clarification boundaries required; each core capability must also be inspected.",
+    "amount": "Compare actual paid unit amounts only. No claim about maximum refundable amount, merchant approval or executed refund.",
+    "immutability": "Do not adjust queries/gold after any execution. Exposed suites are development only; candidate chosen on those before this fixed validation is run once."
+  },
+  "actor": {
+    "appId": "TEST_APP",
+    "senderId": "TEST_USER1"
+  },
+  "groupOpenid": "C1_TEST_GROUP",
+  "orderFixtures": {
+    "lunch": {
+      "orderId": "COUPON-1001",
+      "template": "paid_lunch",
+      "owner": "TEST_USER1"
+    },
+    "partial": {
+      "orderId": "COUPON-1005",
+      "template": "partial_dinner",
+      "owner": "TEST_USER1"
+    },
+    "refunded": {
+      "orderId": "COUPON-1004",
+      "template": "refunded_dinner",
+      "owner": "TEST_USER1"
+    },
+    "expired": {
+      "orderId": "COUPON-1003",
+      "template": "expired_lunch",
+      "owner": "TEST_USER1"
+    },
+    "private": {
+      "orderId": "COUPON-1008",
+      "template": "private_meal",
+      "owner": "TEST_USER1"
+    },
+    "other_customer": {
+      "orderId": "COUPON-1002",
+      "template": "paid_lunch",
+      "owner": "TEST_USER2"
+    }
+  },
+  "cases": [
+    {
+      "id": "c1-fresh-v3-001",
+      "originalId": "a1-val-055",
+      "corpus": "online",
+      "evaluationStratum": "direct_fact",
+      "contextContract": "core",
+      "originalQuery": "这张已经退款成功的券，还可以重新申请一次退款吗？",
+      "queryOnlyExpected": {
+        "resolution": "clarify",
+        "relevant": [],
+        "reason": "本句仍使用未绑定的订单、金额或上轮话题指代；query-only 不携带宿主上下文，不能当成带上下文检索结果。"
+      },
+      "contextualMeaning": "重新授权读取已退款订单；确认不得重复退款，不依赖用户所说的状态。",
+      "labelReview": {
+        "requestedFact": "重新授权读取已退款订单；确认不得重复退款，不依赖用户所说的状态。",
+        "basis": [
+          {
+            "docId": "KB-REFUND-PAYMENT",
+            "quote": "已完成退款的订单需以支付和退款历史为准，不得重复退款"
+          }
+        ],
+        "completeness": "逐篇审阅当前可见 corpus。relevant 收录每篇能独立支持所问事实/明确边界的文档；相关的缺失说明不算直接事实。宿主金额事实另由真实 order 展示与 fresh order 比较提供。"
+      },
+      "variants": [
+        {
+          "id": "known",
+          "input": {
+            "identity": {
+              "appId": "TEST_APP",
+              "senderId": "TEST_USER1"
+            },
+            "groupOpenid": "C1_TEST_GROUP",
+            "focusOrder": "refunded",
+            "topics": [
+              {
+                "kind": "refund_eligibility",
+                "order": "refunded",
+                "provenance": "successful-host-result",
+                "identity": {
+                  "appId": "TEST_APP",
+                  "senderId": "TEST_USER1"
+                },
+                "groupOpenid": "C1_TEST_GROUP",
+                "priorQuery": "订单 COUPON-1004 已经退款成功，是否还能再次退款？"
+              }
+            ]
+          },
+          "expected": {
+            "resolution": "resolved",
+            "relevant": [
+              "KB-REFUND-PAYMENT"
+            ],
+            "evidence": [
+              {
+                "docId": "KB-REFUND-PAYMENT",
+                "quote": "已完成退款的订单需以支付和退款历史为准，不得重复退款"
+              }
+            ],
+            "effectiveQueryMustInclude": [
+              "退款",
+              "已退款"
+            ],
+            "reason": "PAYMENT 明确禁止已完成退款订单重复退款。"
+          }
+        },
+        {
+          "id": "missing",
+          "input": {
+            "identity": {
+              "appId": "TEST_APP",
+              "senderId": "TEST_USER1"
+            },
+            "groupOpenid": "C1_TEST_GROUP",
+            "focusOrder": null,
+            "topics": []
+          },
+          "expected": {
+            "resolution": "clarify",
+            "relevant": [],
+            "evidence": [],
+            "effectiveQueryMustInclude": [],
+            "reason": "未提供本轮必需的受信任订单、金额来源或唯一话题，先澄清，不能根据用户断言或模型改写填补。"
+          }
+        },
+        {
+          "id": "ambiguous",
+          "input": {
+            "identity": {
+              "appId": "TEST_APP",
+              "senderId": "TEST_USER1"
+            },
+            "groupOpenid": "C1_TEST_GROUP",
+            "focusOrder": null,
+            "topics": [
+              {
+                "kind": "refund_eligibility",
+                "order": "lunch",
+                "provenance": "successful-host-result",
+                "identity": {
+                  "appId": "TEST_APP",
+                  "senderId": "TEST_USER1"
+                },
+                "groupOpenid": "C1_TEST_GROUP",
+                "priorQuery": "订单 COUPON-1001 的退款申请资格是什么？"
+              },
+              {
+                "kind": "refund_eligibility",
+                "order": "refunded",
+                "provenance": "successful-host-result",
+                "identity": {
+                  "appId": "TEST_APP",
+                  "senderId": "TEST_USER1"
+                },
+                "groupOpenid": "C1_TEST_GROUP",
+                "priorQuery": "订单 COUPON-1004 已经退款成功，是否还能再次退款？"
+              }
+            ]
+          },
+          "expected": {
+            "resolution": "clarify",
+            "relevant": [],
+            "evidence": [],
+            "effectiveQueryMustInclude": [],
+            "reason": "给出的可信候选无法唯一绑定本轮指代；先明确订单、金额来源或话题，不自行选择。"
+          }
+        }
+      ]
+    },
+    {
+      "id": "c1-fresh-v3-002",
+      "originalId": "a1-val-056",
+      "corpus": "online",
+      "evaluationStratum": "direct_fact",
+      "contextContract": "core",
+      "originalQuery": "余下那份的实付价，和之前展示的每券金额相等吗？",
+      "queryOnlyExpected": {
+        "resolution": "clarify",
+        "relevant": [],
+        "reason": "本句仍使用未绑定的订单、金额或上轮话题指代；query-only 不携带宿主上下文，不能当成带上下文检索结果。"
+      },
+      "contextualMeaning": "仅比较当前唯一未消费券实付单价与宿主此前展示的实付单价；不承诺退款上限、批准或执行。",
+      "labelReview": {
+        "requestedFact": "仅比较当前唯一未消费券实付单价与宿主此前展示的实付单价；不承诺退款上限、批准或执行。",
+        "basis": [
+          {
+            "docId": "KB-REFUND-PARTIAL",
+            "quote": "未核销、未过期、未退款部分可申请的金额按对应券的实付单价计算"
+          }
+        ],
+        "completeness": "逐篇审阅当前可见 corpus。relevant 收录每篇能独立支持所问事实/明确边界的文档；相关的缺失说明不算直接事实。宿主金额事实另由真实 order 展示与 fresh order 比较提供。"
+      },
+      "variants": [
+        {
+          "id": "known",
+          "input": {
+            "identity": {
+              "appId": "TEST_APP",
+              "senderId": "TEST_USER1"
+            },
+            "groupOpenid": "C1_TEST_GROUP",
+            "focusOrder": "partial",
+            "topics": [
+              {
+                "kind": "remaining_coupon_refund",
+                "order": "partial",
+                "provenance": "successful-host-result",
+                "identity": {
+                  "appId": "TEST_APP",
+                  "senderId": "TEST_USER1"
+                },
+                "groupOpenid": "C1_TEST_GROUP",
+                "priorQuery": "订单 COUPON-1005 用了一张，剩余券退款申请金额按什么计算？"
+              }
+            ],
+            "amountReference": {
+              "order": "partial",
+              "field": "item_paid_unit",
+              "productId": "product-demo-2",
+              "provenance": "successful-host-result"
+            },
+            "couponSelector": "unique_unused"
+          },
+          "expected": {
+            "resolution": "resolved",
+            "relevant": [
+              "KB-REFUND-PARTIAL"
+            ],
+            "evidence": [
+              {
+                "docId": "KB-REFUND-PARTIAL",
+                "quote": "未核销、未过期、未退款部分可申请的金额按对应券的实付单价计算"
+              }
+            ],
+            "effectiveQueryMustInclude": [
+              "剩余"
+            ],
+            "reason": "固定订单无优惠分摊缺口，当前剩余1券的实付单价5990分与实际展示来源相等；PARTIAL 仅为对应券计价规则。",
+            "facts": {
+              "remainingCouponCount": 1,
+              "remainingUnitPaidCents": 5990,
+              "referencePaidCents": 5990,
+              "comparisonEqual": true,
+              "refundApproved": false
+            }
+          }
+        },
+        {
+          "id": "missing",
+          "input": {
+            "identity": {
+              "appId": "TEST_APP",
+              "senderId": "TEST_USER1"
+            },
+            "groupOpenid": "C1_TEST_GROUP",
+            "focusOrder": "partial",
+            "topics": []
+          },
+          "expected": {
+            "resolution": "clarify",
+            "relevant": [],
+            "evidence": [],
+            "effectiveQueryMustInclude": [],
+            "reason": "未提供本轮必需的受信任订单、金额来源或唯一话题，先澄清，不能根据用户断言或模型改写填补。"
+          }
+        },
+        {
+          "id": "ambiguous",
+          "input": {
+            "identity": {
+              "appId": "TEST_APP",
+              "senderId": "TEST_USER1"
+            },
+            "groupOpenid": "C1_TEST_GROUP",
+            "focusOrder": null,
+            "topics": [
+              {
+                "kind": "remaining_coupon_refund",
+                "order": "partial",
+                "provenance": "successful-host-result",
+                "identity": {
+                  "appId": "TEST_APP",
+                  "senderId": "TEST_USER1"
+                },
+                "groupOpenid": "C1_TEST_GROUP",
+                "priorQuery": "订单 COUPON-1005 用了一张，剩余券退款申请金额按什么计算？"
+              },
+              {
+                "kind": "refund_eligibility",
+                "order": "lunch",
+                "provenance": "successful-host-result",
+                "identity": {
+                  "appId": "TEST_APP",
+                  "senderId": "TEST_USER1"
+                },
+                "groupOpenid": "C1_TEST_GROUP",
+                "priorQuery": "订单 COUPON-1001 的退款申请资格是什么？"
+              }
+            ]
+          },
+          "expected": {
+            "resolution": "clarify",
+            "relevant": [],
+            "evidence": [],
+            "effectiveQueryMustInclude": [],
+            "reason": "给出的可信候选无法唯一绑定本轮指代；先明确订单、金额来源或话题，不自行选择。"
+          }
+        }
+      ]
+    },
+    {
+      "id": "c1-fresh-v3-003",
+      "originalId": "a1-val-057",
+      "corpus": "online",
+      "evaluationStratum": "direct_fact",
+      "contextContract": "core",
+      "originalQuery": "换查另一笔订单，它是否可以申请退款？",
+      "queryOnlyExpected": {
+        "resolution": "clarify",
+        "relevant": [],
+        "reason": "本句仍使用未绑定的订单、金额或上轮话题指代；query-only 不携带宿主上下文，不能当成带上下文检索结果。"
+      },
+      "contextualMeaning": "可信列表恰有已退款订单与未核销午餐订单；从已退款焦点切换到唯一另一笔，再授权读取状态和适用规则。",
+      "labelReview": {
+        "requestedFact": "可信列表恰有已退款订单与未核销午餐订单；从已退款焦点切换到唯一另一笔，再授权读取状态和适用规则。",
+        "basis": [
+          {
+            "docId": "KB-REFUND-UNUSED",
+            "quote": "已支付、未核销且尚未过期的团购券可以申请退款"
+          }
+        ],
+        "completeness": "逐篇审阅当前可见 corpus。relevant 收录每篇能独立支持所问事实/明确边界的文档；相关的缺失说明不算直接事实。宿主金额事实另由真实 order 展示与 fresh order 比较提供。"
+      },
+      "variants": [
+        {
+          "id": "known",
+          "input": {
+            "identity": {
+              "appId": "TEST_APP",
+              "senderId": "TEST_USER1"
+            },
+            "groupOpenid": "C1_TEST_GROUP",
+            "focusOrder": "refunded",
+            "topics": [
+              {
+                "kind": "refund_eligibility",
+                "order": "refunded",
+                "provenance": "successful-host-result",
+                "identity": {
+                  "appId": "TEST_APP",
+                  "senderId": "TEST_USER1"
+                },
+                "groupOpenid": "C1_TEST_GROUP",
+                "priorQuery": "订单 COUPON-1004 已经退款成功，是否还能再次退款？"
+              }
+            ],
+            "alternatives": [
+              "refunded",
+              "lunch"
+            ],
+            "alternativeSource": "successful-host-order-list"
+          },
+          "expected": {
+            "resolution": "resolved",
+            "relevant": [
+              "KB-REFUND-UNUSED"
+            ],
+            "evidence": [
+              {
+                "docId": "KB-REFUND-UNUSED",
+                "quote": "已支付、未核销且尚未过期的团购券可以申请退款"
+              }
+            ],
+            "effectiveQueryMustInclude": [
+              "退款",
+              "未核销"
+            ],
+            "reason": "实际切到有效期内未核销的午餐订单后，UNUSED 提供申请资格。",
+            "facts": {
+              "resolvedOrderId": "COUPON-1001"
+            }
+          }
+        },
+        {
+          "id": "missing",
+          "input": {
+            "identity": {
+              "appId": "TEST_APP",
+              "senderId": "TEST_USER1"
+            },
+            "groupOpenid": "C1_TEST_GROUP",
+            "focusOrder": "refunded",
+            "topics": []
+          },
+          "expected": {
+            "resolution": "clarify",
+            "relevant": [],
+            "evidence": [],
+            "effectiveQueryMustInclude": [],
+            "reason": "未提供本轮必需的受信任订单、金额来源或唯一话题，先澄清，不能根据用户断言或模型改写填补。"
+          }
+        },
+        {
+          "id": "ambiguous",
+          "input": {
+            "identity": {
+              "appId": "TEST_APP",
+              "senderId": "TEST_USER1"
+            },
+            "groupOpenid": "C1_TEST_GROUP",
+            "focusOrder": "refunded",
+            "topics": [
+              {
+                "kind": "refund_eligibility",
+                "order": "refunded",
+                "provenance": "successful-host-result",
+                "identity": {
+                  "appId": "TEST_APP",
+                  "senderId": "TEST_USER1"
+                },
+                "groupOpenid": "C1_TEST_GROUP",
+                "priorQuery": "订单 COUPON-1004 已经退款成功，是否还能再次退款？"
+              }
+            ],
+            "alternatives": [
+              "refunded",
+              "lunch",
+              "expired"
+            ],
+            "alternativeSource": "successful-host-order-list"
+          },
+          "expected": {
+            "resolution": "clarify",
+            "relevant": [],
+            "evidence": [],
+            "effectiveQueryMustInclude": [],
+            "reason": "给出的可信候选无法唯一绑定本轮指代；先明确订单、金额来源或话题，不自行选择。"
+          }
+        }
+      ]
+    },
+    {
+      "id": "c1-fresh-v3-004",
+      "originalId": "a1-val-058",
+      "corpus": "online",
+      "evaluationStratum": "direct_fact",
+      "contextContract": "core",
+      "originalQuery": "这张券星期天也按刚才的规则使用吗？",
+      "queryOnlyExpected": {
+        "resolution": "clarify",
+        "relevant": [],
+        "reason": "本句仍使用未绑定的订单、金额或上轮话题指代；query-only 不携带宿主上下文，不能当成带上下文检索结果。"
+      },
+      "contextualMeaning": "常规午餐普通周末可用的唯一已证实话题；本轮星期天仍属于普通周末，不涉及特殊节假日或实时接待。",
+      "labelReview": {
+        "requestedFact": "常规午餐普通周末可用的唯一已证实话题；本轮星期天仍属于普通周末，不涉及特殊节假日或实时接待。",
+        "basis": [
+          {
+            "docId": "KB-SHOP-DEMO-1",
+            "quote": "常规午餐与晚餐套餐允许普通周末使用"
+          }
+        ],
+        "completeness": "逐篇审阅当前可见 corpus。relevant 收录每篇能独立支持所问事实/明确边界的文档；相关的缺失说明不算直接事实。宿主金额事实另由真实 order 展示与 fresh order 比较提供。"
+      },
+      "variants": [
+        {
+          "id": "known",
+          "input": {
+            "identity": {
+              "appId": "TEST_APP",
+              "senderId": "TEST_USER1"
+            },
+            "groupOpenid": "C1_TEST_GROUP",
+            "focusOrder": "lunch",
+            "topics": [
+              {
+                "kind": "usage_calendar",
+                "order": "lunch",
+                "provenance": "successful-host-result",
+                "identity": {
+                  "appId": "TEST_APP",
+                  "senderId": "TEST_USER1"
+                },
+                "groupOpenid": "C1_TEST_GROUP",
+                "priorQuery": "常规午餐套餐普通周末能用吗？",
+                "sourceEvidence": {
+                  "docId": "KB-SHOP-DEMO-1",
+                  "quote": "常规午餐与晚餐套餐允许普通周末使用"
+                }
+              }
+            ]
+          },
+          "expected": {
+            "resolution": "resolved",
+            "relevant": [
+              "KB-SHOP-DEMO-1"
+            ],
+            "evidence": [
+              {
+                "docId": "KB-SHOP-DEMO-1",
+                "quote": "常规午餐与晚餐套餐允许普通周末使用"
+              }
+            ],
+            "effectiveQueryMustInclude": [
+              "星期天",
+              "午餐"
+            ],
+            "reason": "SHOP 对常规午餐和晚餐明确规定普通周末允许使用，商品文档没有周末事实。"
+          }
+        },
+        {
+          "id": "missing",
+          "input": {
+            "identity": {
+              "appId": "TEST_APP",
+              "senderId": "TEST_USER1"
+            },
+            "groupOpenid": "C1_TEST_GROUP",
+            "focusOrder": "lunch",
+            "topics": []
+          },
+          "expected": {
+            "resolution": "clarify",
+            "relevant": [],
+            "evidence": [],
+            "effectiveQueryMustInclude": [],
+            "reason": "未提供本轮必需的受信任订单、金额来源或唯一话题，先澄清，不能根据用户断言或模型改写填补。"
+          }
+        },
+        {
+          "id": "ambiguous",
+          "input": {
+            "identity": {
+              "appId": "TEST_APP",
+              "senderId": "TEST_USER1"
+            },
+            "groupOpenid": "C1_TEST_GROUP",
+            "focusOrder": "lunch",
+            "topics": [
+              {
+                "kind": "usage_calendar",
+                "order": "lunch",
+                "provenance": "successful-host-result",
+                "identity": {
+                  "appId": "TEST_APP",
+                  "senderId": "TEST_USER1"
+                },
+                "groupOpenid": "C1_TEST_GROUP",
+                "priorQuery": "常规午餐套餐普通周末能用吗？",
+                "sourceEvidence": {
+                  "docId": "KB-SHOP-DEMO-1",
+                  "quote": "常规午餐与晚餐套餐允许普通周末使用"
+                }
+              },
+              {
+                "kind": "refund_eligibility",
+                "order": "lunch",
+                "provenance": "successful-host-result",
+                "identity": {
+                  "appId": "TEST_APP",
+                  "senderId": "TEST_USER1"
+                },
+                "groupOpenid": "C1_TEST_GROUP",
+                "priorQuery": "订单 COUPON-1001 的退款申请资格是什么？"
+              }
+            ]
+          },
+          "expected": {
+            "resolution": "clarify",
+            "relevant": [],
+            "evidence": [],
+            "effectiveQueryMustInclude": [],
+            "reason": "给出的可信候选无法唯一绑定本轮指代；先明确订单、金额来源或话题，不自行选择。"
+          }
+        }
+      ]
+    },
+    {
+      "id": "c1-fresh-v3-005",
+      "originalId": "a1-val-059",
+      "corpus": "reference",
+      "evaluationStratum": "direct_fact",
+      "contextContract": "core",
+      "originalQuery": "这个时间范围的上限是几个工作日？",
+      "queryOnlyExpected": {
+        "resolution": "clarify",
+        "relevant": [],
+        "reason": "本句仍使用未绑定的订单、金额或上轮话题指代；query-only 不携带宿主上下文，不能当成带上下文检索结果。"
+      },
+      "contextualMeaning": "唯一可信话题是信用卡退款通常3至7个工作日；只问政策范围上限，不问某笔实际到账日或保证期限。",
+      "labelReview": {
+        "requestedFact": "唯一可信话题是信用卡退款通常3至7个工作日；只问政策范围上限，不问某笔实际到账日或保证期限。",
+        "basis": [
+          {
+            "docId": "RF005",
+            "quote": "信用卡3-7个工作日"
+          }
+        ],
+        "completeness": "逐篇审阅当前可见 corpus。relevant 收录每篇能独立支持所问事实/明确边界的文档；相关的缺失说明不算直接事实。宿主金额事实另由真实 order 展示与 fresh order 比较提供。"
+      },
+      "variants": [
+        {
+          "id": "known",
+          "input": {
+            "identity": {
+              "appId": "TEST_APP",
+              "senderId": "TEST_USER1"
+            },
+            "groupOpenid": "C1_TEST_GROUP",
+            "focusOrder": null,
+            "topics": [
+              {
+                "kind": "refund_arrival",
+                "order": null,
+                "provenance": "successful-host-result",
+                "identity": {
+                  "appId": "TEST_APP",
+                  "senderId": "TEST_USER1"
+                },
+                "groupOpenid": "C1_TEST_GROUP",
+                "priorQuery": "信用卡退款一般需要3到7个工作日到账吗？",
+                "paymentChannel": "credit_card",
+                "boundaryWorkingDays": 7,
+                "sourceEvidence": {
+                  "docId": "RF005",
+                  "quote": "信用卡3-7个工作日"
+                }
+              }
+            ]
+          },
+          "expected": {
+            "resolution": "resolved",
+            "relevant": [
+              "RF005"
+            ],
+            "evidence": [
+              {
+                "docId": "RF005",
+                "quote": "信用卡3-7个工作日"
+              }
+            ],
+            "effectiveQueryMustInclude": [
+              "工作日",
+              "信用卡"
+            ],
+            "reason": "RF005 独立记载信用卡3至7工作日；RF001 通用1至3日不能替代信用卡范围。"
+          }
+        },
+        {
+          "id": "missing",
+          "input": {
+            "identity": {
+              "appId": "TEST_APP",
+              "senderId": "TEST_USER1"
+            },
+            "groupOpenid": "C1_TEST_GROUP",
+            "focusOrder": null,
+            "topics": []
+          },
+          "expected": {
+            "resolution": "clarify",
+            "relevant": [],
+            "evidence": [],
+            "effectiveQueryMustInclude": [],
+            "reason": "未提供本轮必需的受信任订单、金额来源或唯一话题，先澄清，不能根据用户断言或模型改写填补。"
+          }
+        },
+        {
+          "id": "ambiguous",
+          "input": {
+            "identity": {
+              "appId": "TEST_APP",
+              "senderId": "TEST_USER1"
+            },
+            "groupOpenid": "C1_TEST_GROUP",
+            "focusOrder": null,
+            "topics": [
+              {
+                "kind": "refund_arrival",
+                "order": null,
+                "provenance": "successful-host-result",
+                "identity": {
+                  "appId": "TEST_APP",
+                  "senderId": "TEST_USER1"
+                },
+                "groupOpenid": "C1_TEST_GROUP",
+                "priorQuery": "信用卡退款一般需要3到7个工作日到账吗？",
+                "paymentChannel": "credit_card",
+                "boundaryWorkingDays": 7,
+                "sourceEvidence": {
+                  "docId": "RF005",
+                  "quote": "信用卡3-7个工作日"
+                }
+              },
+              {
+                "kind": "refund_arrival",
+                "order": null,
+                "provenance": "successful-host-result",
+                "identity": {
+                  "appId": "TEST_APP",
+                  "senderId": "TEST_USER1"
+                },
+                "groupOpenid": "C1_TEST_GROUP",
+                "priorQuery": "银行卡退款通常需要1至3个工作日到账吗？",
+                "paymentChannel": "bank_card",
+                "boundaryWorkingDays": 3,
+                "sourceEvidence": {
+                  "docId": "RF005",
+                  "quote": "银行卡1-3个工作日"
+                }
+              }
+            ]
+          },
+          "expected": {
+            "resolution": "clarify",
+            "relevant": [],
+            "evidence": [],
+            "effectiveQueryMustInclude": [],
+            "reason": "给出的可信候选无法唯一绑定本轮指代；先明确订单、金额来源或话题，不自行选择。"
+          }
+        }
+      ]
+    },
+    {
+      "id": "c1-fresh-v3-006",
+      "originalId": "a1-val-060",
+      "corpus": "reference",
+      "evaluationStratum": "direct_fact",
+      "contextContract": "core",
+      "originalQuery": "这个变更如果没有他的同意，能直接办吗？",
+      "queryOnlyExpected": {
+        "resolution": "clarify",
+        "relevant": [],
+        "reason": "本句仍使用未绑定的订单、金额或上轮话题指代；query-only 不携带宿主上下文，不能当成带上下文检索结果。"
+      },
+      "contextualMeaning": "已讨论距离预约10小时的改期，唯一对象是商家；确认不足24小时需商家同意，不推断审批已经完成。",
+      "labelReview": {
+        "requestedFact": "已讨论距离预约10小时的改期，唯一对象是商家；确认不足24小时需商家同意，不推断审批已经完成。",
+        "basis": [
+          {
+            "docId": "RS003",
+            "quote": "距预约时间不足24小时的变更需商家同意"
+          }
+        ],
+        "completeness": "逐篇审阅当前可见 corpus。relevant 收录每篇能独立支持所问事实/明确边界的文档；相关的缺失说明不算直接事实。宿主金额事实另由真实 order 展示与 fresh order 比较提供。"
+      },
+      "variants": [
+        {
+          "id": "known",
+          "input": {
+            "identity": {
+              "appId": "TEST_APP",
+              "senderId": "TEST_USER1"
+            },
+            "groupOpenid": "C1_TEST_GROUP",
+            "focusOrder": null,
+            "topics": [
+              {
+                "kind": "appointment_change",
+                "order": null,
+                "provenance": "successful-host-result",
+                "identity": {
+                  "appId": "TEST_APP",
+                  "senderId": "TEST_USER1"
+                },
+                "groupOpenid": "C1_TEST_GROUP",
+                "priorQuery": "距离预约还有10小时，改期需要商家同意吗？",
+                "hoursBefore": 10,
+                "decisionMaker": "merchant",
+                "sourceEvidence": {
+                  "docId": "RS003",
+                  "quote": "距预约时间不足24小时的变更需商家同意"
+                }
+              }
+            ]
+          },
+          "expected": {
+            "resolution": "resolved",
+            "relevant": [
+              "RS003"
+            ],
+            "evidence": [
+              {
+                "docId": "RS003",
+                "quote": "距预约时间不足24小时的变更需商家同意"
+              }
+            ],
+            "effectiveQueryMustInclude": [
+              "商家",
+              "预约"
+            ],
+            "reason": "RS003 明确不足24小时的预约变更需商家同意；RF003 未给出此商家同意条件。"
+          }
+        },
+        {
+          "id": "missing",
+          "input": {
+            "identity": {
+              "appId": "TEST_APP",
+              "senderId": "TEST_USER1"
+            },
+            "groupOpenid": "C1_TEST_GROUP",
+            "focusOrder": null,
+            "topics": []
+          },
+          "expected": {
+            "resolution": "clarify",
+            "relevant": [],
+            "evidence": [],
+            "effectiveQueryMustInclude": [],
+            "reason": "未提供本轮必需的受信任订单、金额来源或唯一话题，先澄清，不能根据用户断言或模型改写填补。"
+          }
+        },
+        {
+          "id": "ambiguous",
+          "input": {
+            "identity": {
+              "appId": "TEST_APP",
+              "senderId": "TEST_USER1"
+            },
+            "groupOpenid": "C1_TEST_GROUP",
+            "focusOrder": null,
+            "topics": [
+              {
+                "kind": "appointment_change",
+                "order": null,
+                "provenance": "successful-host-result",
+                "identity": {
+                  "appId": "TEST_APP",
+                  "senderId": "TEST_USER1"
+                },
+                "groupOpenid": "C1_TEST_GROUP",
+                "priorQuery": "距离预约还有10小时，改期需要商家同意吗？",
+                "hoursBefore": 10,
+                "decisionMaker": "merchant",
+                "sourceEvidence": {
+                  "docId": "RS003",
+                  "quote": "距预约时间不足24小时的变更需商家同意"
+                }
+              },
+              {
+                "kind": "appointment_change",
+                "order": null,
+                "provenance": "successful-host-result",
+                "identity": {
+                  "appId": "TEST_APP",
+                  "senderId": "TEST_USER1"
+                },
+                "groupOpenid": "C1_TEST_GROUP",
+                "priorQuery": "距离预约还有48小时，通常可以自由改期吗？",
+                "hoursBefore": 48,
+                "sourceEvidence": {
+                  "docId": "RS003",
+                  "quote": "通常允许在预约时间24小时前自由改期"
+                }
+              }
+            ]
+          },
+          "expected": {
+            "resolution": "clarify",
+            "relevant": [],
+            "evidence": [],
+            "effectiveQueryMustInclude": [],
+            "reason": "给出的可信候选无法唯一绑定本轮指代；先明确订单、金额来源或话题，不自行选择。"
+          }
+        }
+      ]
+    },
+    {
+      "id": "c1-fresh-v3-007",
+      "originalId": "a1-val-058",
+      "corpus": "online",
+      "evaluationStratum": "boundary_question",
+      "contextContract": "fact-support",
+      "originalQuery": "当前知识库里，这张私享券的使用日期限制是否已经写明？",
+      "queryOnlyExpected": {
+        "resolution": "clarify",
+        "relevant": [],
+        "reason": "本句仍使用未绑定的订单、金额或上轮话题指代；query-only 不携带宿主上下文，不能当成带上下文检索结果。"
+      },
+      "contextualMeaning": "明确问现有资料有没有私享使用限制，不问私享某日能否消费。",
+      "labelReview": {
+        "requestedFact": "明确问现有资料有没有私享使用限制，不问私享某日能否消费。",
+        "basis": [
+          {
+            "docId": "KB-SHOP-DEMO-1",
+            "quote": "法定节假日、特殊活动和私享套餐使用限制没有录入"
+          }
+        ],
+        "completeness": "逐篇审阅当前可见 corpus。relevant 收录每篇能独立支持所问事实/明确边界的文档；相关的缺失说明不算直接事实。宿主金额事实另由真实 order 展示与 fresh order 比较提供。"
+      },
+      "variants": [
+        {
+          "id": "known",
+          "input": {
+            "identity": {
+              "appId": "TEST_APP",
+              "senderId": "TEST_USER1"
+            },
+            "groupOpenid": "C1_TEST_GROUP",
+            "focusOrder": "private",
+            "topics": []
+          },
+          "expected": {
+            "resolution": "resolved",
+            "relevant": [
+              "KB-SHOP-DEMO-1"
+            ],
+            "evidence": [
+              {
+                "docId": "KB-SHOP-DEMO-1",
+                "quote": "法定节假日、特殊活动和私享套餐使用限制没有录入"
+              }
+            ],
+            "effectiveQueryMustInclude": [
+              "私享"
+            ],
+            "reason": "SHOP 明确声明私享限制没有录入，可以回答这个资料完备性问题。"
+          }
+        }
+      ]
+    },
+    {
+      "id": "c1-fresh-v3-008",
+      "originalId": "a1-val-055",
+      "corpus": "online",
+      "evaluationStratum": "boundary_question",
+      "contextContract": "fact-support",
+      "originalQuery": "这张午餐券79.80元的标价，是否足以证明我的实际付款金额？",
+      "queryOnlyExpected": {
+        "resolution": "clarify",
+        "relevant": [],
+        "reason": "本句仍使用未绑定的订单、金额或上轮话题指代；query-only 不携带宿主上下文，不能当成带上下文检索结果。"
+      },
+      "contextualMeaning": "明确问能否从标价推断实付；即使演示订单实付恰好相等，标价本身不构成付款证据。",
+      "labelReview": {
+        "requestedFact": "明确问能否从标价推断实付；即使演示订单实付恰好相等，标价本身不构成付款证据。",
+        "basis": [
+          {
+            "docId": "KB-REFUND-PAYMENT",
+            "quote": "不能把订单标价当作实付金额"
+          },
+          {
+            "docId": "KB-PRODUCT-LUNCH",
+            "quote": "不能从标价推断实付金额"
+          }
+        ],
+        "completeness": "逐篇审阅当前可见 corpus。relevant 收录每篇能独立支持所问事实/明确边界的文档；相关的缺失说明不算直接事实。宿主金额事实另由真实 order 展示与 fresh order 比较提供。"
+      },
+      "variants": [
+        {
+          "id": "known",
+          "input": {
+            "identity": {
+              "appId": "TEST_APP",
+              "senderId": "TEST_USER1"
+            },
+            "groupOpenid": "C1_TEST_GROUP",
+            "focusOrder": "lunch",
+            "topics": []
+          },
+          "expected": {
+            "resolution": "resolved",
+            "relevant": [
+              "KB-REFUND-PAYMENT",
+              "KB-PRODUCT-LUNCH"
+            ],
+            "evidence": [
+              {
+                "docId": "KB-REFUND-PAYMENT",
+                "quote": "不能把订单标价当作实付金额"
+              },
+              {
+                "docId": "KB-PRODUCT-LUNCH",
+                "quote": "不能从标价推断实付金额"
+              }
+            ],
+            "effectiveQueryMustInclude": [
+              "标价",
+              "实付"
+            ],
+            "reason": "PAYMENT 与 LUNCH 都独立禁止从标价推断实付，完整纳入等价 gold。"
+          }
+        }
+      ]
+    },
+    {
+      "id": "c1-fresh-v3-009",
+      "originalId": "a1-val-058",
+      "corpus": "online",
+      "evaluationStratum": "direct_missing_fact",
+      "contextContract": "fact-support",
+      "originalQuery": "这张私享券2026年10月6日当天可以核销吗？",
+      "queryOnlyExpected": {
+        "resolution": "clarify",
+        "relevant": [],
+        "reason": "本句仍使用未绑定的订单、金额或上轮话题指代；query-only 不携带宿主上下文，不能当成带上下文检索结果。"
+      },
+      "contextualMeaning": "直接索要特定私享套餐在指定日期可使用的事实；现有规则没有这个事实。",
+      "labelReview": {
+        "requestedFact": "直接索要特定私享套餐在指定日期可使用的事实；现有规则没有这个事实。",
+        "basis": [
+          {
+            "docId": "KB-SHOP-DEMO-1",
+            "quote": "法定节假日、特殊活动和私享套餐使用限制没有录入"
+          }
+        ],
+        "completeness": "逐篇审阅当前可见 corpus。relevant 收录每篇能独立支持所问事实/明确边界的文档；相关的缺失说明不算直接事实。宿主金额事实另由真实 order 展示与 fresh order 比较提供。"
+      },
+      "variants": [
+        {
+          "id": "known",
+          "input": {
+            "identity": {
+              "appId": "TEST_APP",
+              "senderId": "TEST_USER1"
+            },
+            "groupOpenid": "C1_TEST_GROUP",
+            "focusOrder": "private",
+            "topics": []
+          },
+          "expected": {
+            "resolution": "resolved_no_evidence",
+            "relevant": [],
+            "evidence": [],
+            "effectiveQueryMustInclude": [
+              "私享",
+              "2026年10月6日"
+            ],
+            "reason": "SHOP 的限制缺失声明只能解释未知，不能据此肯定或否定当天可核销。"
+          }
+        }
+      ]
+    },
+    {
+      "id": "c1-fresh-v3-010",
+      "originalId": "a1-val-058",
+      "corpus": "online",
+      "evaluationStratum": "direct_missing_fact",
+      "contextContract": "fact-support",
+      "originalQuery": "这张双人午餐券的套餐里具体配了哪几道菜？",
+      "queryOnlyExpected": {
+        "resolution": "clarify",
+        "relevant": [],
+        "reason": "本句仍使用未绑定的订单、金额或上轮话题指代；query-only 不携带宿主上下文，不能当成带上下文检索结果。"
+      },
+      "contextualMeaning": "直接索要套餐具体菜品列表；商品说明只给人数、标价和核销方式。",
+      "labelReview": {
+        "requestedFact": "直接索要套餐具体菜品列表；商品说明只给人数、标价和核销方式。",
+        "basis": [
+          {
+            "docId": "KB-PRODUCT-LUNCH",
+            "quote": "菜品明细、过敏原和特殊节假日可用性未录入"
+          }
+        ],
+        "completeness": "逐篇审阅当前可见 corpus。relevant 收录每篇能独立支持所问事实/明确边界的文档；相关的缺失说明不算直接事实。宿主金额事实另由真实 order 展示与 fresh order 比较提供。"
+      },
+      "variants": [
+        {
+          "id": "known",
+          "input": {
+            "identity": {
+              "appId": "TEST_APP",
+              "senderId": "TEST_USER1"
+            },
+            "groupOpenid": "C1_TEST_GROUP",
+            "focusOrder": "lunch",
+            "topics": []
+          },
+          "expected": {
+            "resolution": "resolved_no_evidence",
+            "relevant": [],
+            "evidence": [],
+            "effectiveQueryMustInclude": [
+              "午餐",
+              "菜"
+            ],
+            "reason": "LUNCH 明确菜品明细未录入；SHOP 使用规则也不提供任何菜名，不能算答案。"
+          }
+        }
+      ]
+    },
+    {
+      "id": "c1-fresh-v3-011",
+      "originalId": "a1-val-059",
+      "corpus": "reference",
+      "evaluationStratum": "direct_missing_fact",
+      "contextContract": "fact-support",
+      "originalQuery": "按照刚才的到账时间，我这笔银行卡退款实际会在2026年10月几日入账？",
+      "queryOnlyExpected": {
+        "resolution": "clarify",
+        "relevant": [],
+        "reason": "本句仍使用未绑定的订单、金额或上轮话题指代；query-only 不携带宿主上下文，不能当成带上下文检索结果。"
+      },
+      "contextualMeaning": "直接索要某笔银行卡退款的实际日历日期；上下文只有一般政策范围，没有渠道实际状态或发起日。",
+      "labelReview": {
+        "requestedFact": "直接索要某笔银行卡退款的实际日历日期；上下文只有一般政策范围，没有渠道实际状态或发起日。",
+        "basis": [
+          {
+            "docId": "RF005",
+            "quote": "银行卡1-3个工作日"
+          },
+          {
+            "docId": "RF005",
+            "quote": "可在订单详情页的退款进度中查看当前状态"
+          }
+        ],
+        "completeness": "逐篇审阅当前可见 corpus。relevant 收录每篇能独立支持所问事实/明确边界的文档；相关的缺失说明不算直接事实。宿主金额事实另由真实 order 展示与 fresh order 比较提供。"
+      },
+      "variants": [
+        {
+          "id": "known",
+          "input": {
+            "identity": {
+              "appId": "TEST_APP",
+              "senderId": "TEST_USER1"
+            },
+            "groupOpenid": "C1_TEST_GROUP",
+            "focusOrder": null,
+            "topics": [
+              {
+                "kind": "refund_arrival",
+                "order": null,
+                "provenance": "successful-host-result",
+                "identity": {
+                  "appId": "TEST_APP",
+                  "senderId": "TEST_USER1"
+                },
+                "groupOpenid": "C1_TEST_GROUP",
+                "priorQuery": "银行卡退款通常需要1至3个工作日到账吗？",
+                "paymentChannel": "bank_card",
+                "boundaryWorkingDays": 3,
+                "sourceEvidence": {
+                  "docId": "RF005",
+                  "quote": "银行卡1-3个工作日"
+                }
+              }
+            ]
+          },
+          "expected": {
+            "resolution": "resolved_no_evidence",
+            "relevant": [],
+            "evidence": [],
+            "effectiveQueryMustInclude": [
+              "银行卡",
+              "几日"
+            ],
+            "reason": "RF005/RF001/PY002 只有一般到账范围，均没有这笔退款的实际到账日；核实建议不能变成所求日期。"
+          }
+        }
+      ]
+    },
+    {
+      "id": "c1-fresh-v3-012",
+      "originalId": "a1-val-060",
+      "corpus": "reference",
+      "evaluationStratum": "direct_missing_fact",
+      "contextContract": "fact-support",
+      "originalQuery": "这次按刚才说的规则临时改期，商家确定要收几元手续费？",
+      "queryOnlyExpected": {
+        "resolution": "clarify",
+        "relevant": [],
+        "reason": "本句仍使用未绑定的订单、金额或上轮话题指代；query-only 不携带宿主上下文，不能当成带上下文检索结果。"
+      },
+      "contextualMeaning": "直接索要该临时改期的确定手续费金额；上下文只知道距预约10小时变更需商家同意。",
+      "labelReview": {
+        "requestedFact": "直接索要该临时改期的确定手续费金额；上下文只知道距预约10小时变更需商家同意。",
+        "basis": [
+          {
+            "docId": "RS003",
+            "quote": "距预约时间不足24小时的变更需商家同意"
+          }
+        ],
+        "completeness": "逐篇审阅当前可见 corpus。relevant 收录每篇能独立支持所问事实/明确边界的文档；相关的缺失说明不算直接事实。宿主金额事实另由真实 order 展示与 fresh order 比较提供。"
+      },
+      "variants": [
+        {
+          "id": "known",
+          "input": {
+            "identity": {
+              "appId": "TEST_APP",
+              "senderId": "TEST_USER1"
+            },
+            "groupOpenid": "C1_TEST_GROUP",
+            "focusOrder": null,
+            "topics": [
+              {
+                "kind": "appointment_change",
+                "order": null,
+                "provenance": "successful-host-result",
+                "identity": {
+                  "appId": "TEST_APP",
+                  "senderId": "TEST_USER1"
+                },
+                "groupOpenid": "C1_TEST_GROUP",
+                "priorQuery": "距离预约还有10小时，改期需要商家同意吗？",
+                "hoursBefore": 10,
+                "decisionMaker": "merchant",
+                "sourceEvidence": {
+                  "docId": "RS003",
+                  "quote": "距预约时间不足24小时的变更需商家同意"
+                }
+              }
+            ]
+          },
+          "expected": {
+            "resolution": "resolved_no_evidence",
+            "relevant": [],
+            "evidence": [],
+            "effectiveQueryMustInclude": [
+              "改期",
+              "几元"
+            ],
+            "reason": "RS003 只提供改期条件，没有手续费金额；其他费用、差价或违约金政策也没有本次改期的确定数值。"
+          }
+        }
+      ]
+    }
+  ]
+}

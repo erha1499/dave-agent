@@ -18,6 +18,31 @@ const support = catalog.presets[0]!.config;
 assert.equal(remoteRequired(support), true);
 assert.throws(() => requireExperimentExecution(support), ExperimentInputError);
 assert.doesNotThrow(() => requireExperimentExecution({ ...support, allowRemote: true }));
+const knowledgeAB = catalog.presets.find(preset => preset.id === "support-knowledge-ab")!.config;
+assert.equal(knowledgeAB.kind, "support");
+if (knowledgeAB.kind !== "support") throw new Error("knowledge preset kind");
+assert.deepEqual(knowledgeAB.variants.map(variant => [variant.architecture, variant.parameters.knowledgeMode]),
+  [["controller", "lexical"], ["controller", "m4-support"]]);
+assert.ok(knowledgeAB.variants.every(variant => variant.parameters.knowledgeThreshold === .71 && variant.parameters.knowledgeTimeoutMs === 15_000));
+assert.deepEqual(resolveExperimentConfig(JSON.parse(await readFile("configs/experiments/support-knowledge-ab.json", "utf8"))), knowledgeAB);
+assert.throws(() => requireExperimentExecution(knowledgeAB));
+assert.throws(() => resolveExperimentConfig({ ...support, variants: [{ id: "A", architecture: "atomic", parameters: { knowledgeMode: "m4-support" } }] }));
+for (const key of ["knowledgeMode", "knowledgeSupport", "knowledgeThreshold", "knowledgeTimeoutMs"]) assert.ok(catalog.fields.support.some(field => field.key === key));
+const profileAB = catalog.presets.find(preset => preset.id === "support-knowledge-profile-ab")!.config;
+assert.equal(profileAB.kind, "support");
+if (profileAB.kind !== "support") throw new Error("profile preset kind");
+assert.deepEqual(profileAB.variants.map(variant => [variant.parameters.knowledgeMode, variant.parameters.knowledgeSupport]), [["m4-support", "binary"], ["m4-support", "typed"]]);
+assert.deepEqual(resolveExperimentConfig(JSON.parse(await readFile("configs/experiments/support-knowledge-profile-ab.json", "utf8"))), profileAB);
+assert.throws(() => resolveExperimentConfig({ ...support, variants: [{ id: "A", architecture: "controller", parameters: { knowledgeSupport: "typed" } }] }));
+for (const entry of ["src/cli.ts", "src/qq.ts"]) {
+  await assert.rejects(promisify(execFile)(process.execPath, [entry], {
+    env: { SUPPORT_ARCHITECTURE: "atomic", KNOWLEDGE_MODE: "m4-support" }, timeout: 5000,
+  }), (error: unknown) => {
+    const failure = error as { code?: number; stderr?: string };
+    assert.equal(failure.code, 1); assert.match(failure.stderr ?? "", /atomic 仅支持 lexical/);
+    assert.doesNotMatch(failure.stderr ?? "", /DB_PASSWORD|API_KEY|QQBOT_APP_SECRET/); return true;
+  });
+}
 for (const change of [
   { version: 2 }, { kind: ["retrieval"] }, { repeat: 0 }, { repeat: 4 }, { repeat: "1" }, { allowRemote: "true" }, { label: "\nsecret" },
   { env: { DASHSCOPE_API_KEY: "must-not-be-accepted" } }, { command: "touch forbidden" },

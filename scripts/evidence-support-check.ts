@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import type { AssistantMessage } from "@earendil-works/pi-ai";
 import { acceptEvidence, resolveEvidenceAcceptance } from "../src/evidence-acceptance.ts";
 import { applyEvidenceSupport, createEvidenceSupportClient, EvidenceSupportError, evidenceSupportInputHash, validateEvidenceSupport,
-  validateEvidenceSupportVerification, verifyEvidenceSupport, type EvidenceSupportDecision } from "../src/evidence-support.ts";
+  validateEvidenceSupportVerification, verifyEvidenceSupport, evidenceSupportPrompt, evidenceSupportTypedPromptVersion,
+  evidenceSupportTypedV1Prompt, evidenceSupportTypedV1PromptHash, evidenceSupportTypedV1PromptVersion, type EvidenceSupportDecision } from "../src/evidence-support.ts";
+import { contentHash } from "../src/bailian.ts";
 
 const documents = [
   { id: "A", title: "有效期", body: "具体截止日期以本人订单 expiresAt 为准。不得从套餐名称估算日期。", tags: ["到期"], shopId: "shop-a", productId: null },
@@ -45,6 +47,16 @@ const client = await createEvidenceSupportClient({ timeoutMs: 1000, runtime: { m
   return message({ decisions });
 } } });
 const checked = await verifyEvidenceSupport({ query, scope, candidates, client });
+// Frozen before typed was added: A1 default settings, prompt and serialized request remain byte-compatible.
+assert.equal(contentHash(evidenceSupportPrompt), "3d254e0bca8e14fae05804a0f027c653f5f099e1b91e5fb519088b5aaa04f15a");
+assert.equal(contentHash(client.settings), "265a727c8253fd59ea22a7fc9c47fe6efce5e0430b92740b364ad92aebd95e77");
+assert.equal(checked.requestHash, "952b7c517f07d0ca4e729789a210db9df83e67884289b9aa581163a33231d6af");
+assert.equal(client.settings.profile, undefined);
+assert.equal(evidenceSupportTypedV1PromptVersion, "fact-support-v2-typed");
+assert.equal(contentHash(evidenceSupportTypedV1Prompt), evidenceSupportTypedV1PromptHash);
+assert.equal(evidenceSupportTypedV1PromptHash, "4223604540af3298649bb546fb14354e1bb779cf2d23626bd368448f6fd9c9dd");
+const explicitBinary = await createEvidenceSupportClient({ profile: "binary", timeoutMs: 1000, runtime: { model, complete: async () => message({ decisions }) } });
+assert.deepEqual(explicitBinary.settings, client.settings, "explicit binary retains the default v1 settings shape");
 assert.equal(calls, 1); assert.equal(checked.attempts.length, 1); assert.equal(checked.attempts[0]!.outcome, "ok");
 assert.equal(checked.attempts[0]!.totalTokens, 90); assert.equal(checked.attempts[0]!.costUsd, .0000111);
 assert.match(client.settings.promptHash, /^[a-f0-9]{64}$/); assert.equal(client.settings.maxRetries, 0);
@@ -102,4 +114,50 @@ await assert.rejects(verifyEvidenceSupport({ query, scope, candidates, client: t
 assert.equal(timeoutCalls, 1);
 await assert.rejects(verifyEvidenceSupport({ query, scope: { shopId: "other" }, candidates, client }), /不可见/); assert.equal(calls, 1);
 const empty = await verifyEvidenceSupport({ query, scope, candidates: [], client }); assert.equal(empty.attempts.length, 0); assert.equal(calls, 1);
+
+let typedCalls = 0;
+let typedRows: unknown = [
+  { id: "A", category: "limitation_only", quote: "具体截止日期以本人订单 expiresAt 为准。", reason: "只有核实路径，没有具体日期" },
+  { id: "B", category: "unrelated", quote: null, reason: "不是到期事实" },
+];
+const typed = await createEvidenceSupportClient({ profile: "typed", timeoutMs: 1000, runtime: { model, complete: async (context, options) => {
+  typedCalls++; assert.equal(options.maxRetries, 0); assert.deepEqual(context.tools, []);
+  assert.notEqual(contentHash(context.systemPrompt), contentHash(evidenceSupportPrompt));
+  assert.deepEqual(JSON.parse(String(context.messages[0]!.content)), { query, documents: candidates.map(({ id, title, tags, body }) => ({ id, title, tags, body })) });
+  return message({ decisions: typedRows });
+} } });
+assert.equal(typed.settings.profile, "typed"); assert.equal(typed.settings.promptVersion, evidenceSupportTypedPromptVersion);
+assert.equal(typed.settings.promptVersion, "fact-support-typed-v2"); assert.notEqual(typed.settings.promptHash, evidenceSupportTypedV1PromptHash);
+const typedChecked = await verifyEvidenceSupport({ query, scope, candidates, client: typed });
+assert.equal(typedCalls, 1); assert.notEqual(typedChecked.requestHash, checked.requestHash);
+assert.deepEqual(typedChecked.value.map(row => [row.category, row.supported]), [["limitation_only", false], ["unrelated", false]]);
+assert.equal(applyEvidenceSupport({ prepared, verification: typedChecked, query, scope, documents, settings: typed.settings }).status, "rejected");
+assert.equal(validateEvidenceSupportVerification(typedChecked, bound), false, "typed cannot be replayed as binary");
+assert.equal(validateEvidenceSupportVerification(checked, { ...bound, settings: typed.settings }), false, "binary cannot be replayed as typed");
+assert.equal(validateEvidenceSupport(typedChecked.value, candidates), false);
+assert.equal(validateEvidenceSupport(decisions, candidates, "typed"), false);
+assert.equal(validateEvidenceSupport([{ ...typedChecked.value[0], supported: true }, typedChecked.value[1]], candidates, "typed"), false, "limitation_only can never self-authorize acceptance");
+const typedPositive = await createEvidenceSupportClient({ profile: "typed", runtime: { model, complete: async () => message({ decisions: [
+  { id: "A", category: "boundary_answer", quote: "不得从套餐名称估算日期。", reason: "明确回答是否允许该推断" },
+  { id: "B", category: "unrelated", quote: null, reason: "无关" },
+] }) } });
+const typedBoundary = await verifyEvidenceSupport({ query: positiveQuery, scope, candidates, client: typedPositive });
+assert.deepEqual(applyEvidenceSupport({ prepared, verification: typedBoundary, query: positiveQuery, scope, documents, settings: typedPositive.settings }).accepted.map(row => row.id), ["A"]);
+assert.equal(applyEvidenceSupport({ prepared, verification: typedBoundary, query, scope, documents, settings: typedPositive.settings }).status, "unavailable");
+assert.equal(applyEvidenceSupport({ prepared, verification: typedBoundary, query: positiveQuery, scope, documents: edited, settings: typedPositive.settings }).status, "unavailable");
+for (const invalidRows of [[], [
+  { id: "A", category: "limitation_only", supported: true, quote: documents[0]!.body, reason: "试图绕过宿主" },
+  { id: "B", category: "unrelated", quote: null, reason: "无关" },
+], [{ ...typedChecked.value[0], category: "direct_fact" }, typedChecked.value[1]], [
+  { id: "A", category: "limitation_only", quote: "伪造引文", reason: "无依据" },
+  { id: "B", category: "unrelated", quote: null, reason: "无关" },
+], [
+  { id: "A", category: ["limitation_only"], quote: documents[0]!.body, reason: "类别必须为字符串" },
+  { id: "B", category: "unrelated", quote: null, reason: "无关" },
+]]) {
+  typedRows = invalidRows; const before: number = typedCalls;
+  await assert.rejects(verifyEvidenceSupport({ query, scope, candidates, client: typed }), error => error instanceof EvidenceSupportError && error.attempts[0]!.outcome === "invalid_response");
+  assert.equal(typedCalls, before + 1, "invalid typed schema does not retry");
+}
+await assert.rejects(createEvidenceSupportClient({ profile: "unknown" as "typed", runtime: { model, complete: async () => message({ decisions }) } }));
 console.log("Evidence support checks passed: pending is not accepted, one tool-free JSON request, exact complete decisions, input-bound cache, safe failure/timeout, usage, and post-call source scope recheck; no external calls.");

@@ -1,0 +1,37 @@
+{
+  "version": 2,
+  "createdDate": "2026-10-05",
+  "split": "validation-v2",
+  "validationPolicy": "fixed-validation-not-blind",
+  "stage": "fixed-before-v2-execution",
+  "dataset": {
+    "path": "data/c1-context-validation-v2.json",
+    "sha256": "9a1516165b5ef1d27cef844858802978c86553dc68b254d8af8807e205683166",
+    "bytes": 26913
+  },
+  "counts": {
+    "cases": 6,
+    "originalCaseFamilies": 6,
+    "queryOnlyVariants": 6,
+    "contextualVariants": 18,
+    "contextualResolved": 4,
+    "contextualResolvedNoEvidence": 2,
+    "contextualClarify": 12
+  },
+  "baseFiles": {
+    "data/acceptance-validation.json": "0ead08f6c37cf43be8d84b47557692e3ac2cc264fe37994f2f030cddf7d50592",
+    "data/acceptance-online.json": "5f97b7f4e77cd1695a38ef9b0c42e53f52f40f7ae869a39fcdcdae5ae8971b72",
+    "data/reference/kefu-harness/source.json": "42c6791ca2edfabcb98d9c49c2cd063c81e7705c29e94a6c1858357000c1d5cf",
+    "data/reference/kefu-harness/data/knowledge/docs.jsonl": "d3cd80ba76fdc82e57c1eefdc66a20987f09bc9b3dd0fbd1287c709146217fae",
+    "data/support-v2-validation.json": "7860c21fb98efd4fcbb8158e9dcc9629aad113dc688d280027c14790e6b84969",
+    "db/02-seed.sql": "82c7143840ac30d166207dcf92c227b3368b98af899412a4f669f04bfb976560",
+    "data/c1-context-validation.json": "cc6a457731d8abc2d147e569cb766796a3064b65beb1016861aa1d24589a2271",
+    "data/c1-context-validation-source.json": "807e7028cefba939ba8e977aecf6734f13450c905a8fc162af85259886de2d5f"
+  },
+  "review": {
+    "beforeAnyV2Execution": true,
+    "isBlind": false,
+    "originalLabelsChanged": false,
+    "scope": "Exact frozen evidence quotes and authorized templates. Explicit private-package usability replaces ambiguous original no-evidence continuation only in the new data. Fresh variants add refunded-to-unused switch, bank-card timeout strong premise, and appointment threshold inversion."
+  }
+}
