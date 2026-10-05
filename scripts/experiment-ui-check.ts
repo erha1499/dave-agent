@@ -76,7 +76,7 @@ const counts = (planned: number, passed: number, failed: number, skipped: number
   ({ planned, passed, failed, skipped, missing, passRate: planned ? passed / planned : null });
 const supportParams = (over: Record<string, unknown> = {}): any => ({
   timeoutMs: 60000, repairBudget: 1, merchantEvents: "architecture",
-  knowledgeMode: "lexical", knowledgeSupport: "binary", knowledgeSupportModel: "configured",
+  knowledgeMode: "lexical", knowledgeSupport: "binary", knowledgeSupportModel: "configured", knowledgeApplicability: "model_only",
   knowledgeThreshold: 0.71, knowledgeTimeoutMs: 15000, ...over,
 });
 const retrievalParams = (over: Record<string, unknown> = {}): any => ({
@@ -99,6 +99,9 @@ const catalog = (): any => ({
     { id: "support-knowledge-model-ab", name: "事实支持模型 A/B", config: { version: 1, kind: "support", label: "事实支持模型 A/B", repeat: 1, allowRemote: false, variants: [
       { id: "A", architecture: "controller", parameters: supportParams({ knowledgeMode: "m4-support", knowledgeSupport: "typed", knowledgeSupportModel: "configured", knowledgeThreshold: 0.5 }) },
       { id: "B", architecture: "controller", parameters: supportParams({ knowledgeMode: "m4-support", knowledgeSupport: "typed", knowledgeSupportModel: "deepseek-v4-pro", knowledgeThreshold: 0.5 }) }] } },
+    { id: "support-knowledge-applicability-ab", name: "规则适用条件 A/B", config: { version: 1, kind: "support", label: "规则适用条件 A/B", repeat: 1, allowRemote: false, variants: [
+      { id: "A", architecture: "controller", parameters: supportParams({ knowledgeMode: "m4-support", knowledgeSupport: "typed", knowledgeSupportModel: "deepseek-v4-pro", knowledgeApplicability: "model_only", knowledgeThreshold: 0.5 }) },
+      { id: "B", architecture: "controller", parameters: supportParams({ knowledgeMode: "m4-support", knowledgeSupport: "typed", knowledgeSupportModel: "deepseek-v4-pro", knowledgeApplicability: "declared", knowledgeThreshold: 0.5 }) }] } },
     { id: "retrieval-local", name: "本地检索 M0 / M1", config: { version: 1, kind: "retrieval", label: "本地检索 M0 / M1", repeat: 1, allowRemote: false, variants: [
       { id: "A", modes: ["M0", "M1"], parameters: retrievalParams() } ] } },
     { id: "retrieval-rerank", name: "词项 / 全候选重排", config: { version: 1, kind: "retrieval", label: "词项 / 全候选重排", repeat: 1, allowRemote: false, variants: [
@@ -123,6 +126,8 @@ const catalog = (): any => ({
         { value: "binary", label: "二元基线 v1" }, { value: "typed", label: "分类候选 v3" }], note: "typed 仅用于 m4-support" },
       { key: "knowledgeSupportModel", label: "支持判别模型", type: "select", options: [
         { value: "configured", label: "跟随已配置模型" }, { value: "deepseek-v4-pro", label: "DeepSeek V4 Pro" }], note: "仅 Controller + m4-support；Pro 只切换支持判别" },
+      { key: "knowledgeApplicability", label: "规则适用条件", type: "select", options: [
+        { value: "model_only", label: "仅模型判断" }, { value: "declared", label: "已声明必要前提" }], note: "declared 仅 Controller + m4-support；binary/typed 均可" },
       { key: "knowledgeTimeoutMs", label: "单次知识查询超时（ms）", type: "number", min: 1000, max: 60000, step: 1000, note: "包含读取、重排、支持判别和来源复检；无自动重试" },
     ],
     retrieval: [
@@ -1085,4 +1090,105 @@ const openExperiments = async (booted: Awaited<ReturnType<typeof boot>>, jobs: u
   assert.equal(byField("knowledgeSupportModel", "A").value, "configured", "旧配置缺省 configured，不倒填实际模型");
   assert.equal(byField("knowledgeSupportModel", "A").disabled, true, "词项旧配置判别模型不适用");
   console.log("PASS 实验调试：knowledgeSupportModel 非法组合禁提交可修复、提交体参数、旧缺省 configured 兼容。");
+}
+
+// knowledgeApplicability declared：仅 Controller + m4-support 合法，binary/typed 均可；非法组合禁提交不暗改、可改回 model_only。
+{
+  const booted = await boot();
+  const { element, find, flush, pendingCount } = booted;
+  await openExperiments(booted);
+  const root = element("experiments");
+  const byField = (field: string, variant: string) => findAllAttr(root, "data-field", field).find(item => item.attrs.get("data-variant") === variant)!;
+  const preset = findAttr(root, "data-field", "preset")!;
+  preset.value = "support-knowledge-applicability-ab";
+  preset.fire("change");
+  await flush();
+  assert.equal(byField("knowledgeApplicability", "A").value, "model_only");
+  assert.equal(byField("knowledgeApplicability", "B").value, "declared");
+  assert.equal(byField("knowledgeApplicability", "A").disabled, false, "Controller + m4-support 适用条件生效");
+  assert.match(content(root), /knowledgeApplicability model_only → declared/, "差异含适用条件");
+  // A 改 declared（合法，typed 组合）→ 判别类型归 binary、模型归 configured 以隔离 declared 规则 → 切 lexical（非法）。
+  const appA = byField("knowledgeApplicability", "A");
+  appA.value = "declared";
+  appA.fire("change");
+  await flush();
+  const profileA0 = byField("knowledgeSupport", "A");
+  profileA0.value = "binary";
+  profileA0.fire("change");
+  await flush();
+  const modelA0 = byField("knowledgeSupportModel", "A");
+  modelA0.value = "configured";
+  modelA0.fire("change");
+  await flush();
+  const modeA = byField("knowledgeMode", "A");
+  modeA.value = "lexical";
+  modeA.fire("change");
+  await flush();
+  assert.match(content(root), /declared 规则适用条件需 Controller \+ m4-support 知识检索；请改回 model_only 或调整组合/, "非法组合明确原因");
+  assert.equal(findClass(root, "primary-button")!.disabled, true, "lexical+declared 禁提交");
+  assert.equal(byField("knowledgeApplicability", "A").disabled, false, "非法值保留可操作以修正");
+  assert.equal(byField("knowledgeApplicability", "A").value, "declared", "不暗改参数");
+  const appFix = byField("knowledgeApplicability", "A");
+  appFix.value = "model_only";
+  appFix.fire("change");
+  await flush();
+  assert.ok(!content(root).includes("declared 规则适用条件需"), "改回 model_only 后错误消失");
+  assert.equal(byField("knowledgeApplicability", "A").disabled, true, "合法 lexical+model_only 显示不适用");
+  // binary + declared 同样合法：回 m4-support 且判别类型归 binary，declared 不受 typed 限制。
+  const modeA2 = byField("knowledgeMode", "A");
+  modeA2.value = "m4-support";
+  modeA2.fire("change");
+  await flush();
+  const profileA = byField("knowledgeSupport", "A");
+  profileA.value = "binary";
+  profileA.fire("change");
+  await flush();
+  const appA2 = byField("knowledgeApplicability", "A");
+  appA2.value = "declared";
+  appA2.fire("change");
+  await flush();
+  assert.ok(!content(root).includes("declared 规则适用条件需"), "binary + declared 属合法组合");
+  // atomic + declared 非法。
+  const archA = byField("architecture", "A");
+  archA.value = "atomic";
+  archA.fire("change");
+  await flush();
+  assert.match(content(root), /declared 规则适用条件需|atomic 仅支持本地词项知识检索/, "atomic 组合禁提交");
+  const archA2 = byField("architecture", "A");
+  archA2.value = "controller";
+  archA2.fire("change");
+  await flush();
+  // 提交体与下载配置保留新参数。
+  const allow = findAttr(root, "data-field", "allow-remote")!;
+  allow.checked = true;
+  allow.fire("change");
+  await flush();
+  findClass(root, "primary-button")!.fire("click");
+  await flush(1);
+  const post = find(request => request.path === "/api/experiments" && request.options?.method === "POST", "applicability POST");
+  const body = JSON.parse(post.options?.body || "{}");
+  assert.equal(body.variants[0].parameters.knowledgeApplicability, "declared", "提交体含 declared");
+  assert.equal(body.variants[1].parameters.knowledgeApplicability, "declared");
+  respond(post, job("job-a1", { status: "completed", config: body }));
+  await flush();
+  assert.equal(pendingCount(), 0);
+  // 旧配置缺省 model_only：无该字段的历史配置显示缺省且不伪造历史生效值。
+  const legacyJob = job("job-old-a", {
+    config: { version: 1, kind: "support", label: "旧适用配置", repeat: 1, allowRemote: false,
+      variants: [{ id: "A", architecture: "controller", parameters: { timeoutMs: 60000, repairBudget: 1, merchantEvents: "architecture" } }] },
+    results: [{ variantId: "A", repetition: 1, kind: "support", status: "completed", runId: "run-old-a", summary: supportSummary(3) }],
+  });
+  findAttr(root, "data-action", "refresh-jobs")!.fire("click");
+  await flush(1);
+  respond(find(request => request.path === "/api/experiments", "refresh legacy applicability"), { jobs: [legacyJob] });
+  await flush();
+  walk(root).find(item => item.className.split(" ").includes("exp-job"))!.fire("click");
+  await flush(1);
+  respond(find(request => request.path === "/api/experiments/job-old-a", "legacy applicability detail"), legacyJob);
+  await flush();
+  findAttr(root, "data-action", "load-config")!.fire("click");
+  await flush();
+  assert.equal(byField("knowledgeApplicability", "A").value, "model_only", "旧配置缺省 model_only，不伪造历史生效值");
+  assert.equal(byField("knowledgeApplicability", "A").disabled, true, "词项旧配置适用条件不适用");
+  console.log("PASS 实验调试：knowledgeApplicability 非法组合禁提交可修复、binary 兼容、提交体参数、旧缺省 model_only。");
 }

@@ -4,9 +4,10 @@ import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { requireExperimentExecution, resolveExperimentConfig, type ExperimentConfig, type RetrievalVariant, type SupportVariant } from "./experiment-config.ts";
 import type { EvalRunAnalysis } from "./eval-analysis.ts";
-import type { EvalBatch } from "./evaluation.ts";
+import type { EvalBatch, EvalRunDetail } from "./evaluation.ts";
 import type { runRetrievalV2 } from "../scripts/retrieval-v2.ts";
 import type { loadAcceptanceDataset } from "../scripts/acceptance-data.ts";
+import type { runSupportV2Live } from "../scripts/support-v2-live.ts";
 
 type ResultBase = { variantId: string; repetition: number; status: string; runId: string };
 export type ExperimentResult = ResultBase & ({ kind: "support"; summary: EvalRunAnalysis }
@@ -49,23 +50,25 @@ type RetrievalRunner = (options: Parameters<typeof runRetrievalV2>[0]) => Promis
 }>;
 export async function executeExperiment(input: ExperimentExecution, dependencies: {
   runRetrieval?: RetrievalRunner; loadAcceptance?: typeof loadAcceptanceDataset;
+  runSupport?: typeof runSupportV2Live; readSupport?: (runId: string) => Promise<EvalRunDetail | undefined>;
 } = {}): Promise<ExperimentResult> {
   const common = { variantId: input.variant.id, repetition: input.repetition };
   if (input.config.kind === "support" && "architecture" in input.variant) {
-    const [{ runSupportV2Live }, { createPool }, { EvalStore, readEvalDatabaseConfig }, { analyzeEvaluation }] = await Promise.all([
-      import("../scripts/support-v2-live.ts"), import("mysql2/promise"), import("./eval-store.ts"), import("./eval-analysis.ts"),
-    ]);
-    const runId = await runSupportV2Live({ architecture: input.variant.architecture, parameters: input.variant.parameters,
+    const runSupport = dependencies.runSupport ?? (await import("../scripts/support-v2-live.ts")).runSupportV2Live;
+    const runId = await runSupport({ architecture: input.variant.architecture, parameters: input.variant.parameters,
       label: `${input.config.label} · ${input.variant.id}`, batch: input.batch, experiment: { id: input.jobId, variantId: input.variant.id } });
-    const history = new EvalStore(createPool(readEvalDatabaseConfig()));
-    try {
-      const detail = await history.getRun(runId);
-      if (!detail) throw new Error("已完成评测没有可回读记录。");
-      const summary = analyzeEvaluation(detail), counts = summary.counts;
-      const passed = detail.run.status === "completed" && summary.scope === "objective" && counts !== null
-        && counts.cases.planned === counts.cases.passed && counts.checks.planned === counts.checks.passed;
-      return { ...common, kind: "support", runId, summary, status: passed ? "completed" : "completed_with_failures" };
-    } finally { await history.close(); }
+    const readSupport = dependencies.readSupport ?? (async (id: string) => {
+      const [{ createPool }, { EvalStore, readEvalDatabaseConfig }] = await Promise.all([import("mysql2/promise"), import("./eval-store.ts")]);
+      const history = new EvalStore(createPool(readEvalDatabaseConfig()));
+      try { return await history.getRun(id); } finally { await history.close(); }
+    });
+    const detail = await readSupport(runId);
+    if (!detail) throw new Error("已完成评测没有可回读记录。");
+    const { analyzeEvaluation } = await import("./eval-analysis.ts");
+    const summary = analyzeEvaluation(detail), counts = summary.counts;
+    const passed = detail.run.status === "completed" && summary.scope === "objective" && counts !== null
+      && counts.cases.planned === counts.cases.passed && counts.checks.planned === counts.checks.passed;
+    return { ...common, kind: "support", runId, summary, status: passed ? "completed" : "completed_with_failures" };
   }
   if (input.config.kind !== "retrieval" || !("modes" in input.variant)) throw new Error("实验方案类型不匹配。");
   const runRetrieval = dependencies.runRetrieval ?? (await import("../scripts/retrieval-v2.ts")).runRetrievalV2;

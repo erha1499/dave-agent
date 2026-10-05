@@ -197,3 +197,8 @@ node --env-file-if-exists=.env scripts/evaluate.ts --suite workflow --repeat 3 -
 全部执行串行。客观检查失败仍完成其余预定重复，再以退出码 1 结束；参数或基础设施失败以 2 结束并停止，不自动重跑结果未知的运行。完整通过才退出 0。失败和未执行都不从计划分母移除；已保存运行可由批次 API 回读。每套独立输出后端分析，检索输出分语料/题型指标，不合成跨套件总分。
 
 无参数、非法参数、重复选项不会启动 runner；`--help` 不读取数据库配置。离线 `objective-eval-check.ts` 校验固定题集与负例 oracle、参数边界和串行编排，不调用真实模型或数据库。
+
+
+C1 声明前提候选增加 `context.applicability`（本轮授权订单事实摘要与 factsHash）及 `trace.applicability: {mode, gate?}`。`mode` 为 model_only / declared；旧记录缺字段不推断历史生效配置。gate 包含 version、snapshotHash、contextHash、status（ready / unavailable）、integrity、reason 和 decisions（id、原始 rank、status、reason）。decision status 为 matched / mismatched / unknown / not_checked / none_declared。它们分别表示已声明必要前提满足、不符、事实未知、未检查和未声明，后两者不能显示为通过；mismatched 与模型 unsupported、parser invalid 分列。`settings.applicability` 记录版本、快照哈希及 serialization，`stages` 可增加不产生模型用量的 applicability。
+
+`gate.integrity=false` 时，即使其他证据使 trace accepted，仍不能声称完整校验通过；无其他有效证据时为 unavailable。元数据绑定失效为 `metadata_binding_invalid`，事实未知导致无证据为 `applicability_facts_unknown`；不能计入正确拒答。前端应以简短汇总和折叠明细展示这层必要前提，不将它表述为退款批准或任意规则的完全适用性证明。

@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "createdDate": "2026-10-06",
+  "stage": "development-contract-supplement",
+  "hashScheme": "sha256-bytes",
+  "dataset": {
+    "path": "data/c1-session-product-clarification.json",
+    "sha256": "846caea3f14fe3dfb0fde8f0d3aa2665296195232536812503e855c93902ab9a",
+    "bytes": 1569
+  },
+  "counts": {
+    "cases": 1,
+    "turns": 2
+  },
+  "baseFiles": {
+    "data/c1-session-development.json": "5e07eafb9261bd3a486e476916f771932f6b402a3e3696c89f87e3767f222925",
+    "data/c1-session-development-source.json": "12bd31ffc450a616d2947e8e0b5ed6171dfc3465b7fbeeb148a23be054e67689",
+    "data/acceptance-online.json": "5f97b7f4e77cd1695a38ef9b0c42e53f52f40f7ae869a39fcdcdae5ae8971b72",
+    "db/02-seed.sql": "82c7143840ac30d166207dcf92c227b3368b98af899412a4f669f04bfb976560",
+    "data/c1-context-validation-v3.json": "31e2bc995367ab5e56bc37f5a48c704bd7259a5d40217b07e4dca4fe7dd5623e",
+    "data/c1-context-validation-v3-source.json": "d91100a5de2fa701cd5243112d74282f5d8b197ca06027bc3d0ce73deecd8689",
+    "data/support-v2-validation.json": "7860c21fb98efd4fcbb8158e9dcc9629aad113dc688d280027c14790e6b84969"
+  },
+  "scope": {
+    "actualModelActions": true,
+    "suppliedActions": false,
+    "blindValidation": false,
+    "persistentDatabase": false,
+    "qqSending": false,
+    "fixtureAnchor": "2026-10-05T00:00:00.000Z"
+  },
+  "review": {
+    "timing": "fixed-before-supplement-model-execution",
+    "oldResults": "Original session-weekend-topic expects first-turn evidence and is unchanged; this separate contract expects host product clarification before complete canonical restatement. It cannot retroactively pass the original case.",
+    "clarification": "First turn must execute a policy action, freshly authorize COUPON-1001, publish the host clarification with canonical product and order ID, make zero knowledge requests, and create no successful policy topic. A correct clarification is a valid predecessor for the second user turn.",
+    "continuation": "The user supplies the complete canonical name, order ID and question. Bare yes, persistent alias learning and a trusted alias mapping are not tested or promised.",
+    "gold": [
+      {
+        "turn": 2,
+        "sourceId": "KB-SHOP-DEMO-1",
+        "quote": "常规午餐与晚餐套餐允许普通周末使用，到店前需用户自行与商家确认接待情况；助手目前不能预约、外呼、查询实时库存或安排接待。",
+        "rationale": "Only the scoped shop rule provides the ordinary-weekend usage condition. KB-PRODUCT-LUNCH gives pricing, redemption and order expiry, not ordinary-weekend permission; KB-PRODUCT-DINNER is a different SKU. The five refund rules do not answer weekend usage. All eight original online rules were reviewed."
+      }
+    ],
+    "limitations": "Development supplement, not fresh independent validation; user-visible factual wording beyond the fixed clarification facts is not an online-LLM judge score."
+  }
+}

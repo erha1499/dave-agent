@@ -24,7 +24,7 @@ export type SupportFocus = {
 };
 type State = { next?: SupportPrompt; result?: SupportResult; focusOrderId?: string; policyTopic?: TrustedPolicyTopic;
   orderChoices?: TrustedOrderChoices; amountReference?: TrustedAmountReference;
-  abort?: AbortController; turnError?: boolean; focusUnavailable?: boolean; invalidActions: number };
+  abort?: AbortController; turnError?: boolean; focusUnavailable?: boolean; invalidActions: number; actionStarted: boolean };
 const sessions = new WeakMap<AgentSession, State>();
 function clearReferences(state: State) { state.policyTopic = undefined; state.orderChoices = undefined; state.amountReference = undefined; }
 
@@ -42,6 +42,7 @@ export function prepareSupportPrompt(session: AgentSession, prompt: SupportPromp
   state.result = undefined;
   state.turnError = false;
   state.invalidActions = 0;
+  state.actionStarted = false;
   state.next = prompt;
 }
 export const getSupportResult = (session: AgentSession) => sessions.get(session)?.result;
@@ -81,7 +82,7 @@ export async function createSupportSession(
   const skills = loadSkillsFromDir({ dir: fileURLToPath(new URL("../skills/shop-support-v2", import.meta.url)), source: "project" });
   if (skills.skills.length !== 1 || skills.diagnostics.length) throw new Error("客服 v2 Skill 加载失败。");
   const controller = new SupportController({ store, merchant: afterSales?.store, refunds: afterSales?.refunds, knowledge: options.knowledge });
-  const state: State = { invalidActions: 0 };
+  const state: State = { invalidActions: 0, actionStarted: false };
   let turn: ReturnType<SupportController["createTurn"]> | undefined;
   const tools = [defineTool({
     name: "support_action", label: "处理客服业务动作",
@@ -96,8 +97,13 @@ export async function createSupportSession(
         if (!isCurrent()) throw new Error("业务轮次已切换，不能发布旧轮次结果。");
       };
       assertCurrent();
+      // Schema/current-message errors may be repaired before any business action
+      // starts. A started action (including a refusal or exception) is terminal
+      // for request forcing; the Controller still caches its result or failure.
+      const validated = executingTurn.validate(parseContextSupportAction(action));
+      state.actionStarted = true;
       let result: SupportResult;
-      try { result = await executingTurn.execute(action); }
+      try { result = await executingTurn.execute(validated); }
       catch (error) { if (isCurrent()) clearReferences(state); throw error; }
       assertCurrent();
       let focusWriteFailed = false;
@@ -140,6 +146,7 @@ export async function createSupportSession(
       state.result = undefined;
       state.turnError = false;
       state.invalidActions = 0;
+      state.actionStarted = false;
       const current = state.next ?? { requestId: randomUUID(), groupOpenid, messageId: randomUUID() };
       state.next = undefined;
       try {
@@ -182,6 +189,18 @@ export async function createSupportSession(
         clearReferences(state);
         return JSON.stringify({ kind: "host_context_unavailable", instruction: "本轮宿主初始化失败，无法执行业务；请稍后重新按订单号查询。" });
       }
+    }, (payload, api) => {
+      // Pi's native payload hook is per Session and per request. The current
+      // DeepSeek OpenAI-compatible wire format supports a named function choice;
+      // other adapters and independent verifier requests keep their own options.
+      if (api !== "openai-completions" || !payload || typeof payload !== "object" || Array.isArray(payload)) return payload;
+      const request = payload as { tools?: Array<{ type?: string; function?: { name?: string } }>;
+        thinking?: { type?: string }; reasoning_effort?: unknown };
+      if (!Array.isArray(request.tools) || !request.tools.some(tool => tool?.type === "function" && tool.function?.name === "support_action")) return payload;
+      const requireAction = Boolean(turn && state.abort && !state.abort.signal.aborted && !state.turnError
+        && !state.actionStarted && !state.result && state.invalidActions <= repairBudget
+        && request.thinking?.type !== "enabled" && !request.reasoning_effort);
+      return { ...payload, tool_choice: requireAction ? { type: "function", function: { name: "support_action" } } : "auto" };
     });
   session.subscribe(event => {
     if (event.type !== "message_end" || event.message.role !== "assistant") return;

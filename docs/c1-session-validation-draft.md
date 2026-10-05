@@ -1,6 +1,6 @@
 # C1 v2.2 真实 Session 验证合同草案
 
-状态：**待生产开发回归稳定后冻结**。本页只确定可检查的业务与评分合同，不包含最终新题，不构成调用 API 的授权。原 original / development / v2 / v3 均已曝光；它们用于开发和解释历史失败。新题只能在 10 个生产 Session 开发对话及候选配置稳定后独立编写、标注和冻结，不能按新题结果调整实现或标签。
+状态：**开发候选已完成单次回归，新题待独立审阅冻结**。本页记录业务与评分合同，最终题及来源另存固定数据文件；本页本身不构成调用 API 的授权。原 original / development / v2 / v3 均已曝光；它们用于开发和解释历史失败。新题只能在 10 个生产 Session 开发对话及候选配置稳定后独立编写、标注和冻结，不能按新题结果调整实现或标签。
 
 本轮目标是完整验证原 C1 的六类能力。输入仅为预先固定的用户对话、受控订单初始状态和允许的宿主状态变化；通过生产 `createSupportSession` 产生动作、引用、知识调用及最终回执。fixture 不提供 action、requestId 或可信 topic，不直接改 Session 内部状态。真实动作选择与 [Controller 动作适配](c1-runner-contract.md) 分开报告；使用受控 store 仍不等于真实 MySQL、QQ 或退款执行验收。
 
@@ -51,7 +51,7 @@
 
 金额纯 DB 合同与历史 a1-val-056 所含 PARTIAL 检索 gold 不同。新金额合同通过只能证明 v2.2 实付比较能力，**不能据此追认旧 56 已通过或重算原 C1 分数**。旧报告原样保留，以业务合同版本解释差异。
 
-评分模块为 [`scripts/c1-session-validation-check.ts`](../scripts/c1-session-validation-check.ts)，只消费实际执行素材，不执行 Session 或生成验证题。`C1ValidationActual` 复用现有 runner 的 `SessionTurnActual`，额外提供 case / turn、执行状态和真实 ingress `requestId`；后者取自 `prepareSupportPrompt` 输入，不由返回结果反推。固定状态变化在 turn 的 `stateChange.before/after` 声明，`after=null` 表示撤销可访问性。执行器未来仍需核验受控 store 的 actor / ownership，以及实际应用状态变化。
+评分模块为 [`scripts/c1-session-validation-check.ts`](../scripts/c1-session-validation-check.ts)，只消费实际执行素材，不执行 Session 或生成验证题。`C1ValidationActual` 复用现有 runner 的 `SessionTurnActual`，额外提供 case / turn、执行状态和真实 ingress `requestId`；后者取自 `prepareSupportPrompt` 输入，不由返回结果反推。固定状态变化在 turn 的 `stateChange.before/after` 声明，`after=null` 表示撤销可访问性。新增执行器会核验受控 store 的 actor / ownership，记录实际 ingress、状态变化前后 hash 和每次读取；不会直接改 Session 内部引用。
 
 知识召回按 7 个目标当前轮固定分母计算（核心知识正例 5 个、边界 2 个）；前序同样逐轮评分，其失败阻断对话完成。前序指标另保留，不能用成功前序替代失败目标轮。缺引用 / 竞争引用以安全停止评分：若预声明允许先重读订单，`freshOrder` 指定唯一合法快照；模型直接澄清且未读订单也可安全停止，发生读取则必须与该快照和当前 parent 完全一致。正例必须实际重读。金额 / topic / 备选引用还要追溯到同一 Session 的真实已完成前序。
 
@@ -67,6 +67,17 @@
 
 运行限制区分两类：实际 HTTP 按 operation 设置硬上限 Agent 120、rerank 60、support 60，并设置总 deadline 45 分钟、每轮 60 秒；费用采用已返回 usage 的估算软停止线，动作与支持模型合计 USD 1.00、rerank CNY 0.15。达到停止线后不再发起下一请求，最后一个在途请求仍可能使费用超过停止线，不能称为严格账单上限。实际价格分币种记录；目录缺价格或请求缺 usage 均标 unknown，不能按 0 计价或据此声称费用可控。超限或超时后尚未执行对话标为 not_run，计划分母不变。最终执行前须核验这些 guard 已实现。
 
-现有开发 runner 仅落实所选对话的 HTTP 总请求上限与单轮超时，不等于已实现上述分角色请求、费用和总时限上限。冻结最终计划时必须采用可执行的 guard；模型请求预算包括动作选择、修复以及最终文字生成。预算不足时保留完整计划分母，不能将预算耗尽后的对话从 manifest 中删去。
+现有开发 runner 只具备总请求上限；最终验证使用独立 [`scripts/c1-session-validation-live.ts`](../scripts/c1-session-validation-live.ts)，已实现上述分角色 HTTP、费用软线和时限 guard，并通过零 API 工程检查。模型请求预算包括动作选择、修复以及最终文字生成。预算不足时保留完整计划分母，不能将预算耗尽后的对话从 manifest 中删去。
 
-当前只产出草案。待生产开发稳定后才生成最终新题和独立来源 manifest，审阅完毕后公开冻结配置及期望再执行一次。执行后区分工程缺陷、模型动作错误、检索 / 支持错误、业务边界和标注争议；保留首次成绩，不通过则继续开发，不能把开发回归改名为独立验证。
+当前评分器及预算执行器已实现，新的 24 对话、setup 和独立来源 manifest 正在准备。逐题审阅完毕后，公开冻结配置及期望再执行一次。执行后区分工程缺陷、模型动作错误、检索 / 支持错误、业务边界和标注争议；保留首次成绩，不通过则继续开发，不能把开发回归改名为独立验证。
+
+
+## 已实现执行器与审阅边界
+
+`scripts/c1-session-validation-live.ts` 复用生产 Session、知识服务及纯评分模块，先为所有计划轮建立 not_run 占位。每轮传入真正的 ingress requestId，受控 store 校验当前 actor 与 owner，状态变更只应用于 store。前序工程或知识合同失败时保留后续未执行项。费用来自实际 HTTP 对应的 usage；错误或缺用量保持 unknown，估算软线不能保证严格账单上限。最后一个在途请求仍可能超过软线。
+
+公开 manifest 绑定数据、全部本地生产模块、执行器 / scorer、Prompt / Skill、原文与必要前提快照。`dependencySnapshot` 核对实际安装的核心 Pi / mysql2 版本、lock integrity 和相关依赖声明；不要求与本测无关的本地浏览器依赖改动入库。原始 package / lock 文件 hash 仍在运行 artifact 的 localRuntime 前后记录。此安排记录实际依赖，不用 Git HEAD 冒充本机文件，也不宣称锁定全部间接依赖的安装内容。
+
+执行结束只能生成机器评分和逐轮审阅输入，`admitted` 保持 false；须另外由 Codex 根据预声明 criteria 阅读实际用户可见 reply，并以 replyHash / criteriaHash 绑定审阅，再通过 `summarizeC1Validation` 重新汇总。未审阅、源码漂移、超时、预算停止、身份 / 状态变化不完整或费用未知均不能宣称完整准入。
+
+纯检查命令：`node scripts/c1-session-validation-live.ts`。冻结后使用 `--inspect PLAN MANIFEST SETUP` 做零网络核验；只有显式 `--live PLAN MANIFEST SETUP` 执行一次正式验证。最终文件名与首次运行证据待冻结后补入结果文档。

@@ -733,6 +733,16 @@ for (const outcome of ["success", "detail-failure", "analysis-failure"]) {
       sourceHashes: { before: "b1", after: "b1" }, durationMs: 1240, calls: [],
       usage: { rerankTokens: 1200, supportTokens: 800, estimatedCny: 0.0006, estimatedUsd: 0.00008, incompleteCalls: 0 },
       pricing: { estimated: true },
+      applicability: { mode: "declared", gate: {
+        version: "declared-order-preconditions-v1", snapshotHash: "ab12cd34ef56", contextHash: "fe98dc76ba54",
+        status: "ready", integrity: true, reason: null,
+        decisions: [
+          { id: "KB-REFUND-EXPIRED", rank: 1, status: "matched", reason: "已声明未核销前提与订单事实一致" },
+          { id: "KB-OTHER", rank: 2, status: "mismatched", reason: "订单含已核销券，前提不符" },
+          { id: "KB-UNRELATED", rank: 3, status: "unknown", reason: "券状态事实不足" },
+          { id: "KB-NCHK", rank: 4, status: "not_checked", reason: "未执行实例校验" },
+          { id: "KB-NONE", rank: 5, status: "none_declared", reason: "未声明前提" },
+        ] } },
       settings: { support: { promptVersion: "fact-support-typed-v2", profile: "typed", provider: "deepseek", model: "deepseek-v4-pro",
         validationVersion: "typed-candidate-isolation-v1" }, serialization: "json-title-tags-body-v1" },
       // 结构取自真实 run 990dac49 首个 case 的知识 trace（脱敏）：对象容器 {value, requestHash, inputHash, attempts}。
@@ -777,6 +787,9 @@ for (const outcome of ["success", "detail-failure", "analysis-failure"]) {
       stages: [{ name: "read", observedAt: T, durationMs: 4 }, { name: "rerank", observedAt: T, durationMs: 14996 }],
       // 异常容器：顶层数组不是实际后端合同，必须诊断而非默默兼容。
       supportVerification: [{ id: "KB-WRONG-SHAPE", supported: true }],
+      applicability: { mode: "declared", gate: {
+        version: "declared-order-preconditions-v1", snapshotHash: "00aa11bb22cc", contextHash: null,
+        status: "unavailable", integrity: false, reason: "metadata_binding_invalid", decisions: [] } },
     },
   };
   // 首次无 policyTopic 的接受：版本只来自本轮 trace.sources。
@@ -793,6 +806,7 @@ for (const outcome of ["success", "detail-failure", "analysis-failure"]) {
       sourceHashes: { before: "b1", after: "b1" }, durationMs: 900, calls: [],
       settings: { support: { promptVersion: "fact-support-v2-typed", profile: "typed", provider: "deepseek", model: "deepseek-flash" } },
       usage: { rerankTokens: 900, supportTokens: 600, estimatedCny: 0.0004, estimatedUsd: 0.00006, incompleteCalls: 0 },
+      applicability: { mode: "model_only" },
       stages: [{ name: "read", observedAt: T, durationMs: 3 }],
     },
   };
@@ -831,6 +845,7 @@ for (const outcome of ["success", "detail-failure", "analysis-failure"]) {
         value: [],
         validation: { status: "unavailable", outputHash: "z9y8",
           invalidDecisions: [{ id: "KB-X1", code: "invalid_reason" }, { id: "KB-X2", code: "invalid_quote" }] } },
+      applicability: { mode: "declared", gate: { status: "weird", decisions: "x" } },
       stages: [{ name: "read", observedAt: T, durationMs: 3 }],
     },
   };
@@ -987,6 +1002,19 @@ for (const outcome of ["success", "detail-failure", "analysis-failure"]) {
   assert.match(html, /paid_amount_compare（只读实付比较）/, "v2.2 只读实付比较中文标签");
   assert.match(html, /判别配置：binary 二元判断 · prompt fact-support-v1/, "fact-support-v1 识别为 binary");
   assert.match(html, /宿主仅接受事实或规则与明确安全边界问题的回答/, "接受口径说明");
+  assert.match(html, /已声明必要前提 · 满足 1 · 不符 1 · 暂缓 1 · 未校验 1 · 未声明 1/, "混合 gate 状态汇总");
+  assert.match(html, /适用条件明细 · 5 条/, "适用条件折叠明细");
+  assert.match(html, /rank 2 · KB-OTHER · 前提不符已排除 · 订单含已核销券，前提不符/, "前提不符已排除");
+  assert.match(html, /KB-UNRELATED · 事实不足已暂缓/, "unknown 暂缓不显示正确拒答");
+  assert.match(html, /KB-NCHK · 未执行实例校验/, "未检查不显示通过");
+  assert.match(html, /KB-NONE · 未声明前提/, "未声明前提");
+  assert.match(html, /版本 declared-order-preconditions-v1 · 快照 ab12cd34ef · 上下文哈希 fe98dc76ba/, "版本与哈希短值");
+  assert.match(html, /仅声明必要前提，不是完整规则适用性证明/, "非完整证明声明");
+  assert.match(html, /规则适用条件：model_only（未启用声明门控）/, "model_only 明示未启用");
+  assert.match(html, /适用条件校验不可用：元数据绑定无效 · 完整性异常/, "metadata 失效不显示正确拒答");
+  assert.match(html, /适用条件记录异常，无法解析/, "坏 gate 结构明确异常不崩溃");
+  const applicabilityNotes = walk(element("run-detail")).filter(item => item.textContent === "适用条件记录异常，无法解析。");
+  assert.equal(applicabilityNotes.length, 1, "仅坏 gate 夹具显示适用条件异常");
   assert.match(html, /判别明细记录异常，无法解析/, "顶层数组等非合同容器明确诊断，不默默兼容");
   const verdictFolds = walk(element("run-detail")).filter(item => item.textContent.startsWith("判别明细 · "));
   assert.equal(verdictFolds.length, 6, "无 supportVerification 的旧记录不伪造判别明细");

@@ -1,0 +1,50 @@
+{
+  "version": 1,
+  "stage": "fixed-before-support-development-execution",
+  "createdAt": "2026-10-05T20:34:07.388124Z",
+  "dataset": {
+    "path": "data/c1-language-support-development.json",
+    "sha256": "925c5ce543c40192d85a36f46df4cc1545a3c99250f2522b1923eba950169163",
+    "bytes": 6882
+  },
+  "counts": {
+    "pairs": 4,
+    "questions": 8,
+    "direct_fact": 3,
+    "boundary_answer": 1,
+    "limitation_only": 4,
+    "accepted": 4,
+    "rejected": 4
+  },
+  "baseFiles": {
+    "data/acceptance-online.json": "5f97b7f4e77cd1695a38ef9b0c42e53f52f40f7ae869a39fcdcdae5ae8971b72",
+    "data/reference/kefu-harness/data/knowledge/docs.jsonl": "d3cd80ba76fdc82e57c1eefdc66a20987f09bc9b3dd0fbd1287c709146217fae",
+    "data/reference/kefu-harness/source.json": "42c6791ca2edfabcb98d9c49c2cd063c81e7705c29e94a6c1858357000c1d5cf"
+  },
+  "exposedFailure": {
+    "runId": "2e97898b-ee0f-4932-9c97-00ba76cf4cf7",
+    "artifact": ".runtime/c1-session/live-development-2e97898b-ee0f-4932-9c97-00ba76cf4cf7.json",
+    "sha256": "c94ab8b8688cc2e1bbb7cc0629e573e045a63cdf7cee754347374a991f2c3570",
+    "caseId": "session-weekend-topic",
+    "turn": 2,
+    "exactEffectiveQueryCase": "c1-language-005",
+    "promptVersion": "fact-support-typed-v4",
+    "promptHash": "2f099bedc39fcaec9b3d40e7cd3c579c3b0e2f5577d72cae45d72909bf5fe722",
+    "originalFailureRemainsFailed": true,
+    "originalCandidateCount": 2,
+    "diagnosticCandidateCount": 1,
+    "candidateSetMatchesOriginalFailure": false
+  },
+  "review": {
+    "isBlind": false,
+    "beforeExecution": true,
+    "sameSourcePerPair": true,
+    "sourceBodiesUnmodified": true,
+    "newFinalValidationRead": false,
+    "semanticEvaluationExecuted": false,
+    "languageBoundary": "Allow ordinary paraphrase and definition-level set/range entailment while retaining all conditions and exceptions. Do not infer actual receipt, opening, holiday classification, reception or product identity.",
+    "targetBoundary": "The exposed follow-up retains the ordinary-weekend antecedent; acceptance permits a conditional rule explanation, not a guarantee for any dated visit.",
+    "slotLimitation": "Direct-support probes cannot prove that the action model extracts productMention; the exposed first turn omitted that optional field.",
+    "targetLimitation": "Only the effective query is reproduced exactly. This direct-support probe provides one source rather than the original two candidates and does not replay Session history or model action selection."
+  }
+}

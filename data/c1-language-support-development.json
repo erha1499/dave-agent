@@ -1,0 +1,145 @@
+{
+  "version": 1,
+  "suiteId": "c1-language-support-development-v1",
+  "stage": "development-not-validation",
+  "provenance": "Public development diagnostics frozen after an exposed typed-v4 false rejection. The original failed follow-up is deliberately reused; the independent pairs test language entailment versus missing business facts. This is neither blind validation nor an end-to-end rerun. No new final-24 validation questions or gold were created or read.",
+  "measurement": "Direct per-document typed support classification only. Four accepted/rejected pairs share complete existing source and scope. Eight planned queries including failures; no rerank, context resolver, order execution, model action selection, answer-quality or product-slot extraction score. Engineering mocks do not establish semantic accuracy.",
+  "cases": [
+    {
+      "id": "c1-language-001",
+      "pair": "payment-account-paraphrase",
+      "corpus": "reference",
+      "sourceId": "RF001",
+      "query": "对未核销且还在有效期内的团购券，规则里的退钱去向，是不是我最初付款用的那个账户？",
+      "scope": {
+        "shopId": null,
+        "productId": null
+      },
+      "expected": {
+        "category": "direct_fact",
+        "supported": true,
+        "evidenceQuote": "退款将原路退回至原支付账户",
+        "reason": "退钱和退款、最初付款用的账户和原支付账户是语义等价表达；这是资金路径规则，不证明本次已到账。"
+      }
+    },
+    {
+      "id": "c1-language-002",
+      "pair": "payment-account-paraphrase",
+      "corpus": "reference",
+      "sourceId": "RF001",
+      "query": "我这笔未核销且还在有效期内的团购券，最初付款用的那个账户现在已经收到退回的钱了吗？",
+      "scope": {
+        "shopId": null,
+        "productId": null
+      },
+      "expected": {
+        "category": "limitation_only",
+        "supported": false,
+        "evidenceQuote": "退款将原路退回至原支付账户,一般1-3个工作日到账,具体到账时间以支付渠道为准",
+        "reason": "政策提供路径和一般时效，但没有本单实际到账记录；语言理解不能补实例事件。"
+      }
+    },
+    {
+      "id": "c1-language-003",
+      "pair": "time-interval-vs-live-business",
+      "corpus": "reference",
+      "sourceId": "RS002",
+      "query": "假设商家在正常营业且没有节假日调整，只比较午市券的限定时段：中午12点是否落在允许使用的时间区间内？",
+      "scope": {
+        "shopId": null,
+        "productId": null
+      },
+      "expected": {
+        "category": "direct_fact",
+        "supported": true,
+        "evidenceQuote": "午市券仅限11:00-14:00使用",
+        "reason": "12:00属于原文明确给出的时间区间；问题显式假设其他营业前提，不要求补现实商家状态。"
+      }
+    },
+    {
+      "id": "c1-language-004",
+      "pair": "time-interval-vs-live-business",
+      "corpus": "reference",
+      "sourceId": "RS002",
+      "query": "这家商店今天中午12点一定正常营业，而且一定会接待我使用午市券吗？",
+      "scope": {
+        "shopId": null,
+        "productId": null
+      },
+      "expected": {
+        "category": "limitation_only",
+        "supported": false,
+        "evidenceQuote": "法定节假日营业时间可能调整,以商家实际公告为准",
+        "reason": "具体日期的实际营业、商家公告及接待状态未给出；区间包含关系不能证明这些现实前提。"
+      }
+    },
+    {
+      "id": "c1-language-005",
+      "pair": "exposed-weekend-followup",
+      "corpus": "online",
+      "sourceId": "KB-SHOP-DEMO-1",
+      "query": "这张券星期天也按刚才的规则使用吗？\n上轮已完成取证的问题（仅用于理解本轮指代）：该订单 对应的常规午餐套餐，普通周末能用吗？\n已核实订单商品：双人午餐团购券。",
+      "scope": {
+        "shopId": "shop-demo-1",
+        "productId": "product-demo-1"
+      },
+      "expected": {
+        "category": "direct_fact",
+        "supported": true,
+        "evidenceQuote": "常规午餐与晚餐套餐允许普通周末使用，到店前需用户自行与商家确认接待情况",
+        "reason": "逐字重放已曝光失败的有效query；可信前文限定普通周末，可按原规则条件解释词义关系，仍须保留自行确认接待和特殊日期例外，不证明任何具体日期可用。"
+      }
+    },
+    {
+      "id": "c1-language-006",
+      "pair": "exposed-weekend-followup",
+      "corpus": "online",
+      "sourceId": "KB-SHOP-DEMO-1",
+      "query": "这张券在2026年10月11日一定可以用、商家也一定会接待吗？\n上轮已完成取证的问题（仅用于理解本轮指代）：该订单 对应的常规午餐套餐，普通周末能用吗？\n已核实订单商品：双人午餐团购券。",
+      "scope": {
+        "shopId": "shop-demo-1",
+        "productId": "product-demo-1"
+      },
+      "expected": {
+        "category": "limitation_only",
+        "supported": false,
+        "evidenceQuote": "到店前需用户自行与商家确认接待情况；助手目前不能预约、外呼、查询实时库存或安排接待",
+        "reason": "给出日期不等于核实是否普通周末、特殊活动或接待情况；普通词义不能补外部日历事件和商家承诺。"
+      }
+    },
+    {
+      "id": "c1-language-007",
+      "pair": "documentation-vs-product-fact",
+      "corpus": "online",
+      "sourceId": "KB-SHOP-DEMO-1",
+      "query": "现有文档是否已经记载特殊活动期间和私享套餐的使用限制？",
+      "scope": {
+        "shopId": "shop-demo-1",
+        "productId": null
+      },
+      "expected": {
+        "category": "boundary_answer",
+        "supported": true,
+        "evidenceQuote": "法定节假日、特殊活动和私享套餐使用限制没有录入",
+        "reason": "明确询问文档覆盖；原文的缺失声明支持文档未记录的否定答案，不涉及现实使用许可。"
+      }
+    },
+    {
+      "id": "c1-language-008",
+      "pair": "documentation-vs-product-fact",
+      "corpus": "online",
+      "sourceId": "KB-SHOP-DEMO-1",
+      "query": "我的私享套餐团购券在普通周末一定能够使用吗？\n已核实订单商品：私享套餐团购券。",
+      "scope": {
+        "shopId": "shop-demo-1",
+        "productId": null
+      },
+      "expected": {
+        "category": "limitation_only",
+        "supported": false,
+        "evidenceQuote": "法定节假日、特殊活动和私享套餐使用限制没有录入",
+        "reason": "私享套餐不能凭名称或语义相近推为常规午餐或晚餐；同篇原文对该商品类别的限制未录入，缺失声明不能授权可用。"
+      }
+    }
+  ]
+}

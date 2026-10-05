@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "suiteId": "c1-session-product-clarification-v1",
+  "stage": "development-contract-supplement",
+  "provenance": "New two-turn development contract for the exposed product-name ambiguity. The original 10/20 dataset, gold and results remain unchanged. Real Session inputs contain only user questions; expected actions and evidence stay checker-only. The second turn explicitly restates the canonical product and order, not a bare yes confirmation.",
+  "cases": [
+    {
+      "id": "session-product-clarification-restatement",
+      "corpus": "online",
+      "turns": [
+        {
+          "question": "订单 COUPON-1001 对应的常规午餐套餐，普通周末能用吗？",
+          "expect": {
+            "kind": "policy",
+            "orderId": "COUPON-1001",
+            "orderRef": "explicit",
+            "questionContext": "standalone",
+            "outcome": "clarification",
+            "clarification": {
+              "canonicalProductName": "双人午餐团购券"
+            },
+            "knowledge": "none",
+            "produceTopic": false
+          }
+        },
+        {
+          "question": "订单 COUPON-1001 的双人午餐团购券，普通周末能使用吗？",
+          "expect": {
+            "kind": "policy",
+            "orderId": "COUPON-1001",
+            "orderRef": "explicit",
+            "questionContext": "standalone",
+            "knowledge": "evidence",
+            "relevant": [
+              "KB-SHOP-DEMO-1"
+            ],
+            "produceTopic": true
+          }
+        }
+      ]
+    }
+  ]
+}

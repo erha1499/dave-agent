@@ -141,6 +141,9 @@ function expComboError(config) {
       if (variant.parameters?.knowledgeSupportModel === "deepseek-v4-pro"
         && (variant.architecture !== "controller" || (variant.parameters?.knowledgeMode ?? "lexical") !== "m4-support"))
         return `方案 ${variant.id}：固定 Pro 判别模型需 Controller + m4-support 知识检索；请改回 configured 或调整组合。`;
+      if (variant.parameters?.knowledgeApplicability === "declared"
+        && (variant.architecture !== "controller" || (variant.parameters?.knowledgeMode ?? "lexical") !== "m4-support"))
+        return `方案 ${variant.id}：declared 规则适用条件需 Controller + m4-support 知识检索；请改回 model_only 或调整组合。`;
     }
     return "";
   }
@@ -434,7 +437,8 @@ function expParamRow(draft, variant, field, controls) {
   const profileApplicable = variant.architecture === "controller" && (params.knowledgeMode ?? "lexical") === "m4-support";
   const profileNA = field.key === "knowledgeSupport" && draft.kind === "support" && !profileApplicable && (params.knowledgeSupport ?? "binary") !== "typed";
   const modelNA = field.key === "knowledgeSupportModel" && draft.kind === "support" && !profileApplicable && (params.knowledgeSupportModel ?? "configured") !== "deepseek-v4-pro";
-  const notApplicable = repairNA || timeoutNA || thresholdNA || profileNA || modelNA;
+  const applicabilityNA = field.key === "knowledgeApplicability" && draft.kind === "support" && !profileApplicable && (params.knowledgeApplicability ?? "model_only") !== "declared";
+  const notApplicable = repairNA || timeoutNA || thresholdNA || profileNA || modelNA || applicabilityNA;
   let control;
   if (field.type === "select") {
     control = node("select", { "data-field": field.key, "data-variant": variant.id });
@@ -452,7 +456,7 @@ function expParamRow(draft, variant, field, controls) {
           linkedThreshold.control.disabled = na;
           linkedThreshold.row.className = `exp-param${na ? " disabled" : ""}`;
         }
-        for (const [key, illegalValue] of [["knowledgeSupport", "typed"], ["knowledgeSupportModel", "deepseek-v4-pro"]]) {
+        for (const [key, illegalValue] of [["knowledgeSupport", "typed"], ["knowledgeSupportModel", "deepseek-v4-pro"], ["knowledgeApplicability", "declared"]]) {
           const linked = controls.get(key);
           if (!linked) continue;
           const na = !applicable && linked.control.value !== illegalValue;
@@ -460,9 +464,9 @@ function expParamRow(draft, variant, field, controls) {
           linked.row.className = `exp-param${na ? " disabled" : ""}`;
         }
       }
-      if (field.key === "knowledgeSupport" || field.key === "knowledgeSupportModel") {
+      if (field.key === "knowledgeSupport" || field.key === "knowledgeSupportModel" || field.key === "knowledgeApplicability") {
         const applicable = variant.architecture === "controller" && (params.knowledgeMode ?? "lexical") === "m4-support";
-        const illegalValue = field.key === "knowledgeSupport" ? "typed" : "deepseek-v4-pro";
+        const illegalValue = { knowledgeSupport: "typed", knowledgeSupportModel: "deepseek-v4-pro", knowledgeApplicability: "declared" }[field.key];
         const na = !applicable && control.value !== illegalValue;
         control.disabled = na;
         row.className = `exp-param${na ? " disabled" : ""}`;

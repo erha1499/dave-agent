@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
 import type { AssistantMessage } from "@earendil-works/pi-ai";
 import type { Pool } from "mysql2/promise";
-import { createBailianClient } from "../src/bailian.ts";
+import { contentHash, createBailianClient } from "../src/bailian.ts";
 import { CouponStore } from "../src/coupon-store.ts";
 import { createEvidenceSupportClient, evidenceSupportInputHash, evidenceSupportTypedPromptVersion, resolveEvidenceSupportModel } from "../src/evidence-support.ts";
 import { createKnowledgeService, type KnowledgeServiceOptions } from "../src/knowledge-service.ts";
@@ -12,6 +12,7 @@ import type { RetrievalDocument } from "../src/retrieval-ranking.ts";
 import { knowledgeProviderSpans } from "../src/knowledge-evaluation.ts";
 import { summarizeEvaluation, type EvalSpan } from "../src/evaluation.ts";
 import { analyzeSupportSpans } from "../src/support-evaluation.ts";
+import { buildKnowledgeApplicabilityContext, knowledgeApplicabilitySourceHash, validateKnowledgeApplicabilitySnapshot } from "../src/knowledge-applicability.ts";
 
 const docs: RetrievalDocument[] = [
   { id: "A", title: "退款规则", body: "未使用的券可申请退款。", tags: ["退款"], shopId: null, productId: null, status: "active" },
@@ -290,4 +291,95 @@ const raw = await couponStore.readKnowledgeDocuments("shop-a", "product-a"); ass
 const legacy = await couponStore.searchKnowledge(query, "shop-a", "product-a"); assert.deepEqual(legacy, lexical.documents);
 assert.equal(sqls.length, 4); await assert.rejects(couponStore.readKnowledgeDocuments(undefined, "product-a"));
 assert.deepEqual(await new CouponStore({ execute: async () => [[]] } as unknown as Pool).readKnowledgeDocuments("inactive-shop"), []);
-console.log("Knowledge service checks passed: compatible lexical, two-stage acceptance, scope/source recheck, cancellation, timeout and honest usage.");
+
+// Declared host facts filter the original score/Top5 candidates, independently of model semantics.
+const gateDocs: RetrievalDocument[] = ["multi", "redeemed", "unused", "general", "other", "sixth"].map(id => ({
+  id: `gate-${id}`, title: id, body: `${id} original rule.`, tags: [], shopId: null, productId: null, status: "active" }));
+const gateSnapshot = validateKnowledgeApplicabilitySnapshot({ version: 1, serialization: "knowledge-document-v1", documents: gateDocs.map((doc, index) => ({
+  sourceId: doc.id, sourceHash: knowledgeApplicabilitySourceHash(doc), scope: { shopId: null, productId: null },
+  ...(index === 0 ? { minimumCouponCount: 2 } : index < 3 ? { atLeastOneCouponInStates: [index === 1 ? "redeemed" : "unused"] } : {}),
+  basis: index < 3 ? [{ field: index === 0 ? "minimumCouponCount" : "atLeastOneCouponInStates", quote: doc.body }] : [], reviewNote: "Synthetic necessary prerequisite" })) });
+const gateOrder: Awaited<ReturnType<CouponStore["getOrder"]>> = { source: "demo-database", id: "COUPON-9999", status: "paid", asOf: "2026-10-06T00:00:00.000Z",
+  amounts: { totalCents: 100, paidCents: 100, refundedCents: 0 }, createdAt: null, paidAt: null,
+  shop: { id: scope.shopId, name: "unit", merchantName: "unit", address: "unit" },
+  items: [{ id: "unit-item", productId: scope.productId, productName: "unit", quantity: 1, unitPriceCents: 100, totalCents: 100 }],
+  coupons: [{ id: "unit-coupon", orderItemId: "unit-item", status: "unused", expiresAt: "2027-01-01T00:00:00.000Z", redeemedAt: null, redeemedShopId: null }], payments: [], refunds: [] };
+const gateContext = buildKnowledgeApplicabilityContext({ order: gateOrder, requestId: "gate-request", purpose: "refund_eligibility" });
+let gateRows = structuredClone(gateDocs), gateJudgments = 0, gateRequests = 0, onGateSupport = () => {};
+let observedCandidateIds: string[] = [];
+const gateRerank = createBailianClient({ timeoutMs: 1000, retries: 0, env: { DASHSCOPE_API_KEY: "fake-local", DASHSCOPE_BASE_URL: "https://dashscope.aliyuncs.com" },
+  fetch: async (_url, options) => { gateRequests++; const payload = JSON.parse(String(options!.body));
+    const results = payload.documents.map((doc: string, index: number) => ({ index,
+      relevance_score: .96 - gateDocs.findIndex(source => source.title === JSON.parse(doc).title) * .02 }))
+      .sort((left: { relevance_score: number }, right: { relevance_score: number }) => right.relevance_score - left.relevance_score);
+    return new Response(JSON.stringify({ results, usage: { total_tokens: 100 } })); } });
+const gateSupport = await createEvidenceSupportClient({ timeoutMs: 1000, runtime: { model, complete: async (context): Promise<AssistantMessage> => {
+  gateJudgments++; const payload = JSON.parse(String(context.messages[0]!.content));
+  observedCandidateIds = payload.documents.map((doc: { id: string }) => doc.id); onGateSupport();
+  return { role: "assistant", api: "openai-completions", provider: model.provider, model: model.id, stopReason: "stop", timestamp: 0,
+    content: [{ type: "text", text: JSON.stringify({ decisions: payload.documents.map((doc: { id: string; body: string }) => ({ id: doc.id, supported: true, quote: doc.body, reason: "Synthetic supported fact" })) }) }],
+    usage: { input: 30, output: 20, cacheRead: 0, cacheWrite: 0, totalTokens: 50, cost: { input: .000003, output: .000004, cacheRead: 0, cacheWrite: 0, total: .000007 } } };
+} } });
+const gateStore = { readKnowledgeDocuments: async () => structuredClone(gateRows) };
+const declaredOptions: KnowledgeServiceOptions = { mode: "m4-support", threshold: .5, timeoutMs: 1000, applicability: "declared",
+  applicabilitySnapshot: gateSnapshot, clients: { rerank: gateRerank, support: gateSupport } };
+const declaredService = createKnowledgeService(gateStore, declaredOptions);
+const declared = await declaredService.search({ query, scope, applicabilityContext: gateContext });
+assert.equal(declared.trace.status, "accepted"); assert.equal(declared.trace.applicability!.gate!.integrity, true);
+assert.deepEqual(declared.trace.rawRanking.map(row => row.id), gateDocs.map(doc => doc.id));
+assert.deepEqual(observedCandidateIds, gateDocs.slice(2, 5).map(doc => doc.id));
+assert.deepEqual(declared.trace.acceptance!.accepted.map(doc => doc.rank), [3, 4, 5], "Never refill or renumber after host exclusions");
+assert.equal(declared.trace.acceptance!.rejected.filter(row => row.reason === "applicability_mismatch").length, 2);
+assert.ok(declared.trace.acceptance!.rejected.some(row => row.id === "gate-sixth" && row.reason === "top_k_limit"));
+assert.equal(declared.trace.settings!.applicability!.snapshotHash, gateSnapshot.sha256);
+assert.equal(declared.trace.applicability!.gate!.contextHash, gateContext.factsHash);
+assert.deepEqual(declared.trace.usage, good.trace.usage, "Local host gating adds neither model calls nor fees");
+const declaredRequests = gateRequests, declaredJudgments = gateJudgments;
+gateRows = gateDocs.slice(0, 2);
+const allExcluded = await declaredService.search({ query, scope, applicabilityContext: gateContext });
+assert.equal(allExcluded.trace.status, "rejected"); assert.deepEqual(allExcluded.documents, []);
+assert.equal(gateJudgments, declaredJudgments); assert.equal(gateRequests, declaredRequests + 1);
+assert.deepEqual(allExcluded.trace.calls.map(call => call.operation), ["rerank"]);
+assert.equal(allExcluded.trace.usage.estimatedUsd, 0); assert.equal(allExcluded.trace.supportVerification, undefined);
+assert.ok(allExcluded.trace.acceptance!.rejected.every(row => row.reason === "applicability_mismatch"), "Gate mismatch is not model unsupported");
+
+gateRows = structuredClone(gateDocs);
+const incompleteOrder = structuredClone(gateOrder); incompleteOrder.items[0]!.quantity = 2;
+const unknownContext = buildKnowledgeApplicabilityContext({ order: incompleteOrder, requestId: "gate-request", purpose: "refund_eligibility" });
+const unknown = await declaredService.search({ query, scope, applicabilityContext: unknownContext });
+assert.equal(unknown.trace.status, "accepted"); assert.equal(unknown.trace.applicability!.gate!.integrity, false);
+assert.deepEqual(unknown.documents.map(doc => doc.sourceId), ["gate-general", "gate-other"]);
+assert.equal(unknown.trace.applicability!.gate!.decisions.filter(row => row.status === "unknown").length, 3);
+gateRows = gateDocs.slice(0, 3);
+const onlyUnknown = await declaredService.search({ query, scope, applicabilityContext: unknownContext });
+assert.equal(onlyUnknown.trace.status, "unavailable"); assert.equal(onlyUnknown.trace.reason, "applicability_facts_unknown");
+assert.deepEqual(onlyUnknown.trace.calls.map(call => call.operation), ["rerank"]);
+assert.ok(onlyUnknown.trace.acceptance!.rejected.every(row => row.reason === "applicability_unknown"));
+
+gateRows = [{ ...gateDocs[0]!, body: "changed current original" }];
+for (const applicabilityContext of [gateContext, null]) {
+  const stale = await declaredService.search({ query, scope, applicabilityContext });
+  assert.equal(stale.trace.status, "unavailable"); assert.equal(stale.trace.reason, "metadata_binding_invalid");
+  assert.deepEqual(stale.trace.calls.map(call => call.operation), ["rerank"]);
+  assert.equal(stale.trace.applicability!.gate!.integrity, false);
+}
+gateRows = [{ ...gateDocs[0]!, id: "reference-unannotated" }];
+const reference = await declaredService.search({ query, scope });
+assert.equal(reference.trace.status, "accepted"); assert.equal(reference.trace.applicability!.gate!.decisions[0]!.status, "not_checked");
+const missingMetadata = await declaredService.search({ query, scope, applicabilityContext: gateContext });
+assert.equal(missingMetadata.trace.status, "unavailable"); assert.equal(missingMetadata.trace.reason, "metadata_binding_invalid");
+gateRows = structuredClone(gateDocs);
+const generic = await declaredService.search({ query, scope });
+assert.equal(generic.documents.length, 5); assert.ok(generic.trace.applicability!.gate!.decisions.every(row => row.status === "not_checked"));
+onGateSupport = () => { gateRows[0]!.body = "Excluded source changed during support"; };
+const changedExcluded = await declaredService.search({ query, scope, applicabilityContext: gateContext });
+assert.equal(changedExcluded.trace.status, "unavailable"); assert.equal(changedExcluded.trace.reason, "source_changed");
+assert.deepEqual(changedExcluded.documents, []); onGateSupport = () => {};
+gateRows = structuredClone(gateDocs);
+const malformedSnapshot = { ...gateSnapshot, documents: [] };
+const modelOnly = await createKnowledgeService(gateStore, { ...declaredOptions, applicability: "model_only", applicabilitySnapshot: malformedSnapshot }).search({ query, scope, applicabilityContext: gateContext });
+assert.equal(modelOnly.trace.status, "accepted"); assert.equal(modelOnly.documents.length, 5, "model_only neither reads nor validates metadata");
+assert.deepEqual(modelOnly.trace.applicability, { mode: "model_only" }); assert.equal(modelOnly.trace.settings!.applicability, undefined);
+assert.equal(contentHash(modelOnly.trace.rawRanking), contentHash(declared.trace.rawRanking));
+assert.throws(() => createKnowledgeService(gateStore, { applicability: "declared" }));
+console.log("Knowledge service checks passed: compatible lexical/model_only, declared Top5 filtering/unknown/bindings, scope/source recheck, cancellation, timeout and honest usage.");

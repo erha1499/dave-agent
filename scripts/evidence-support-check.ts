@@ -5,7 +5,8 @@ import { applyEvidenceSupport, createEvidenceSupportClient, EvidenceSupportError
   validateEvidenceSupportVerification, verifyEvidenceSupport, evidenceSupportPrompt, evidenceSupportTypedPrompt, evidenceSupportTypedPromptVersion,
   evidenceSupportTypedV1Prompt, evidenceSupportTypedV1PromptHash, evidenceSupportTypedV1PromptVersion,
   evidenceSupportTypedV2Prompt, evidenceSupportTypedV2PromptHash, evidenceSupportTypedV2PromptVersion,
-  evidenceSupportTypedV3Prompt, evidenceSupportTypedV3PromptHash, evidenceSupportTypedV3PromptVersion, resolveEvidenceSupportModel, type EvidenceSupportDecision } from "../src/evidence-support.ts";
+  evidenceSupportTypedV3Prompt, evidenceSupportTypedV3PromptHash, evidenceSupportTypedV3PromptVersion,
+  evidenceSupportTypedV4Prompt, evidenceSupportTypedV4PromptHash, evidenceSupportTypedV4PromptVersion, resolveEvidenceSupportModel, type EvidenceSupportDecision } from "../src/evidence-support.ts";
 import { contentHash } from "../src/bailian.ts";
 
 const documents = [
@@ -63,6 +64,9 @@ assert.equal(evidenceSupportTypedV2PromptHash, "cd375d082eb2b5fb9b780377cad922df
 assert.equal(evidenceSupportTypedV3PromptVersion, "fact-support-typed-v3");
 assert.equal(contentHash(evidenceSupportTypedV3Prompt), evidenceSupportTypedV3PromptHash);
 assert.equal(evidenceSupportTypedV3PromptHash, "5d976a03cd880350701f65b08b7fee0397e23891807c4ccf7c5598879e8c8395");
+assert.equal(evidenceSupportTypedV4PromptVersion, "fact-support-typed-v4");
+assert.equal(contentHash(evidenceSupportTypedV4Prompt), evidenceSupportTypedV4PromptHash);
+assert.equal(evidenceSupportTypedV4PromptHash, "2f099bedc39fcaec9b3d40e7cd3c579c3b0e2f5577d72cae45d72909bf5fe722");
 const explicitBinary = await createEvidenceSupportClient({ profile: "binary", timeoutMs: 1000, runtime: { model, complete: async () => message({ decisions }) } });
 assert.deepEqual(explicitBinary.settings, client.settings, "explicit binary retains the default v1 settings shape");
 assert.equal(calls, 1); assert.equal(checked.attempts.length, 1); assert.equal(checked.attempts[0]!.outcome, "ok");
@@ -135,7 +139,8 @@ const typed = await createEvidenceSupportClient({ profile: "typed", validationVe
   return message({ decisions: typedRows });
 } } });
 assert.equal(typed.settings.profile, "typed"); assert.equal(typed.settings.promptVersion, evidenceSupportTypedPromptVersion);
-assert.equal(typed.settings.promptVersion, "fact-support-typed-v4"); assert.notEqual(typed.settings.promptHash, evidenceSupportTypedV3PromptHash);
+assert.equal(typed.settings.promptVersion, "fact-support-typed-v5"); assert.notEqual(typed.settings.promptHash, evidenceSupportTypedV4PromptHash);
+assert.equal(typed.settings.promptHash, "6f90373dc229648806bfa93957041bc7bb8ba7f50c76e61fe316827561b2453b");
 const typedChecked = await verifyEvidenceSupport({ query, scope, candidates, client: typed });
 assert.equal(typedCalls, 1); assert.notEqual(typedChecked.requestHash, checked.requestHash);
 // Historical prompt and parser selections are independent; neither may silently reuse a new prompt with old hashes.
@@ -152,9 +157,28 @@ assert.equal(contentHash(typedV3.settings), "a5ea9bbb677a856af836efa84c70318139f
 assert.equal(contentHash(typedV3Isolated.settings), "289694dfff885e6b3569e2bea599af80911f6f986f6b7a40e1a430b95f16e26b");
 const replayedV3 = await verifyEvidenceSupport({ query, scope, candidates, client: typedV3 });
 assert.equal(replayCalls, 1); assert.notEqual(replayedV3.requestHash, typedChecked.requestHash);
-assert.equal(validateEvidenceSupportVerification(replayedV3, { ...bound, settings: typed.settings }), false, "v3 result cannot satisfy a v4 request");
-assert.equal(validateEvidenceSupportVerification(typedChecked, { ...bound, settings: typedV3.settings }), false, "v4 result cannot be attributed to v3");
+assert.equal(validateEvidenceSupportVerification(replayedV3, { ...bound, settings: typed.settings }), false, "v3 result cannot satisfy a current request");
+assert.equal(validateEvidenceSupportVerification(typedChecked, { ...bound, settings: typedV3.settings }), false, "current result cannot be attributed to v3");
 assert.equal(applyEvidenceSupport({ prepared, verification: replayedV3, query, scope, documents, settings: typed.settings }).status, "unavailable");
+// Captured before the v5 edit: both old parser branches retain their exact v4 settings and request bytes.
+for (const legacy of [
+  { validationVersion: "typed-batch-v1" as const, settingsHash: "ea035edf059e1b53d5a09f32c4861c750bcdf59d10f9359b8f196bfe350eecf9", requestHash: "6505edb748407246502bf251d27cfb4b12c452171e67c6a23c1e41c0c261513c" },
+  { validationVersion: undefined, settingsHash: "9307a1df38a4f9d0721db8f0c52dc48df405162975a71a003111fb9979842a83", requestHash: "78a88d68d6d409fada8605a17910b904160a4c2d42ec504a7f6994eb8ac54fe8" },
+]) {
+  let v4Calls = 0;
+  const v4 = await createEvidenceSupportClient({ profile: "typed", typedPromptVersion: evidenceSupportTypedV4PromptVersion,
+    validationVersion: legacy.validationVersion, timeoutMs: 1000, runtime: { model, complete: async (context, options) => {
+      v4Calls++; assert.equal(context.systemPrompt, evidenceSupportTypedV4Prompt); assert.equal(options.maxRetries, 0);
+      assert.deepEqual(JSON.parse(String(context.messages[0]!.content)), { query, documents: candidates.map(({ id, title, tags, body }) => ({ id, title, tags, body })) });
+      return message({ decisions: typedRows });
+    } } });
+  assert.equal(contentHash(v4.settings), legacy.settingsHash);
+  const replayed = await verifyEvidenceSupport({ query, scope, candidates, client: v4 });
+  assert.equal(v4Calls, 1); assert.equal(replayed.requestHash, legacy.requestHash); assert.equal(replayed.attempts[0]!.totalTokens, 90);
+  assert.equal(validateEvidenceSupportVerification(replayed, { ...bound, settings: typed.settings }), false);
+  assert.equal(validateEvidenceSupportVerification(typedChecked, { ...bound, settings: v4.settings }), false);
+  assert.equal(applyEvidenceSupport({ prepared, verification: replayed, query, scope, documents, settings: typed.settings }).status, "unavailable");
+}
 for (const options of [{ profile: "binary", typedPromptVersion: evidenceSupportTypedV3PromptVersion },
   { profile: "typed", typedPromptVersion: "fact-support-typed-invalid" }] as const) {
   await assert.rejects(createEvidenceSupportClient({ ...options, typedPromptVersion: options.typedPromptVersion as typeof evidenceSupportTypedV3PromptVersion,

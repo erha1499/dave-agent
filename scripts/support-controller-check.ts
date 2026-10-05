@@ -360,6 +360,17 @@ console.log("[support-controller] typed business denial vs infrastructure failur
     assert.ok(observed.at(-1)!.query.includes(expected));
     assert.ok(!observed.at(-1)!.query.includes("未核销退款"), "unknown/closed facts cannot be promoted to unused eligibility by the model");
   }
+  test.services.store.getOrder = async () => structuredClone(order);
+  const current = await test.controller.createTurn(test.context(`${orderId} 本单有99张券，能退款吗？`))
+    .execute({ protocol: "v2.2", kind: "refund_eligibility", orderRef: explicit,
+      question: "模型称有99张券", questionContext: { kind: "standalone" } });
+  assert.deepEqual(observed.at(-1)!.applicabilityContext, current.evidence.knowledge[0]!.context.applicability);
+  assert.equal(observed.at(-1)!.applicabilityContext!.facts!.couponCount, 1, "service receives fresh facts rather than claimed counts");
+  assert.equal(observed.at(-1)!.applicabilityContext!.requestId, current.evidence.requestId);
+  await test.controller.createTurn(test.context(`假如 ${orderId} 有多张券，一般规则是什么？`))
+    .execute({ protocol: "v2.2", kind: "policy", orderRef: explicit,
+      question: "一般多券规则", questionContext: { kind: "standalone" } });
+  assert.equal(observed.at(-1)!.applicabilityContext, null, "general rules bypass current-order premise checks");
 }
 console.log("[support-controller] injected knowledge, original-query preservation, source scope and trace provenance PASS");
 
@@ -666,6 +677,15 @@ const focus = { kind: "focus" as const };
   const wrong = await test.controller.createTurn(test.context("这份海鲜套餐能用吗？", { focusOrderId: orderId }))
     .execute({ ...action, productMention: "海鲜套餐" });
   assert.equal(wrong.outcome, "clarification"); assert.deepEqual(wrong.evidence.actualCalls.map(call => call.name), ["get_order"]);
+  assert.equal(wrong.reply.kind, "notice");
+  if (wrong.reply.kind === "notice") {
+    assert.ok(wrong.reply.text.includes(orderId)); assert.ok(wrong.reply.text.includes("单人餐"));
+  }
+  assert.equal(wrong.verifiedPolicyTopic, undefined, "a product clarification cannot establish a completed policy topic");
+  const restated = await test.controller.createTurn(test.context(`订单 ${orderId} 的单人餐周日能用吗？`))
+    .execute({ ...action, orderRef: explicit, productMention: "单人餐" });
+  assert.equal(restated.outcome, "ready");
+  assert.deepEqual(restated.evidence.actualCalls.map(call => call.name), ["get_order", "search_faq"], "restated canonical product is freshly authorized before evidence lookup");
   const noScope = await test.controller.createTurn(test.context("海鲜套餐能用吗？"))
     .execute({ protocol, kind: "policy", question: "规则", questionContext: standalone, productMention: "海鲜套餐" });
   assert.equal(noScope.outcome, "clarification"); assert.equal(noScope.evidence.actualCalls.length, 0);
@@ -702,6 +722,12 @@ console.log("[support-controller] v2.2 strict protocol, raw question preservatio
     const knowledge = result.evidence.knowledge[0]!, context = knowledge.context;
     assert.deepEqual(context.facts!.couponCounts, counts, "fresh authorized coupons determine counts, never user/model claims");
     assert.equal(context.originalQuery, raw); assert.equal(context.modelQuestion, action.question);
+    assert.equal(context.applicability!.requestId, result.evidence.requestId);
+    assert.equal(context.applicability!.orderId, fresh.id);
+    assert.equal(context.applicability!.asOf, fresh.asOf);
+    assert.deepEqual(context.applicability!.facts, { couponCount: counts.total,
+      couponStates: { unused: counts.unused, redeemed: counts.redeemed, expired: counts.expired, refunded: counts.refunded } });
+    assert.equal(context.applicability!.unknownReason, null);
     assert.ok(context.effectiveQuery.endsWith(`已核实本单券数：${suffix}（按券状态字段计数）。`));
     assert.equal(knowledge.trace.query, context.effectiveQuery);
     assert.equal(result.evidence.actualCalls.find(call => call.name === "search_faq")!.input.query, context.effectiveQuery);
@@ -710,10 +736,15 @@ console.log("[support-controller] v2.2 strict protocol, raw question preservatio
   const legacy = await test.controller.createTurn(test.context(`${orderId} 能申请退款吗？`))
     .execute({ kind: "refund_eligibility", question: "未核销退款", orderRef: explicit });
   assert.equal(legacy.evidence.knowledge[0]!.context.facts!.couponCounts, undefined);
+  assert.equal(legacy.evidence.knowledge[0]!.context.applicability, undefined, "legacy replay cannot silently gain a current-order gate");
   assert.equal(legacy.evidence.knowledge[0]!.context.effectiveQuery,
     `该订单 能申请退款吗？\n已核实订单商品：${order.items[0]!.productName}。\n订单状态对应的规则条件：未核销退款。`, "legacy query bytes stay unchanged");
   const prepared = await test.controller.createTurn(test.context()).execute({ protocol, kind: "refund_prepare", orderRef: explicit });
   assert.match(prepared.evidence.knowledge[0]!.context.effectiveQuery, /^未核销退款\n已核实本单券数：共1张/);
+  assert.equal(prepared.evidence.knowledge[0]!.context.applicability!.purpose, "business_prerequisite");
+  const generic = await test.controller.createTurn(test.context(`假如订单 ${orderId} 有多张券，一般怎么处理退款？`))
+    .execute({ protocol, kind: "policy", question: "多张券的一般规则", orderRef: explicit, questionContext: standalone });
+  assert.equal(generic.evidence.knowledge[0]!.context.applicability, undefined, "general policy consultation does not claim instance eligibility");
 }
 console.log("[support-controller] v2.2 fresh coupon cardinality/status counts and legacy query compatibility PASS");
 

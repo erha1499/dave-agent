@@ -4,16 +4,20 @@ import { acceptEvidence, resolveEvidenceAcceptance, type EvidenceAcceptanceResul
 import { applyEvidenceSupport, createEvidenceSupportClient, EvidenceSupportError, verifyEvidenceSupport, resolveEvidenceSupportModel,
   type EvidenceSupportAttempt, type EvidenceSupportClient, type EvidenceSupportModel, type EvidenceSupportProfile, type EvidenceSupportFailure, type EvidenceSupportSettings, type EvidenceSupportVerification } from "./evidence-support.ts";
 import { rankLexical, scopeDocuments, serializeRetrievalDocument, type RetrievalScope } from "./retrieval-ranking.ts";
+import { gateKnowledgeApplicability, loadKnowledgeApplicabilitySnapshot, validateKnowledgeApplicabilitySnapshot,
+  type KnowledgeApplicabilityContext, type KnowledgeApplicabilityMode, type KnowledgeApplicabilityResult,
+  type KnowledgeApplicabilitySnapshot } from "./knowledge-applicability.ts";
 
 export type KnowledgeMode = "lexical" | "m4-support";
-export type KnowledgeStage = "read" | "rerank" | "support" | "recheck";
+export type KnowledgeStage = "read" | "rerank" | "applicability" | "support" | "recheck";
 export type KnowledgeDocuments = Awaited<ReturnType<CouponStore["searchKnowledge"]>>;
 export type KnowledgeCall = { operation: "rerank"; requestHash: string | null; attempts: BailianAttempt[]; status: "ok" | "unavailable" }
   | { operation: "support"; requestHash: string | null; attempts: EvidenceSupportAttempt[]; status: "ok" | "partial" | "unavailable" };
 export type KnowledgeTrace = {
   mode: KnowledgeMode; threshold: number | null; query: string; originalQuery: string; scope: RetrievalScope;
   status: "accepted" | "rejected" | "unavailable";
-  reason: null | "invalid_input" | "aborted" | "timeout" | "database_unavailable" | "provider_unavailable" | "source_changed" | "invalid_support_decision";
+  reason: null | "invalid_input" | "aborted" | "timeout" | "database_unavailable" | "provider_unavailable" | "source_changed" | "invalid_support_decision"
+    | "metadata_binding_invalid" | "applicability_facts_unknown";
   rawRanking: EvidenceRanking; acceptance: EvidenceAcceptanceResult | null;
   // Current accepted document versions, never versions carried by an earlier conversation topic.
   sources?: Array<{ sourceId: string; version: string }>;
@@ -21,22 +25,54 @@ export type KnowledgeTrace = {
   supportVerification?: EvidenceSupportVerification;
   supportFailure?: EvidenceSupportFailure;
   supportProfile?: EvidenceSupportProfile; supportModel?: EvidenceSupportModel;
+  applicability?: { mode: KnowledgeApplicabilityMode; gate?: Omit<KnowledgeApplicabilityResult, "candidates"> };
   sourceHashes: { before: string | null; after: string | null }; durationMs: number; calls: KnowledgeCall[];
   usage: { rerankTokens: number | null; supportTokens: number | null; estimatedCny: number | null; estimatedUsd: number | null; incompleteCalls: number };
   pricing: { estimated: true; rerankCnyPerMillionTokens: number | null; rerankAsOf: "2026-10-05"; supportSource: "Pi model catalog" };
-  settings?: { rerank?: BailianClient["settings"]; support?: EvidenceSupportSettings; serialization: "json-title-tags-body-v1" };
+  settings?: { rerank?: BailianClient["settings"]; support?: EvidenceSupportSettings; serialization: "json-title-tags-body-v1";
+    applicability?: ReturnType<typeof knowledgeApplicabilitySettings> };
   stages?: Array<{ name: KnowledgeStage; observedAt: string; durationMs: number }>;
 };
-export type KnowledgeSearchInput = { query: string; originalQuery?: string; scope: RetrievalScope; signal?: AbortSignal; onStage?: (stage: KnowledgeStage) => void };
+export type KnowledgeSearchInput = { query: string; originalQuery?: string; scope: RetrievalScope; applicabilityContext?: KnowledgeApplicabilityContext | null;
+  signal?: AbortSignal; onStage?: (stage: KnowledgeStage) => void };
 export type KnowledgeSearchResult = { documents: KnowledgeDocuments; trace: KnowledgeTrace };
 export type KnowledgeService = { search(input: KnowledgeSearchInput): Promise<KnowledgeSearchResult> };
 export type KnowledgeServiceOptions = { mode?: KnowledgeMode; threshold?: number; timeoutMs?: number; supportProfile?: EvidenceSupportProfile; supportModel?: EvidenceSupportModel;
+  applicability?: KnowledgeApplicabilityMode; applicabilitySnapshot?: KnowledgeApplicabilitySnapshot;
   clients?: { rerank?: Pick<BailianClient, "settings" | "rerank">; support?: EvidenceSupportClient } };
+
+export function knowledgeApplicabilitySettings(snapshot: KnowledgeApplicabilitySnapshot) {
+  return { version: "declared-order-preconditions-v1" as const, snapshotHash: snapshot.sha256, serialization: snapshot.serialization };
+}
+
+// Shared with the offline scorer. Filtering applies only to the score gate's original Top5.
+// Exclusions and unknown facts remain separate from a model's valid unsupported decision.
+export function applyKnowledgeApplicabilityGate(prepared: EvidenceAcceptanceResult, gate: KnowledgeApplicabilityResult): EvidenceAcceptanceResult {
+  if (prepared.config.mode !== "support") throw new Error("声明前提门控仅适用于支持判别候选。");
+  const result = structuredClone(prepared), kept = new Set(gate.candidates.map(candidate => candidate.id));
+  result.pendingSupport = gate.status === "ready" ? structuredClone(gate.candidates) : [];
+  result.rejected = result.rejected.filter(row => row.reason !== "support_verification_required" || kept.has(row.id!));
+  for (const candidate of prepared.pendingSupport ?? []) {
+    if (gate.status === "unavailable") result.rejected.push({ id: candidate.id, rank: candidate.rank, reason: "applicability_unavailable" });
+    else if (!kept.has(candidate.id)) result.rejected.push({ id: candidate.id, rank: candidate.rank,
+      reason: gate.decisions.find(row => row.id === candidate.id)?.status === "mismatched" ? "applicability_mismatch" : "applicability_unknown" });
+  }
+  result.accepted = [];
+  result.status = result.pendingSupport.length || gate.status === "unavailable" || !gate.integrity ? "unavailable" : "rejected";
+  return result;
+}
+
+export function finishKnowledgeApplicabilityAcceptance(acceptance: EvidenceAcceptanceResult, gate?: KnowledgeApplicabilityResult): EvidenceAcceptanceResult {
+  return gate && (gate.status === "unavailable" || !gate.integrity && !acceptance.accepted.length)
+    ? { ...acceptance, accepted: [], status: "unavailable" } : acceptance;
+}
 
 // No document/result cache: every business request reads and rechecks the current authorized source.
 export function createKnowledgeService(store: Pick<CouponStore, "readKnowledgeDocuments">, options: KnowledgeServiceOptions = {}): KnowledgeService {
   const mode = options.mode ?? "lexical", threshold = options.threshold ?? .71, timeoutMs = options.timeoutMs ?? 60_000;
   const supportProfile = options.supportProfile ?? "binary", supportModel = options.supportModel ?? "configured";
+  const applicability = options.applicability ?? "model_only";
+  if (!["model_only", "declared"].includes(applicability) || applicability === "declared" && mode !== "m4-support") throw new Error("声明前提门控仅适用于 m4-support 知识检索。");
   if (mode === "lexical" && supportModel !== "configured") throw new Error("固定支持判别模型仅适用于 m4-support 知识检索。");
   const selectedModel = resolveEvidenceSupportModel(supportModel);
   const modelMatches = (client: EvidenceSupportClient) => client.settings.provider === selectedModel.provider && client.settings.model === selectedModel.model;
@@ -47,10 +83,15 @@ export function createKnowledgeService(store: Pick<CouponStore, "readKnowledgeDo
   resolveEvidenceAcceptance({ mode: "support", threshold }, ["M4"]);
   let rerankClient = options.clients?.rerank, supportClient = options.clients?.support;
   let supportLoading: Promise<EvidenceSupportClient> | undefined;
+  let applicabilityLoading: Promise<KnowledgeApplicabilitySnapshot> | undefined;
+  const loadApplicability = () => applicabilityLoading ??= options.applicabilitySnapshot ? Promise.resolve().then(() => {
+    const { sha256, ...manifest } = options.applicabilitySnapshot!;
+    return validateKnowledgeApplicabilitySnapshot(manifest, sha256);
+  }) : loadKnowledgeApplicabilitySnapshot();
   return { async search(input) {
     const started = performance.now(), deadline = AbortSignal.timeout(timeoutMs);
     const signal = input.signal ? AbortSignal.any([input.signal, deadline]) : deadline;
-    const trace: KnowledgeTrace = { mode, supportProfile, supportModel, threshold: mode === "lexical" ? null : threshold, query: input.query,
+    const trace: KnowledgeTrace = { mode, supportProfile, supportModel, applicability: { mode: applicability }, threshold: mode === "lexical" ? null : threshold, query: input.query,
       originalQuery: input.originalQuery ?? input.query, scope: { shopId: input.scope?.shopId ?? null, productId: input.scope?.productId ?? null },
       status: "unavailable", reason: null, rawRanking: [], acceptance: null, sources: [], sourceHashes: { before: null, after: null }, durationMs: 0, calls: [],
       usage: { rerankTokens: 0, supportTokens: 0, estimatedCny: 0, estimatedUsd: 0, incompleteCalls: 0 },
@@ -116,6 +157,20 @@ export function createKnowledgeService(store: Pick<CouponStore, "readKnowledgeDo
       }
       trace.acceptance = acceptEvidence({ config: mode === "lexical" ? { mode: "off" } : { mode: "support", threshold },
         query: input.query, documents: before, scope: trace.scope, ranking: trace.rawRanking });
+      let applicabilityGate: KnowledgeApplicabilityResult | undefined;
+      if (applicability === "declared") {
+        enter("applicability");
+        try {
+          const snapshot = await wait(loadApplicability);
+          applicabilityGate = gateKnowledgeApplicability({ snapshot, context: input.applicabilityContext ?? null,
+            scope: trace.scope, candidates: trace.acceptance.pendingSupport ?? [] });
+          const { candidates: _candidates, ...audit } = applicabilityGate;
+          trace.applicability!.gate = structuredClone(audit);
+          trace.settings = { ...trace.settings, serialization: "json-title-tags-body-v1", applicability: knowledgeApplicabilitySettings(snapshot) };
+          trace.acceptance = applyKnowledgeApplicabilityGate(trace.acceptance, applicabilityGate);
+        } catch (error) { if (!signal.aborted) trace.reason = "metadata_binding_invalid"; throw error; }
+        if (applicabilityGate.status === "unavailable") trace.reason = "metadata_binding_invalid";
+      }
       let verification: Awaited<ReturnType<typeof verifyEvidenceSupport>> | null = null;
       if (trace.acceptance.pendingSupport?.length) {
         enter("support");
@@ -151,10 +206,12 @@ export function createKnowledgeService(store: Pick<CouponStore, "readKnowledgeDo
       if (trace.sourceHashes.before !== trace.sourceHashes.after) { trace.reason = "source_changed"; throw new Error(); }
       if (verification) trace.acceptance = applyEvidenceSupport({ prepared: trace.acceptance, verification, query: input.query,
         scope: trace.scope, documents: after, settings: supportClient!.settings });
+      trace.acceptance = finishKnowledgeApplicabilityAcceptance(trace.acceptance, applicabilityGate);
       signal.throwIfAborted();
       trace.status = trace.acceptance.status;
       if (trace.status === "unavailable") {
-        if (verification?.validation?.invalidDecisions.length) trace.reason = "invalid_support_decision";
+        if (applicabilityGate?.reason === "facts_unknown") trace.reason = "applicability_facts_unknown";
+        else if (verification?.validation?.invalidDecisions.length) trace.reason = "invalid_support_decision";
         throw new Error();
       }
       const current = new Map(after.map(doc => [doc.id, doc]));
@@ -170,7 +227,9 @@ export function createKnowledgeService(store: Pick<CouponStore, "readKnowledgeDo
         : stage === "read" || stage === "recheck" ? "database_unavailable" : "provider_unavailable";
       if (trace.acceptance) {
         trace.acceptance.accepted = []; delete trace.acceptance.pendingSupport; trace.acceptance.status = "unavailable";
-        if (trace.reason !== "invalid_support_decision") trace.acceptance.rejected.push({ id: null, rank: null, reason: "provider_unavailable" });
+        if (!["invalid_support_decision", "metadata_binding_invalid", "applicability_facts_unknown"].includes(trace.reason)) {
+          trace.acceptance.rejected.push({ id: null, rank: null, reason: "provider_unavailable" });
+        }
       }
     }
     for (const operation of ["rerank", "support"] as const) {

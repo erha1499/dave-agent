@@ -7,6 +7,7 @@ import { merchantSourceKey } from "../src/after-sales.ts";
 import { createBailianClient } from "../src/bailian.ts";
 import { OrderAccessError, type CouponStore, type QQIdentity } from "../src/coupon-store.ts";
 import { createEvidenceSupportClient, evidenceSupportPromptVersion, evidenceSupportTypedPromptVersion, resolveEvidenceSupportModel, type EvidenceSupportModel, type EvidenceSupportProfile } from "../src/evidence-support.ts";
+import { resolveSupportRunParameters, type SupportExperimentParameters } from "../src/support-parameters.ts";
 import { createKnowledgeService, type KnowledgeService, type KnowledgeTrace } from "../src/knowledge-service.ts";
 import { rankBm25, scopeDocuments, type RetrievalDocument } from "../src/retrieval-ranking.ts";
 import { SupportController, type SupportResult, type TrustedPolicyTopic } from "../src/support-controller.ts";
@@ -212,13 +213,14 @@ type Row = { caseId: string; variantId: string; partition: "query_only" | "conte
   fixturePreparation?: { declaredTopics: number; attemptedTopics: number; establishedTopics: number; currentTopicSelected: boolean };
   suppliedAction?: ContextSupportAction; referenceProbe?: { kind: "missing_or_ambiguous" | "nonexistent"; passed: boolean; result?: SupportResult } };
 
-export async function runC1ContextCheck(live = false, split: C1Split = "original", threshold = .71, knowledgeSupport: EvidenceSupportProfile = "binary", knowledgeSupportModel: EvidenceSupportModel = "configured") {
+export async function runC1ContextCheck(live = false, split: C1Split = "original", threshold = .71, knowledgeSupport: EvidenceSupportProfile = "binary", knowledgeSupportModel: EvidenceSupportModel = "configured", knowledgeApplicability: SupportExperimentParameters["knowledgeApplicability"] = "model_only") {
+  resolveSupportRunParameters("controller", { knowledgeMode: "m4-support", knowledgeApplicability });
   assert.ok(Number.isFinite(threshold) && threshold >= 0 && threshold <= 1, "threshold must be 0..1");
   assert.ok(knowledgeSupport === "binary" || knowledgeSupport === "typed", "knowledgeSupport must be binary or typed");
   resolveEvidenceSupportModel(knowledgeSupportModel);
   const data = await loadC1ContextDataset(split), adapter = await loadActionAdapter(), clients = live ? undefined : await mockClients(knowledgeSupport, knowledgeSupportModel), runId = randomUUID();
   const rows: Row[] = [];
-  const codeFiles = ["scripts/c1-context-check.ts", "src/support-controller.ts", "src/support-context.ts", "src/support-context-action.ts", "src/knowledge-service.ts", "src/evidence-support.ts", "src/evidence-acceptance.ts", "src/retrieval-ranking.ts", "src/bailian.ts"];
+  const codeFiles = ["scripts/c1-context-check.ts", "src/support-controller.ts", "src/support-context.ts", "src/support-context-action.ts", "src/knowledge-service.ts", "src/knowledge-applicability.ts", "data/knowledge-applicability.json", "src/support-parameters.ts", "src/evidence-support.ts", "src/evidence-acceptance.ts", "src/retrieval-ranking.ts", "src/bailian.ts"];
   const codeHashes = async () => Object.fromEntries(await Promise.all(codeFiles.map(async file => [file, hash(await readFile(new URL(file, root)))])));
   const codeBefore = await codeHashes();
   for (const test of data.dataset.cases) {
@@ -231,7 +233,7 @@ export async function runC1ContextCheck(live = false, split: C1Split = "original
       rows.push(row);
       const input = variant.input, sourceKey = merchantSourceKey(input.identity, input.groupOpenid);
       const rawService = createKnowledgeService({ readKnowledgeDocuments: async () => structuredClone(data.corpora[test.corpus]) },
-        { mode: "m4-support", supportProfile: knowledgeSupport, supportModel: knowledgeSupportModel, threshold, timeoutMs: live ? 60_000 : 1000, clients });
+        { mode: "m4-support", applicability: knowledgeApplicability, supportProfile: knowledgeSupport, supportModel: knowledgeSupportModel, threshold, timeoutMs: live ? 60_000 : 1000, clients });
       const knowledge: KnowledgeService = { search: async request => { const result = await rawService.search(request); row.traces.push(result.trace); return result; } };
       const store = {
         getOrder: async (identity: QQIdentity, id: string) => {
@@ -330,6 +332,10 @@ export async function runC1ContextCheck(live = false, split: C1Split = "original
           assert.equal(result.outcome, "clarification"); assert.equal(result.evidence.knowledge.length, 0); row.referenceProbe.passed = true;
         }
         if (row.traces.some(trace => trace.status === "unavailable")) throw new Error("Knowledge service unavailable; see sanitized traces");
+        if (row.traces.some(trace => trace.applicability?.mode !== knowledgeApplicability
+          || knowledgeApplicability === "declared" && trace.applicability?.gate?.integrity !== true)) {
+          throw new Error("Knowledge applicability audit incomplete; retained accepted evidence is not a complete judgment");
+        }
         if (variant.expected.resolution === "clarify" || supplied.contract === "unsupported_refund_limit") {
           assert.equal(row.observedResolution, "clarify"); assert.equal(row.controller?.evidence.knowledge.length ?? 0, 0);
         } else {
@@ -413,7 +419,7 @@ export async function runC1ContextCheck(live = false, split: C1Split = "original
     limits: { acceptedRecallAt5Minimum: .8, falseRejectRateMaximum: .1, falseAcceptsMaximum: 0, scopeViolationsMaximum: 0, incompleteMaximum: 0, clarificationBoundaryRequired: "all", coreTrustedReferenceContractsRequired: split === "validation-v3" ? "all (policy recall scored separately)" : "not separately declared in earlier datasets" },
     allKnownContextContractsPassed: Object.values(metrics.knownPassedByFamily).every(Boolean),
     note: "Passing retrieval metrics alone does not prove every contextual capability or final answer quality; inspect known contracts and all failures." } : null;
-  const artifact = { version: 2, codeStable, configuration: { threshold, knowledgeSupport, knowledgeSupportModel, observedSupportSettings: [...new Map(traces.flatMap(trace => trace.settings?.support ? [[JSON.stringify(trace.settings.support), trace.settings.support] as const] : [])).values()], supportPrompt: knowledgeSupport === "typed" ? evidenceSupportTypedPromptVersion : evidenceSupportPromptVersion, observedSupportPrompts: [...new Set(traces.flatMap(trace => trace.settings?.support ? [trace.settings.support.promptVersion] : []))], timeoutMs: live ? 60_000 : 1000, retries: 0 }, runnerVersion: "c1-context-runner-v3.2-adapter", scoringVersion: "c1-supplied-action-scoring-v2", split, runId, executedAt: new Date().toISOString(), mode: live ? "live-supplied-action-development" : "offline-adapter-engineering",
+  const artifact = { version: 3, codeStable, configuration: { threshold, knowledgeSupport, knowledgeSupportModel, knowledgeApplicability, observedSupportSettings: [...new Map(traces.flatMap(trace => trace.settings?.support ? [[JSON.stringify(trace.settings.support), trace.settings.support] as const] : [])).values()], supportPrompt: knowledgeSupport === "typed" ? evidenceSupportTypedPromptVersion : evidenceSupportPromptVersion, observedSupportPrompts: [...new Set(traces.flatMap(trace => trace.settings?.support ? [trace.settings.support.promptVersion] : []))], timeoutMs: live ? 60_000 : 1000, retries: 0 }, runnerVersion: "c1-context-runner-v3.3-adapter", scoringVersion: "c1-supplied-action-scoring-v3-applicability", split, runId, executedAt: new Date().toISOString(), mode: live ? "live-supplied-action-development" : "offline-adapter-engineering",
     scope: "v2.2 Controller host-contract development with frozen supplied actions and controlled order snapshots; no natural-language action selection, MySQL or QQ.",
     validationPolicy: "exposed-development-adapter-not-new-validation", originalValidationPolicy: data.dataset.validationPolicy, source: data.manifest, actionAdapter: adapter.manifest, semanticScored: live,
     fixtureActionsAreOracle: true, naturalLanguageUnderstandingEvaluated: false, originalAdmissionNotApplicable: "v2.2 supplied actions and paid-amount zero-knowledge contract differ from original runs; frozen data/gold/report retained",
@@ -443,7 +449,7 @@ export async function runC1ContextCheck(live = false, split: C1Split = "original
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  assert.ok(process.argv.slice(2).every(arg => arg === "--live" || arg === "--schema-only" || /^--split=(original|development|validation-v2|validation-v3)$/.test(arg) || /^--knowledge-support=(binary|typed)$/.test(arg) || /^--knowledge-support-model=(configured|deepseek-v4-pro)$/.test(arg) || /^--threshold=(?:0(?:\.\d+)?|1(?:\.0+)?)$/.test(arg)), "Use --live, --schema-only, --split=original|development|validation-v2|validation-v3, --threshold=0..1, --knowledge-support=binary|typed, --knowledge-support-model=configured|deepseek-v4-pro only");
+  assert.ok(process.argv.slice(2).every(arg => arg === "--live" || arg === "--schema-only" || /^--split=(original|development|validation-v2|validation-v3)$/.test(arg) || /^--applicability=(model_only|declared)$/.test(arg) || /^--knowledge-support=(binary|typed)$/.test(arg) || /^--knowledge-support-model=(configured|deepseek-v4-pro)$/.test(arg) || /^--threshold=(?:0(?:\.\d+)?|1(?:\.0+)?)$/.test(arg)), "Use --live, --schema-only, --split=original|development|validation-v2|validation-v3, --threshold=0..1, --knowledge-support=binary|typed, --knowledge-support-model=configured|deepseek-v4-pro, --applicability=model_only|declared only");
   const split = (process.argv.find(arg => arg.startsWith("--split="))?.slice(8) ?? "original") as C1Split;
   const threshold = Number(process.argv.find(arg => arg.startsWith("--threshold="))?.slice(12) ?? ".71");
   assert.ok(process.argv.filter(arg => arg.startsWith("--threshold=")).length <= 1, "Only one threshold is allowed");
@@ -451,7 +457,10 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   assert.ok(process.argv.filter(arg => arg.startsWith("--knowledge-support=")).length <= 1, "Only one knowledge support profile is allowed");
   const knowledgeSupportModel = (process.argv.find(arg => arg.startsWith("--knowledge-support-model="))?.slice(26) ?? "configured") as EvidenceSupportModel;
   assert.ok(process.argv.filter(arg => arg.startsWith("--knowledge-support-model=")).length <= 1, "Only one knowledge support model is allowed");
+  const knowledgeApplicability = (process.argv.find(arg => arg.startsWith("--applicability="))?.slice(16) ?? "model_only") as SupportExperimentParameters["knowledgeApplicability"];
+  assert.ok(process.argv.filter(arg => arg.startsWith("--applicability=")).length <= 1, "Only one applicability mode is allowed");
+  resolveSupportRunParameters("controller", { knowledgeMode: "m4-support", knowledgeApplicability });
   resolveEvidenceSupportModel(knowledgeSupportModel);
   if (process.argv.includes("--schema-only")) { const data = await loadC1ContextDataset(split), adapter = await loadActionAdapter(); console.log(JSON.stringify({ split, sha256: data.manifest.dataset.sha256, counts: data.manifest.counts, adapterSha256: adapter.manifest.dataset.sha256 })); }
-  else { const result = await runC1ContextCheck(process.argv.includes("--live"), split, threshold, knowledgeSupport, knowledgeSupportModel); if (!result.codeStable || result.summary.queryOnly.errors || result.summary.contextual.errors || result.summary.queryOnly.failed || result.summary.contextual.failed) process.exitCode = 1; }
+  else { const result = await runC1ContextCheck(process.argv.includes("--live"), split, threshold, knowledgeSupport, knowledgeSupportModel, knowledgeApplicability); if (!result.codeStable || result.summary.queryOnly.errors || result.summary.contextual.errors || result.summary.queryOnly.failed || result.summary.contextual.failed) process.exitCode = 1; }
 }

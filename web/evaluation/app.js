@@ -518,6 +518,9 @@ const knowledgeRejectReasons = {
   invalid_support_decision: "支持判别无效",
 };
 const knowledgeInvalidReasons = { invalid_quote: "引用无效", invalid_reason: "理由无效", invalid_category: "类别无效" };
+const knowledgeApplicabilityStatus = { matched: "前提满足", mismatched: "前提不符已排除", unknown: "事实不足已暂缓", not_checked: "未执行实例校验", none_declared: "未声明前提" };
+const knowledgeApplicabilitySummary = { matched: "满足", mismatched: "不符", unknown: "暂缓", not_checked: "未校验", none_declared: "未声明" };
+const knowledgeApplicabilityReasons = { metadata_binding_invalid: "元数据绑定无效", facts_unknown: "事实不足" };
 const knowledgeStageNames = { read: "读取", rerank: "重排", support: "支持判别", recheck: "复检" };
 const knowledgeVerdictCategories = { direct_fact: "事实或规则", boundary_answer: "明确安全边界问题的回答", limitation_only: "仅说明缺失或需核实", unrelated: "无关" };
 const knowledgeMs = value => value === null || value === undefined || !Number.isFinite(value) ? "未知" : `${Math.round(value)} ms`;
@@ -573,6 +576,17 @@ function knowledgeNode(span) {
     || (validation.status === "unavailable" && (verdicts.length > 0 || !invalidDecisions.length)));
   const validationUsable = validationShapeOk && !validationMalformed;
   const supportFailure = trace.supportFailure && typeof trace.supportFailure === "object" ? trace.supportFailure : null;
+  // 规则适用条件（declared 门控）：只声明必要前提，不是完整规则适用性证明；
+  // 未执行/未声明不显示通过，暂缓/元数据失效不显示正确拒答，不混入模型 unsupported 或 parser invalid。
+  const applicability = trace.applicability && typeof trace.applicability === "object" ? trace.applicability : null;
+  const gate = applicability?.gate && typeof applicability.gate === "object" ? applicability.gate : null;
+  const gateStatuses = new Set(["matched", "mismatched", "unknown", "not_checked", "none_declared"]);
+  const gateMalformed = gate !== null && (!["ready", "unavailable"].includes(gate.status)
+    || typeof gate.integrity !== "boolean"
+    || (gate.reason !== null && gate.reason !== undefined && !["metadata_binding_invalid", "facts_unknown"].includes(gate.reason))
+    || !Array.isArray(gate.decisions)
+    || gate.decisions.some(item => !item || typeof item !== "object" || typeof item.id !== "string" || !item.id
+      || !gateStatuses.has(item.status) || typeof item.reason !== "string"));
   const dropped = rawAccepted.length - accepted.length + (rawRejected.length - rejected.length) + (rawVerdicts.length - verdicts.length);
   const rawProfile = trace.supportProfile ?? trace.settings?.support?.profile;
   const promptVersion = trace.settings?.support?.promptVersion;
@@ -622,6 +636,27 @@ function knowledgeNode(span) {
         ? node("ul", { class: "check-list" }, ...invalidDecisions.map(item => node("li", {},
           text("span", `${item.id ?? "—"} · ${knowledgeInvalidReasons[item.code] || item.code || "未知"}`))))
         : null,
+      applicability?.mode === "model_only" ? text("p", "规则适用条件：model_only（未启用声明门控）。", "knowledge-line") : null,
+      applicability?.mode === "declared" && !gate ? text("p", "规则适用条件：declared · 校验未记录。", "knowledge-line") : null,
+      gateMalformed ? text("p", "适用条件记录异常，无法解析。", "knowledge-line") : null,
+      gate && !gateMalformed && gate.status === "unavailable"
+        ? text("p", `适用条件校验不可用：${knowledgeApplicabilityReasons[gate.reason] || gate.reason || "未记录"}${gate.integrity === false ? " · 完整性异常" : ""}`, "knowledge-line")
+        : null,
+      gate && !gateMalformed && gate.status === "ready" ? (() => {
+        const tally = {};
+        for (const decision of gate.decisions) tally[decision.status] = (tally[decision.status] || 0) + 1;
+        const summary = ["matched", "mismatched", "unknown", "not_checked", "none_declared"]
+          .filter(status => tally[status]).map(status => `${knowledgeApplicabilitySummary[status]} ${tally[status]}`).join(" · ");
+        return [
+          text("p", `已声明必要前提${summary ? ` · ${summary}` : "：无决策记录"}${gate.integrity === false ? " · 完整性异常" : ""}`, "knowledge-line"),
+          gate.decisions.length ? node("details", { class: "trace" },
+            node("summary", {}, `适用条件明细 · ${gate.decisions.length} 条`),
+            node("ul", { class: "check-list" }, ...gate.decisions.map(item => node("li", {},
+              text("span", `rank ${item.rank} · ${item.id} · ${knowledgeApplicabilityStatus[item.status]} · ${item.reason}`)))),
+            text("p", `版本 ${gate.version ?? trace.settings?.applicability?.version ?? "未记录"} · 快照 ${gate.snapshotHash ? short(gate.snapshotHash) : "未记录"} · 上下文哈希 ${gate.contextHash ? short(gate.contextHash) : "无"}`, "knowledge-line"),
+            text("p", "仅声明必要前提，不是完整规则适用性证明；未执行或未声明不表示通过，暂缓不表示拒答。", "knowledge-line")) : null,
+        ];
+      })() : null,
       verdicts.length
         ? node("details", { class: "trace" },
           node("summary", {}, `判别明细 · ${verdicts.length} 条`),

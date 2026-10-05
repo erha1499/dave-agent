@@ -1,6 +1,6 @@
 # C1 真实模型业务回归结果
 
-2026-10-06（北京时间）。最新 **v2.2 + M4-support / typed v4 + Pro / 0.5 / fresh 券计数 / 逐候选隔离** 单次回归通过 **14/14 案例、24/24 轮、172/172 断言**，安全断言 **64/64**。历史 typed v2、typed v3 各自的 14/14 成绩保留，不同版本不合并为重复实验。当前 C1 Session 仍为 **8/10 对话**，而本套业务报告也保留单券问题额外接收多券证据的风险，**本套业务通过不代表 C1 准入**。
+2026-10-06（北京时间）。最新 **v2.2 + M4-support / typed v5 + Pro / 0.5 / declared** 单次回归通过 **14/14 案例、24/24 轮、172/172 断言**；重复 prepare 流程已实际执行。历史版本及本轮 v4 13/14 的失败单独保留。额外业务证据审计 v2 为 8/8、40/40；v1 因限定单一等价动作路径所得 7/8、37/40 原样保留。当前 Session 开发 10/10，语言诊断 7/8，**完整 C1 新验证尚未执行**。
 
 此前两轮使用 binary v1 / 0.71，与 lexical 做同版本配对。第二轮 lexical 保留“未知手续费”证据误接收失败，结果为 13/14 案例、23/24 轮。最终候选没有再跑 lexical；它与历史 lexical 的源码和参数不同，**只能作历史开发参照，不能称同轮严格 A/B**。所有方案每轮仅执行一次，不能据此推断生产效果或统计显著性；QQ 默认及 A1 binary / 0.71 固定基线未切换。
 
@@ -167,3 +167,29 @@ node --env-file-if-exists=.env scripts/support-v2-live.ts --live --architecture 
 确定性入口 `node scripts/support-v2-check.ts` 同时核对原 12 个 mock 案例、历史 3/8 和本次 14/24 数据；`node scripts/knowledge-service-check.ts` 验证范围复读、超时/取消、原文版本、支持判别审计与费用分母。它们分别接入现有 `scripts/check.ts`、`scripts/eval-check.ts`。
 
 本轮验证了同一 Controller 上切换知识策略的完整业务路径，并修复两个有 trace 依据的动作边界；没有证明手机/公网 QQ 验收、真实商业退款、持久会话焦点、生产效果或多次独立稳定性。支持性模型在不同阈值和陌生问法上的错误仍以各自固定题集结果为准。
+
+## declared 前提 + 原生动作约束首批（2026-10-06，typed v4）
+
+run `d2f23c5b-48ff-43b3-8241-c8bfe029cebb` 为 **13/14 案例**，24 轮中 19 通过、1 失败、4 因前序失败跳过；原 172 项为 151 通过、4 失败、17 跳过。失败发生在 approved-prepare-repeat/3：用户明确要求再查并生成方案，模型选成 refund_status，只查询已有方案，未执行要求的重新取证 / prepare 链。已有方案未发生资金操作，但没有满足预先固定的办理合同；不以返回同一张卡为由追改成通过。
+
+新增 [`c1-business-evidence-check.ts`](../scripts/c1-business-evidence-check.ts) 独立检查 8 个计划知识轮、40 项：本批 **7/8、35/40**，实际出现的 7 次查询全部满足各自合同，缺失的正是上述 prepare 轮。单券咨询只接收 UNUSED，原 Top5 中 PARTIAL 因券数不符、REDEEMED 因不存在已核销券被宿主排除。原始排名保留，未补位。一般咨询、空库和受控 DB 故障分别评分；故障轮前提未执行，不能虚构 gate 完整性。旧 v4 run `0227…` 的附加审计为 7/8、39/40，唯一语义失败是多收 PARTIAL；其原 172/172 历史成绩不改。
+
+本批总 HTTP **49** = 39 Agent + 5 rerank + 5 support；Agent wire 中 20 次指定 support_action、19 次 auto，全部 HTTP 200 且 thinking disabled。原生参数已在真实服务生效，但不保证动作类别选对。全部请求用量可核对，估算 USD 0.018271492（Agent 0.011885244 + support 0.006386248）+ CNY 0.003157，P50/P95 1895/5751 ms。缺失了一个计划知识轮，不能把比历史更低的总费用解释成优化收益。源码稳定，16 个唯一 fixture 订单清理后独立 SELECT 剩余 0。
+
+产物 SHA-256：run `f2c47356fe45f498635e14cd94eea3c02e01ea59af214d304440b30c2aeff8be`；HTTP 审计 `52faf4b9c816a9a7603de8835c3b2623051ce09e61d004044af5edcff436fb1d`；清理 `fd8e493b2000d981b09e0773b15ae8e4f8ac14a59b85a1f2b889954e33dd2413`。这些都是合成业务、真实 MySQL / 模型与本地 QQ handler 的证据，没有向 QQ 发送消息或接真实资金。下一候选明确当前准备意图优先于历史待确认状态，幂等复用仍由宿主决定。
+
+## typed v5 + 当前办理优先：单次 MySQL 复验（2026-10-06）
+
+run `0dba8b92-2cc0-4c22-b667-b757684822c3` 保持原固定 14 案例 / 24 轮合同，**14/14、24/24、172/172**。重复生成方案执行了 prepare 链并复用有效方案，后续原本因依赖失败而跳过的 4 轮本次均执行。P50 / P95 为 1,573 / 4,768 ms；原报告工具错误为 3，需结合预期拒绝与故障用例解释，不把这一数字改写为零故障。
+
+实际 56 次 HTTP = Agent 44 + rerank 6 + support 6，计量完整、codeStable=true。Agent 253,651 tokens / USD 0.0142533，support 11,636 tokens / USD 0.007787472，rerank 7,889 tokens / CNY 0.0039445；合计估算 **USD 0.022040772 + CNY 0.0039445**。业务 artifact SHA-256 `82dac2efdccae044a59c204ee87ea5cfd6ee23c8197efad2a459aa61888157bf`；独立网络计量 artifact `business-audit-5d26aaa0-b7bb-4ce9-8090-ad8265acc74c.json` SHA-256 `10f7ab70ef77c42bbcd5df6a6a51a718e886ce8c712ea0a1fe0888eeb86f2ce9`。
+
+新业务证据审计 v1 的首次结果为 **7/8、37/40**：5 个要求 UNUSED 的知识轮均无多余 PARTIAL / REDEEMED 接收；unknown-policy-fact 未接收任何证据，但实际 purpose 为 refund_eligibility，审计写死了 user_policy，导致 3 项关联检查失败。此处先保留原判分并独立审核业务语义，不以原 172 项通过抵销新的审计差异，也不按实际返回反推 gold。审计修订如确有依据，需版本化并同时保留首次结果。
+
+本批 Agent 请求中实际观察到 23 次指定 support_action、21 次 auto，44 次 thinking=disabled；全部 56 HTTP 为 200，support invalid/partial 为 0。工具选择约束只保证要求调用指定工具，动作种类和业务依据仍须单独验证。独立数据库 SELECT 确认本批 16 个合成 fixture 订单剩余 0，清理日志只在本地保存。
+
+### 等价只读动作的审计修正
+
+独立核对原固定业务合同发现，unknown-policy-fact 要求原问取证、missing_rules、无写入，并未限定只能选择 policy。本次 refund_eligibility 仍完整保留隐藏手续费原问，只追加 fresh 事实；两篇候选均不支持具体手续费，接受集合为空。故审计升级为 `c1-business-evidence-v2`：仅该合同容许 policy / refund_eligibility 两种只读动作，从实际动作核对 purpose、重新构造原问、fresh 事实及门控，再校验完整判别证明。新增负例把原问偷换成一般退款条件，即使同步重建请求 / gate / support 全部哈希仍判失败；purpose 不匹配、额外写入也失败。
+
+同一已保存 artifact 的零 API 复评分为 **8/8、40/40**，知识完整性 7/7，受控 DB 故障合同 1/1。原 v1 7/8、37/40 文件不变；旧 `0227…` 在 v2 下仍因多接收 PARTIAL 失败（7/8、39/40）。新代码 SHA-256 `a030a9519751e4a298188a5d1e22b466ef1082a62bd72f0b6c11c4ac243f8b0a`，v2 审计报告 SHA-256 `accb760710f23bf31878fd9bb83e814c94d677faeffc4156cd7c0a8ac3e820ea`。这是明确合同下的评分缺陷修正，没有改模型输出、原数据或业务边界，也没有新增远程请求。

@@ -69,9 +69,11 @@ export const experimentFields: Record<"support" | "retrieval", Field[]> = {
     { key: "knowledgeMode", label: "知识检索", type: "select", options: [
       { value: "lexical", label: "本地词项" }, { value: "m4-support", label: "全候选重排 + 事实支持" }], note: "m4-support 仅 Controller；额外调用百炼和支持性模型" },
     { key: "knowledgeSupport", label: "事实支持判别", type: "select", options: [
-      { value: "binary", label: "二元基线 v1" }, { value: "typed", label: "分类候选 v3" }], note: "typed 仅用于 m4-support；区分直接事实、可答边界、仅有缺失说明和无关证据" },
+      { value: "binary", label: "二元基线 v1" }, { value: "typed", label: "分类候选（当前版本见运行快照）" }], note: "typed 仅用于 m4-support；区分直接事实、可答边界、仅有缺失说明和无关证据" },
     { key: "knowledgeSupportModel", label: "支持判别模型", type: "select", options: [
       { value: "configured", label: "跟随已配置模型" }, { value: "deepseek-v4-pro", label: "DeepSeek V4 Pro" }], note: "仅 Controller + m4-support；Pro 只切换支持判别，业务 Agent 不变；要求当前 provider 为 DeepSeek" },
+    { key: "knowledgeApplicability", label: "已声明必要前提", type: "select", options: [
+      { value: "model_only", label: "模型判断" }, { value: "declared", label: "声明前提 + 模型判断" }], note: "declared 仅 Controller + m4-support；按版本化声明和本轮可信事实检查必要前提；通过不证明全部规则适用或获批，不新增模型调用；身份、范围与确认校验始终保留" },
     { key: "knowledgeThreshold", label: "知识接收阈值", type: "number", min: 0, max: 1, step: .01, note: "仅 m4-support；默认冻结值 0.71，分数不是概率" },
     { key: "knowledgeTimeoutMs", label: "单次知识查询超时（ms）", type: "number", min: 1000, max: 60000, step: 1000, note: "包含读取、重排、支持判别和来源复检；无自动重试" },
   ],
@@ -106,6 +108,10 @@ export function experimentCatalog() {
       preset("support-knowledge-model-ab", "事实支持模型 A/B", "support", [
         { id: "A", architecture: "controller", parameters: { knowledgeMode: "m4-support", knowledgeSupport: "typed", knowledgeSupportModel: "configured", knowledgeThreshold: .5 } },
         { id: "B", architecture: "controller", parameters: { knowledgeMode: "m4-support", knowledgeSupport: "typed", knowledgeSupportModel: "deepseek-v4-pro", knowledgeThreshold: .5 } },
+      ]),
+      preset("support-knowledge-applicability-ab", "已声明必要前提 A/B", "support", [
+        { id: "A", architecture: "controller", parameters: { knowledgeMode: "m4-support", knowledgeSupport: "typed", knowledgeSupportModel: "deepseek-v4-pro", knowledgeThreshold: .5, knowledgeApplicability: "model_only" } },
+        { id: "B", architecture: "controller", parameters: { knowledgeMode: "m4-support", knowledgeSupport: "typed", knowledgeSupportModel: "deepseek-v4-pro", knowledgeThreshold: .5, knowledgeApplicability: "declared" } },
       ]),
       preset("retrieval-local", "本地检索 M0 / M1", "retrieval", [{ id: "A", modes: ["M0", "M1"] }]),
       preset("retrieval-rerank", "词项 / 全候选重排", "retrieval", [{ id: "A", modes: ["M0", "M4"] }]),

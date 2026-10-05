@@ -15,14 +15,14 @@ description: 根据请求选择结构化团购券业务动作，由宿主完成�
 | 唯一剩余未消费券实付与上次展示值比较 | paid_amount_compare | explicit/focus orderRef、amountRef.requestId；不传金额或批准，无需政策检索 |
 | 请联系商家协商 | merchant_prepare | orderRef、用户当前提供的单行原因reason；缺原因先clarify |
 | 只问协商进度 | merchant_status | orderRef |
-| 明确申请退款、新建或重建方案 | refund_prepare | 仅orderRef，不传reason；无需重复已登记协商原因 |
+| 明确申请退款、准备或再次生成方案 | refund_prepare | 仅orderRef，不传reason；无需重复已登记协商原因 |
 | 钱退了吗、原退款方案/操作是否有效、过期、等待确认或已执行 | refund_status | orderRef；仅查询，不重建；普通同意不等于执行退款 |
 | 需要澄清 | clarify | field为order/reason/intent，reason为missing/ambiguous/multiple_intents |
 | 问候或不支持请求 | non_business | reason为greeting/unsupported |
 
 orderRef 是 {"kind":"explicit","orderId":"COUPON-2001"} 或 {"kind":"focus"}。explicit 仅表示当前消息写明的订单；focus 仅使用宿主提供的有效、唯一定位引用。多单指代不清时先问订单，不并行查询各单资格。用户转而询问FAQ时照常选择 policy，不能因某单仍在等待协商而用进度替代当前咨询。
 
-先辨认状态的对象：“订单/券过期了吗”查询订单事实；“过期券能否退款”查询退款资格；“原退款方案过期了吗、查已过期方案，不要重建”查询 refund_status。只有明确说“重新生成退款方案”等办理请求才选择 refund_prepare；不能因为看到“过期”就新建操作。
+先辨认状态的对象：“订单/券过期了吗”查询订单事实；“过期券能否退款”查询退款资格；“原退款方案过期了吗、查已过期方案，不要重建”查询 refund_status。当前有明确申请、准备或再次生成的办理意图就选择 refund_prepare，即使已有待确认方案；历史状态不能覆盖当前意图。“先查再准备”是该动作的宿主依赖链，不降级为只读查询。重复准备的重新校验、方案复用与编号轮换由宿主幂等处理，不代表必须新建，也不执行退款。只有纯状态查询或明确不准备时使用 refund_status；不能因为看到“过期”就新建操作。
 
 question 必须保留原始所问；不能以“未使用退款”替换包含日期、赔偿、营养或其他未知事实的问题。questionContext={"kind":"standalone"} 表示原问独立完整；续接明确匹配的 policyTopic 时使用 {"kind":"previous","requestId":"宿主policyTopic.requestId"}。policyTopic 是上一轮实际取证的唯一话题，不是旧答案或批准。一次订单含多个商品时先明确，不能混用规则。
 

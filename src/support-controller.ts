@@ -3,6 +3,7 @@ import { isDeepStrictEqual } from "node:util";
 import { MerchantBusinessError, merchantReasonControls, merchantSourceKey, type AfterSalesStore, type MerchantTask } from "./after-sales.ts";
 import { OrderAccessError, type CouponStore, type QQIdentity } from "./coupon-store.ts";
 import type { KnowledgeService, KnowledgeTrace } from "./knowledge-service.ts";
+import { buildKnowledgeApplicabilityContext, type KnowledgeApplicabilityContext } from "./knowledge-applicability.ts";
 import { RefundBusinessError, type RefundStore } from "./refunds.ts";
 import { isRefundOperation, type Reply } from "./reply.ts";
 import { SupportProtocolError } from "./support-action.ts";
@@ -33,6 +34,8 @@ export type SupportKnowledgeContext = {
   policyTopic: TrustedPolicyTopic | null;
   objectReference: { kind: "remaining_amount" | "alternative_order"; sourceRequestIds: string[]; fromOrderId: string; toOrderId: string } | null;
   protocol?: "v2.2";
+  // Built from this turn's authorized order, never from user/model-supplied counts.
+  applicability?: KnowledgeApplicabilityContext;
 };
 export type TrustedPolicyTopic = {
   requestId: string; sourceKey: string; groupOpenid: string; originalQuery: string; orderId: string | null;
@@ -309,7 +312,8 @@ export class SupportController {
       const scope = { shopId: order?.shop.id ?? null, productId: order?.items[0]?.productId ?? null };
       const documents = await call("search_faq", { query, shopId: scope.shopId ?? undefined, productId: scope.productId ?? undefined }, async step => {
         const started = performance.now();
-        const response = this.services.knowledge ? await this.services.knowledge.search({ query, originalQuery: context.userText, scope, signal: context.signal }) : undefined;
+        const response = this.services.knowledge ? await this.services.knowledge.search({ query, originalQuery: context.userText, scope,
+          applicabilityContext: knowledgeContext.applicability ?? null, signal: context.signal }) : undefined;
         const docs = response?.documents ?? await this.services.store.searchKnowledge(query, scope.shopId ?? undefined, scope.productId ?? undefined);
         const trace: KnowledgeTrace = response?.trace ?? {
           mode: "lexical", threshold: null, query, originalQuery: context.userText, scope, status: docs.length ? "accepted" : "rejected", reason: null,
@@ -350,7 +354,9 @@ export class SupportController {
     if (order && readOnlyQuestion && mentions.some(modifier => modifier
       && !order.items.some(item => item.productName.normalize("NFKC").replace(/\s+/gu, "")
         .includes(semantic ? modifier.normalize("NFKC").replace(/\s+/gu, "") : modifier)))) {
-      return result(notice("当前已核验订单中的商品与您描述不一致，请提供对应订单号或明确商品；不能把旧订单的规则套到另一商品。"), "clarification");
+      const products = [...new Set(order.items.map(item => item.productName))].join("、");
+      return result(notice(`本轮查到订单 ${order.id} 的商品为「${products}」，尚无法与您描述的商品对应。`
+        + "如您咨询的是这份商品，请用此订单号、商品名和具体问题重新说明；如不是，请提供对应订单号。"), "clarification");
     }
     if (action.kind === "merchant_status") {
       if (!this.services.merchant) return result(notice("当前未启用模拟协商，只能咨询订单和规则。"), "blocked");
@@ -407,9 +413,10 @@ export class SupportController {
     // originalQuery/facts while normalizing only this known locator for retrieval.
     if (order) query = query.replaceAll(`订单 ${order.id}`, "该订单").replaceAll(`订单${order.id}`, "该订单").replaceAll(order.id, "该订单");
     if (query.length > 500) return result(notice("请缩短本次政策问题，保留要确认的具体条件与订单号。"), "clarification");
+    const purpose = prerequisite ? "business_prerequisite" : refundQuestion ? "refund_eligibility" : "user_policy";
     const knowledgeContext: SupportKnowledgeContext = { originalQuery: context.userText,
       modelQuestion: "question" in action ? action.question : null, effectiveQuery: query,
-      purpose: prerequisite ? "business_prerequisite" : refundQuestion ? "refund_eligibility" : "user_policy",
+      purpose,
       orderSource: alternativeOrderId ? "verified_alternative" : order ? action.orderRef?.kind === "explicit" ? "current_explicit" : "verified_focus" : "none",
       scopeSource: order ? "fresh_order" : "global",
       policyTopic: question.topic,
@@ -417,6 +424,8 @@ export class SupportController {
         sourceRequestIds: objectReference === "remaining_amount" ? [context.amountReference!.requestId]
           : [...(question.topic ? [question.topic.requestId] : []), ...context.orderChoices!.orders.map(row => row.requestId)] } : null,
       ...(semantic ? { protocol: "v2.2" as const } : {}),
+      ...(semantic && order && purpose !== "user_policy" ? { applicability: buildKnowledgeApplicabilityContext({ order,
+        requestId: context.requestId, purpose }) } : {}),
       facts: order ? { orderId: order.id, asOf: order.asOf, status: order.status,
         productId: order.items[0]!.productId, productName: order.items[0]!.productName, refundState: refundQuery(order),
         ...(couponCounts ? { couponCounts } : {}) } : null };

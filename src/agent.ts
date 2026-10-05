@@ -10,6 +10,9 @@ import {
   ModelRuntime,
   SessionManager,
   SettingsManager,
+  type BeforeProviderRequestEvent,
+  type Extension,
+  type ExtensionContext,
   type ResourceLoader,
   type ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
@@ -148,18 +151,21 @@ export async function createSession(
   modelRuntime: ModelRuntime, model: Model<Api>, systemPrompt: string,
   tools: ToolDefinition[], skills: ReturnType<ResourceLoader["getSkills"]>,
   beforeStart?: (prompt: string) => Promise<string | undefined>,
+  beforeProviderRequest?: (payload: unknown, api: Api | undefined) => unknown,
 ) {
-
+  const handlers: Extension["handlers"] = new Map([["before_agent_start", [async (event: unknown) => {
+    const context = await beforeStart?.((event as { prompt: string }).prompt);
+    return { systemPrompt, ...(context ? { message: { customType: "support-context", content: context, display: false } } : {}) };
+  }]]]);
+  if (beforeProviderRequest) handlers.set("before_provider_request", [async (event, ctx) =>
+    beforeProviderRequest((event as BeforeProviderRequestEvent).payload, (ctx as ExtensionContext).model?.api)]);
   const resourceLoader: ResourceLoader = {
     getExtensions: () => ({
       extensions: [{
         path: "<host-prompt>",
         resolvedPath: "<host-prompt>",
         sourceInfo: createSyntheticSourceInfo("<host-prompt>", { source: "sdk" }),
-        handlers: new Map([["before_agent_start", [async (event: unknown) => {
-          const context = await beforeStart?.((event as { prompt: string }).prompt);
-          return { systemPrompt, ...(context ? { message: { customType: "support-context", content: context, display: false } } : {}) };
-        }]]]),
+        handlers,
         tools: new Map(), commands: new Map(), flags: new Map(), shortcuts: new Map(), messageRenderers: new Map(),
       }],
       errors: [],

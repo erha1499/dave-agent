@@ -39,3 +39,5 @@ A1 增量已接入 version 2 数据集/接收策略/阈值，保持 version 1 �
 16 组评测 UI 检查、14 组实验 UI 检查与 typecheck 通过；完整 `npm run validate` 通过后，这次仅 UI 合同修复又重验上述三项。Codex 用真实候选 run `990dac49-10c3-46ab-a6dd-fdcb6e0c8f69` 验证 1440px / 390px 展开与判别内容、配置下载、非法组合修复及历史比较展示，页面错误与横向溢出均为 0。浏览器检查没有启动付费实验；历史参照不是同代码配对，页面可比较不等于模型效果有显著提升。本地证据 `.runtime/c1-browser-results.json` 和截图不提交。
 
 后续 Kimi K3 Max 增量显示 `supportVerification.validation` 的 partial / 全项 invalid、失败 code/hash、实际 parser 版本和逐项无效原因。无效项不显示为 supported=false 或正确拒收；status/ID/code/有效无效重叠异常时显示数据异常并保留原始 trace。16 组评测 UI、15 组实验 UI 和完整 validate 通过。Codex 使用真实 MySQL run `0082f06e-60d5-43c1-a797-488e84b461d4` 验证 1440px / 390px 取证明细及调参下载，页面错误和横向溢出为 0；该实际 DB run 没有 partial，partial/全项无效与坏记录由合成前端检查覆盖，不能混称真实服务故障验收。
+
+2026-10-06：同一 Kimi K3 / Max 会话接入 `knowledgeApplicability` 参数及 A/B 预设，保留非法组合以便修复，不暗改配置；取证详情以简短汇总和折叠表展示“已声明必要前提”、原 rank、五类状态及版本哈希。未检查 / 未声明不显示通过，未知与模型 unsupported / parser invalid 分开。16 组实验 UI、16 组评测 UI 工程检查通过；Codex 在 1440px / 390px 检查下载配置、组合修复和实际 run `d2f23c5b-48ff-43b3-8241-c8bfe029cebb` 的门控明细，页面错误及横向溢出为 0。浏览器没有提交付费实验；真实运行整体仍有业务动作失败，界面展示成功不能替代业务准入。

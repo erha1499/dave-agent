@@ -7,6 +7,7 @@ import { executeExperiment, ExperimentBusyError, ExperimentJobs, type Experiment
 
 import { experimentCatalog } from "../src/experiment-config.ts";
 import type { runRetrievalV2, V2Dataset } from "./retrieval-v2.ts";
+import type { runSupportV2Live } from "./support-v2-live.ts";
 
 const config = { version: 1, kind: "retrieval", label: "serial synthetic experiment", repeat: 2, allowRemote: false,
   variants: [{ id: "A", modes: ["M0"] }, { id: "B", modes: ["M1"] }] };
@@ -19,6 +20,18 @@ function service(name: string, execute?: ExperimentExecute) {
   const jobs = new ExperimentJobs({ directory: join(root, name), ...(execute ? { execute } : {}) }); services.push(jobs); return jobs;
 }
 try {
+  const applicabilityConfig = experimentCatalog().presets.find(p => p.id === "support-knowledge-applicability-ab")!.config;
+  if (applicabilityConfig.kind !== "support") throw new Error("support applicability preset expected");
+  for (const variant of applicabilityConfig.variants) {
+    let actual: Parameters<typeof runSupportV2Live>[0] | undefined;
+    const runId = randomUUID(), jobId = randomUUID();
+    await assert.rejects(executeExperiment({ config: { ...applicabilityConfig, allowRemote: true }, variant,
+      jobId, repetition: 1, batch: { id: jobId, repetition: 1, plannedRepetitions: 1 } }, {
+      runSupport: async options => { actual = structuredClone(options); return runId; },
+      readSupport: async id => { assert.equal(id, runId); return undefined; },
+    }), /没有可回读记录/);
+    assert.deepEqual(actual?.parameters, variant.parameters, "actual business runner receives the resolved applicability variant; no DB/API in this check");
+  }
   let unblock!: () => void;
   const blocked = new Promise<void>(resolve => { unblock = resolve; });
   const order: ExperimentExecution[] = []; let executing = 0, maxExecuting = 0;

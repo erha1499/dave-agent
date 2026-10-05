@@ -10,12 +10,14 @@ import type { CouponStore } from "../src/coupon-store.ts";
 import type { ContextSupportAction } from "../src/support-context-action.ts";
 import type { RemainingAmountComparison } from "../src/support-context.ts";
 import type { SupportCall, SupportKnowledgeContext, SupportResult } from "../src/support-controller.ts";
-import type { KnowledgeTrace } from "../src/knowledge-service.ts";
+import { applyKnowledgeApplicabilityGate, finishKnowledgeApplicabilityAcceptance, knowledgeApplicabilitySettings, type KnowledgeTrace } from "../src/knowledge-service.ts";
+import { buildKnowledgeApplicabilityContext, gateKnowledgeApplicability, knowledgeApplicabilitySourceHash, validateKnowledgeApplicabilitySnapshot,
+  type KnowledgeApplicabilityMode, type KnowledgeApplicabilitySnapshot } from "../src/knowledge-applicability.ts";
 import { rankLexical, scopeDocuments, type RetrievalDocument, type RetrievalScope } from "../src/retrieval-ranking.ts";
 import type { SessionTurnActual } from "./c1-session-live.ts";
 
 // Pure contracts/scoring only. No executor, generated validation questions, I/O or model judge.
-export const c1ValidationScoringVersion = "c1-session-validation-v2";
+export const c1ValidationScoringVersion = "c1-session-validation-v3";
 export const c1Families = ["order_state", "paid_amount", "alternative_order", "policy_followup", "refund_time", "appointment_actor"] as const;
 export const c1Strata = ["known", "missing", "competing", "direct_missing_fact", "boundary"] as const;
 type Family = typeof c1Families[number];
@@ -47,6 +49,8 @@ export type C1AnswerReview = { caseId: string; turn: number; reviewer: "codex"; 
   status: "passed" | "failed" | "unreviewed"; replyHash: string; criteriaHash: string;
   checks: Array<{ criterionId: string; passed: boolean; reasoning: string }> };
 type Corpora = Record<C1ValidationCase["corpus"], readonly RetrievalDocument[]>;
+// Supplied by the frozen run configuration, never inferred from the report being scored.
+export type C1ValidationKnowledgeConfiguration = { applicability?: KnowledgeApplicabilityMode; applicabilitySnapshot?: KnowledgeApplicabilitySnapshot };
 const nonempty = (value: unknown): value is string => typeof value === "string" && Boolean(value.trim());
 const digest = (value: unknown) => typeof value === "string" && /^[a-f0-9]{64}$/.test(value);
 const equal = isDeepStrictEqual;
@@ -123,8 +127,48 @@ function reviewPassed(turn: C1ValidationTurn, actual: C1ValidationActual | undef
     && turn.expected.answerCriteria.every(criterion => review.checks.some(row => row.criterionId === criterion.id && row.passed === true && nonempty(row.reasoning)));
 }
 
+function prepareKnowledgeEvidence(actual: C1ValidationActual, call: SupportCall, documents: readonly RetrievalDocument[], configuration: C1ValidationKnowledgeConfiguration) {
+  const { trace, context } = call.knowledge!;
+  let prepared = acceptEvidence({ query: trace.query, scope: trace.scope, documents, ranking: trace.rawRanking,
+    config: trace.mode === "lexical" ? { mode: "off" } : { mode: "support", threshold: trace.threshold! } });
+  const mode = configuration.applicability ?? "model_only";
+  assert.equal(trace.applicability?.mode ?? "model_only", mode);
+  if (mode === "model_only") {
+    assert.equal(trace.applicability?.gate, undefined); assert.equal(trace.settings?.applicability, undefined);
+    return { prepared, gate: undefined };
+  }
+  assert.equal(mode, "declared"); assert.equal(trace.mode, "m4-support");
+  const snapshot = configuration.applicabilitySnapshot;
+  assert.ok(snapshot, "Declared mode requires an externally frozen metadata snapshot");
+  const { sha256, ...manifest } = snapshot;
+  const frozen = validateKnowledgeApplicabilitySnapshot(manifest, sha256);
+  let trustedContext = null;
+  assert.equal(context.protocol, "v2.2", "Declared validation requires the frozen current host protocol");
+  if (context.protocol === "v2.2") {
+    const action = actual.result!.action;
+    assert.ok("protocol" in action && action.protocol === "v2.2");
+    const purpose = action.kind === "refund_eligibility" ? "refund_eligibility"
+      : action.kind === "merchant_prepare" || action.kind === "refund_prepare" ? "business_prerequisite" : "user_policy";
+    assert.equal(context.purpose, purpose, "Current-object classification cannot bypass declared applicability");
+    if (purpose !== "user_policy") {
+      const order = actual.result?.evidence.order;
+      assert.ok(order && actual.requestId);
+      assert.ok(actual.calls.slice(0, actual.calls.indexOf(call)).some(prior => prior.name === "get_order" && !prior.isError
+        && prior.parentSpanId === actual.requestId && prior.input.orderId === order.id && equal(prior.output, order)), "Fresh authorized facts must precede the knowledge call");
+      trustedContext = buildKnowledgeApplicabilityContext({ order, requestId: actual.requestId, purpose });
+    }
+  } else assert.ok(!actual.result || !("protocol" in actual.result.action), "Current protocol cannot omit its host context version");
+  assert.deepEqual(context.applicability ?? null, trustedContext);
+  const gate = gateKnowledgeApplicability({ snapshot: frozen, context: trustedContext, scope: trace.scope, candidates: prepared.pendingSupport ?? [] });
+  const { candidates: _candidates, ...audit } = gate;
+  assert.deepEqual(trace.applicability?.gate, audit);
+  assert.deepEqual(trace.settings?.applicability, knowledgeApplicabilitySettings(frozen));
+  prepared = applyKnowledgeApplicabilityGate(prepared, gate);
+  return { prepared, gate };
+}
+
 // Reuse the production acceptance/binding checks against the frozen corpus; IDs alone are not evidence.
-function knowledgeProofPassed(actual: C1ValidationActual | undefined, corpus: readonly RetrievalDocument[]) {
+function knowledgeProofPassed(actual: C1ValidationActual | undefined, corpus: readonly RetrievalDocument[], configuration: C1ValidationKnowledgeConfiguration = {}) {
   if (!actual) return false;
   try {
     const result = actual.result, calls = actual.calls, knowledgeCalls = calls.filter(call => call.knowledge);
@@ -145,8 +189,7 @@ function knowledgeProofPassed(actual: C1ValidationActual | undefined, corpus: re
       if (trace.mode === "m4-support" && (trace.rawRanking.length !== documents.length || new Set(trace.rawRanking.map(row => row.id)).size !== documents.length
         || trace.rawRanking.some((row, index) => !documents.some(doc => doc.id === row.id) || typeof row.score !== "number" || !Number.isFinite(row.score)
           || row.score < 0 || row.score > 1 || index > 0 && row.score > trace.rawRanking[index - 1]!.score!))) return false;
-      const prepared = acceptEvidence({ query: trace.query, scope: trace.scope, documents, ranking: trace.rawRanking,
-        config: trace.mode === "lexical" ? { mode: "off" } : { mode: "support", threshold: trace.threshold! } });
+      const { prepared, gate } = prepareKnowledgeEvidence(actual, call, documents, configuration);
       let acceptance = prepared;
       const supportCalls = trace.calls.filter(item => item.operation === "support");
       if (prepared.pendingSupport?.length) {
@@ -158,6 +201,7 @@ function knowledgeProofPassed(actual: C1ValidationActual | undefined, corpus: re
           || supportCalls[0]!.status !== (verification.validation?.status === "partial" ? "partial" : verification.validation?.status === "unavailable" ? "unavailable" : "ok")) return false;
         acceptance = applyEvidenceSupport({ prepared, verification, query: trace.query, scope: trace.scope, documents, settings });
       } else if (trace.supportVerification || supportCalls.length) return false;
+      acceptance = finishKnowledgeApplicabilityAcceptance(acceptance, gate);
       if (!equal(trace.acceptance, acceptance) || trace.status !== acceptance.status) return false;
       const output = acceptance.accepted.map(entry => {
         const doc = documents.find(item => item.id === entry.id)!;
@@ -171,7 +215,8 @@ function knowledgeProofPassed(actual: C1ValidationActual | undefined, corpus: re
   } catch { return false; }
 }
 
-export function scoreC1ValidationTurn(turn: C1ValidationTurn, actual: C1ValidationActual | undefined, corpus: readonly RetrievalDocument[], review?: C1AnswerReview) {
+export function scoreC1ValidationTurn(turn: C1ValidationTurn, actual: C1ValidationActual | undefined, corpus: readonly RetrievalDocument[], review?: C1AnswerReview,
+  configuration: C1ValidationKnowledgeConfiguration = {}) {
   const e = turn.expected, result = actual?.result, calls = actual?.calls ?? [], host = actual?.hostReference;
   const traces = calls.flatMap(call => call.knowledge ? [call.knowledge.trace] : []);
   const bound = Boolean(actual && nonempty(actual.requestId) && (!result || result.evidence.requestId === actual.requestId)
@@ -182,17 +227,28 @@ export function scoreC1ValidationTurn(turn: C1ValidationTurn, actual: C1Validati
   const gold = e.gold.map(row => row.sourceId), extra = accepted.filter(id => !gold.includes(id));
   const raw = traces.at(-1)?.rawRanking.slice(0, 5).map(row => row.id) ?? [];
   const invalid = traces.flatMap(trace => trace.supportVerification?.validation?.invalidDecisions.map(row => row.id) ?? []);
-  const validDecisions = traces.flatMap(trace => {
+  const validDecisions = calls.flatMap(call => {
+    if (!call.knowledge || !actual) return [];
+    const trace = call.knowledge.trace;
     try {
       const settings = trace.settings?.support, verification = trace.supportVerification;
-      const prepared = acceptEvidence({ query: trace.query, scope: trace.scope, documents: scopeDocuments(corpus, trace.scope), ranking: trace.rawRanking,
-        config: { mode: "support", threshold: trace.threshold! } });
+      const { prepared } = prepareKnowledgeEvidence(actual, call, scopeDocuments(corpus, trace.scope), configuration);
       return settings && verification && validateEvidenceSupportVerification(verification,
         { query: trace.query, scope: trace.scope, candidates: prepared.pendingSupport ?? [], settings }) ? verification.value : [];
     } catch { return []; }
   });
   const unavailable = !complete || traces.some(trace => trace.supportFailure || trace.status === "unavailable");
-  const evidenceProofPassed = knowledgeProofPassed(actual, corpus);
+  const evidenceProofPassed = knowledgeProofPassed(actual, corpus, configuration);
+  const applicabilityGates = calls.flatMap(call => {
+    if (!call.knowledge || !actual) return [];
+    try {
+      const { gate } = prepareKnowledgeEvidence(actual, call, scopeDocuments(corpus, call.knowledge.trace.scope), configuration);
+      return gate ? [gate] : [];
+    } catch { return []; }
+  });
+  const applicabilityDecisions = applicabilityGates.flatMap(gate => gate.decisions);
+  const applicabilityDeclared = (configuration.applicability ?? "model_only") === "declared";
+  const applicabilityIntegrityPassed = evidenceProofPassed && (!applicabilityDeclared || applicabilityGates.length === traces.length && applicabilityGates.every(gate => gate.integrity));
   const visible = new Set(scopeDocuments(corpus, e.scope).map(doc => doc.id));
   const scopeViolations = accepted.filter(id => !visible.has(id));
   const scoped = traces.every(trace => equal({ shopId: trace.scope.shopId ?? null, productId: trace.scope.productId ?? null },
@@ -228,11 +284,17 @@ export function scoreC1ValidationTurn(turn: C1ValidationTurn, actual: C1Validati
   const engineeringPassed = Boolean(complete && evidenceProofPassed && outcome && actionGate && fresh && noSideEffects && scoped && !scopeViolations.length && amount);
   const answerPassed = reviewPassed(turn, actual, review);
   const supportIntegrityPassed = !unavailable && evidenceProofPassed && invalid.length === 0;
-  return { engineeringPassed, knowledgePassed: knowledge, supportIntegrityPassed, semanticEvidenceCorrect: supportIntegrityPassed ? knowledge : null,
-    answerPassed, passed: engineeringPassed && knowledge && supportIntegrityPassed && answerPassed,
+  return { engineeringPassed, knowledgePassed: knowledge, supportIntegrityPassed, applicabilityIntegrityPassed,
+    semanticEvidenceCorrect: supportIntegrityPassed && applicabilityIntegrityPassed ? knowledge : null,
+    answerPassed, passed: engineeringPassed && knowledge && supportIntegrityPassed && applicabilityIntegrityPassed && answerPassed,
     actionCorrect, firstActionKindCorrect, safeStopped: engineeringPassed && e.outcome !== "ready" && knowledge,
     observedStop: result?.action.kind === "clarify" ? "model_clarify" : outcome && e.outcome !== "ready" ? "host_denial" : null,
     fresh, reference, amount, requestBound: bound, evidenceProofPassed, scopeMatched: scoped, extraAcceptedIds: extra, scopeViolationIds: scopeViolations, invalidDecisionIds: invalid,
+    applicabilityExcludedIds: applicabilityDecisions.filter(row => row.status === "mismatched").map(row => row.id),
+    applicabilityUnknownIds: applicabilityDecisions.filter(row => row.status === "unknown").map(row => row.id),
+    applicabilityUncheckedIds: applicabilityDecisions.filter(row => row.status === "not_checked").map(row => row.id),
+    applicabilityNoneDeclaredIds: applicabilityDecisions.filter(row => row.status === "none_declared").map(row => row.id),
+    applicabilityDeclared, applicabilityRecorded: traces.some(trace => trace.applicability?.mode === "declared"),
     validDecisionCount: validDecisions.length, validUnsupportedIds: validDecisions.filter(row => !row.supported).map(row => row.id),
     unavailable, correctlyRejected: e.knowledge === "rejected" && knowledge, rawHasGold: raw.some(id => gold.includes(id)),
     rawRecall: gold.length ? actual?.execution === "completed" ? gold.filter(id => raw.includes(id)).length / gold.length : 0 : null,
@@ -240,14 +302,15 @@ export function scoreC1ValidationTurn(turn: C1ValidationTurn, actual: C1Validati
     missingGold: gold.filter(id => !accepted.includes(id)), reviewStatus: review?.status ?? "unreviewed" };
 }
 
-export function summarizeC1Validation(plan: C1ValidationPlan, actuals: C1ValidationActual[], corpora: Corpora, reviews: C1AnswerReview[] = []) {
+export function summarizeC1Validation(plan: C1ValidationPlan, actuals: C1ValidationActual[], corpora: Corpora, reviews: C1AnswerReview[] = [],
+  configuration: C1ValidationKnowledgeConfiguration = {}) {
   checkC1ValidationPlan(plan, corpora);
   const key = (row: { caseId: string; turn: number }) => `${row.caseId}:${row.turn}`;
   const planned = new Set(plan.cases.flatMap(item => item.turns.map((_, index) => `${item.id}:${index + 1}`)));
   for (const records of [actuals, reviews]) { assert.equal(new Set(records.map(key)).size, records.length); assert.ok(records.every(row => planned.has(key(row)))); }
   const rows = plan.cases.flatMap(item => item.turns.map((turn, index) => {
     const actual = actuals.find(row => row.caseId === item.id && row.turn === index + 1);
-    const score = scoreC1ValidationTurn(turn, actual, corpora[item.corpus], reviews.find(row => row.caseId === item.id && row.turn === index + 1));
+    const score = scoreC1ValidationTurn(turn, actual, corpora[item.corpus], reviews.find(row => row.caseId === item.id && row.turn === index + 1), configuration);
     const prior = actuals.filter(row => row.caseId === item.id && row.turn < index + 1 && row.execution === "completed");
     let stateChangePassed = true;
     if (turn.stateChange) {
@@ -260,7 +323,7 @@ export function summarizeC1Validation(plan: C1ValidationPlan, actuals: C1Validat
     if (turn.expected.reference === "previous") referenceProvenancePassed = prior.some(row => {
       const topic = row.result?.verifiedPolicyTopic, current = actual?.result?.evidence.knowledge[0]?.context.policyTopic;
       return Boolean(topic && row.requestId === actual?.hostReference?.policyTopic?.requestId && topic.requestId === row.requestId
-        && row.result!.outcome === "ready" && row.result!.evidence.rules.length > 0 && knowledgeProofPassed(row, corpora[item.corpus])
+        && row.result!.outcome === "ready" && row.result!.evidence.rules.length > 0 && knowledgeProofPassed(row, corpora[item.corpus], configuration)
         && equal(topic.sources, row.result!.evidence.rules.map(rule => ({ sourceId: rule.sourceId, version: rule.version })))
         && topic.groupOpenid === row.result!.evidence.trustedRoute.groupOpenid && topic.groupOpenid === actual?.result?.evidence.trustedRoute.groupOpenid
         && equal(current, topic));
@@ -285,7 +348,7 @@ export function summarizeC1Validation(plan: C1ValidationPlan, actuals: C1Validat
       hostDenial: finals.filter(row => row.stratum === stratum && row.safeStopped && row.observedStop === "host_denial").length }])),
     coreEngineering: { planned: 6, passed: finals.filter(row => row.stratum === "known" && row.engineeringPassed && row.stateChangePassed && row.referenceProvenancePassed
       && rows.filter(prior => prior.caseId === row.caseId && !prior.final).every(prior => prior.engineeringPassed && prior.knowledgePassed
-        && prior.supportIntegrityPassed && prior.stateChangePassed && prior.referenceProvenancePassed)).length },
+        && prior.supportIntegrityPassed && prior.applicabilityIntegrityPassed && prior.stateChangePassed && prior.referenceProvenancePassed)).length },
     knowledgeTargets: { planned: answerable.length, withoutEvidence: answerable.filter(row => !row.acceptedRecall).length },
     rawRecall: answerable.reduce((sum, row) => sum + (row.rawRecall ?? 0), 0) / answerable.length,
     acceptedRecall: answerable.reduce((sum, row) => sum + (row.acceptedRecall ?? 0), 0) / answerable.length,
@@ -295,6 +358,10 @@ export function summarizeC1Validation(plan: C1ValidationPlan, actuals: C1Validat
     extraEvidenceTurns: rows.filter(row => row.extraAcceptedIds.length).length, invalidDecisionTurns: rows.filter(row => row.invalidDecisionIds.length).length,
     supportDecisions: { valid: rows.reduce((sum, row) => sum + row.validDecisionCount, 0),
       validUnsupported: rows.reduce((sum, row) => sum + row.validUnsupportedIds.length, 0), invalid: rows.reduce((sum, row) => sum + row.invalidDecisionIds.length, 0) },
+    applicability: { recordedTurns: rows.filter(row => row.applicabilityRecorded).length,
+      incompleteTurns: rows.filter(row => row.applicabilityRecorded && !row.applicabilityIntegrityPassed).length,
+      excluded: rows.reduce((sum, row) => sum + row.applicabilityExcludedIds.length, 0), unknown: rows.reduce((sum, row) => sum + row.applicabilityUnknownIds.length, 0),
+      notChecked: rows.reduce((sum, row) => sum + row.applicabilityUncheckedIds.length, 0), noneDeclared: rows.reduce((sum, row) => sum + row.applicabilityNoneDeclaredIds.length, 0) },
     scopeViolationTurns: rows.filter(row => row.scopeViolationIds.length || !row.scopeMatched).length, unavailableTurns: rows.filter(row => row.unavailable).length,
     evidenceProofFailedTurns: rows.filter(row => !row.evidenceProofPassed).length,
     unreviewedReplies: rows.filter(row => !row.answerPassed && row.reviewStatus === "unreviewed").length,
@@ -478,7 +545,87 @@ export function checkC1ValidationScoring() {
   }
   const noPrior = summarizeC1Validation(topicPlan, [topicActual], corpora, [reviewed(topicActual, topicCase.turns[1]!)]);
   assert.equal(noPrior.rows.find(row => row.caseId === topicCase.id && row.turn === 2)!.referenceProvenancePassed, false);
-  console.log("C1 pure scoring checks passed: schema/byte manifest, all planned denominators, fresh parent/output/state change, invalid/unavailable/extra evidence and review binding; no final dataset or API.");
+
+  // The scorer independently rebuilds declared candidates from real preceding get_order output.
+  const multiDoc = { ...doc, id: "unit-multi", body: "A rule with a declared multi-coupon prerequisite" };
+  const generalDoc = { ...doc, id: "unit-general", body: "A rule without a declared quantity or state prerequisite" };
+  const declaredSnapshot = validateKnowledgeApplicabilitySnapshot({ version: 1, serialization: "knowledge-document-v1", documents: [doc, multiDoc, generalDoc].map((entry, index) => ({
+    sourceId: entry.id, sourceHash: knowledgeApplicabilitySourceHash(entry), scope: { shopId: null, productId: null },
+    ...(index === 0 ? { atLeastOneCouponInStates: ["unused"] } : index === 1 ? { minimumCouponCount: 2 } : {}),
+    basis: index < 2 ? [{ field: index === 0 ? "atLeastOneCouponInStates" : "minimumCouponCount", quote: entry.body }] : [], reviewNote: "Synthetic prerequisite only" })) });
+  const declaredConfiguration: C1ValidationKnowledgeConfiguration = { applicability: "declared", applicabilitySnapshot: declaredSnapshot };
+  function declaredActual(freshOrder: Order, documents: RetrievalDocument[]): C1ValidationActual {
+    const value = structuredClone(actual), knowledgeCall = value.calls[0]!, t = knowledgeCall.knowledge!.trace, ctx = knowledgeCall.knowledge!.context;
+    const r = value.result!, currentScope = { shopId: freshOrder.shop.id, productId: freshOrder.items[0]!.productId };
+    r.action = { protocol: "v2.2", kind: "refund_eligibility", question: turn.question, questionContext: { kind: "standalone" }, orderRef: { kind: "explicit", orderId: freshOrder.id } };
+    r.evidence.action = r.action; r.evidence.order = freshOrder;
+    value.calls = [{ ...structuredClone(orderCall), output: freshOrder }, knowledgeCall]; r.evidence.actualCalls = value.calls;
+    Object.assign(ctx, { purpose: "refund_eligibility", orderSource: "current_explicit", scopeSource: "fresh_order", protocol: "v2.2",
+      applicability: buildKnowledgeApplicabilityContext({ order: freshOrder, requestId: value.requestId!, purpose: "refund_eligibility" }) });
+    knowledgeCall.input = { query: t.query, ...currentScope }; t.scope = currentScope;
+    const visibleDocs = scopeDocuments(documents, currentScope);
+    t.sourceHashes = { before: contentHash(visibleDocs), after: contentHash(visibleDocs) };
+    t.rawRanking = visibleDocs.map((entry, index) => ({ id: entry.id, score: .9 - index * .1 }));
+    const prepared = acceptEvidence({ query: t.query, scope: currentScope, documents: visibleDocs, ranking: t.rawRanking, config: { mode: "support", threshold: .5 } });
+    const gate = gateKnowledgeApplicability({ snapshot: declaredSnapshot, context: ctx.applicability!, scope: currentScope, candidates: prepared.pendingSupport! });
+    const filtered = applyKnowledgeApplicabilityGate(prepared, gate), { candidates: _candidates, ...audit } = gate;
+    t.applicability = { mode: "declared", gate: audit };
+    t.settings = { serialization: "json-title-tags-body-v1", support: settings, applicability: knowledgeApplicabilitySettings(declaredSnapshot) };
+    if (filtered.pendingSupport!.length) {
+      const supportInput = { query: t.query, scope: currentScope, candidates: filtered.pendingSupport!, settings };
+      const value = filtered.pendingSupport!.map(entry => ({ id: entry.id, supported: true, category: "direct_fact" as const, quote: entry.body, reason: "Synthetic supported fact" }));
+      const verification: EvidenceSupportVerification = { value, inputHash: evidenceSupportInputHash(supportInput), requestHash: evidenceSupportRequestHash(supportInput),
+        attempts: structuredClone(trace.supportVerification!.attempts), validation: { status: "complete", outputHash: contentHash(value), invalidDecisions: [] } };
+      t.supportVerification = verification; t.calls = [{ operation: "support", requestHash: verification.requestHash, attempts: verification.attempts, status: "ok" }];
+      t.acceptance = applyEvidenceSupport({ prepared: filtered, verification, query: t.query, scope: currentScope, documents: visibleDocs, settings });
+    } else { delete t.supportVerification; t.calls = []; t.acceptance = filtered; }
+    t.acceptance = finishKnowledgeApplicabilityAcceptance(t.acceptance, gate); t.status = t.acceptance.status;
+    t.reason = t.status === "unavailable" ? gate.reason === "facts_unknown" ? "applicability_facts_unknown" : "metadata_binding_invalid" : null;
+    const output = t.acceptance.accepted.map(entry => ({ source: "demo-knowledge" as const, sourceId: entry.id, title: entry.title, body: entry.body, scope: { shopId: null, productId: null } }));
+    knowledgeCall.output = output; t.sources = output.map(entry => ({ sourceId: entry.sourceId, version: contentHash(entry) }));
+    r.evidence.rules = output.map(entry => ({ ...entry, version: contentHash(entry) }));
+    r.evidence.knowledge = [{ callId: knowledgeCall.id, context: ctx, trace: t }];
+    return value;
+  }
+  const declaredTurn: C1ValidationTurn = { question: turn.question, expected: { ...positive.expected, allowedKinds: ["refund_eligibility"], freshOrder: order,
+    scope: { shopId: order.shop.id, productId: order.items[0]!.productId } } };
+  const declaredValue = declaredActual(order, [doc, multiDoc]);
+  const scoreDeclared = (value: C1ValidationActual, expected = declaredTurn, documents: RetrievalDocument[] = [doc, multiDoc], configuration = declaredConfiguration) =>
+    scoreC1ValidationTurn(expected, value, documents, reviewed(value, expected), configuration);
+  assert.equal(scoreDeclared(declaredValue).passed, true);
+  assert.deepEqual(scoreDeclared(declaredValue).applicabilityExcludedIds, [multiDoc.id]);
+  assert.deepEqual(scoreDeclared(declaredValue).validUnsupportedIds, [], "Host exclusion is not a model's valid negative");
+  assert.equal(scoreDeclared(declaredValue, declaredTurn, [doc, multiDoc], { applicability: "declared" }).evidenceProofPassed, false, "A self-reported snapshot is not authority");
+  assert.equal(scoreDeclared(declaredValue, declaredTurn, [doc, multiDoc], {}).evidenceProofPassed, false, "Frozen mode must match actual mode");
+  for (const mutate of [
+    (value: C1ValidationActual) => { value.calls[1]!.knowledge!.trace.applicability!.gate!.decisions.find(row => row.id === multiDoc.id)!.status = "matched"; },
+    (value: C1ValidationActual) => { value.calls[1]!.knowledge!.trace.applicability!.gate!.snapshotHash = "0".repeat(64); },
+    (value: C1ValidationActual) => { value.calls[1]!.knowledge!.trace.settings!.applicability!.snapshotHash = "0".repeat(64); },
+    (value: C1ValidationActual) => { value.calls[1]!.knowledge!.context.applicability!.facts!.couponCount = 2; },
+    (value: C1ValidationActual) => { value.calls[1]!.knowledge!.context.purpose = "user_policy"; },
+    (value: C1ValidationActual) => { delete value.calls[1]!.knowledge!.context.applicability; },
+    (value: C1ValidationActual) => { delete value.calls[1]!.knowledge!.context.protocol; },
+    (value: C1ValidationActual) => { value.calls[0]!.parentSpanId = "old-request"; },
+    (value: C1ValidationActual) => { value.calls.reverse(); value.result!.evidence.actualCalls = value.calls; },
+    (value: C1ValidationActual) => { value.calls[0]!.output = { ...order, coupons: [] }; },
+  ]) {
+    const forged = structuredClone(declaredValue); mutate(forged);
+    assert.equal(scoreDeclared(forged).evidenceProofPassed, false); assert.equal(scoreDeclared(forged).passed, false);
+  }
+  const incomplete = structuredClone(order); incomplete.items[0]!.quantity = 2;
+  const unknownPositive = declaredActual(incomplete, [doc, generalDoc]);
+  const unknownTurn = { ...declaredTurn, expected: { ...declaredTurn.expected, freshOrder: incomplete, gold: [{ sourceId: generalDoc.id, quote: generalDoc.body }] } };
+  const unknownScore = scoreDeclared(unknownPositive, unknownTurn, [doc, generalDoc]);
+  assert.equal(unknownScore.evidenceProofPassed, true); assert.equal(unknownScore.acceptedRecall, 1);
+  assert.equal(unknownScore.knowledgePassed, true); assert.equal(unknownScore.supportIntegrityPassed, true);
+  assert.equal(unknownScore.applicabilityIntegrityPassed, false); assert.equal(unknownScore.semanticEvidenceCorrect, null); assert.equal(unknownScore.passed, false);
+  assert.deepEqual(unknownScore.applicabilityUnknownIds, [doc.id]); assert.deepEqual(unknownScore.validUnsupportedIds, []);
+  const rejectedTurn = { ...declaredTurn, expected: { ...declaredTurn.expected, knowledge: "rejected" as const, gold: [] } };
+  const mismatchScore = scoreDeclared(declaredActual(order, [multiDoc]), rejectedTurn, [multiDoc]);
+  assert.equal(mismatchScore.correctlyRejected, true); assert.equal(mismatchScore.validDecisionCount, 0);
+  const unknownOnly = scoreDeclared(declaredActual(incomplete, [doc]), { ...rejectedTurn, expected: { ...rejectedTurn.expected, freshOrder: incomplete } }, [doc]);
+  assert.equal(unknownOnly.correctlyRejected, false); assert.equal(unknownOnly.unavailable, true);
+  console.log("C1 pure scoring checks passed: schema/manifest, planned denominators, fresh authorization and declared metadata replay, unknown/invalid/extra evidence, reply/topic bindings; no final dataset or API.");
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) checkC1ValidationScoring();

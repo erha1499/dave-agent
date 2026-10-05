@@ -11,20 +11,26 @@ const root = new URL("../", import.meta.url), hash = (value: Buffer) => createHa
 const json = async (path: string) => JSON.parse(await readFile(new URL(path, root), "utf8"));
 type Case = { id: string; pair: string; corpus: string; sourceId: string; query: string; scope: RetrievalScope;
   expected: { category: EvidenceSupportCategory; acceptableCategories?: EvidenceSupportCategory[]; supported: boolean; evidenceQuote: string; reason: string } };
+type Selection = "original" | "expanded" | "language";
 
-export async function loadC1SupportDevelopment(selection: "original" | "expanded" = "original") {
-  assert.ok(selection === "original" || selection === "expanded");
-  const path = selection === "expanded" ? "data/c1-support-development-v2.json" : "data/c1-support-development.json", manifest = await json(path.replace(".json", "-source.json"));
+export async function loadC1SupportDevelopment(selection: Selection = "original") {
+  assert.ok(["original", "expanded", "language"].includes(selection));
+  const path = selection === "language" ? "data/c1-language-support-development.json"
+    : selection === "expanded" ? "data/c1-support-development-v2.json" : "data/c1-support-development.json", manifest = await json(path.replace(".json", "-source.json"));
   const bytes = await readFile(new URL(path, root));
   assert.equal(manifest.version, 1); assert.equal(manifest.stage, "fixed-before-support-development-execution");
   assert.deepEqual(manifest.dataset, { path, sha256: hash(bytes), bytes: bytes.length });
+  if (selection === "language") {
+    assert.equal(manifest.dataset.sha256, "925c5ce543c40192d85a36f46df4cc1545a3c99250f2522b1923eba950169163", "Language diagnostic inputs and gold frozen before execution");
+    assert.equal(hash(await readFile(new URL(path.replace(".json", "-source.json"), root))), "9a6bbe566aa756e259fe22334d8d94db746f690056bab93d727c4d271e246d48", "Language provenance and scope frozen before execution");
+  }
   for (const [path, expected] of Object.entries(manifest.baseFiles)) assert.equal(hash(await readFile(new URL(path, root))), expected, path);
   const data = JSON.parse(bytes.toString()) as { version: number; stage: string; cases: Case[] };
   assert.equal(data.version, selection === "expanded" ? 2 : 1); assert.equal(data.stage, "development-not-validation");
-  const count = selection === "expanded" ? 10 : 6;
+  const count = selection === "language" ? 8 : selection === "expanded" ? 10 : 6;
   if (selection === "expanded") assert.deepEqual(data.cases.slice(0, 6), (await json("data/c1-support-development.json")).cases, "original six questions and gold remain unchanged");
   const corpora = (await loadAcceptanceDataset("validation")).corpora;
-  assert.deepEqual(data.cases.map(row => row.id), Array.from({ length: count }, (_, n) => `c1-pair-${String(n + 1).padStart(3, "0")}`));
+  assert.deepEqual(data.cases.map(row => row.id), Array.from({ length: count }, (_, n) => `c1-${selection === "language" ? "language" : "pair"}-${String(n + 1).padStart(3, "0")}`));
   assert.equal(new Set(data.cases.map(row => row.query)).size, count);
   const pairs = new Set(data.cases.map(row => row.pair)); assert.equal(pairs.size, count / 2);
   for (const pair of pairs) {
@@ -43,15 +49,17 @@ export async function loadC1SupportDevelopment(selection: "original" | "expanded
     const docs = corpora.find(corpus => corpus.id === row.corpus)?.documents ?? [];
     assert.ok(scopeDocuments(docs, row.scope).find(doc => doc.id === row.sourceId)?.body.includes(row.expected.evidenceQuote), `${row.id} scope/quote`);
   }
-  assert.deepEqual(manifest.counts, { pairs: count / 2, questions: count, direct_fact: 2, boundary_answer: count / 2 - 2, limitation_only: count / 2, accepted: count / 2, rejected: count / 2 });
+  assert.deepEqual(manifest.counts, { pairs: count / 2, questions: count, direct_fact: selection === "language" ? 3 : 2,
+    boundary_answer: selection === "language" ? 1 : count / 2 - 2, limitation_only: count / 2, accepted: count / 2, rejected: count / 2 });
   for (const category of ["direct_fact", "boundary_answer", "limitation_only"] as const) assert.equal(data.cases.filter(row => row.expected.category === category).length, manifest.counts[category]);
   return { data, manifest, corpora };
 }
 
-export async function runC1SupportDevelopment(selection: "original" | "expanded" = "original") {
+export async function runC1SupportDevelopment(selection: Selection = "original") {
   const data = await loadC1SupportDevelopment(selection), runId = randomUUID();
   const codePaths = ["scripts/c1-support-check.ts", "src/evidence-support.ts", "src/evidence-acceptance.ts", "src/retrieval-ranking.ts", "src/agent.ts",
-    data.manifest.dataset.path, data.manifest.dataset.path.replace(".json", "-source.json")];
+    data.manifest.dataset.path, data.manifest.dataset.path.replace(".json", "-source.json"),
+    ...(selection === "language" ? Object.keys(data.manifest.baseFiles) : [])];
   const codeHashes = async () => Object.fromEntries(await Promise.all(codePaths.map(async path => [path, hash(await readFile(new URL(path, root)))])));
   const before = await codeHashes();
   let client: EvidenceSupportClient | null = null;
@@ -95,8 +103,9 @@ export async function runC1SupportDevelopment(selection: "original" | "expanded"
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const args = process.argv.slice(2);
-  assert.ok(args.every(arg => ["--live", "--expanded"].includes(arg)) && new Set(args).size === args.length, "Use --live and/or --expanded; default is schema-only and no network");
-  const selection = args.includes("--expanded") ? "expanded" : "original";
+  assert.ok(args.every(arg => ["--live", "--expanded", "--language"].includes(arg)) && new Set(args).size === args.length
+    && !(args.includes("--expanded") && args.includes("--language")), "Use --live and one optional --expanded/--language selection; default is schema-only and no network");
+  const selection = args.includes("--language") ? "language" : args.includes("--expanded") ? "expanded" : "original";
   if (!args.includes("--live")) { const data = await loadC1SupportDevelopment(selection); console.log(JSON.stringify({ sha256: data.manifest.dataset.sha256, counts: data.manifest.counts, providerRequests: 0 })); }
   else { const result = await runC1SupportDevelopment(selection); if (!result.codeStable || result.summary.failed || result.summary.errors) process.exitCode = 1; }
 }
