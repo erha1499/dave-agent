@@ -11,7 +11,7 @@ import { markRefundReplyPresented } from "../src/refund-entry.ts";
 import { cancelSupportTurn, createSupportSession, getSupportResult, isSupportSession, prepareSupportPrompt, readSupportArchitecture, supportReply,
   type SupportFocus } from "../src/support-session.ts";
 import type { SupportAction } from "../src/support-action.ts";
-import { contextSupportActionParameters, type ContextOrderRef, type ContextSupportAction } from "../src/support-context-action.ts";
+import { modelSupportActionParameters, normalizeModelSupportAction, parseContextSupportAction, type ContextOrderRef, type ContextSupportAction } from "../src/support-context-action.ts";
 import type { SupportCall } from "../src/support-controller.ts";
 import { readKnowledgeParameters, resolveSupportParameters, resolveSupportRunParameters, type SupportExperimentParameters } from "../src/support-parameters.ts";
 import { runSupportV2Live } from "./support-v2-live.ts";
@@ -149,8 +149,8 @@ function observe(context: TranscriptContext, expectedFocus?: string | null) {
     assert.equal(getCurrentSystemPrompt(context.messages), expectedPrompt);
     const tools = getCurrentTools(context.messages);
     assert.deepEqual(tools.map(tool => tool.name), ["support_action"]);
-    assert.deepEqual(JSON.parse(JSON.stringify(tools[0]!.parameters)), JSON.parse(JSON.stringify(contextSupportActionParameters)),
-      "the real session exposes only the strict v2.2 tool schema");
+    assert.deepEqual(JSON.parse(JSON.stringify(tools[0]!.parameters)), JSON.parse(JSON.stringify(modelSupportActionParameters)),
+      "the real session exposes current business fields with only the host protocol constant optional");
     if (expectedFocus !== undefined) {
       const reference = hostReference(context);
       assert.equal(reference?.orderId, expectedFocus, "before_agent_start must inject the current host reference");
@@ -322,18 +322,35 @@ try {
   const repaired = await run(`查询 ${orderId}`, [malformed, choose({ kind: "order", orderRef: explicit() }), finish]);
   assert.deepEqual(repaired.map(result => result.isError), [true, false], "one correction is permitted");
   assert.equal(getSupportResult(session)?.action.kind, "order");
-  const legacyAction = () => fauxAssistantMessage(fauxToolCall("support_action", { action: { kind: "order", orderRef: explicit() } }), { stopReason: "toolUse" });
+  const omitted = { kind: "order", orderRef: explicit() };
+  assert.throws(() => parseContextSupportAction(omitted), /业务动作格式无效/, "internal parser remains strict");
+  assert.deepEqual(normalizeModelSupportAction(omitted), { ...omitted, protocol: "v2.2" });
+  assert.equal(Object.hasOwn(omitted, "protocol"), false, "normalization must not rewrite the recorded raw model input");
+  for (const invalid of [
+    ...["v2.1", "v3", null, undefined].map(protocol => ({ ...omitted, protocol })),
+    { kind: "order" }, { kind: "policy", question: "能退款吗？" },
+    { kind: "refund_eligibility", question: "能退款吗？", questionContext: { kind: "standalone" } },
+    ...["identity", "scope", "amountCents", "approved"].map(field => ({ ...omitted, [field]: "untrusted" })),
+    { kind: "paid_amount_compare", orderRef: explicit(), amountRef: { requestId: "source", amountCents: 100 } },
+  ]) assert.throws(() => normalizeModelSupportAction(invalid), /业务动作格式无效/, "only an absent protocol can be filled");
+  const omittedProtocol = () => fauxAssistantMessage(fauxToolCall("support_action", { action: omitted }), { stopReason: "toolUse" });
+  const beforeOmitted = calls.length;
+  const normalized = await run(`查询 ${orderId}`, [omittedProtocol, finish]);
+  assert.deepEqual(normalized.map(result => result.isError), [false]);
+  assert.deepEqual(calls.slice(beforeOmitted), [`order:${orderId}`]);
+  assert.deepEqual(getSupportResult(session)!.action, { ...omitted, protocol: "v2.2" });
+  const wrongProtocol = () => fauxAssistantMessage(fauxToolCall("support_action", { action: { ...omitted, protocol: "v2.1" } }), { stopReason: "toolUse" });
   const beforeProtocolRepair = calls.length;
-  const protocolRepair = await run(`查询 ${orderId}`, [legacyAction, choose({ kind: "order", orderRef: explicit() }), finish]);
+  const protocolRepair = await run(`查询 ${orderId}`, [wrongProtocol, choose({ kind: "order", orderRef: explicit() }), finish]);
   assert.deepEqual(protocolRepair.map(result => result.isError), [true, false]);
   assert.deepEqual(calls.slice(beforeProtocolRepair), [`order:${orderId}`]);
   assert.equal((getSupportResult(session)!.action as ContextSupportAction).protocol, "v2.2");
   const beforeOldProtocol = calls.length, beforeOldModel = faux.state.callCount;
-  const exhaustedProtocol = await run(`查询 ${orderId}`, [legacyAction, legacyAction, choose({ kind: "order", orderRef: explicit() }), finish], 2);
+  const exhaustedProtocol = await run(`查询 ${orderId}`, [wrongProtocol, wrongProtocol, choose({ kind: "order", orderRef: explicit() }), finish], 2);
   assert.ok(exhaustedProtocol.every(result => result.isError)); assert.equal(calls.length, beforeOldProtocol);
   assert.equal(faux.state.callCount, beforeOldModel + 2); assert.equal(getSupportResult(session), undefined);
   faux.setResponses([]);
-  console.log("[support-session] missing protocol is rejected by the current tool and consumes bounded repairs without legacy fallback PASS");
+  console.log("[support-session] host fills only omitted protocol; internal schema, business fields and bounded invalid-version repair stay strict PASS");
   const beforeReasonRepair = prepares, beforeReasonCalls = calls.length;
   const reasonRepair = await run(`请给 ${orderId} 生成退款方案。`, [
     fauxAssistantMessage(fauxToolCall("support_action", { action: { protocol: "v2.2", kind: "refund_prepare", orderRef: explicit(), reason: "行程变化" } }), { stopReason: "toolUse" }),
@@ -360,6 +377,9 @@ try {
     session.dispose();
     session = await createSupportSession(identity, store, runtime, faux.getModel(), { store: merchant, sourceKey, refunds },
       { groupOpenid: group, focus: focusStore, repairBudget });
+    const normalizedAtBudget = await run(`查询 ${orderId}`, [omittedProtocol, finish]);
+    assert.deepEqual(normalizedAtBudget.map(result => result.isError), [false], "omitted host constant consumes no schema or event repair budget");
+    assert.deepEqual(getSupportResult(session)!.action, { ...omitted, protocol: "v2.2" });
     const allowed = await run(`查询 ${orderId}`, [
       ...Array.from({ length: repairBudget }, () => malformed), choose({ kind: "order", orderRef: explicit() }), finish,
     ]);

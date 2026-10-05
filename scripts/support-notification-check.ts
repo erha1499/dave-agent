@@ -10,7 +10,7 @@ import { confirmRefundReply } from "../src/refund-entry.ts";
 import type { RefundOperation, RefundStore } from "../src/refunds.ts";
 import type { RenderedReply } from "../src/reply.ts";
 import { createSupportSession, getSupportResult } from "../src/support-session.ts";
-import { contextSupportActionParameters } from "../src/support-context-action.ts";
+import { modelSupportActionParameters } from "../src/support-context-action.ts";
 
 // Real Pi + QQAgent + notification dispatcher. Persistence and sends are deterministic spies, not a DB/QQ integration claim.
 const runtime = await createModelRuntime(), faux = fauxProvider();
@@ -38,7 +38,7 @@ function message(id: string, content = "你好", timestamp = new Date().toISOStr
 function observe(context: TranscriptContext, contains?: string) {
   try {
     assert.deepEqual(getCurrentTools(context.messages).map(tool => tool.name), ["support_action"]);
-    assert.deepEqual(JSON.parse(JSON.stringify(getCurrentTools(context.messages)[0]!.parameters)), JSON.parse(JSON.stringify(contextSupportActionParameters)));
+    assert.deepEqual(JSON.parse(JSON.stringify(getCurrentTools(context.messages)[0]!.parameters)), JSON.parse(JSON.stringify(modelSupportActionParameters)));
     if (contains) assert.ok(JSON.stringify(context.messages).includes(contains));
   } catch (error) { modelErrors.push(error); }
 }

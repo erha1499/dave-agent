@@ -9,7 +9,7 @@ import type { CouponStore, QQIdentity } from "./coupon-store.ts";
 import type { KnowledgeService } from "./knowledge-service.ts";
 import type { RefundStore } from "./refunds.ts";
 import type { Reply } from "./reply.ts";
-import { parseContextSupportAction, contextSupportActionParameters } from "./support-context-action.ts";
+import { normalizeModelSupportAction, modelSupportActionParameters } from "./support-context-action.ts";
 import { SupportController, type SupportCall, type SupportResult, type TrustedPolicyTopic } from "./support-controller.ts";
 import { amountChoiceNotice, amountChoicesVersion, currentAmountChoices, rememberAmountChoice, rememberOrderChoice,
   resolveAmountReference, selectAmountChoice, selectAlternativeOrder, type TrustedAmountChoices, type TrustedOrderChoices } from "./support-context.ts";
@@ -106,8 +106,8 @@ export async function createSupportSession(
   let pendingFocusWrite: Promise<void> | undefined;
   const tools = [defineTool({
     name: "support_action", label: "处理客服业务动作",
-    description: "每轮选择一个 protocol=v2.2 的业务动作。模型判断语义，宿主验证引用和事实：当前写明订单用explicit，唯一当前订单用focus，另一笔只读订单用alternative；政策问题区分standalone/previous，previous必须带宿主话题requestId。实付比较只可用当前宿主itemPaidUnit的requestId；金额候选多义时clarify amount_basis，禁止模型代替用户选择候选。不接收身份、范围、金额或批准；缺引用或多义用clarify。",
-    parameters: contextSupportActionParameters,
+    description: "每轮选择一个业务动作。宿主固定协议v2.2，protocol可省略，如提供只能为v2.2。模型判断语义，宿主验证引用和事实：当前写明订单用explicit，唯一当前订单用focus，另一笔只读订单用alternative；政策问题区分standalone/previous，previous必须带宿主话题requestId。实付比较只可用当前宿主itemPaidUnit的requestId；金额候选多义时clarify amount_basis，禁止模型代替用户选择候选。不接收身份、范围、金额或批准；缺引用或多义用clarify。",
+    parameters: modelSupportActionParameters,
     execute: async (_id, { action }) => {
       if (!turn) throw new Error("业务轮次尚未初始化。");
       const executingTurn = turn, executingAbort = state.abort;
@@ -120,7 +120,7 @@ export async function createSupportSession(
       // Schema/current-message errors may be repaired before any business action
       // starts. A started action (including a refusal or exception) is terminal
       // for request forcing; the Controller still caches its result or failure.
-      const validated = executingTurn.validate(parseContextSupportAction(action));
+      const validated = executingTurn.validate(normalizeModelSupportAction(action));
       state.actionStarted = true;
       let result: SupportResult;
       try { result = await executingTurn.execute(validated); }
@@ -186,7 +186,7 @@ export async function createSupportSession(
       try {
         if (part.name !== "support_action" || Object.keys(part.arguments).length !== 1 || !("action" in part.arguments)) throw new Error();
         // Count pure reference/protocol failures in the same bounded repair budget as schema errors.
-        const action = parseContextSupportAction(part.arguments.action);
+        const action = normalizeModelSupportAction(part.arguments.action);
         if (turn) turn.validate(action);
       } catch { state.invalidActions++; }
     }
@@ -278,7 +278,7 @@ export async function createSupportSession(
             candidates: state.amountChoices.candidates.map(row => ({ token: row.token, version: row.version,
               requestId: row.reference.requestId, orderId: row.reference.orderId, field: row.reference.field, paidCents: row.reference.paidCents })) },
           alternativeOrderId: selectAlternativeOrder(state.orderChoices, { sourceKey, groupOpenid }, state.focusOrderId) ?? null,
-          instruction: "使用protocol=v2.2。这些是有界定位引用，不代表批准或确认。当前有订单号用explicit；当前单用focus；唯一另一单用alternative且仅只读。依赖前文的话题用previous与policyTopic.requestId；独立完整问题用standalone。只读实付比较仅可用paid_amount_compare与当前非空itemPaidUnit.requestId；amountChoices只是曾展示候选，模型不得自行挑选其中requestId。金额基准为空或多义用clarify amount_basis，宿主会列出单行选择指令，由用户下一轮选择。引用不匹配先clarify，禁止从历史聊天自造引用或把旧状态带到新单；宿主每轮重新授权取证。" });
+          instruction: "宿主固定协议v2.2，protocol可省略，如提供只能为v2.2。这些是有界定位引用，不代表批准或确认。当前有订单号用explicit；当前单用focus；唯一另一单用alternative且仅只读。依赖前文的话题用previous与policyTopic.requestId；独立完整问题用standalone。只读实付比较仅可用paid_amount_compare与当前非空itemPaidUnit.requestId；amountChoices只是曾展示候选，模型不得自行挑选其中requestId。金额基准为空或多义用clarify amount_basis，宿主会列出单行选择指令，由用户下一轮选择。引用不匹配先clarify，禁止从历史聊天自造引用或把旧状态带到新单；宿主每轮重新授权取证。" });
       assertCurrent();
       const run: NonNullable<typeof activeRun> = { abort, contextText };
       activeRun = run;

@@ -38,6 +38,10 @@ export const contextSupportActionSchema = Type.Union([...common,
   }, { additionalProperties: false }),
 ]);
 export const contextSupportActionParameters = Type.Object({ action: contextSupportActionSchema }, { additionalProperties: false });
+// Protocol is a host constant, not a semantic decision for the model. All
+// business fields retain the strict current schema, including extra-key rejection.
+export const modelSupportActionParameters = Type.Object({ action: Type.Union(contextSupportActionSchema.anyOf.map(schema =>
+  Type.Object({ ...schema.properties, protocol: Type.Optional(protocol) }, { additionalProperties: false }))) }, { additionalProperties: false });
 export type ContextQuestionRef = { kind: "standalone" } | { kind: "previous"; requestId: string };
 export type ContextOrderRef = SupportOrderRef | { kind: "alternative" };
 export type ContextEvidenceTarget = { kind: "current_order" } | { kind: "rule_only"; basis: string };
@@ -62,6 +66,10 @@ export function parseContextSupportAction(value: unknown): ContextSupportAction 
   } catch {
     throw new SupportProtocolError("业务动作格式无效：请使用 v2.2 动作及宿主给出的引用，不得传身份、范围、金额或批准状态。");
   }
+}
+export function normalizeModelSupportAction(value: unknown): ContextSupportAction {
+  return parseContextSupportAction(value && typeof value === "object" && !Array.isArray(value) && !Object.hasOwn(value, "protocol")
+    ? { ...value, protocol: "v2.2" } : value);
 }
 export function parseAnySupportAction(value: unknown): AnySupportAction {
   return value && typeof value === "object" && "protocol" in value ? parseContextSupportAction(value) : parseSupportAction(value);

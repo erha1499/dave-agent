@@ -170,6 +170,7 @@ async function executeProbe(runtime: Runtime, guard: Guard, save: () => Promise<
     let priorPassed = true;
     for (const row of rows) {
       if (!priorPassed || guard.stopped()) { row.status = "skipped"; row.reason = !priorPassed ? "required_prior_failed" : guard.stopped(); continue; }
+      row.reason = null;
       if (row.turn === 4) {
         const source = candidateB(rows[2]!); row.question = `选择金额基准 ${source.token}`;
         row.selection = { fromTurn: 3, sourceOrderId: source.reference.orderId, sourceRequestId: source.reference.requestId,
@@ -222,7 +223,7 @@ export async function runAmountSelectionProbe() {
   const before = await inspectAmountSelectionProbe(), runId = randomUUID(), startedAt = new Date().toISOString();
   const directory = new URL(".runtime/c1-amount-selection/", root); await mkdir(directory, { recursive: true });
   const path = new URL(`${runId}.json`, directory), guard = createAmountProbeGuard();
-  const artifact = { version: 1, runId, startedAt, finishedAt: null as string | null, mode: "real-model-synthetic-store-no-SQL-no-QQ",
+  const artifact = { version: 2, runId, startedAt, finishedAt: null as string | null, mode: "real-model-synthetic-store-no-SQL-no-QQ",
     before, after: null as Awaited<ReturnType<typeof inspectAmountSelectionProbe>> | null,
     codeStable: false, dependenciesStable: false, configurationStable: false, execution: plannedExecution(),
     requests: guard.requests, usage: guard.usage(), failure: null as string | null, answerReviews: [] as unknown[], summary: {} as Record<string, unknown>, admitted: false };
@@ -309,6 +310,7 @@ export async function checkAmountSelectionProbe() {
     JSON.stringify(result.rows.map(row => ({ turn: row.turn, checks: row.engineeringChecks, action: row.result?.action }))));
   assert.equal(result.rows[3]!.requests.length, 0); assert.equal(result.rows[3]!.result, undefined); assert.equal(result.rows[3]!.hostReceipt?.outcome, "selected");
   assert.equal(guard.requests.length, 8); assert.equal(guard.usage().agent.unknownCosts, 0);
+  assert.ok(result.rows.every(row => row.reason === null), "Executed successful rows must not retain the not_started placeholder");
   assert.equal(result.cleanup.remainingOrders, 0); assert.equal(result.cleanup.sessionDisposed, true);
   const tampered = structuredClone(result.rows); tampered[3]!.hostReceipt!.selectedRequestId = "not-displayed";
   scoreRow(tampered[3]!, tampered, true); assert.equal(tampered[3]!.status, "failed");
@@ -324,6 +326,7 @@ export async function checkAmountSelectionProbe() {
     { headers: { "content-type": "text/event-stream" } }));
   const failure = await executeProbe({ modelRuntime, model }, noAction, async () => {}, "failed-engineering");
   assert.equal(failure.rows.length, 5); assert.equal(failure.rows[0]!.status, "failed");
+  assert.equal(failure.rows[0]!.reason, "engineering_contract_failed");
   assert.ok(failure.rows.slice(1).every(row => row.status === "skipped"));
   console.log("Amount selection probe engineering PASS: actual five-turn Session with fake HTTP, live guards, host-only selection, complete denominator and cleanup; 0 network.");
 }

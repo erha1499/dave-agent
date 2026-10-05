@@ -69,13 +69,25 @@ export async function checkSupportToolChoice() {
     assert.equal(getSupportResult(session)!.evidence.requestId, first.requestId);
     assert.ok(calls.every(call => call.parentSpanId === first.requestId));
 
-    const schema = await prompt(`查 ${orderId}`, [{ action: { kind: "order", orderRef: { kind: "explicit", orderId } } }, select(), finish]);
-    assert.deepEqual(schema.choices, [forced, forced, "auto"], "schema rejection does not count as a started business action");
+    const omitted = { kind: "order", orderRef: { kind: "explicit", orderId } };
+    const normalized = await prompt(`查 ${orderId}`, [{ action: omitted }, finish]);
+    assert.deepEqual(normalized.choices, [forced, "auto"], "an omitted host constant succeeds without another forced repair request");
+    assert.deepEqual(getSupportResult(session)!.action, { ...omitted, protocol: "v2.2" });
+    const recorded = (normalized.payloads[1]!.messages as Array<{ tool_calls?: Array<{ function: { name: string; arguments: string } }> }>)
+      .flatMap(message => message.tool_calls ?? []).filter(call => call.function.name === "support_action").at(-1)!;
+    assert.deepEqual(JSON.parse(recorded.function.arguments), { action: omitted }, "raw model arguments remain auditable beside the normalized result");
+    const wireTool = normalized.payloads[0]!.tools![0] as { function: { parameters: { properties: {
+      action: { anyOf: Array<{ properties: { protocol: { const: string } }; required: string[]; additionalProperties: boolean }> }
+    } } } };
+    assert.ok(wireTool.function.parameters.properties.action.anyOf.every(branch => branch.properties.protocol.const === "v2.2"
+      && !branch.required.includes("protocol") && branch.additionalProperties === false), "actual provider schema omits only the required protocol constant");
+    const schema = await prompt(`查 ${orderId}`, [{ action: { ...omitted, protocol: "v2.1" } }, select(), finish]);
+    assert.deepEqual(schema.choices, [forced, forced, "auto"], "a supplied invalid version still requires a bounded repair before business execution");
     assert.equal(getSupportResult(session)!.evidence.requestId, schema.requestId);
-    assert.equal(reads, 2);
+    assert.equal(reads, 3);
     const preflight = await prompt("再看这笔", [select(), select("focus"), finish]);
     assert.deepEqual(preflight.choices, [forced, forced, "auto"], "current-message reference repair keeps the same forced tool");
-    assert.equal(getSupportResult(session)!.evidence.requestId, preflight.requestId); assert.equal(reads, 3);
+    assert.equal(getSupportResult(session)!.evidence.requestId, preflight.requestId); assert.equal(reads, 4);
 
     for (const mode of ["denied", "error"] as const) {
       readMode = mode; const readsBefore: number = reads;
