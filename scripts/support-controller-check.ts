@@ -679,6 +679,45 @@ const focus = { kind: "focus" as const };
 console.log("[support-controller] v2.2 strict protocol, raw question preservation and grounded product slots PASS");
 
 {
+  const test = setup(), partial = structuredClone(order), refunded = structuredClone(order), expired = structuredClone(order);
+  partial.status = "partially_redeemed";
+  partial.amounts.totalCents = partial.amounts.paidCents = order.amounts.paidCents * 2;
+  Object.assign(partial.items[0]!, { quantity: 2, totalCents: partial.amounts.totalCents });
+  partial.payments[0]!.amountCents = partial.amounts.paidCents;
+  partial.coupons.push({ ...partial.coupons[0]!, id: "used-second", status: "redeemed", redeemedAt: current, redeemedShopId: order.shop.id });
+  refunded.status = "refunded"; refunded.amounts.refundedCents = refunded.amounts.paidCents;
+  refunded.coupons[0]!.status = "refunded";
+  refunded.refunds.push({ status: "succeeded", amountCents: refunded.amounts.paidCents, completedAt: current });
+  expired.coupons[0]!.status = "expired"; expired.coupons[0]!.expiresAt = "2000-01-01T00:00:00.000Z";
+  const raw = `${orderId} 我说本单有99张已退款券，现在符合哪些申请条件？`;
+  const action: ContextSupportAction = { protocol, kind: "refund_eligibility", question: "模型称全部已核销", questionContext: standalone, orderRef: explicit };
+  for (const [fresh, counts, suffix] of [
+    [order, { total: 1, unused: 1, redeemed: 0, expired: 0, refunded: 0 }, "共1张，未核销1张、已核销0张、已过期0张、已退款0张"],
+    [partial, { total: 2, unused: 1, redeemed: 1, expired: 0, refunded: 0 }, "共2张，未核销1张、已核销1张、已过期0张、已退款0张"],
+    [refunded, { total: 1, unused: 0, redeemed: 0, expired: 0, refunded: 1 }, "共1张，未核销0张、已核销0张、已过期0张、已退款1张"],
+    [expired, { total: 1, unused: 0, redeemed: 0, expired: 1, refunded: 0 }, "共1张，未核销0张、已核销0张、已过期1张、已退款0张"],
+  ] as const) {
+    test.services.store.getOrder = async (who, id) => { assert.deepEqual(who, identity); assert.equal(id, orderId); return structuredClone(fresh); };
+    const result = await test.controller.createTurn(test.context(raw)).execute(action);
+    const knowledge = result.evidence.knowledge[0]!, context = knowledge.context;
+    assert.deepEqual(context.facts!.couponCounts, counts, "fresh authorized coupons determine counts, never user/model claims");
+    assert.equal(context.originalQuery, raw); assert.equal(context.modelQuestion, action.question);
+    assert.ok(context.effectiveQuery.endsWith(`已核实本单券数：${suffix}（按券状态字段计数）。`));
+    assert.equal(knowledge.trace.query, context.effectiveQuery);
+    assert.equal(result.evidence.actualCalls.find(call => call.name === "search_faq")!.input.query, context.effectiveQuery);
+  }
+  test.services.store.getOrder = async () => structuredClone(order);
+  const legacy = await test.controller.createTurn(test.context(`${orderId} 能申请退款吗？`))
+    .execute({ kind: "refund_eligibility", question: "未核销退款", orderRef: explicit });
+  assert.equal(legacy.evidence.knowledge[0]!.context.facts!.couponCounts, undefined);
+  assert.equal(legacy.evidence.knowledge[0]!.context.effectiveQuery,
+    `该订单 能申请退款吗？\n已核实订单商品：${order.items[0]!.productName}。\n订单状态对应的规则条件：未核销退款。`, "legacy query bytes stay unchanged");
+  const prepared = await test.controller.createTurn(test.context()).execute({ protocol, kind: "refund_prepare", orderRef: explicit });
+  assert.match(prepared.evidence.knowledge[0]!.context.effectiveQuery, /^未核销退款\n已核实本单券数：共1张/);
+}
+console.log("[support-controller] v2.2 fresh coupon cardinality/status counts and legacy query compatibility PASS");
+
+{
   const test = setup();
   const first = await test.controller.createTurn(test.context(`${orderId} 的入店使用时间有哪些要求？`))
     .execute({ protocol, kind: "policy", question: "使用时间", questionContext: standalone, orderRef: explicit });
@@ -694,6 +733,8 @@ console.log("[support-controller] v2.2 strict protocol, raw question preservatio
     { ...topic, groupOpenid: "other-group" }, { ...topic, orderId: "COUPON-9999" }]) {
     const result = await test.controller.createTurn(test.context(text, { focusOrderId: orderId, policyTopic })).execute(action);
     assert.equal(result.outcome, "clarification"); assert.equal(result.evidence.actualCalls.length, 0);
+    assert.equal(result.needsAnswer, false); assert.ok(result.reply.kind === "notice");
+    assert.match(result.reply.text, /先处理哪项需求.*若续问前文，请补充所指规则、时间或对象/);
   }
   const changedScope = structuredClone(topic); changedScope.scope.productId = "old-product";
   const rejectedScope = await test.controller.createTurn(test.context(text, { focusOrderId: orderId, policyTopic: changedScope })).execute(action);
@@ -709,7 +750,8 @@ console.log("[support-controller] v2.2 previous-topic ID, actor/group/order/scop
 
 {
   const test = setup(), otherId = "COUPON-2088", binding = { sourceKey: merchantSourceKey(identity, group), groupOpenid: group };
-  const other = { ...structuredClone(order), id: otherId, status: "refunded", amounts: { ...order.amounts, refundedCents: 7980 } };
+  const other = { ...structuredClone(order), id: otherId, status: "refunded", amounts: { ...order.amounts, refundedCents: 7980 },
+    coupons: [{ ...order.coupons[0]!, status: "refunded" }] };
   let revoked = false;
   test.services.store.getOrder = async (who, id) => {
     assert.deepEqual(who, identity); if (revoked) throw new OrderAccessError("changed owner");
@@ -725,6 +767,9 @@ console.log("[support-controller] v2.2 previous-topic ID, actor/group/order/scop
   assert.equal(switched.verifiedOrderId, orderId); assert.equal(switched.evidence.order!.status, "paid");
   const query = switched.evidence.knowledge[0]!.context.effectiveQuery;
   assert.match(query, /未核销退款/); assert.doesNotMatch(query, /已经退款成功|再次退款|COUPON-2088/);
+  assert.deepEqual(prior.evidence.knowledge[0]!.context.facts!.couponCounts, { total: 1, unused: 0, redeemed: 0, expired: 0, refunded: 1 });
+  assert.deepEqual(switched.evidence.knowledge[0]!.context.facts!.couponCounts, { total: 1, unused: 1, redeemed: 0, expired: 0, refunded: 0 });
+  assert.match(query, /未核销1张、已核销0张、已过期0张、已退款0张/); assert.doesNotMatch(query, /已退款1张/);
   const independent = await test.controller.createTurn(test.context("另一个订单需要满足哪些退款条件？", { ...ctx, policyTopic: undefined }))
     .execute({ ...action, questionContext: standalone });
   assert.equal(independent.outcome, "ready"); assert.equal(independent.verifiedOrderId, orderId);

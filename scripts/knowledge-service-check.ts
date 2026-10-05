@@ -5,7 +5,7 @@ import type { AssistantMessage } from "@earendil-works/pi-ai";
 import type { Pool } from "mysql2/promise";
 import { createBailianClient } from "../src/bailian.ts";
 import { CouponStore } from "../src/coupon-store.ts";
-import { createEvidenceSupportClient, evidenceSupportInputHash, resolveEvidenceSupportModel } from "../src/evidence-support.ts";
+import { createEvidenceSupportClient, evidenceSupportInputHash, evidenceSupportTypedPromptVersion, resolveEvidenceSupportModel } from "../src/evidence-support.ts";
 import { createKnowledgeService, type KnowledgeServiceOptions } from "../src/knowledge-service.ts";
 import { rankKnowledge } from "../src/knowledge-retrieval.ts";
 import type { RetrievalDocument } from "../src/retrieval-ranking.ts";
@@ -172,13 +172,16 @@ assert.throws(() => createKnowledgeService(store, { threshold: NaN })); assert.t
 assert.throws(() => createKnowledgeService(store, { mode: "lexical", supportProfile: "typed" }));
 assert.throws(() => createKnowledgeService(store, { ...options, supportProfile: "typed" }), /profile 不一致/);
 let typedJudges = 0;
+let typedCorruption: "none" | "positive" | "negative" | "all" = "none";
 const typedClient = await createEvidenceSupportClient({ profile: "typed", timeoutMs: 1000, runtime: { model, complete: async (context, parameters) => {
   typedJudges++; assert.equal(parameters.maxRetries, 0);
   const input = JSON.parse(String(context.messages[0]!.content));
   assert.ok(!/gold|expectedBehavior/.test(JSON.stringify(input)));
   return { role: "assistant", api: "openai-completions", provider: model.provider, model: model.id, stopReason: "stop", timestamp: 0,
     content: [{ type: "text", text: JSON.stringify({ decisions: input.documents.map((doc: { id: string; body: string }) => ({
-      id: doc.id, category: doc.id === "A" ? "direct_fact" : "limitation_only", quote: doc.body, reason: "固定工程分类",
+      id: doc.id, category: doc.id === "A" ? "direct_fact" : "limitation_only",
+      quote: typedCorruption === "all" || typedCorruption === "positive" && doc.id === "A" || typedCorruption === "negative" && doc.id === "B" ? "非原文引文" : doc.body,
+      reason: "固定工程分类",
     })) }) }], usage: { input: 30, output: 20, cacheRead: 0, cacheWrite: 0, totalTokens: 50,
       cost: { input: .000003, output: .000004, cacheRead: 0, cacheWrite: 0, total: .000007 } } };
 } } });
@@ -188,8 +191,32 @@ const typedResult = await typedService.search({ query, scope });
 assert.equal(typedJudges, 1); assert.equal(typedResult.trace.supportProfile, "typed");
 assert.deepEqual(typedResult.documents.map(doc => doc.sourceId), ["A"], "only direct facts are accepted; limitation remains an auditable rejection");
 assert.deepEqual(typedResult.trace.supportVerification!.value.map(row => [row.category, row.supported]), [["direct_fact", true], ["limitation_only", false]]);
-assert.equal(typedResult.trace.settings!.support!.promptVersion, "fact-support-typed-v3");
+assert.equal(typedResult.trace.settings!.support!.promptVersion, evidenceSupportTypedPromptVersion);
 assert.deepEqual(typedResult.trace.sources!.map(source => source.sourceId), ["A"]);
+
+typedCorruption = "negative";
+const partialKnowledge = await typedService.search({ query, scope });
+assert.equal(partialKnowledge.trace.status, "accepted"); assert.deepEqual(partialKnowledge.documents.map(doc => doc.sourceId), ["A"]);
+assert.equal(partialKnowledge.trace.supportVerification!.validation!.status, "partial");
+assert.deepEqual(partialKnowledge.trace.supportVerification!.validation!.invalidDecisions, [{ id: "B", code: "invalid_quote" }]);
+assert.equal(partialKnowledge.trace.calls.find(call => call.operation === "support")!.status, "partial");
+const partialSpans = knowledgeProviderSpans({ ...faqSpan, knowledge: { ...faqSpan.knowledge!, trace: partialKnowledge.trace } });
+assert.equal(partialSpans[1]!.outcome, "error"); assert.equal(partialSpans[1]!.usage!.totalTokens, 50);
+assert.equal(partialKnowledge.trace.usage.supportTokens, 50);
+assert.equal(analyzeSupportSpans(partialSpans).providers.find(provider => provider.model === model.id)!.usageReported, 1);
+typedCorruption = "positive";
+const invalidPositive = await typedService.search({ query, scope });
+assert.equal(invalidPositive.trace.status, "unavailable"); assert.equal(invalidPositive.trace.reason, "invalid_support_decision");
+assert.deepEqual(invalidPositive.documents, []); assert.equal(invalidPositive.trace.supportVerification!.validation!.status, "partial");
+assert.ok(invalidPositive.trace.acceptance!.rejected.some(row => row.id === "A" && row.reason === "invalid_support_decision"));
+typedCorruption = "all";
+const invalidAll = await typedService.search({ query, scope });
+assert.equal(invalidAll.trace.status, "unavailable"); assert.equal(invalidAll.trace.reason, "invalid_support_decision");
+assert.equal(invalidAll.trace.supportVerification!.validation!.status, "unavailable");
+assert.equal(invalidAll.trace.supportVerification!.attempts[0]!.outcome, "invalid_response");
+assert.equal(invalidAll.trace.supportVerification!.validation!.invalidDecisions.length, 2); assert.equal(invalidAll.trace.usage.supportTokens, 50);
+assert.ok(invalidAll.trace.acceptance!.rejected.every(row => row.reason !== "unsupported"));
+typedCorruption = "none";
 
 // Only the support judge changes model; mismatched injected clients cannot make the switch a no-op.
 assert.throws(() => createKnowledgeService(store, { supportModel: "deepseek-v4-pro" }), /仅适用于/);

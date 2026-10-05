@@ -2,9 +2,10 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
+import { isDeepStrictEqual } from "node:util";
 import { createConfiguredModelRuntime } from "../src/agent.ts";
 import { contentHash, createBailianClient } from "../src/bailian.ts";
-import { createEvidenceSupportClient } from "../src/evidence-support.ts";
+import { createEvidenceSupportClient, evidenceSupportValidationVersion, type EvidenceSupportValidation } from "../src/evidence-support.ts";
 import { OrderAccessError, type CouponStore } from "../src/coupon-store.ts";
 import { captureEvaluationTurn } from "../src/eval-capture.ts";
 import { createKnowledgeService, type KnowledgeTrace } from "../src/knowledge-service.ts";
@@ -23,14 +24,21 @@ type Dataset = { version: 1; suiteId: string; stage: string; provenance: string;
   cases: Array<{ id: string; corpus: "online" | "reference"; turns: Turn[] }> };
 type HostReference = { kind?: string; orderId?: string | null; policyTopic?: { requestId: string } | null;
   itemPaidUnit?: { requestId: string; paidCents: number } | null; alternativeOrderId?: string | null };
-type Check = { layer: "action" | "reference" | "business" | "knowledge" | "execution"; name: string; passed: boolean };
+type Check = { layer: "action" | "reference" | "business" | "knowledge" | "execution" | "integrity"; name: string; passed: boolean };
+type SupportIntegrity = { status: EvidenceSupportValidation["status"] | "not_applicable" | "unknown";
+  invalidDecisions: EvidenceSupportValidation["invalidDecisions"]; validDecisionCount: number; validUnsupportedIds: string[] };
 type NetworkRequest = { operation: "agent" | "support" | "rerank"; caseId: string; turn: number; startedAt: string;
   httpStatus: number | null; error: "request_failed" | null };
 type Row = { caseId: string; turn: number; phase: "preparatory" | "final"; question: string; expected: Expect;
   status: "passed" | "failed" | "skipped"; reason?: string; durationMs: number | null; checks: Check[];
   hostReference?: HostReference; result?: SupportResult; reply?: unknown; steps: EvalStep[]; calls: SupportCall[];
   requests: NetworkRequest[]; sdkRetryEvents: Array<{ type: "auto_retry_start" | "auto_retry_end"; attempt: number }>;
-  rawRecall: number | null; acceptedRecall: number | null; firstActionCorrect: boolean | null };
+  rawRecall: number | null; acceptedRecall: number | null; firstActionCorrect: boolean | null;
+  businessContractPassed: boolean | null; supportIntegrity: SupportIntegrity | null; semanticEvidenceCorrect: boolean | null;
+  extraAcceptedIds: string[]; missingExpectedIds: string[] };
+// New validation may consume the measured material without duplicating execution
+// or inheriting this development set's checker-only expectation vocabulary.
+export type SessionTurnActual = Pick<Row, "result" | "calls" | "steps" | "reply" | "hostReference" | "requests" | "durationMs">;
 const root = new URL("../", import.meta.url);
 const datasetPath = "data/c1-session-development.json", sourcePath = "data/c1-session-development-source.json";
 const codeFiles = ["scripts/c1-session-live.ts", "scripts/c1-context-check.ts", "src/support-session.ts", "src/support-controller.ts",
@@ -40,6 +48,27 @@ const codeFiles = ["scripts/c1-session-live.ts", "scripts/c1-context-check.ts", 
 const hashes = async (files: string[]) => Object.fromEntries(await Promise.all(files.map(async file => [file, contentHash(await readFile(new URL(file, root)))])));
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
 function exactKeys(value: object, allowed: string[]) { assert.ok(Object.keys(value).every(key => allowed.includes(key))); }
+function selectPlan(data: Dataset, caseId?: string) {
+  if (caseId !== undefined) assert.ok(typeof caseId === "string" && data.cases.some(item => item.id === caseId), "Unknown development case");
+  const cases = caseId === undefined ? data.cases : data.cases.filter(item => item.id === caseId);
+  const plannedTurns = cases.reduce((n, item) => n + item.turns.length, 0);
+  const knowledgeTurns = cases.reduce((n, item) => n + item.turns.filter(turn => turn.expect.knowledge === "evidence").length, 0);
+  return { cases, plannedCases: cases.length, plannedTurns, knowledgeTurns,
+    // Two Agent responses plus one permitted action repair per user turn, and
+    // rerank + support for each expected knowledge query. Retries share this cap.
+    maxHttpRequests: Math.min(70, plannedTurns * 3 + knowledgeTurns * 2) };
+}
+function parseArgs(args: string[]) {
+  const options: { live: boolean; caseId?: string } = { live: false };
+  for (let index = 0; index < args.length; index++) {
+    if (args[index] === "--live") { assert.equal(options.live, false, "Duplicate --live"); options.live = true; }
+    else if (args[index] === "--case") {
+      assert.equal(options.caseId, undefined, "Duplicate --case");
+      const caseId = args[++index]; assert.ok(caseId && !caseId.startsWith("--"), "--case needs an exact case ID"); options.caseId = caseId;
+    } else assert.fail(`Unknown argument: ${args[index]}`);
+  }
+  return options;
+}
 
 export async function loadC1SessionDevelopment() {
   const bytes = await readFile(new URL(datasetPath, root));
@@ -112,6 +141,22 @@ function actionCorrect(action: unknown, e: Expect, host: HostReference) {
     && (e.questionContext !== "previous" || Boolean(host.policyTopic?.requestId) && value.questionContext?.requestId === host.policyTopic!.requestId)
     && (e.kind !== "paid_amount_compare" || Boolean(host.itemPaidUnit?.requestId) && value.amountRef?.requestId === host.itemPaidUnit!.requestId);
 }
+function supportIntegrity(trace: KnowledgeTrace | undefined): SupportIntegrity {
+  const verification = trace?.supportVerification, validation = verification?.validation;
+  const supportCalled = trace?.calls.some(call => call.operation === "support");
+  let status: SupportIntegrity["status"] = !trace ? "unknown" : !supportCalled ? trace.status === "unavailable" ? "unavailable" : "not_applicable"
+    : validation ? validation.status : trace.status === "unavailable" ? "unavailable" : "unknown";
+  const invalidIds = new Set(validation?.invalidDecisions.map(item => item.id));
+  if (validation && (validation.status === "complete" && invalidIds.size !== 0
+    || validation.status !== "complete" && invalidIds.size === 0
+    || verification?.value.some(item => invalidIds.has(item.id)))) status = "unknown";
+  const valid = verification?.value.filter(item => !invalidIds.has(item.id)) ?? [];
+  return { status, invalidDecisions: structuredClone(validation?.invalidDecisions ?? []),
+    validDecisionCount: valid.length,
+    // These are syntactically valid negative decisions, not automatically correct
+    // rejections. Invalid candidates are absent from value and never count here.
+    validUnsupportedIds: valid.filter(value => !value.supported).map(value => value.id) };
+}
 function evaluate(row: Row, executed: boolean) {
   const e = row.expected, result = row.result, host = row.hostReference ?? {};
   const check = (layer: Check["layer"], name: string, passed: boolean) => row.checks.push({ layer, name, passed });
@@ -120,7 +165,8 @@ function evaluate(row: Row, executed: boolean) {
   check("business", "no side-effecting service calls", row.calls.every(call => ["get_order", "search_faq"].includes(call.name)));
   check("business", "expected terminal outcome", result?.outcome === (e.kind === "clarify" ? "clarification" : "ready"));
   check("reference", "fresh authorization or no-order path", e.orderId === null ? !row.calls.some(call => call.name === "get_order")
-    : result?.evidence.order?.id === e.orderId && row.calls.some(call => call.name === "get_order" && !call.isError && call.input.orderId === e.orderId));
+    : result?.evidence.order?.id === e.orderId && row.calls.some(call => call.name === "get_order" && !call.isError
+      && call.parentSpanId === result.evidence.requestId && call.input.orderId === e.orderId && isDeepStrictEqual(call.output, result.evidence.order)));
   if (e.kind === "clarify") check("reference", "clarification does not access business services", row.calls.length === 0);
   if (e.questionContext === "previous") check("reference", "knowledge uses actual visible prior topic", Boolean(host.policyTopic?.requestId)
     && result?.evidence.knowledge[0]?.context.policyTopic?.requestId === host.policyTopic!.requestId);
@@ -137,12 +183,19 @@ function evaluate(row: Row, executed: boolean) {
       && amount.referenceRequestId === host.itemPaidUnit?.requestId);
   }
   const traces = row.calls.flatMap(call => call.knowledge ? [call.knowledge.trace] : []);
+  const accepted = result?.evidence.rules.map(rule => rule.sourceId) ?? [], relevant = e.relevant ?? [];
+  row.extraAcceptedIds = accepted.filter(id => !relevant.includes(id));
+  row.missingExpectedIds = relevant.filter(id => !accepted.includes(id));
+  if (traces.length || e.knowledge === "evidence") {
+    row.supportIntegrity = supportIntegrity(traces.length === 1 ? traces[0] : undefined);
+    check("integrity", "candidate judgments are complete; invalid is not a correct rejection",
+      ["complete", "not_applicable"].includes(row.supportIntegrity.status));
+  }
   if (e.knowledge === "none") check("knowledge", "no knowledge or knowledge-provider requests", traces.length === 0
     && !row.calls.some(call => call.name === "search_faq") && row.requests.every(request => request.operation === "agent"));
   else {
     check("knowledge", "one actual two-stage knowledge query", traces.length === 1 && traces[0]!.mode === "m4-support"
       && traces[0]!.supportProfile === "typed" && traces[0]!.supportModel === "deepseek-v4-pro" && traces[0]!.threshold === .5 && traces[0]!.status !== "unavailable");
-    const accepted = result?.evidence.rules.map(rule => rule.sourceId) ?? [], relevant = e.relevant!;
     check("knowledge", "accepted evidence equals frozen expected sources", same([...accepted].sort(), [...relevant].sort()));
     check("knowledge", "original current question remains auditable", traces[0]?.originalQuery === row.question);
     for (const phrase of e.forbiddenQueryPhrases ?? []) check("reference", `no historical assumption in query: ${phrase}`,
@@ -151,14 +204,25 @@ function evaluate(row: Row, executed: boolean) {
       ? relevant.filter(id => traces[0]!.rawRanking.slice(0, 5).some(doc => doc.id === id)).length / relevant.length : null;
     row.acceptedRecall = traces[0] && traces[0].status !== "unavailable"
       ? relevant.filter(id => accepted.includes(id)).length / relevant.length : null;
+    const complete = ["complete", "not_applicable"].includes(row.supportIntegrity!.status);
+    row.semanticEvidenceCorrect = complete && traces[0]?.status !== "unavailable"
+      ? row.extraAcceptedIds.length === 0 && row.missingExpectedIds.length === 0 : null;
   }
   const first = row.steps.find(step => step.type === "tool" && step.name === "support_action")?.input as { action?: unknown } | undefined;
   row.firstActionCorrect = actionCorrect(first?.action, e, host);
+  row.businessContractPassed = row.checks.filter(check => check.layer !== "integrity").every(check => check.passed);
   row.status = row.checks.every(check => check.passed) ? "passed" : "failed";
 }
 
-export async function checkC1SessionRunner() {
+export async function checkC1SessionRunner(caseId?: string) {
   const { data } = await loadC1SessionDevelopment();
+  const all = selectPlan(data), appointment = selectPlan(data, "session-appointment-topic"), selected = selectPlan(data, caseId);
+  assert.deepEqual([all.plannedCases, all.plannedTurns, all.knowledgeTurns, all.maxHttpRequests], [10, 20, 8, 70]);
+  assert.deepEqual([appointment.plannedCases, appointment.plannedTurns, appointment.knowledgeTurns, appointment.maxHttpRequests], [1, 2, 2, 10]);
+  assert.equal(selectPlan(data, "session-paid-comparison").maxHttpRequests, 6);
+  assert.throws(() => selectPlan(data, "unknown"));
+  assert.deepEqual(parseArgs(["--live", "--case", "session-appointment-topic"]), { live: true, caseId: "session-appointment-topic" });
+  for (const args of [["--case"], ["--case", "--live"], ["--live", "--live"], ["--case", "one", "--case", "two"], ["--repeat", "2"]]) assert.throws(() => parseArgs(args));
   const guard = requestGuard(1, async () => new Response("{}"));
   guard.setActive({ caseId: "guard", turn: 1, signal: new AbortController().signal });
   await guard.fetchFor("agent")("https://example.invalid");
@@ -173,19 +237,71 @@ export async function checkC1SessionRunner() {
     { kind: "policy", orderId: null, knowledge: "evidence", questionContext: "previous" }, { policyTopic: { requestId: "actual" } }), false);
   for (const item of data.cases) for (const [index, turn] of item.turns.entries()) {
     const row: Row = { caseId: item.id, turn: index + 1, phase: "final", question: turn.question, expected: turn.expect,
-      status: "failed", durationMs: null, checks: [], steps: [], calls: [], requests: [], sdkRetryEvents: [], rawRecall: null, acceptedRecall: null, firstActionCorrect: null };
+      status: "failed", durationMs: null, checks: [], steps: [], calls: [], requests: [], sdkRetryEvents: [], rawRecall: null, acceptedRecall: null, firstActionCorrect: null,
+      businessContractPassed: null, supportIntegrity: null, semanticEvidenceCorrect: null, extraAcceptedIds: [], missingExpectedIds: [] };
     evaluate(row, false); assert.equal(row.status, "failed", "missing execution cannot pass any planned turn");
   }
-  console.log("C1 Session runner engineering checks passed: 10 cases / 20 turns, frozen data, hard HTTP budget, cancellation and missing-execution rejection. No live model.");
+  // Scorer probes only. No fabricated result is persisted as a live run.
+  const trace = { mode: "m4-support", supportProfile: "typed", supportModel: "deepseek-v4-pro", threshold: .5,
+    query: "工程问题", originalQuery: "工程问题", status: "accepted", rawRanking: [{ id: "GOOD", score: .9 }],
+    calls: [{ operation: "rerank", status: "ok" }, { operation: "support", status: "partial" }],
+    supportVerification: { value: [{ id: "GOOD", supported: true }, { id: "VALID-NEGATIVE", supported: false }],
+      validation: { status: "partial", outputHash: "a".repeat(64), invalidDecisions: [{ id: "INVALID", code: "invalid_quote" }] } } } as unknown as KnowledgeTrace;
+  const scorerRow = (): Row => ({ caseId: "scorer-only", turn: 1, phase: "preparatory", question: "工程问题",
+    expected: { kind: "policy", orderId: null, questionContext: "standalone", knowledge: "evidence", relevant: ["GOOD"] },
+    status: "failed", durationMs: 1, checks: [], calls: [{ name: "search_faq", knowledge: { trace } } as SupportCall], steps: [], requests: [], sdkRetryEvents: [],
+    result: { action: { protocol: "v2.2", kind: "policy", question: "工程问题", questionContext: { kind: "standalone" } }, outcome: "ready",
+      evidence: { requestId: "actual-request", rules: [{ sourceId: "GOOD" }] } } as SupportResult,
+    rawRecall: null, acceptedRecall: null, firstActionCorrect: null, businessContractPassed: null,
+    supportIntegrity: null, semanticEvidenceCorrect: null, extraAcceptedIds: [], missingExpectedIds: [] });
+  const partial = scorerRow(); evaluate(partial, true);
+  assert.equal(partial.businessContractPassed, true); assert.equal(partial.status, "failed");
+  assert.equal(partial.semanticEvidenceCorrect, null); assert.equal(partial.acceptedRecall, 1);
+  assert.deepEqual(partial.supportIntegrity?.validUnsupportedIds, ["VALID-NEGATIVE"]);
+  assert.deepEqual(partial.supportIntegrity?.invalidDecisions, [{ id: "INVALID", code: "invalid_quote" }]);
+  const unexpectedKnowledge = scorerRow(); unexpectedKnowledge.expected = { kind: "clarify", orderId: null, knowledge: "none" };
+  evaluate(unexpectedKnowledge, true);
+  assert.equal(unexpectedKnowledge.businessContractPassed, false);
+  assert.deepEqual(unexpectedKnowledge.extraAcceptedIds, ["GOOD"]);
+  assert.deepEqual(unexpectedKnowledge.supportIntegrity?.invalidDecisions, [{ id: "INVALID", code: "invalid_quote" }],
+    "unexpected provider work still contributes its invalid judgments and cost");
+  const invalidAsNegative = structuredClone(trace);
+  invalidAsNegative.supportVerification!.value.push({ id: "INVALID", supported: false, quote: null, reason: "cannot convert invalid to a rejection" });
+  assert.equal(supportIntegrity(invalidAsNegative).status, "unknown");
+  assert.deepEqual(supportIntegrity(invalidAsNegative).validUnsupportedIds, ["VALID-NEGATIVE"]);
+  const complete = scorerRow(); complete.calls = structuredClone(complete.calls);
+  complete.calls[0]!.knowledge!.trace.supportVerification!.validation = { status: "complete", invalidDecisions: [], outputHash: "a".repeat(64) };
+  complete.calls[0]!.knowledge!.trace.calls.find(call => call.operation === "support")!.status = "ok";
+  evaluate(complete, true); assert.equal(complete.status, "passed"); assert.equal(complete.semanticEvidenceCorrect, true);
+  const unavailable = scorerRow(); unavailable.calls = structuredClone(unavailable.calls);
+  unavailable.calls[0]!.knowledge!.trace.status = "unavailable";
+  unavailable.calls[0]!.knowledge!.trace.supportVerification!.validation!.status = "unavailable";
+  unavailable.calls[0]!.knowledge!.trace.supportVerification!.value = [];
+  evaluate(unavailable, false); assert.equal(unavailable.businessContractPassed, false); assert.equal(unavailable.semanticEvidenceCorrect, null);
+  const order = scorerRow(); order.expected = { kind: "order", orderId: "COUPON-1001", orderRef: "explicit", knowledge: "none" };
+  order.result!.action = { protocol: "v2.2", kind: "order", orderRef: { kind: "explicit", orderId: "COUPON-1001" } };
+  order.result!.evidence.rules = [];
+  order.result!.evidence.order = { id: "COUPON-1001", amounts: { paidCents: 100 } } as SupportResult["evidence"]["order"];
+  order.calls = [{ id: "actual-call", name: "get_order", parentSpanId: "actual-request", actor: "host", trigger: "user", component: "support-controller",
+    observedAt: "2026-10-06T00:00:00.000Z", durationMs: 1, isError: false,
+    input: { orderId: "COUPON-1001" }, output: structuredClone(order.result!.evidence.order) }];
+  evaluate(order, true); assert.equal(order.businessContractPassed, true);
+  for (const mutate of [(row: Row) => { row.calls[0]!.parentSpanId = "earlier-request"; },
+    (row: Row) => { row.calls[0]!.output = { id: "COUPON-1001", amounts: { paidCents: 999 } }; }]) {
+    const stale = structuredClone(order); stale.checks = []; mutate(stale); evaluate(stale, true);
+    assert.equal(stale.businessContractPassed, false, "current ID alone cannot substitute for fresh, matching authorized output");
+  }
+  console.log(`C1 Session runner engineering checks passed: frozen source 10 cases / 20 turns; selection ${selected.plannedCases} cases / ${selected.plannedTurns} turns / max ${selected.maxHttpRequests} HTTP. Strict selection, dynamic denominator, cancellation and missing-execution rejection. No live model.`);
 }
 
-export async function runC1SessionDevelopment() {
+export async function runC1SessionDevelopment(caseId?: string) {
   const { data, source, context } = await loadC1SessionDevelopment();
+  const plan = selectPlan(data, caseId);
   const snapshotFiles = [...new Set([...codeFiles, datasetPath, sourcePath, ...Object.keys(source.baseFiles)])];
   const runId = randomUUID(), startedAt = new Date().toISOString(), codeBefore = await hashes(snapshotFiles);
   const directory = new URL(".runtime/c1-session/", root); await mkdir(directory, { recursive: true });
   const path = new URL(`live-development-${runId}.json`, directory);
-  const guard = requestGuard(70), rows: Row[] = [], cleanup: Array<{ caseId: string; sessionDisposed: boolean; remainingOrders: number }> = [];
+  const guard = requestGuard(plan.maxHttpRequests), rows: Row[] = [], cleanup: Array<{ caseId: string; sessionDisposed: boolean; remainingOrders: number }> = [];
   const { modelRuntime, model } = await createConfiguredModelRuntime();
   assert.equal(model.provider, "deepseek"); assert.equal(model.api, "openai-completions");
   const supportModel = modelRuntime.getModel("deepseek", "deepseek-v4-pro"); assert.ok(supportModel);
@@ -194,10 +310,15 @@ export async function runC1SessionDevelopment() {
   const rerank = createBailianClient({ retries: 0, timeoutMs: 60_000, fetch: guard.fetchFor("rerank") });
   const support = await createEvidenceSupportClient({ profile: "typed", modelSelection: "deepseek-v4-pro", timeoutMs: 60_000, runtime: { model: supportModel,
     complete: (transcript, options) => modelRuntime.complete(supportModel, transcript, { ...options, fetch: guard.fetchFor("support") }) } });
-  const artifact = { version: 1, runId, startedAt, finishedAt: null as string | null, stage: data.stage,
+  assert.equal(support.settings.validationVersion, evidenceSupportValidationVersion);
+  const artifact = { version: 2, runId, startedAt, finishedAt: null as string | null, stage: data.stage,
     modelActionSelectionEvaluated: true, finalAnswerQualityEvaluated: false, source,
+    selection: { caseId: caseId ?? null, selectedCaseIds: plan.cases.map(item => item.id),
+      sourceCases: data.cases.length, sourceTurns: data.cases.reduce((n, item) => n + item.turns.length, 0),
+      plannedCases: plan.plannedCases, plannedTurns: plan.plannedTurns },
     scope: "Real Pi Session / DeepSeek action selection and real Bailian rerank / typed support; isolated in-memory synthetic orders and corpus per case; no SQL or QQ.",
-    settings: { maxHttpRequests: 70, turnTimeoutMs: 60_000, knowledgeTimeoutMs: 60_000, supportProfile: "typed", supportModel: "deepseek-v4-pro", threshold: .5,
+    settings: { maxHttpRequests: plan.maxHttpRequests, requestBudgetFormula: "min(70, plannedTurns * 3 + expectedKnowledgeTurns * 2)",
+      turnTimeoutMs: 60_000, knowledgeTimeoutMs: 60_000, supportProfile: "typed", supportModel: "deepseek-v4-pro", threshold: .5,
       sdkSessionAutomaticRetries: 2, sdkProviderRetries: 0, knowledgeRetries: 0, businessRetries: 0, repairBudget: 1,
       model: { provider: model.provider, id: model.id, api: model.api, maxTokens: Math.min(model.maxTokens, 2048), thinking: "off", cost: model.cost },
       support: support.settings, rerank: rerank.settings },
@@ -207,7 +328,7 @@ export async function runC1SessionDevelopment() {
   const save = async () => writeFile(path, `${JSON.stringify(artifact, null, 2)}\n`);
   await save();
   try {
-    for (const item of data.cases) {
+    for (const item of plan.cases) {
       const orders = new Map(Object.keys(context.dataset.orderFixtures).map(key => [context.dataset.orderFixtures[key]!.orderId, fixtureOrder(key, context)]));
       const store = { getOrder: async (identity: Parameters<CouponStore["getOrder"]>[0], id: string) => {
         const owner = Object.values(context.dataset.orderFixtures).find(order => order.orderId === id)?.owner;
@@ -223,9 +344,10 @@ export async function runC1SessionDevelopment() {
         for (const [index, turn] of item.turns.entries()) {
           const row: Row = { caseId: item.id, turn: index + 1, phase: index === item.turns.length - 1 ? "final" : "preparatory",
             question: turn.question, expected: turn.expect, status: "skipped", durationMs: null, checks: [], steps: [], calls: [], requests: [], sdkRetryEvents: [],
-            rawRecall: null, acceptedRecall: null, firstActionCorrect: null };
+            rawRecall: null, acceptedRecall: null, firstActionCorrect: null,
+            businessContractPassed: null, supportIntegrity: null, semanticEvidenceCorrect: null, extraAcceptedIds: [], missingExpectedIds: [] };
           rows.push(row);
-          if (dependencyFailed || guard.exhausted || guard.requests.length >= 70) { row.reason = dependencyFailed ? "Required prior turn failed; denominator retained" : "Global request budget reached"; continue; }
+          if (dependencyFailed || guard.exhausted || guard.requests.length >= plan.maxHttpRequests) { row.reason = dependencyFailed ? "Required prior turn failed; denominator retained" : "Global request budget reached"; continue; }
           const controller = new AbortController(), capture = captureEvaluationTurn(`${model.provider}/${model.id}`);
           guard.setActive({ caseId: item.id, turn: index + 1, signal: controller.signal });
           prepareSupportPrompt(session, { requestId: `${runId}:${item.id}:${index + 1}`, groupOpenid: `${runId}:${item.id}`,
@@ -253,11 +375,14 @@ export async function runC1SessionDevelopment() {
             return trace.acceptance?.accepted.every(doc => visible.has(doc.id)) ?? true;
           });
           row.checks.push({ layer: "knowledge", name: "accepted sources remain inside trusted scope", passed: scopeValid });
-          if (!scopeValid) row.status = "failed";
+          if (!scopeValid) { row.status = "failed"; row.businessContractPassed = false; }
           // Continue only when the actual prior action established its expected
           // host facts and evidence. Never synthesize the missing reference.
-          dependencyFailed = row.status !== "passed";
-          console.log(`[c1-session] ${item.id}/${index + 1} ${row.status}; HTTP=${guard.requests.length}/70`);
+          // A usable, validated source may create the real topic even if another
+          // candidate was invalid. Continue that business path while retaining
+          // the invalid judgment as an incomplete overall result.
+          dependencyFailed = row.businessContractPassed !== true;
+          console.log(`[c1-session] ${item.id}/${index + 1} ${row.status}; business=${row.businessContractPassed}; integrity=${row.supportIntegrity?.status ?? "not_applicable"}; HTTP=${guard.requests.length}/${plan.maxHttpRequests}`);
           guard.setActive(undefined); await save();
         }
       } finally { cancelSupportTurn(session); await session.abort().catch(() => {}); session.dispose(); orders.clear();
@@ -281,13 +406,17 @@ export async function runC1SessionDevelopment() {
     };
     const layer = (name: Check["layer"]) => ({ checkedTurns: rows.filter(row => row.checks.some(check => check.layer === name)).length,
       passedTurns: rows.filter(row => row.checks.some(check => check.layer === name) && row.checks.filter(check => check.layer === name).every(check => check.passed)).length });
-    artifact.summary = { plannedCases: data.cases.length, plannedTurns: data.cases.reduce((n, item) => n + item.turns.length, 0),
-      passedCases: data.cases.filter(item => rows.filter(row => row.caseId === item.id).length === item.turns.length
+    artifact.summary = { plannedCases: plan.plannedCases, plannedTurns: plan.plannedTurns,
+      passedCases: plan.cases.filter(item => rows.filter(row => row.caseId === item.id).length === item.turns.length
         && rows.filter(row => row.caseId === item.id).every(row => row.status === "passed")).length,
+      businessContractPassedCases: plan.cases.filter(item => rows.filter(row => row.caseId === item.id).length === item.turns.length
+        && rows.filter(row => row.caseId === item.id).every(row => row.businessContractPassed === true)).length,
+      businessContractPassedTurns: rows.filter(row => row.businessContractPassed === true).length,
       passedTurns: rows.filter(row => row.status === "passed").length, failedTurns: rows.filter(row => row.status === "failed").length,
-      skippedTurns: rows.filter(row => row.status === "skipped").length, missingTurns: 20 - rows.length,
-      finalTurns: rows.filter(row => row.phase === "final").map(row => ({ caseId: row.caseId, status: row.status })),
-      layers: Object.fromEntries((["action", "reference", "business", "knowledge", "execution"] as const).map(name => [name, layer(name)])),
+      skippedTurns: rows.filter(row => row.status === "skipped").length, missingTurns: plan.plannedTurns - rows.length,
+      finalTurns: rows.filter(row => row.phase === "final").map(row => ({ caseId: row.caseId, status: row.status, businessContractPassed: row.businessContractPassed,
+        supportIntegrity: row.supportIntegrity?.status ?? null, semanticEvidenceCorrect: row.semanticEvidenceCorrect })),
+      layers: Object.fromEntries((["action", "reference", "business", "knowledge", "execution", "integrity"] as const).map(name => [name, layer(name)])),
       firstActionCorrect: rows.filter(row => row.firstActionCorrect === true).length,
       httpRequests: guard.requests.length, agentHttpRequests: agentRequests, modelResponses: modelSteps.length, agentUsageReported: agentReported.length,
       agentTotalTokens: agentReported.length === agentRequests ? agentReported.reduce((n, step) => n + step.usage!.totalTokens, 0) : null,
@@ -295,9 +424,17 @@ export async function runC1SessionDevelopment() {
         ? agentReported.reduce((n, step) => n + step.usage!.estimatedCostUsd!, 0) : null,
       sdkRetryStarts: rows.reduce((n, row) => n + row.sdkRetryEvents.filter(event => event.type === "auto_retry_start").length, 0),
       knowledge: { providerCoverage, rerankTokens: knowledgeSum("rerankTokens"), supportTokens: knowledgeSum("supportTokens"),
-        estimatedCny: knowledgeSum("estimatedCny"), estimatedUsd: knowledgeSum("estimatedUsd"), incompleteCalls: traces.reduce((n, trace) => n + trace.usage.incompleteCalls, 0) },
-      budgetExhausted: guard.exhausted || guard.requests.length >= 70, cleanupsCompleted: cleanup.length,
-      conclusion: "Development evidence only. Action selection, host facts, knowledge support and final natural-language quality are separate; final answer quality is not scored." };
+        estimatedCny: knowledgeSum("estimatedCny"), estimatedUsd: knowledgeSum("estimatedUsd"), incompleteCalls: traces.reduce((n, trace) => n + trace.usage.incompleteCalls, 0),
+        plannedTurns: plan.knowledgeTurns, measuredTurns: rows.filter(row => row.supportIntegrity !== null).length,
+        invalidCandidatesKnown: traces.reduce((n, trace) => n + (trace.supportVerification?.validation?.invalidDecisions.length ?? 0), 0),
+        integrityCounts: Object.fromEntries((["complete", "partial", "unavailable", "unknown", "not_applicable"] as const)
+          .map(status => [status, rows.filter(row => row.supportIntegrity?.status === status).length])),
+        semanticCorrectTurns: rows.filter(row => row.semanticEvidenceCorrect === true).length,
+        semanticIncorrectTurns: rows.filter(row => row.semanticEvidenceCorrect === false).length,
+        semanticUnscoredTurns: rows.filter(row => row.expected.knowledge === "evidence" && row.semanticEvidenceCorrect === null).length,
+        extraAcceptedIds: rows.flatMap(row => row.extraAcceptedIds), missingExpectedIds: rows.flatMap(row => row.missingExpectedIds) },
+      budgetExhausted: guard.exhausted || guard.requests.length >= plan.maxHttpRequests, cleanupsCompleted: cleanup.length,
+      conclusion: "Development evidence only. Business contract satisfaction is separate from complete candidate judgments. Invalid candidates are neither correct rejections nor semantically correct decisions. Partial judgments prevent an overall pass even when usable evidence completes the business action. Final answer quality is not scored." };
     await save();
     console.log(JSON.stringify({ artifact: path.pathname, codeStable: artifact.codeStable, ...artifact.summary }));
   }
@@ -305,6 +442,7 @@ export async function runC1SessionDevelopment() {
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
-  if (process.argv.includes("--live")) await runC1SessionDevelopment();
-  else await checkC1SessionRunner();
+  const options = parseArgs(process.argv.slice(2));
+  if (options.live) await runC1SessionDevelopment(options.caseId);
+  else await checkC1SessionRunner(options.caseId);
 }

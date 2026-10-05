@@ -16,14 +16,17 @@ export function resolveEvidenceSupportModel(selection: EvidenceSupportModel = "c
     : env.MODEL_ID?.trim() || (provider === "deepseek" ? "deepseek-flash" : "gpt-4.1-mini") };
 }
 export type EvidenceSupportCategory = "direct_fact" | "boundary_answer" | "limitation_only" | "unrelated";
+export const evidenceSupportValidationVersion = "typed-candidate-isolation-v1";
+export type EvidenceSupportValidation = { status: "complete" | "partial" | "unavailable"; outputHash: string | null;
+  invalidDecisions: Array<{ id: string; code: "invalid_quote" | "invalid_reason" | "invalid_category" }> };
 export type EvidenceSupportDecision = { id: string; supported: boolean; quote: string | null; reason: string; category?: EvidenceSupportCategory };
 export type EvidenceSupportAttempt = { operation: "support"; provider: string; model: string; attempt: 1; durationMs: number;
   outcome: "ok" | "timeout" | "provider_error" | "invalid_response"; totalTokens: number | null; inputTokens: number | null;
   outputTokens: number | null; cacheReadTokens: number | null; cacheWriteTokens: number | null; costUsd: number | null };
 export type EvidenceSupportSettings = { provider: string; model: string; api: string; endpoint: string; timeoutMs: number;
   temperature: 0; maxTokens: number; maxRetries: 0; promptVersion: string; promptHash: string; serialization: string; serializationHash: string;
-  pricing: { currency: "USD"; estimated: true; source: "Pi model catalog"; rates: ModelCost }; profile?: "typed" };
-export type EvidenceSupportResult = { value: EvidenceSupportDecision[]; requestHash: string; attempts: EvidenceSupportAttempt[] };
+  pricing: { currency: "USD"; estimated: true; source: "Pi model catalog"; rates: ModelCost }; profile?: "typed"; validationVersion?: typeof evidenceSupportValidationVersion };
+export type EvidenceSupportResult = { value: EvidenceSupportDecision[]; requestHash: string; attempts: EvidenceSupportAttempt[]; validation?: EvidenceSupportValidation };
 export type EvidenceSupportVerification = EvidenceSupportResult & { inputHash: string };
 export type EvidenceSupportClient = { settings: EvidenceSupportSettings;
   verify(query: string, candidates: readonly EvidenceSupportCandidate[]): Promise<EvidenceSupportResult> };
@@ -72,13 +75,21 @@ query附加的已核实商品/状态仅用于定位适用条件，不能取代�
 每个输入ID恰好一项，无遗漏、无新增、无额外字段。前三类quote必须是body中连续逐字一致且非空的原文，最长2000字；unrelated必须quote=null。reason简述原文已给出的事实或欠缺事实，不输出思维链。不要输出supported字段；宿主根据类别决定是否接收。`;
 export const evidenceSupportTypedV2PromptHash = "cd375d082eb2b5fb9b780377cad922df5d3b79dffe7568df823a06c1b3b344a3";
 
-export const evidenceSupportTypedPromptVersion = "fact-support-typed-v3";
-export const evidenceSupportTypedPrompt = evidenceSupportTypedV2Prompt
+export const evidenceSupportTypedV3PromptVersion = "fact-support-typed-v3";
+export const evidenceSupportTypedV3Prompt = evidenceSupportTypedV2Prompt
   .replace("元边界诉求：用户明确问现有证据是否足够、是否可以作某种推断或应到哪里核实。不得因为原文只有缺失声明，就把一个实例事实问题改写成元边界问题。",
     "元边界诉求：用户明确问知识库或文档是否已经记载某信息、现有证据是否足够、是否可以作某种推断或应到哪里核实。若用户问文档是否有记载，原文明示未录入、未提供或未记载，就是足以回答‘文档没有记录’的否定依据；这是关于文档覆盖范围的答案，不是关于现实业务资格的答案。不得因为原文只有缺失声明，就把一个实例事实问题改写成文档覆盖或其他元边界问题。")
   .replace("boundary_answer：用户明确问元边界，且原文直接回答该元问题。若问某对象到底能否使用，原文“尚未录入”不能归此类。",
     "boundary_answer：用户明确问元边界，且原文直接回答该元问题。问‘资料有没有记载操作时段’，原文‘操作时段未登记’可支持否定回答；问‘现在是否允许操作’，同一缺失声明只能归limitation_only。实例使用资格、具体日期、是否已批准或到账仍需该事实依据；文档未记载不能证明现实中可以、不可以、已经或尚未发生。")
   .replace("reason简述原文已给出的事实或欠缺事实，不输出思维链。", "reason简述原文已给出的规则、实例事实、文档覆盖事实或尚欠的事实，不输出思维链。");
+export const evidenceSupportTypedV3PromptHash = "5d976a03cd880350701f65b08b7fee0397e23891807c4ccf7c5598879e8c8395";
+
+export const evidenceSupportTypedPromptVersion = "fact-support-typed-v4";
+export const evidenceSupportTypedPrompt = evidenceSupportTypedV3Prompt.replace("先识别用户诉求，再判断证据：", `先核对问题的引用是否完整，再识别用户诉求、判断规则是否适用：
+引用完整性：时间、主体或对象的指代必须在query的本轮问题或附带的已核实前文中有明确依据。若所问判断依赖尚未解析的指代，不能从候选原文中的时限、数字、主体或对象反向补齐，也不能把原问题换成自行选择条件后的通用建议。相关原文只能归limitation_only；无关原文归unrelated。query已提供的可信前文可用于理解指代，不得一律把有省略的续问当作无答案；本身完整的一般政策问题无需虚构实例或要求历史前文。
+当前对象适用性：用户问当前对象符合哪些条件、具有何种资格或可如何处理时，须按整篇原文的适用对象、生命周期、数量及其他前提，与query中的已核实事实逐项核对。不能只截取局部通用句，忽略整篇规则限定，或因主题相同就接收只适用于其他状态、数量或对象的规则。前提冲突或关键前提尚未确定时，该篇不能归direct_fact；相关但不足以回答归limitation_only，无关归unrelated。引文不得掩去使规则不适用于当前对象的前提，reason应说明适用或欠缺的关键条件。
+一般或假设规则：用户明确咨询一般规则、流程或假设条件时，可按原文解释这些条件及结果，不要求现实实例已经满足假设、获批或完成；也不得把条件式规定升级为当前实例已满足。规则要求审批仍可回答审批流程问题。当前对象资格咨询不是枚举所有同主题规则；上述区别不改变元边界问题的判断。
+在引用完整、适用条件符合所问诉求后，按以下分类合同判断：`);
 
 const plain = (value: unknown): value is Record<string, unknown> => Boolean(value && typeof value === "object" && !Array.isArray(value)
   && [Object.prototype, null].includes(Object.getPrototypeOf(value)));
@@ -127,12 +138,30 @@ export function validateEvidenceSupport(value: unknown, candidates: readonly Evi
   return evidenceSupportFailure(value, candidates, profile) === null;
 }
 export function validateEvidenceSupportVerification(value: unknown, input: EvidenceSupportInput): value is EvidenceSupportVerification {
-  if (!plain(value) || !keysExactly(value, ["value", "requestHash", "attempts", "inputHash"]) || value.inputHash !== evidenceSupportInputHash(input)
-    || value.requestHash !== evidenceSupportRequestHash(input) || !validateEvidenceSupport(value.value, input.candidates, input.settings.profile ?? "binary")
+  const isolated = input.settings.validationVersion === evidenceSupportValidationVersion;
+  if (input.settings.validationVersion !== undefined && (!isolated || input.settings.profile !== "typed")) return false;
+  if (!plain(value) || !keysExactly(value, ["value", "requestHash", "attempts", "inputHash", ...(isolated ? ["validation"] : [])])
+    || value.inputHash !== evidenceSupportInputHash(input) || value.requestHash !== evidenceSupportRequestHash(input)
     || !Array.isArray(value.attempts) || value.attempts.length > 1) return false;
+  let expectedOutcome = "ok";
+  if (isolated) {
+    if (value.attempts.length !== (input.candidates.length ? 1 : 0)) return false;
+    const validation = value.validation;
+    if (!plain(validation) || !keysExactly(validation, ["status", "outputHash", "invalidDecisions"]) || !Array.isArray(validation.invalidDecisions)
+      || (input.candidates.length ? typeof validation.outputHash !== "string" || !/^[a-f0-9]{64}$/.test(validation.outputHash) : validation.outputHash !== null)) return false;
+    const ids = new Set(input.candidates.map(doc => doc.id)), invalidIds = new Set<string>();
+    for (const row of validation.invalidDecisions) {
+      if (!plain(row) || !keysExactly(row, ["id", "code"]) || typeof row.id !== "string" || !ids.has(row.id) || invalidIds.has(row.id)
+        || typeof row.code !== "string" || !["invalid_quote", "invalid_reason", "invalid_category"].includes(row.code)) return false;
+      invalidIds.add(row.id);
+    }
+    const status = invalidIds.size === 0 ? "complete" : invalidIds.size === input.candidates.length ? "unavailable" : "partial";
+    if (validation.status !== status || !validateEvidenceSupport(value.value, input.candidates.filter(doc => !invalidIds.has(doc.id)), "typed")) return false;
+    if (status === "unavailable") expectedOutcome = "invalid_response";
+  } else if (!validateEvidenceSupport(value.value, input.candidates, input.settings.profile ?? "binary")) return false;
   return value.attempts.every(attempt => plain(attempt) && keysExactly(attempt, ["operation", "provider", "model", "attempt", "durationMs", "outcome", "totalTokens", "inputTokens", "outputTokens", "cacheReadTokens", "cacheWriteTokens", "costUsd"])
     && attempt.operation === "support" && attempt.provider === input.settings.provider && attempt.model === input.settings.model && attempt.attempt === 1
-    && attempt.outcome === "ok" && typeof attempt.durationMs === "number" && Number.isFinite(attempt.durationMs) && attempt.durationMs >= 0
+    && attempt.outcome === expectedOutcome && typeof attempt.durationMs === "number" && Number.isFinite(attempt.durationMs) && attempt.durationMs >= 0
     && ["totalTokens", "inputTokens", "outputTokens", "cacheReadTokens", "cacheWriteTokens"].every(key => attempt[key] === null || (Number.isSafeInteger(attempt[key]) && Number(attempt[key]) >= 0))
     && (attempt.costUsd === null || (typeof attempt.costUsd === "number" && Number.isFinite(attempt.costUsd) && attempt.costUsd >= 0)));
 }
@@ -148,6 +177,10 @@ export class EvidenceSupportError extends Error {
 type CompletionOptions = { signal: AbortSignal; timeoutMs: number; temperature: 0; maxTokens: number; maxRetries: 0;
   samplingParams: { response_format: { type: "json_object" } }; onPayload: (value: unknown) => unknown };
 export async function createEvidenceSupportClient(options: { env?: NodeJS.ProcessEnv; timeoutMs?: number; profile?: EvidenceSupportProfile; modelSelection?: EvidenceSupportModel;
+  // Internal prompt replay only; historical requests must select their actual prompt, independently of the parser.
+  typedPromptVersion?: typeof evidenceSupportTypedV3PromptVersion | typeof evidenceSupportTypedPromptVersion;
+  // Internal historical replay only; no user-facing parser toggle. Legacy typed settings omit validationVersion.
+  validationVersion?: "typed-batch-v1" | typeof evidenceSupportValidationVersion;
   // Synthetic diagnostics only: no query or reasoning blocks, bounded text; production does not install an observer.
   observeResponseForTest?: (response: { text: string; stopReason: AssistantMessage["stopReason"]; outputHash: string; truncated: boolean }) => void;
   // Injection keeps transport checks deterministic; production always uses the configured Pi runtime.
@@ -156,7 +189,12 @@ export async function createEvidenceSupportClient(options: { env?: NodeJS.Proces
   const timeoutMs = options.timeoutMs ?? 60_000;
   const profile = options.profile ?? "binary";
   if (profile !== "binary" && profile !== "typed") throw new Error("支持性判别 profile 仅支持 binary 或 typed。");
-  const prompt = profile === "typed" ? evidenceSupportTypedPrompt : evidenceSupportPrompt;
+  if (options.typedPromptVersion !== undefined && (profile !== "typed" || ![evidenceSupportTypedV3PromptVersion, evidenceSupportTypedPromptVersion].includes(options.typedPromptVersion))) throw new Error("支持判别提示词版本无效。");
+  if (options.validationVersion !== undefined && (profile !== "typed" || !["typed-batch-v1", evidenceSupportValidationVersion].includes(options.validationVersion))) throw new Error("支持判别校验版本无效。");
+  const isolated = profile === "typed" && options.validationVersion !== "typed-batch-v1";
+  const promptVersion = profile === "typed" ? options.typedPromptVersion ?? evidenceSupportTypedPromptVersion : evidenceSupportPromptVersion;
+  const prompt = profile === "binary" ? evidenceSupportPrompt
+    : promptVersion === evidenceSupportTypedV3PromptVersion ? evidenceSupportTypedV3Prompt : evidenceSupportTypedPrompt;
   if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1000 || timeoutMs > 120_000) throw new Error("支持性判别超时配置无效。");
   const selected = options.modelSelection === undefined ? null : resolveEvidenceSupportModel(options.modelSelection, options.env);
   const configured = options.runtime ?? await (async () => {
@@ -170,14 +208,16 @@ export async function createEvidenceSupportClient(options: { env?: NodeJS.Proces
   const endpoint = new URL(model.baseUrl);
   if (endpoint.protocol !== "https:" || endpoint.username || endpoint.password || endpoint.search || endpoint.hash) throw new Error("支持性判别 endpoint 无效。");
   const settings: EvidenceSupportSettings = { provider: model.provider, model: model.id, api: model.api, endpoint: model.baseUrl, timeoutMs,
-    temperature: 0, maxTokens: Math.min(model.maxTokens, 2048), maxRetries: 0, promptVersion: profile === "typed" ? evidenceSupportTypedPromptVersion : evidenceSupportPromptVersion,
+    temperature: 0, maxTokens: Math.min(model.maxTokens, 2048), maxRetries: 0, promptVersion,
     promptHash: contentHash(prompt), serialization: evidenceSupportSerialization,
     serializationHash: contentHash(evidenceSupportSerialization), pricing: { currency: "USD", estimated: true, source: "Pi model catalog", rates: structuredClone(model.cost) },
-    ...(profile === "typed" ? { profile } : {}) };
+    ...(profile === "typed" ? { profile } : {}), ...(isolated ? { validationVersion: evidenceSupportValidationVersion } : {}) };
   return { settings, async verify(query, candidates) {
     validateCandidates(query, candidates);
     const requestHash = evidenceSupportRequestHash({ query, candidates, settings });
-    if (!candidates.length) return { value: [], requestHash, attempts: [] };
+    if (!candidates.length) return { value: [], requestHash, attempts: [], ...(isolated ? { validation: {
+      status: "complete" as const, outputHash: null, invalidDecisions: [],
+    } } : {}) };
     const started = performance.now(), controller = new AbortController();
     const attempt: EvidenceSupportAttempt = { operation: "support", provider: model.provider, model: model.id, attempt: 1, durationMs: 0,
       outcome: "provider_error", totalTokens: null, inputTokens: null, outputTokens: null, cacheReadTokens: null, cacheWriteTokens: null, costUsd: null };
@@ -219,6 +259,25 @@ export async function createEvidenceSupportClient(options: { env?: NodeJS.Proces
         if (!Array.isArray(decisions) || decisions.some(row => !plain(row) || !keysExactly(row, ["id", "category", "quote", "reason"]))) throw new Error("invalid typed decisions");
         decisions = decisions.map(row => ({ ...row, supported: row.category === "direct_fact" || row.category === "boundary_answer" }));
       }
+      if (isolated) {
+        // Trust the mapping only after the full response has exactly one row for every known candidate.
+        const rows = decisions as Array<Record<string, unknown>>, ids = new Set(candidates.map(doc => doc.id));
+        code = "invalid_id";
+        if (rows.length !== candidates.length || new Set(rows.map(row => row.id)).size !== candidates.length
+          || rows.some(row => typeof row.id !== "string" || !ids.has(row.id))) throw new Error();
+        const valid: EvidenceSupportDecision[] = [], invalidDecisions: EvidenceSupportValidation["invalidDecisions"] = [];
+        for (const row of rows) {
+          const candidate = candidates.find(doc => doc.id === row.id)!;
+          const invalid = evidenceSupportFailure([row], [candidate], "typed");
+          if (invalid) {
+            if (invalid !== "invalid_quote" && invalid !== "invalid_reason" && invalid !== "invalid_category") { code = invalid; throw new Error(); }
+            invalidDecisions.push({ id: candidate.id, code: invalid });
+          } else valid.push(row as EvidenceSupportDecision);
+        }
+        const status = !invalidDecisions.length ? "complete" : !valid.length ? "unavailable" : "partial";
+        attempt.outcome = status === "unavailable" ? "invalid_response" : "ok";
+        return { value: valid, requestHash, attempts: [attempt], validation: { status, outputHash, invalidDecisions } };
+      }
       const invalid = evidenceSupportFailure(decisions, candidates, profile);
       if (invalid) { code = invalid; throw new Error(); }
       attempt.outcome = "ok";
@@ -257,16 +316,18 @@ export function applyEvidenceSupport(input: { prepared: EvidenceAcceptanceResult
     documents: input.documents, ranking: candidates.map(doc => ({ id: doc.id, score: doc.score })) });
   const stillValid = new Map(current.accepted.map(doc => [doc.id, doc]));
   const decisions = new Map(input.verification.value.map(row => [row.id, row]));
+  const invalidIds = new Set(input.verification.validation?.invalidDecisions.map(row => row.id) ?? []);
   let stale = false;
   for (const candidate of candidates) {
     const original = stillValid.get(candidate.id), decision = decisions.get(candidate.id)!;
     if (!original || original.title !== candidate.title || original.body !== candidate.body || JSON.stringify(original.tags) !== JSON.stringify(candidate.tags)) {
       stale = true;
       result.rejected.push({ id: candidate.id, rank: candidate.rank, reason: "support_unavailable" });
-    } else if (!decision.supported) result.rejected.push({ id: candidate.id, rank: candidate.rank, reason: "unsupported" });
+    } else if (invalidIds.has(candidate.id)) result.rejected.push({ id: candidate.id, rank: candidate.rank, reason: "invalid_support_decision" });
+    else if (!decision.supported) result.rejected.push({ id: candidate.id, rank: candidate.rank, reason: "unsupported" });
     else result.accepted.push({ ...original, rank: candidate.rank });
   }
   if (stale) { result.accepted = []; result.status = "unavailable"; }
-  else result.status = result.accepted.length ? "accepted" : "rejected";
+  else result.status = result.accepted.length ? "accepted" : invalidIds.size ? "unavailable" : "rejected";
   return result;
 }

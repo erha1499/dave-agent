@@ -9,11 +9,11 @@ export type KnowledgeMode = "lexical" | "m4-support";
 export type KnowledgeStage = "read" | "rerank" | "support" | "recheck";
 export type KnowledgeDocuments = Awaited<ReturnType<CouponStore["searchKnowledge"]>>;
 export type KnowledgeCall = { operation: "rerank"; requestHash: string | null; attempts: BailianAttempt[]; status: "ok" | "unavailable" }
-  | { operation: "support"; requestHash: string | null; attempts: EvidenceSupportAttempt[]; status: "ok" | "unavailable" };
+  | { operation: "support"; requestHash: string | null; attempts: EvidenceSupportAttempt[]; status: "ok" | "partial" | "unavailable" };
 export type KnowledgeTrace = {
   mode: KnowledgeMode; threshold: number | null; query: string; originalQuery: string; scope: RetrievalScope;
   status: "accepted" | "rejected" | "unavailable";
-  reason: null | "invalid_input" | "aborted" | "timeout" | "database_unavailable" | "provider_unavailable" | "source_changed";
+  reason: null | "invalid_input" | "aborted" | "timeout" | "database_unavailable" | "provider_unavailable" | "source_changed" | "invalid_support_decision";
   rawRanking: EvidenceRanking; acceptance: EvidenceAcceptanceResult | null;
   // Current accepted document versions, never versions carried by an earlier conversation topic.
   sources?: Array<{ sourceId: string; version: string }>;
@@ -136,7 +136,7 @@ export function createKnowledgeService(store: Pick<CouponStore, "readKnowledgeDo
           call.requestHash = verification.requestHash; call.attempts = verification.attempts;
           if (verification.attempts.length !== 1) throw new Error();
           trace.supportVerification = structuredClone(verification);
-          call.status = "ok";
+          call.status = verification.validation?.status === "partial" ? "partial" : verification.validation?.status === "unavailable" ? "unavailable" : "ok";
         } catch (error) {
           if (error instanceof EvidenceSupportError) {
             call.attempts = error.attempts;
@@ -153,7 +153,10 @@ export function createKnowledgeService(store: Pick<CouponStore, "readKnowledgeDo
         scope: trace.scope, documents: after, settings: supportClient!.settings });
       signal.throwIfAborted();
       trace.status = trace.acceptance.status;
-      if (trace.status === "unavailable") throw new Error();
+      if (trace.status === "unavailable") {
+        if (verification?.validation?.invalidDecisions.length) trace.reason = "invalid_support_decision";
+        throw new Error();
+      }
       const current = new Map(after.map(doc => [doc.id, doc]));
       documents = trace.acceptance.accepted.map(entry => {
         const doc = current.get(entry.id)!;
@@ -167,7 +170,7 @@ export function createKnowledgeService(store: Pick<CouponStore, "readKnowledgeDo
         : stage === "read" || stage === "recheck" ? "database_unavailable" : "provider_unavailable";
       if (trace.acceptance) {
         trace.acceptance.accepted = []; delete trace.acceptance.pendingSupport; trace.acceptance.status = "unavailable";
-        trace.acceptance.rejected.push({ id: null, rank: null, reason: "provider_unavailable" });
+        if (trace.reason !== "invalid_support_decision") trace.acceptance.rejected.push({ id: null, rank: null, reason: "provider_unavailable" });
       }
     }
     for (const operation of ["rerank", "support"] as const) {

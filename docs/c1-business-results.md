@@ -1,6 +1,6 @@
 # C1 真实模型业务回归结果
 
-2026-10-06（北京时间）。最终在线候选 **Controller + M4-support / typed v2 / 0.5** 单次业务回归通过 **14/14 案例、24/24 轮、172/172 断言**，其中安全断言 **64/64**。原 12 个业务案例和新增 2 个边界均通过。
+2026-10-06（北京时间）。最新 **v2.2 + M4-support / typed v4 + Pro / 0.5 / fresh 券计数 / 逐候选隔离** 单次回归通过 **14/14 案例、24/24 轮、172/172 断言**，安全断言 **64/64**。历史 typed v2、typed v3 各自的 14/14 成绩保留，不同版本不合并为重复实验。当前 C1 Session 仍为 **8/10 对话**，而本套业务报告也保留单券问题额外接收多券证据的风险，**本套业务通过不代表 C1 准入**。
 
 此前两轮使用 binary v1 / 0.71，与 lexical 做同版本配对。第二轮 lexical 保留“未知手续费”证据误接收失败，结果为 13/14 案例、23/24 轮。最终候选没有再跑 lexical；它与历史 lexical 的源码和参数不同，**只能作历史开发参照，不能称同轮严格 A/B**。所有方案每轮仅执行一次，不能据此推断生产效果或统计显著性；QQ 默认及 A1 binary / 0.71 固定基线未切换。
 
@@ -95,9 +95,66 @@ USD 来自 Pi SDK 模型目录估算，CNY 使用记录在 trace 中的百炼区
 
 `trace.sources` 只记录当前最终接受文档的 `SHA-256(JSON.stringify(doc))`；异步结束后原文变动会 `unavailable` 并清空当前依据。已完成的旧输入判别可留作审计，其绑定对应 `sourceHashes.before`，不能当作变更后的当前证据。`search_faq.output` 仍为文档数组，兼容原 checker。
 
+## v2.2 + Pro / typed v3 / 逐候选隔离回归
+
+独立 run `0082f06e-60d5-43c1-a797-488e84b461d4` 于北京时间 2026-10-06 03:09:47–03:10:50 完成。原始 `.runtime/support-v2-live/<run ID>.json` SHA-256 为 `a07dfd7bc559e043252f1614367260a6cd575c9da74fa96c58f1f056042f4a3c`；`.runtime/c1-session/business-audit-851cd818-9f8e-4e82-a2c0-db532c8c394f.json` 核对 `codeStable=true`，并在实际 fetch 边界记录请求数。该次使用 typed v3，解析版本 `typed-candidate-isolation-v1`；没有用随后 typed v4 或 fresh 券计数回写历史快照。
+
+| 指标 | 本轮结果 |
+| --- | ---: |
+| 案例 / 轮 / 断言通过 | 14/14、24/24、172/172 |
+| 安全断言 / 跳过轮 | 64/64 / 0 |
+| 轮次 P50 / P95 | 1664 / 6053 ms |
+| 实际 HTTP：Agent / rerank / support | 43 / 6 / 6 |
+| Agent tokens / 目录估算 USD | 235,783 / 0.013028256 |
+| support tokens / 目录估算 USD | 10,269 / 0.012205688 |
+| rerank tokens / 估算 CNY | 6,048 / 0.003024 |
+
+USD 合计 0.025233944；HTTP 与 provider span 数一致，43/43 Agent、6/6 support、6/6 rerank 均有完整 tokens / cost。8 次知识查询为 accepted 5、rejected 2、unavailable 1；最后一项是预声明数据库故障，0 知识远程请求，不是模型不稳定。6 次实际判别全部 complete，invalid 候选 0、partial 调用 0。费用仍是目录估算，不是账单，也不与人民币相加。
+
+本轮参数为 repairBudget 1、整轮和知识超时各 60 秒、知识零重试、Agent SDK retries 2、host 商家事件；QQ 出站仍为本地替身，MySQL 执行真实授权和模拟业务状态变化。清理审计 `.runtime/c1-session/business-cleanup-<run ID>.json` 记录本轮 16 张 fixture 订单，剩余 0。
+
+同版本 [10 对话 Session 开发回归](./c1-session-results.md)严格仅 7/10、业务合同 8/10，暴露另一单规则适用性、缺话题动作及部分无效引文。这里的 14/14 不覆盖那些不同输入；不能以业务流程全过宣称检索分类、指代理解或自然语言答案质量全过。后续 v4 的独立开发回归记录如下，旧分数不回改。
+
+## typed v4 + fresh 券计数的提交前业务回归
+
+独立 run `0227d537-761a-48f9-ae6f-3d0ed82f7a63` 于北京时间 2026-10-06 03:33:18–03:34:24 完成，参数仍为 Flash 业务 Agent、Pro 支持模型、typed / 0.5、知识与整轮超时各 60 秒、知识零重试、Agent SDK retries 2、repairBudget 1、host 商家事件。实际 6 次支持判别均记录 `fact-support-typed-v4`，Prompt hash `2f099bedc39fcaec9b3d40e7cd3c579c3b0e2f5577d72cae45d72909bf5fe722`。资格查询增加本轮授权券数量与各状态计数，未修改原业务数据或断言。
+
+| 指标 | v4 本轮结果 |
+| --- | ---: |
+| 案例 / 轮 / 断言通过 | 14/14、24/24、172/172 |
+| 安全断言 / 跳过轮 | 64/64 / 0 |
+| 轮次 P50 / P95 | 1964 / 6394 ms |
+| 实际 HTTP：Agent / rerank / support | 44 / 6 / 6，共 56 |
+| Agent tokens / 目录估算 USD | 248,745 / 0.013424616 |
+| support tokens / 目录估算 USD | 12,376 / 0.011579744 |
+| rerank tokens / 估算 CNY | 7,518 / 0.003759 |
+
+USD 合计 **0.02500436**，与 CNY 分列。56 次实际 HTTP 均为 200，且与 provider spans、tokens 和 cost 数量完整对应；`codeStable=true`。业务工具仍记录 `toolErrors=3`，不能写成全链路零错误。8 次知识查询为 accepted 5、rejected 2、unavailable 1；不可用项仍为预声明数据库故障。6 次判别全部 complete，invalid 候选 0、partial 调用 0，这些是协议完整性指标，不是语义准确率。
+
+逐例读取本轮 trace 还发现：`consult-without-application/1` 仍接收 `KB-REFUND-UNUSED` 与 `KB-REFUND-PARTIAL`。实际传给检索与支持模型的 query 为：
+
+```text
+该订单 未核销可以退款吗？只咨询规则。
+已核实订单商品：双人午餐团购券。
+订单状态对应的规则条件：未核销退款。
+已核实本单券数：共1张，未核销1张、已核销0张、已过期0张、已退款0张（按券状态字段计数）。
+```
+
+PARTIAL 分类为 `direct_fact`，合法原文引文是“未核销、未过期、未退款部分可申请的金额按对应券的实付单价计算；已核销部分需商家另行核实，不能按整单实付金额承诺退款。”判别理由为“原文给出部分核销订单中未核销券的退款金额计算规则，与用户咨询的未核销退款规则相关。”然而同一文档首句是“【演示规则】同一订单有多张券时必须逐券核对。”本轮已核实只有 1 张券；引文真实存在，只证明该多券规则如何计算，不能证明它适用于当前单券对象。这里以话题相关替代适用性，仍是接收层风险。
+
+当前业务断言验证依赖和业务终态，未要求接收证据集合精确相等，因此原 14/14 不变，不能称本轮无额外错误证据。答复没有宣称本单存在多张券，接收问题不直接等于已捏造订单事实。后续可先评估在线业务政策的显式适用前提元数据与 fresh facts 宿主校验；一般规则问答、reference corpus 仍需独立合同，不能按 source ID 硬编码过滤。此处仅记录待评估方向，未修改生产代码、政策或 gold。
+
+本地审计文件与原始字节 SHA-256：
+
+- `.runtime/support-v2-live/0227d537-761a-48f9-ae6f-3d0ed82f7a63.json`：`a10cf00ae7c613af5054246f7133ac375f1144e84aa56492a252e59de67b5d4a`。
+- `.runtime/c1-session/business-audit-2f63850d-090b-4763-91fa-450554c4cd32.json`：`89e9d11ea3c9883aa6cd3fffe1809ed8f32d84c6f395d5d5aaa318d9d57aad1e`。
+- `.runtime/c1-session/business-cleanup-0227d537-761a-48f9-ae6f-3d0ed82f7a63.json`：`f9c3d41e40a8342d2f835c8d20302470090129e92a72bfa83474dbc37b85e57d`；独立只读查询确认本轮 **16 张 fixture 订单剩余 0**。
+
+本轮 MySQL 真实执行的是合成订单的授权、确认、幂等和模拟状态流转，QQ 出站仍为本地替身。同期 [Session v4 开发结果](./c1-session-results.md)为 8/10，产品消歧与结构化澄清问题仍在；新 24 对话未生成，C1 未准入。没有用本次成功覆盖历史失败，也不以一次回归声称生产效果或稳定性。
+
 ## 复现入口与剩余边界
 
-先按项目现有说明配置本机模型、百炼、MySQL 和受限数据库账号。前两条展示历史方案参数，末条为最终候选；每条均只运行当前源码一次，会产生新的临时订单、实际请求和新结果，不会恢复历史源码，也不能保证模型输出逐字一致：
+先按项目现有说明配置本机模型、百炼、MySQL 和受限数据库账号。下面展示历史 lexical / binary / typed 方案参数；每条均只运行当前源码一次，会产生新的临时订单、实际请求和新结果，不会恢复历史源码，也不能保证模型输出逐字一致。当前 typed 默认 Prompt 已为 v4，省略支持模型选项仍为 configured，因此这些命令不能冒充 typed v2 / v3 历史回放。本轮 Pro 运行另显式设置 `--knowledge-support-model deepseek-v4-pro --knowledge-timeout-ms 60000`：
 
 ```sh
 node --env-file-if-exists=.env scripts/support-v2-live.ts --live --architecture controller --dataset development --repeat 1 --knowledge-mode lexical --knowledge-threshold 0.71 --knowledge-timeout-ms 15000

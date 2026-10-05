@@ -116,6 +116,10 @@ C1 的 `business-service/search_faq` 保留 `output: documents[]`，附加 `know
 
 `trace.supportModel` 是配置选择（configured / deepseek-v4-pro），`trace.settings.support.provider/model` 才是判别客户端实际配置；没有真实请求时不得用所选项补造模型调用。`trace.supportFailure` 可包含失败枚举 `code` 与 `outputHash`，不包含原始模型文本。类别/引文的成功记录仍在 `supportVerification.value` 数组中。v2.2 `paid_amount_compare` 只读取授权订单和金额引用，正常没有知识 trace，不应显示为检索失败。
 
+typed 的 `settings.support.validationVersion: "typed-candidate-isolation-v1"` 表示逐候选校验。`supportVerification.validation` 保存 `status: complete | partial | unavailable`、`outputHash` 和 `invalidDecisions: [{id, code}]`；code 为 `invalid_quote | invalid_reason | invalid_category`。`value[]` 只含有效判断，与 invalid ID 不重叠且合起来恰好覆盖本次候选。整体 JSON/结构、未知/重复/遗漏 ID 仍整批拒绝；invalid 不等于 `supported:false`，不计正确拒收。全项无效、或仅有有效负例而其他项无效时，取证为 unavailable；仍有有效正例时可返回 accepted，并明确保留 partial。候选原文及范围复检不变。请求和已发生用量完整保留，partial 的 provider span 标为 error，不能当完整判别成功；业务是否完成另行评分。旧记录没有 validation 字段时不补造完整性结论，异常状态组合保留原始 trace 并显示记录异常。
+
+v2.2 的 `context.facts.couponCounts` 来自本轮授权订单的券状态字段，含 total/unused/redeemed/expired/refunded。资格及业务前提检索附带该数量，帮助判断多券或核销规则的适用性；普通政策咨询不额外扩展 query。此字段不把有效期推断成新的券状态，也不代表退款批准；旧协议回放不增加该字段。
+
 知识提供商请求只在相应子 span 填 `usage`，其父 `search_faq` 不重复填，且不加入 Agent 的 `steps`。人民币 `price_estimate` 按适用区域与版本价目估算，美元 `sdk_estimate` 按 Pi 模型目录估算；超时未回传的用量保留 null。旧 `analysis.usage` 继续只代表 Agent 模型步骤，业务总成本比较应使用带知识调用的归因明细，按币种分别报告。
 
 轮次类型优先依据可信入口 span 的 `trigger`：`event` 是商家事件，`confirmation` 是用户精确确认经宿主执行，`user` 是普通用户请求。v2 的事件和确认回执应标为宿主；其他轮不因含 host 服务 span 就改标宿主。这里标的是最终回执生成方：atomic 商家事件仍可能调用模型，但发送的是宿主固定状态卡，模型步骤仍保留展示。旧轮无 spans 时保留原展示。spans 为空表示显式没有归因记录，不等于模型调用必为零；零模型需依据该轮实际 `steps`。无效归因记录应保留原始文本与诊断，不能让页面崩溃或显示为正常执行。

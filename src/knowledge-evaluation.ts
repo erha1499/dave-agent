@@ -23,7 +23,8 @@ export function knowledgeProviderSpans(parent: EvalSpan): EvalSpan[] {
         : cnyRate === null || attempt.totalTokens === null ? null : { currency: "CNY" as const,
           amount: attempt.totalTokens * cnyRate / 1_000_000, source: "price_estimate" as const };
       return { ...base, id: `${parent.id}:knowledge:${callIndex}:${index + 1}`, durationMs: attempt.durationMs,
-        outcome: attempt.outcome === "ok" ? "ok" as const : "error" as const, output: { status: call.status, attempt: structuredClone(attempt) },
+        outcome: attempt.outcome === "ok" && call.status === "ok" ? "ok" as const : "error" as const,
+        output: { status: call.status, attempt: structuredClone(attempt), ...(support && trace.supportVerification?.validation ? { validation: structuredClone(trace.supportVerification.validation) } : {}) },
         usage: { provider: support?.provider ?? "bailian", model: attempt.model, kind: support ? "llm" as const : "rerank" as const,
           inputTokens: support && [support.inputTokens, support.cacheReadTokens, support.cacheWriteTokens].every(value => value !== null)
             ? support.inputTokens! + support.cacheReadTokens! + support.cacheWriteTokens! : null,

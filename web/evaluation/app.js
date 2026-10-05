@@ -515,7 +515,9 @@ const knowledgeRejectReasons = {
   inactive_document: "文档已停用", out_of_scope: "超出授权范围", duplicate_document: "重复文档", missing_score: "缺少分数",
   invalid_score: "分数无效", below_threshold: "低于阈值", top_k_limit: "超出条数上限",
   support_verification_required: "待支持判别", unsupported: "事实不支持", support_unavailable: "支持判别不可用",
+  invalid_support_decision: "支持判别无效",
 };
+const knowledgeInvalidReasons = { invalid_quote: "引用无效", invalid_reason: "理由无效", invalid_category: "类别无效" };
 const knowledgeStageNames = { read: "读取", rerank: "重排", support: "支持判别", recheck: "复检" };
 const knowledgeVerdictCategories = { direct_fact: "事实或规则", boundary_answer: "明确安全边界问题的回答", limitation_only: "仅说明缺失或需核实", unrelated: "无关" };
 const knowledgeMs = value => value === null || value === undefined || !Number.isFinite(value) ? "未知" : `${Math.round(value)} ms`;
@@ -550,6 +552,27 @@ function knowledgeNode(span) {
     && (typeof verification !== "object" || Array.isArray(verification) || !Array.isArray(verification.value));
   const rawVerdicts = !verificationInvalid && verification ? verification.value : [];
   const verdicts = rawVerdicts.filter(item => item && typeof item === "object");
+  // 逐候选错误隔离：validation.invalidDecisions 与有效决策并集覆盖候选；无效不等于 supported=false，不显示为正确拒收。
+  // 小型完整性校验：status 三枚举、invalid ID 非空唯一且不与有效 ID 重叠、code 三枚举；
+  // complete 必须无 invalid，partial 必须有效无效都非空，unavailable 必须无有效且有无效。
+  // 坏记录显示数据异常，不展示 partial 语义或“全部判别无效”；不从缺失历史字段推测候选完整性。
+  const validation = !verificationInvalid && verification ? verification.validation : undefined;
+  const hasValidation = validation !== undefined && validation !== null;
+  const validationShapeOk = hasValidation && typeof validation === "object" && !Array.isArray(validation)
+    && Array.isArray(validation.invalidDecisions) && validation.invalidDecisions.every(item => item && typeof item === "object");
+  const invalidDecisions = validationShapeOk ? validation.invalidDecisions : [];
+  const validIds = new Set(verdicts.map(item => item?.id).filter(id => typeof id === "string" && id));
+  const invalidCodes = new Set(["invalid_quote", "invalid_reason", "invalid_category"]);
+  const validationMalformed = hasValidation && (!validationShapeOk
+    || !["complete", "partial", "unavailable"].includes(validation.status)
+    || invalidDecisions.some(item => typeof item.id !== "string" || !item.id || !invalidCodes.has(item.code))
+    || new Set(invalidDecisions.map(item => item.id)).size !== invalidDecisions.length
+    || invalidDecisions.some(item => validIds.has(item.id))
+    || (validation.status === "complete" && invalidDecisions.length > 0)
+    || (validation.status === "partial" && (!verdicts.length || !invalidDecisions.length))
+    || (validation.status === "unavailable" && (verdicts.length > 0 || !invalidDecisions.length)));
+  const validationUsable = validationShapeOk && !validationMalformed;
+  const supportFailure = trace.supportFailure && typeof trace.supportFailure === "object" ? trace.supportFailure : null;
   const dropped = rawAccepted.length - accepted.length + (rawRejected.length - rejected.length) + (rawVerdicts.length - verdicts.length);
   const rawProfile = trace.supportProfile ?? trace.settings?.support?.profile;
   const promptVersion = trace.settings?.support?.promptVersion;
@@ -559,6 +582,8 @@ function knowledgeNode(span) {
   const supportProvider = trace.settings?.support?.provider;
   const supportModelName = trace.settings?.support?.model;
   const modelSegment = supportProvider || supportModelName ? ` · ${[supportProvider, supportModelName].filter(Boolean).join("/")}` : "";
+  // parser 校验版本按记录显示；旧记录缺字段不猜版本，也不补 invalid=0。
+  const validationVersion = trace.settings?.support?.validationVersion;
   const usage = trace.usage && typeof trace.usage === "object" ? trace.usage : {};
   const stages = Array.isArray(trace.stages) ? trace.stages.filter(stage => stage && typeof stage === "object") : [];
   return node("div", { class: "knowledge-call" },
@@ -586,8 +611,17 @@ function knowledgeNode(span) {
         ? node("ul", { class: "check-list" }, ...rejected.map(item => node("li", {},
           text("span", `${item.id ?? "—"} · ${knowledgeRejectReasons[item.reason] || item.reason || "未记录"}`))))
         : null,
-      rawProfile || promptVersion ? text("p", `判别配置：${profileLabel}${modelSegment}${promptVersion ? ` · prompt ${promptVersion}` : ""}`, "knowledge-line") : null,
+      rawProfile || promptVersion ? text("p", `判别配置：${profileLabel}${modelSegment}${promptVersion ? ` · prompt ${promptVersion}` : ""}${validationVersion ? ` · 校验 ${validationVersion}` : ""}`, "knowledge-line") : null,
       verificationInvalid ? text("p", "判别明细记录异常，无法解析。", "knowledge-line") : null,
+      supportFailure ? text("p", `判别失败：${supportFailure.code || "未记录"}`, "knowledge-line") : null,
+      supportFailure ? node("details", { class: "trace" }, node("summary", {}, "判别失败哈希"), text("p", supportFailure.outputHash ?? "未记录", "knowledge-line")) : null,
+      validationMalformed ? text("p", "判别校验记录异常，无法解析。", "knowledge-line") : null,
+      validationUsable && validation.status === "partial" ? text("p", `部分判别无效 · ${invalidDecisions.length} 条`, "batch-caution") : null,
+      validationUsable && !verdicts.length && invalidDecisions.length ? text("p", "全部判别无效，没有充分有效证据。", "batch-caution") : null,
+      validationUsable && invalidDecisions.length
+        ? node("ul", { class: "check-list" }, ...invalidDecisions.map(item => node("li", {},
+          text("span", `${item.id ?? "—"} · ${knowledgeInvalidReasons[item.code] || item.code || "未知"}`))))
+        : null,
       verdicts.length
         ? node("details", { class: "trace" },
           node("summary", {}, `判别明细 · ${verdicts.length} 条`),

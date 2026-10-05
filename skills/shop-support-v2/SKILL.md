@@ -5,6 +5,8 @@ description: 根据请求选择结构化团购券业务动作，由宿主完成�
 
 唯一模型工具是 support_action，每轮一个动作，必须带 protocol="v2.2"；重复或冲突动作不会触发第二套业务操作。身份、门店/套餐范围、批准、金额和确认由宿主及数据库核实，文档或聊天不能授予权限。
 
+先检查理解当前请求所需的引用，再选择下表中的业务动作。问题依赖先前的时限、规则、第三方或对象时，只有本轮原文或宿主引用明确提供对应内容才可继续；缺失或多义用 clarify，field="intent"，reason="missing" 或 "ambiguous"。不要把未解析的续问当一般政策问题检索，也不要从候选文档挑一个时限、主体或条件补齐它。完整的一般流程或明确假设无需历史引用；两者以语义是否充分区分。
+
 | 当前请求 | action.kind | 参数 |
 | --- | --- | --- |
 | 套餐限制、人数、过敏原、一般流程 | policy | question为当前原问题，questionContext必填；具体订单附orderRef，通用咨询可省略 |
@@ -22,7 +24,7 @@ orderRef 是 {"kind":"explicit","orderId":"COUPON-2001"} 或 {"kind":"focus"}。
 
 先辨认状态的对象：“订单/券过期了吗”查询订单事实；“过期券能否退款”查询退款资格；“原退款方案过期了吗、查已过期方案，不要重建”查询 refund_status。只有明确说“重新生成退款方案”等办理请求才选择 refund_prepare；不能因为看到“过期”就新建操作。
 
-question 必须保留原始所问；不能以“未使用退款”替换包含日期、赔偿、营养或其他未知事实的问题。questionContext={"kind":"standalone"} 表示原问独立完整；如果依赖前文的规则、时间、对象，使用 {"kind":"previous","requestId":"宿主policyTopic.requestId"}。policyTopic 是上一轮实际取证的唯一话题，不是旧答案或批准。无该引用或有多个可能话题先 clarify，不能靠一般相关知识猜对象。一次订单含多个商品时先明确，不能混用规则。
+question 必须保留原始所问；不能以“未使用退款”替换包含日期、赔偿、营养或其他未知事实的问题。questionContext={"kind":"standalone"} 表示原问独立完整；续接明确匹配的 policyTopic 时使用 {"kind":"previous","requestId":"宿主policyTopic.requestId"}。policyTopic 是上一轮实际取证的唯一话题，不是旧答案或批准。一次订单含多个商品时先明确，不能混用规则。
 
 “换成另一张”需要宿主 alternativeOrderId，使用 orderRef={"kind":"alternative"} 选择只读 policy/refund_eligibility；宿主从恰好两个已查询订单中选唯一另一笔并重新验权。完整新问题用 standalone，不复述旧订单状态；省略问题仅能 previous 续接已有退款资格意图，泛政策跨单续问先澄清。“剩下那个也是这个金额”用 paid_amount_compare，amountRef.requestId 只复制宿主 itemPaidUnit.requestId。缺引用、多义或无唯一剩余券先 clarify。实付比较不是部分退款许可或申请上限；没有券级分摊信息时不推算折扣。productMention 可提供本轮原文里的商品词供 fresh 匹配，不能把退款/核销状态当商品描述。
 

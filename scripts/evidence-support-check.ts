@@ -2,9 +2,10 @@ import assert from "node:assert/strict";
 import type { AssistantMessage } from "@earendil-works/pi-ai";
 import { acceptEvidence, resolveEvidenceAcceptance } from "../src/evidence-acceptance.ts";
 import { applyEvidenceSupport, createEvidenceSupportClient, EvidenceSupportError, evidenceSupportInputHash, validateEvidenceSupport,
-  validateEvidenceSupportVerification, verifyEvidenceSupport, evidenceSupportPrompt, evidenceSupportTypedPromptVersion,
+  validateEvidenceSupportVerification, verifyEvidenceSupport, evidenceSupportPrompt, evidenceSupportTypedPrompt, evidenceSupportTypedPromptVersion,
   evidenceSupportTypedV1Prompt, evidenceSupportTypedV1PromptHash, evidenceSupportTypedV1PromptVersion,
-  evidenceSupportTypedV2Prompt, evidenceSupportTypedV2PromptHash, evidenceSupportTypedV2PromptVersion, resolveEvidenceSupportModel, type EvidenceSupportDecision } from "../src/evidence-support.ts";
+  evidenceSupportTypedV2Prompt, evidenceSupportTypedV2PromptHash, evidenceSupportTypedV2PromptVersion,
+  evidenceSupportTypedV3Prompt, evidenceSupportTypedV3PromptHash, evidenceSupportTypedV3PromptVersion, resolveEvidenceSupportModel, type EvidenceSupportDecision } from "../src/evidence-support.ts";
 import { contentHash } from "../src/bailian.ts";
 
 const documents = [
@@ -59,6 +60,9 @@ assert.equal(evidenceSupportTypedV1PromptHash, "4223604540af3298649bb546fb14354e
 assert.equal(evidenceSupportTypedV2PromptVersion, "fact-support-typed-v2");
 assert.equal(contentHash(evidenceSupportTypedV2Prompt), evidenceSupportTypedV2PromptHash);
 assert.equal(evidenceSupportTypedV2PromptHash, "cd375d082eb2b5fb9b780377cad922df5d3b79dffe7568df823a06c1b3b344a3");
+assert.equal(evidenceSupportTypedV3PromptVersion, "fact-support-typed-v3");
+assert.equal(contentHash(evidenceSupportTypedV3Prompt), evidenceSupportTypedV3PromptHash);
+assert.equal(evidenceSupportTypedV3PromptHash, "5d976a03cd880350701f65b08b7fee0397e23891807c4ccf7c5598879e8c8395");
 const explicitBinary = await createEvidenceSupportClient({ profile: "binary", timeoutMs: 1000, runtime: { model, complete: async () => message({ decisions }) } });
 assert.deepEqual(explicitBinary.settings, client.settings, "explicit binary retains the default v1 settings shape");
 assert.equal(calls, 1); assert.equal(checked.attempts.length, 1); assert.equal(checked.attempts[0]!.outcome, "ok");
@@ -124,16 +128,38 @@ let typedRows: unknown = [
   { id: "A", category: "limitation_only", quote: "具体截止日期以本人订单 expiresAt 为准。", reason: "只有核实路径，没有具体日期" },
   { id: "B", category: "unrelated", quote: null, reason: "不是到期事实" },
 ];
-const typed = await createEvidenceSupportClient({ profile: "typed", timeoutMs: 1000, runtime: { model, complete: async (context, options) => {
+const typed = await createEvidenceSupportClient({ profile: "typed", validationVersion: "typed-batch-v1", timeoutMs: 1000, runtime: { model, complete: async (context, options) => {
   typedCalls++; assert.equal(options.maxRetries, 0); assert.deepEqual(context.tools, []);
-  assert.notEqual(contentHash(context.systemPrompt), contentHash(evidenceSupportPrompt));
+  assert.equal(context.systemPrompt, evidenceSupportTypedPrompt);
   assert.deepEqual(JSON.parse(String(context.messages[0]!.content)), { query, documents: candidates.map(({ id, title, tags, body }) => ({ id, title, tags, body })) });
   return message({ decisions: typedRows });
 } } });
 assert.equal(typed.settings.profile, "typed"); assert.equal(typed.settings.promptVersion, evidenceSupportTypedPromptVersion);
-assert.equal(typed.settings.promptVersion, "fact-support-typed-v3"); assert.notEqual(typed.settings.promptHash, evidenceSupportTypedV2PromptHash);
+assert.equal(typed.settings.promptVersion, "fact-support-typed-v4"); assert.notEqual(typed.settings.promptHash, evidenceSupportTypedV3PromptHash);
 const typedChecked = await verifyEvidenceSupport({ query, scope, candidates, client: typed });
 assert.equal(typedCalls, 1); assert.notEqual(typedChecked.requestHash, checked.requestHash);
+// Historical prompt and parser selections are independent; neither may silently reuse a new prompt with old hashes.
+let replayCalls = 0;
+const typedV3 = await createEvidenceSupportClient({ profile: "typed", typedPromptVersion: evidenceSupportTypedV3PromptVersion,
+  validationVersion: "typed-batch-v1", timeoutMs: 1000, runtime: { model, complete: async context => {
+    replayCalls++; assert.equal(context.systemPrompt, evidenceSupportTypedV3Prompt);
+    assert.deepEqual(JSON.parse(String(context.messages[0]!.content)), { query, documents: candidates.map(({ id, title, tags, body }) => ({ id, title, tags, body })) });
+    return message({ decisions: typedRows });
+  } } });
+const typedV3Isolated = await createEvidenceSupportClient({ profile: "typed", typedPromptVersion: evidenceSupportTypedV3PromptVersion,
+  timeoutMs: 1000, runtime: { model, complete: async () => { throw Error("settings check only"); } } });
+assert.equal(contentHash(typedV3.settings), "a5ea9bbb677a856af836efa84c70318139f357ae29267af873aa47b319145728");
+assert.equal(contentHash(typedV3Isolated.settings), "289694dfff885e6b3569e2bea599af80911f6f986f6b7a40e1a430b95f16e26b");
+const replayedV3 = await verifyEvidenceSupport({ query, scope, candidates, client: typedV3 });
+assert.equal(replayCalls, 1); assert.notEqual(replayedV3.requestHash, typedChecked.requestHash);
+assert.equal(validateEvidenceSupportVerification(replayedV3, { ...bound, settings: typed.settings }), false, "v3 result cannot satisfy a v4 request");
+assert.equal(validateEvidenceSupportVerification(typedChecked, { ...bound, settings: typedV3.settings }), false, "v4 result cannot be attributed to v3");
+assert.equal(applyEvidenceSupport({ prepared, verification: replayedV3, query, scope, documents, settings: typed.settings }).status, "unavailable");
+for (const options of [{ profile: "binary", typedPromptVersion: evidenceSupportTypedV3PromptVersion },
+  { profile: "typed", typedPromptVersion: "fact-support-typed-invalid" }] as const) {
+  await assert.rejects(createEvidenceSupportClient({ ...options, typedPromptVersion: options.typedPromptVersion as typeof evidenceSupportTypedV3PromptVersion,
+    runtime: { model, complete: async () => { throw Error("must not run"); } } }), /提示词版本无效/);
+}
 assert.deepEqual(typedChecked.value.map(row => [row.category, row.supported]), [["limitation_only", false], ["unrelated", false]]);
 assert.equal(applyEvidenceSupport({ prepared, verification: typedChecked, query, scope, documents, settings: typed.settings }).status, "rejected");
 assert.equal(validateEvidenceSupportVerification(typedChecked, bound), false, "typed cannot be replayed as binary");
@@ -141,7 +167,7 @@ assert.equal(validateEvidenceSupportVerification(checked, { ...bound, settings: 
 assert.equal(validateEvidenceSupport(typedChecked.value, candidates), false);
 assert.equal(validateEvidenceSupport(decisions, candidates, "typed"), false);
 assert.equal(validateEvidenceSupport([{ ...typedChecked.value[0], supported: true }, typedChecked.value[1]], candidates, "typed"), false, "limitation_only can never self-authorize acceptance");
-const typedPositive = await createEvidenceSupportClient({ profile: "typed", runtime: { model, complete: async () => message({ decisions: [
+const typedPositive = await createEvidenceSupportClient({ profile: "typed", validationVersion: "typed-batch-v1", runtime: { model, complete: async () => message({ decisions: [
   { id: "A", category: "boundary_answer", quote: "不得从套餐名称估算日期。", reason: "明确回答是否允许该推断" },
   { id: "B", category: "unrelated", quote: null, reason: "无关" },
 ] }) } });
@@ -200,7 +226,7 @@ const diagnosticCases: Array<{ code: string; profile?: "binary" | "typed"; raw?:
 for (const test of diagnosticCases) {
   let requests = 0, observed = 0;
   const raw = test.raw ?? JSON.stringify(test.value);
-  const diagnostic = await createEvidenceSupportClient({ profile: test.profile, observeResponseForTest: response => {
+  const diagnostic = await createEvidenceSupportClient({ profile: test.profile, validationVersion: test.profile === "typed" ? "typed-batch-v1" : undefined, observeResponseForTest: response => {
     observed++; assert.equal(response.text, raw.slice(0, 20_000)); assert.equal(response.outputHash, contentHash(raw));
     assert.equal(response.truncated, raw.length > 20_000);
     assert.deepEqual(Object.keys(response).sort(), ["outputHash", "stopReason", "text", "truncated"]);
@@ -219,3 +245,5 @@ let observerRequests = 0;
 const throwingObserver = await createEvidenceSupportClient({ observeResponseForTest: () => { throw Error("observer-only-failure"); },
   runtime: { model, complete: async () => { observerRequests++; return message({ decisions }); } } });
 assert.deepEqual((await throwingObserver.verify(query, candidates)).value, decisions); assert.equal(observerRequests, 1);
+
+await import("./evidence-support-isolation-check.ts");

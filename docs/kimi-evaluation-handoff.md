@@ -37,3 +37,5 @@ A1 增量已接入 version 2 数据集/接收策略/阈值，保持 version 1 �
 真实记录联调发现并修复一次前后端合同不符：后端 `supportVerification` 是含 `value[]` 的对象，首版 UI/合成夹具误用了数组，导致真实判别明细不显示。现在读取真实对象结构，并诊断坏容器；旧 binary 无类别仍正常展示，旧记录没有判别字段不补造。
 
 16 组评测 UI 检查、14 组实验 UI 检查与 typecheck 通过；完整 `npm run validate` 通过后，这次仅 UI 合同修复又重验上述三项。Codex 用真实候选 run `990dac49-10c3-46ab-a6dd-fdcb6e0c8f69` 验证 1440px / 390px 展开与判别内容、配置下载、非法组合修复及历史比较展示，页面错误与横向溢出均为 0。浏览器检查没有启动付费实验；历史参照不是同代码配对，页面可比较不等于模型效果有显著提升。本地证据 `.runtime/c1-browser-results.json` 和截图不提交。
+
+后续 Kimi K3 Max 增量显示 `supportVerification.validation` 的 partial / 全项 invalid、失败 code/hash、实际 parser 版本和逐项无效原因。无效项不显示为 supported=false 或正确拒收；status/ID/code/有效无效重叠异常时显示数据异常并保留原始 trace。16 组评测 UI、15 组实验 UI 和完整 validate 通过。Codex 使用真实 MySQL run `0082f06e-60d5-43c1-a797-488e84b461d4` 验证 1440px / 390px 取证明细及调参下载，页面错误和横向溢出为 0；该实际 DB run 没有 partial，partial/全项无效与坏记录由合成前端检查覆盖，不能混称真实服务故障验收。

@@ -7,7 +7,7 @@ export type EvidenceSupportCandidate = RetrievalDocument & { score: number | nul
 export const evidenceAcceptanceBinding = Object.freeze({ model: "qwen3-rerank", serialization: "json-title-tags-body-v1" });
 export type EvidenceRanking = readonly { id: string; score: number | null }[];
 export type EvidenceRejectionReason = "provider_unavailable" | "not_applicable" | "no_candidates" | "unknown_document"
-  | "inactive_document" | "out_of_scope" | "duplicate_document" | "missing_score" | "invalid_score" | "below_threshold" | "top_k_limit" | "support_verification_required" | "unsupported" | "support_unavailable";
+  | "inactive_document" | "out_of_scope" | "duplicate_document" | "missing_score" | "invalid_score" | "below_threshold" | "top_k_limit" | "support_verification_required" | "unsupported" | "support_unavailable" | "invalid_support_decision";
 export type EvidenceAcceptanceResult = {
   version: typeof evidenceAcceptanceVersion | typeof evidenceSupportAcceptanceVersion; config: EvidenceAcceptanceConfig; status: "accepted" | "rejected" | "unavailable";
   accepted: Array<{ id: string; title: string; body: string; tags: readonly string[]; score: number | null; rank: number }>;

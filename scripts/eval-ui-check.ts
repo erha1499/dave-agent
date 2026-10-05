@@ -733,7 +733,8 @@ for (const outcome of ["success", "detail-failure", "analysis-failure"]) {
       sourceHashes: { before: "b1", after: "b1" }, durationMs: 1240, calls: [],
       usage: { rerankTokens: 1200, supportTokens: 800, estimatedCny: 0.0006, estimatedUsd: 0.00008, incompleteCalls: 0 },
       pricing: { estimated: true },
-      settings: { support: { promptVersion: "fact-support-typed-v2", profile: "typed", provider: "deepseek", model: "deepseek-v4-pro" }, serialization: "json-title-tags-body-v1" },
+      settings: { support: { promptVersion: "fact-support-typed-v2", profile: "typed", provider: "deepseek", model: "deepseek-v4-pro",
+        validationVersion: "typed-candidate-isolation-v1" }, serialization: "json-title-tags-body-v1" },
       // 结构取自真实 run 990dac49 首个 case 的知识 trace（脱敏）：对象容器 {value, requestHash, inputHash, attempts}。
       supportVerification: {
         requestHash: "2e0a54caa785947f", inputHash: "9f1c2d",
@@ -746,6 +747,8 @@ for (const outcome of ["success", "detail-failure", "analysis-failure"]) {
           { id: "KB-PENDING", supported: null, quote: null, reason: "请求未完成" },
           null,
         ],
+        validation: { status: "partial", outputHash: "h1a2b3",
+          invalidDecisions: [{ id: "KB-BAD-QUOTE", code: "invalid_quote" }, { id: "KB-BAD-CAT", code: "invalid_category" }] },
       },
       stages: [{ name: "read", observedAt: T, durationMs: 5 }, null, "oops", { name: "rerank", observedAt: T, durationMs: 310 },
         { name: "support", observedAt: T, durationMs: 900 }, { name: "recheck", observedAt: T, durationMs: 25 }],
@@ -794,8 +797,7 @@ for (const outcome of ["success", "detail-failure", "analysis-failure"]) {
     },
   };
   // 旧 trace 无 sources 字段：版本显示未记录，policyTopic 旧版本不充当本轮版本。
-  const knowledgeLegacyTrace = {
-    context: {
+  const knowledgeLegacyTrace = {    context: {
       originalQuery: "旧规则能退吗", modelQuestion: null, effectiveQuery: "旧规则能退吗", orderSource: "current_explicit", scopeSource: "fresh_order", facts: null,
       policyTopic: { requestId: "r2", sourceKey: "k2", groupOpenid: "g1", originalQuery: "旧规则能退吗", orderId: "COUPON-1234",
         scope: { shopId: "shop-1", productId: "product-1" }, sources: [{ sourceId: "KB-OLD-DOC", version: "a".repeat(64) }] },
@@ -813,6 +815,83 @@ for (const outcome of ["success", "detail-failure", "analysis-failure"]) {
         value: [{ id: "KB-OLD-DOC", supported: true, quote: "旧规正文引文", reason: null }] },
       usage: { rerankTokens: null, supportTokens: null, estimatedCny: null, estimatedUsd: null, incompleteCalls: 0 },
       stages: [{ name: "read", observedAt: T, durationMs: 6 }],
+    },
+  };
+  // 全部判别无效：业务不可用、没有充分有效证据。
+  const knowledgeAllInvalid = {
+    context: { originalQuery: "新规能退吗", modelQuestion: null, effectiveQuery: "新规能退吗", orderSource: "none", scopeSource: "global", facts: null, policyTopic: null },
+    trace: {
+      mode: "m4-support", threshold: 0.71, query: "新规能退吗", originalQuery: "新规能退吗",
+      scope: { shopId: "shop-1", productId: "product-1" }, status: "unavailable", reason: null,
+      rawRanking: [], acceptance: null, sourceHashes: { before: "b1", after: null }, durationMs: 1200, calls: [],
+      usage: { rerankTokens: null, supportTokens: null, estimatedCny: null, estimatedUsd: null, incompleteCalls: 0 },
+      settings: { support: { promptVersion: "fact-support-typed-v2", profile: "typed", provider: "deepseek", model: "deepseek-v4-pro",
+        validationVersion: "typed-candidate-isolation-v1" } },
+      supportVerification: { requestHash: "aa11bb", inputHash: "cc22dd", attempts: [],
+        value: [],
+        validation: { status: "unavailable", outputHash: "z9y8",
+          invalidDecisions: [{ id: "KB-X1", code: "invalid_reason" }, { id: "KB-X2", code: "invalid_quote" }] } },
+      stages: [{ name: "read", observedAt: T, durationMs: 3 }],
+    },
+  };
+  // 整批形状错误：supportFailure 带 code/outputHash，可能无 verification。
+  const knowledgeBatchFailure = {
+    context: { originalQuery: "退款规则", modelQuestion: null, effectiveQuery: "退款规则", orderSource: "none", scopeSource: "global", facts: null, policyTopic: null },
+    trace: {
+      mode: "m4-support", threshold: 0.71, query: "退款规则", originalQuery: "退款规则",
+      scope: { shopId: "shop-1", productId: "product-1" }, status: "unavailable", reason: "provider_unavailable",
+      rawRanking: [], acceptance: null, sourceHashes: { before: "b1", after: null }, durationMs: 900, calls: [],
+      usage: { rerankTokens: null, supportTokens: null, estimatedCny: null, estimatedUsd: null, incompleteCalls: 1 },
+      settings: { support: { promptVersion: "fact-support-typed-v2", profile: "typed", provider: "deepseek", model: "deepseek-v4-pro",
+        validationVersion: "typed-candidate-isolation-v1" } },
+      supportFailure: { code: "schema_mismatch", outputHash: "f7e8d9" },
+      stages: [{ name: "read", observedAt: T, durationMs: 3 }],
+    },
+  };
+  // 坏 validation 完整性夹具：status 非枚举、complete 含 invalid、invalid 与有效 ID 重叠。
+  const badValidationOf = (validation: unknown): any => ({
+    context: { originalQuery: "规则", modelQuestion: null, effectiveQuery: "规则", orderSource: "none", scopeSource: "global", facts: null, policyTopic: null },
+    trace: {
+      mode: "m4-support", threshold: 0.71, query: "规则", originalQuery: "规则",
+      scope: { shopId: "shop-1", productId: "product-1" }, status: "accepted", reason: null,
+      rawRanking: [{ id: "KB-VALID-9", score: 0.9 }],
+      acceptance: { version: "score-support-v1", config: { mode: "support", threshold: 0.71 }, status: "accepted",
+        accepted: [{ id: "KB-VALID-9", title: "有效规则", body: "有效正文", tags: [], score: 0.9, rank: 1 }],
+        rejected: [], diagnostics: { topScore: 0.9, scoreGap: null, candidates: [] } },
+      sourceHashes: { before: "b1", after: "b1" }, durationMs: 700, calls: [],
+      usage: { rerankTokens: null, supportTokens: null, estimatedCny: null, estimatedUsd: null, incompleteCalls: 0 },
+      settings: { support: { promptVersion: "fact-support-typed-v2", profile: "typed", provider: "deepseek", model: "deepseek-v4-pro",
+        validationVersion: "typed-candidate-isolation-v1" } },
+      supportVerification: { requestHash: "cc33dd", inputHash: "ee44ff", attempts: [],
+        value: [{ id: "KB-VALID-9", supported: true, category: "direct_fact", quote: "有效正文", reason: "直接给出规则。" }],
+        validation },
+      stages: [{ name: "read", observedAt: T, durationMs: 3 }],
+    },
+  });
+  const knowledgeBadStatus = badValidationOf({ status: "weird", outputHash: "s1",
+    invalidDecisions: [{ id: "KB-BAD-S", code: "invalid_quote" }] });
+  const knowledgeCompleteWithInvalid = badValidationOf({ status: "complete", outputHash: "s2",
+    invalidDecisions: [{ id: "KB-BAD-C", code: "invalid_reason" }] });
+  const knowledgeOverlapId = badValidationOf({ status: "partial", outputHash: "s3",
+    invalidDecisions: [{ id: "KB-VALID-9", code: "invalid_category" }] });
+  // 坏 validation 记录：invalidDecisions 非数组，明确数据异常且有效判断仍显示。
+  const knowledgeBadValidation = {
+    context: { originalQuery: "临期能退吗", modelQuestion: null, effectiveQuery: "临期能退吗", orderSource: "none", scopeSource: "global", facts: null, policyTopic: null },
+    trace: {
+      mode: "m4-support", threshold: 0.71, query: "临期能退吗", originalQuery: "临期能退吗",
+      scope: { shopId: "shop-1", productId: "product-1" }, status: "accepted", reason: null,
+      rawRanking: [{ id: "KB-VALID-1", score: 0.9 }],
+      acceptance: { version: "score-support-v1", config: { mode: "support", threshold: 0.71 }, status: "accepted",
+        accepted: [{ id: "KB-VALID-1", title: "有效规则", body: "有效正文", tags: [], score: 0.9, rank: 1 }],
+        rejected: [{ id: "KB-VALID-2", rank: 2, reason: "invalid_support_decision" }], diagnostics: { topScore: 0.9, scoreGap: null, candidates: [] } },
+      sourceHashes: { before: "b1", after: "b1" }, durationMs: 800, calls: [],
+      usage: { rerankTokens: null, supportTokens: null, estimatedCny: null, estimatedUsd: null, incompleteCalls: 0 },
+      settings: { support: { promptVersion: "fact-support-typed-v2", profile: "typed", provider: "deepseek", model: "deepseek-v4-pro",
+        validationVersion: "typed-candidate-isolation-v1" } },
+      supportVerification: { requestHash: "bb22cc", inputHash: "dd33ee", attempts: [],
+        value: [{ id: "KB-VALID-1", supported: true, category: "direct_fact", quote: "有效正文", reason: "直接给出规则。" }],
+        validation: { status: "partial", invalidDecisions: "not-an-array", outputHash: null } },
+      stages: [{ name: "read", observedAt: T, durationMs: 3 }],
     },
   };
   respond(take(), { runs: [runRecord("k-run", { plannedCases: 2, plannedTurns: 3 })] });
@@ -833,6 +912,9 @@ for (const outcome of ["success", "detail-failure", "analysis-failure"]) {
           spans: [
             span({ id: "k-span-1", knowledge: knowledgeAccepted }),
             span({ id: "k-span-2", knowledge: knowledgeRejected, durationMs: 8 }),
+            span({ id: "k-span-b1", knowledge: knowledgeBadStatus, durationMs: 700 }),
+            span({ id: "k-span-b2", knowledge: knowledgeCompleteWithInvalid, durationMs: 700 }),
+            span({ id: "k-span-b3", knowledge: knowledgeOverlapId, durationMs: 700 }),
             { id: "p1", parentSpanId: "k-span-1", actor: "host", trigger: "user", component: "knowledge-rerank", name: "rerank", observedAt: T, durationMs: 310, outcome: "ok",
               usage: { provider: "bailian", model: "qwen3-rerank", kind: "rerank", inputTokens: 1200, outputTokens: 0, totalTokens: 1200, cost: { currency: "CNY", amount: 0.0006, source: "price_estimate" } } },
             { id: "p2", parentSpanId: "k-span-1", actor: "host", trigger: "user", component: "knowledge-support", name: "support", observedAt: T, durationMs: 900, outcome: "ok",
@@ -847,6 +929,9 @@ for (const outcome of ["success", "detail-failure", "analysis-failure"]) {
             span({ id: "k-span-3", knowledge: knowledgeUnavailable, durationMs: 15000 }),
             span({ id: "k-span-4", knowledge: knowledgeAcceptedFresh, durationMs: 900 }),
             span({ id: "k-span-5", knowledge: knowledgeLegacyTrace, durationMs: 6 }),
+            span({ id: "k-span-6", knowledge: knowledgeAllInvalid, durationMs: 1200 }),
+            span({ id: "k-span-7", knowledge: knowledgeBatchFailure, durationMs: 900 }),
+            span({ id: "k-span-8", knowledge: knowledgeBadValidation, durationMs: 800 }),
           ] }),
       ] }),
       evalCase("k2", { name: "旧记录场景", turns: [turn({ question: "旧问题", reply: "旧回答" })] }),
@@ -858,8 +943,8 @@ for (const outcome of ["success", "detail-failure", "analysis-failure"]) {
     item.fire("toggle");
   }
   const html = content(element("run-detail"));
-  assert.match(html, /知识取证 · 2 次/, "一轮多个 FAQ 调用合并成区");
-  assert.match(html, /知识取证 · 3 次/, "第二轮三次调用");
+  assert.match(html, /知识取证 · 5 次/, "一轮多个 FAQ 调用合并成区");
+  assert.match(html, /知识取证 · 6 次/, "第二轮六次调用");
   assert.match(html, /m4-support · 阈值 0\.71/, "方案与阈值");
   assert.match(html, /本地词项/, "lexical 方案");
   assert.match(html, /接受/);
@@ -882,16 +967,31 @@ for (const outcome of ["success", "detail-failure", "analysis-failure"]) {
   assert.match(html, /引用：需联系商家核实/, "实际 quote 可见");
   assert.match(html, /KB-PENDING · 二元判断 · 未知/, "未完成不记为不支持");
   assert.match(html, /KB-OLD-DOC · 二元判断 · 支持/, "binary 旧记录不反推类别");
-  assert.match(html, /判别配置：typed 分类判别 · deepseek\/deepseek-v4-pro · prompt fact-support-typed-v2/, "实际 provider/model 与 prompt 版本");
+  assert.match(html, /判别配置：typed 分类判别 · deepseek\/deepseek-v4-pro · prompt fact-support-typed-v2 · 校验 typed-candidate-isolation-v1/, "实际 provider/model、prompt 与校验版本");
+  assert.match(html, /部分判别无效 · 2 条/, "partial 警示横幅");
+  assert.match(html, /KB-BAD-QUOTE · 引用无效/, "无效条目中文原因");
+  assert.match(html, /KB-BAD-CAT · 类别无效/);
+  assert.ok(!html.includes("KB-BAD-QUOTE · 不支持"), "无效项不得显示为正确拒收");
+  assert.match(html, /全部判别无效，没有充分有效证据/, "全 invalid 显示不可用且没有充分证据");
+  assert.match(html, /判别失败：schema_mismatch/, "整批 supportFailure code");
+  assert.match(html, /判别失败哈希/, "失败哈希折叠不挤占页面");
+  assert.match(html, /判别校验记录异常/, "坏 validation 记录明确数据异常");
+  assert.match(html, /KB-VALID-1 · 事实或规则 · 支持/, "坏 validation 下有效判断仍显示");
+  assert.match(html, /KB-VALID-9 · 事实或规则 · 支持/, "坏完整性记录下有效判断仍保留供排查");
+  const partialBanners = walk(element("run-detail")).filter(item => item.textContent.startsWith("部分判别无效 · "));
+  assert.equal(partialBanners.length, 1, "坏 status/complete 含 invalid/重叠 ID 均不显示正常 partial 语义");
+  const malformedNotes = walk(element("run-detail")).filter(item => item.textContent === "判别校验记录异常，无法解析。");
+  assert.equal(malformedNotes.length, 4, "非数组、坏 status、complete 含 invalid、重叠 ID 四处记录异常");
+  assert.match(html, /支持判别无效/, "新增拒收原因中文标签");
   assert.match(html, /deepseek\/deepseek-flash/, "另一调用实际模型分列");
   assert.match(html, /paid_amount_compare（只读实付比较）/, "v2.2 只读实付比较中文标签");
   assert.match(html, /判别配置：binary 二元判断 · prompt fact-support-v1/, "fact-support-v1 识别为 binary");
   assert.match(html, /宿主仅接受事实或规则与明确安全边界问题的回答/, "接受口径说明");
   assert.match(html, /判别明细记录异常，无法解析/, "顶层数组等非合同容器明确诊断，不默默兼容");
   const verdictFolds = walk(element("run-detail")).filter(item => item.textContent.startsWith("判别明细 · "));
-  assert.equal(verdictFolds.length, 2, "无 supportVerification 的旧记录不伪造判别明细");
+  assert.equal(verdictFolds.length, 6, "无 supportVerification 的旧记录不伪造判别明细");
   const profileLines = walk(element("run-detail")).filter(item => item.textContent.startsWith("判别配置："));
-  assert.equal(profileLines.length, 3, "有记录的判别配置按实际版本显示");
+  assert.equal(profileLines.length, 9, "有记录的判别配置按实际版本显示");
   assert.match(html, /临期券退款规则/, "被接受原文标题");
   assert.match(html, /到期前 72 小时内<b>未核销<\/b>可退。/, "来源正文按文本展示（textContent 防注入）");
   assert.match(html, /超出授权范围/, "scope 拒绝原因中文");

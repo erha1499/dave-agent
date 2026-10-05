@@ -65,6 +65,9 @@ export async function runC1SupportDevelopment(selection: "original" | "expanded"
       // Fixed score/rank only satisfy the support client schema; no ranking or threshold experiment is claimed.
       row.verification = await verifyEvidenceSupport({ client, query: input.query, scope: input.scope, candidates: [{ ...document, rank: 1, score: 1 }] });
       row.attempts = row.verification.attempts;
+      if (row.verification.validation?.status !== undefined && row.verification.validation.status !== "complete") {
+        row.error = "Support candidate validation incomplete; invalid decisions are not correct rejections"; continue;
+      }
       const decision = row.verification.value[0]!;
       row.status = (input.expected.acceptableCategories ?? [input.expected.category]).includes(decision.category!)
         && decision.supported === input.expected.supported ? "passed" : "failed";
@@ -76,8 +79,11 @@ export async function runC1SupportDevelopment(selection: "original" | "expanded"
   const after = await codeHashes(), attempts = rows.flatMap(row => row.attempts);
   const codeStable = JSON.stringify(before) === JSON.stringify(after), errors = rows.filter(row => row.status === "error").length;
   const summary = { planned: data.data.cases.length, passed: rows.filter(row => row.status === "passed").length, failed: rows.filter(row => row.status === "failed").length, errors,
-    providerRequests: attempts.length, usage: { supportTokens: errors || attempts.some(attempt => attempt.totalTokens === null) ? null : attempts.reduce((n, attempt) => n + attempt.totalTokens!, 0),
-      estimatedUsd: errors || attempts.some(attempt => attempt.costUsd === null) ? null : attempts.reduce((n, attempt) => n + attempt.costUsd!, 0), rerankRequests: 0, estimatedCny: 0 } };
+    providerRequests: attempts.length,
+    supportValidation: { partialRows: rows.filter(row => row.verification?.validation?.status === "partial").length,
+      unavailableRows: rows.filter(row => row.verification?.validation?.status === "unavailable").length,
+      invalidDecisions: rows.reduce((sum, row) => sum + (row.verification?.validation?.invalidDecisions.length ?? 0), 0) }, usage: { supportTokens: attempts.length !== data.data.cases.length || attempts.some(attempt => attempt.totalTokens === null) ? null : attempts.reduce((n, attempt) => n + attempt.totalTokens!, 0),
+      estimatedUsd: attempts.length !== data.data.cases.length || attempts.some(attempt => attempt.costUsd === null) ? null : attempts.reduce((n, attempt) => n + attempt.costUsd!, 0), rerankRequests: 0, estimatedCny: 0 } };
   const artifact = { version: selection === "expanded" ? 2 : 1, runId, executedAt: new Date().toISOString(), mode: "direct-support-unit-development", datasetSelection: selection, source: data.manifest,
     settings: client?.settings ?? null, codeStable, codeHashes: { before, after }, thresholdEvaluated: false, retrievalEvaluated: false,
     contextResolutionEvaluated: false, modelActionSelectionEvaluated: false, finalAnswerQualityEvaluated: false, summary, rows };

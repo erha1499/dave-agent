@@ -27,7 +27,9 @@ export type SupportKnowledgeContext = {
   purpose: "user_policy" | "refund_eligibility" | "business_prerequisite";
   orderSource: "current_explicit" | "verified_focus" | "verified_alternative" | "none";
   scopeSource: "fresh_order" | "global";
-  facts: { orderId: string; asOf: string; status: string; productId: string; productName: string; refundState: string } | null;
+  facts: { orderId: string; asOf: string; status: string; productId: string; productName: string; refundState: string;
+    // Absent in legacy replay. Counts are the fresh coupon status fields, not inferred lifecycle transitions.
+    couponCounts?: { total: number; unused: number; redeemed: number; expired: number; refunded: number } } | null;
   policyTopic: TrustedPolicyTopic | null;
   objectReference: { kind: "remaining_amount" | "alternative_order"; sourceRequestIds: string[]; fromOrderId: string; toOrderId: string } | null;
   protocol?: "v2.2";
@@ -230,7 +232,7 @@ export class SupportController {
     const clarify = (field: "order" | "reason" | "intent") => result(notice({
       order: "请明确本次要查询或操作的模拟订单号。",
       reason: "请说明希望联系商家协商的原因。",
-      intent: "请明确本次先处理哪项需求：政策咨询、协商进度、退款申请或退款状态。",
+      intent: "请明确本次先处理哪项需求：政策咨询、协商进度、退款申请或退款状态。若续问前文，请补充所指规则、时间或对象。",
     }[field]), "clarification");
     if (action.kind === "clarify") return clarify(action.field);
     if (action.kind === "non_business") return result(notice(action.reason === "greeting"
@@ -391,9 +393,16 @@ export class SupportController {
     // The model may classify the request, but cannot replace an unknown fact with an easier policy question.
     const currentScope = { shopId: order?.shop.id ?? null, productId: order?.items[0]?.productId ?? null };
     if (question.topic && !alternativeOrderId && !isDeepStrictEqual(question.topic.scope, currentScope)) return clarify("intent");
+    const couponCounts = semantic && order ? { total: order.coupons.length,
+      unused: order.coupons.filter(coupon => coupon.status === "unused").length,
+      redeemed: order.coupons.filter(coupon => coupon.status === "redeemed").length,
+      expired: order.coupons.filter(coupon => coupon.status === "expired").length,
+      refunded: order.coupons.filter(coupon => coupon.status === "refunded").length } : undefined;
     let query = prerequisite ? refundQuery(order!) : question.query.trim()
       + (order ? `\n已核实订单商品：${order.items[0]!.productName}。` : "")
       + (refundQuestion ? `\n订单状态对应的规则条件：${refundQuery(order!)}。` : "");
+    if (couponCounts && (refundQuestion || prerequisite)) query += `\n已核实本单券数：共${couponCounts.total}张，未核销${couponCounts.unused}张、`
+      + `已核销${couponCounts.redeemed}张、已过期${couponCounts.expired}张、已退款${couponCounts.refunded}张（按券状态字段计数）。`;
     // The authorized ID selects the scope, not semantic evidence. Preserve it in
     // originalQuery/facts while normalizing only this known locator for retrieval.
     if (order) query = query.replaceAll(`订单 ${order.id}`, "该订单").replaceAll(`订单${order.id}`, "该订单").replaceAll(order.id, "该订单");
@@ -409,7 +418,8 @@ export class SupportController {
           : [...(question.topic ? [question.topic.requestId] : []), ...context.orderChoices!.orders.map(row => row.requestId)] } : null,
       ...(semantic ? { protocol: "v2.2" as const } : {}),
       facts: order ? { orderId: order.id, asOf: order.asOf, status: order.status,
-        productId: order.items[0]!.productId, productName: order.items[0]!.productName, refundState: refundQuery(order) } : null };
+        productId: order.items[0]!.productId, productName: order.items[0]!.productName, refundState: refundQuery(order),
+        ...(couponCounts ? { couponCounts } : {}) } : null };
     const ids = await getRules(knowledgeContext, order);
     if (action.kind === "policy" || action.kind === "refund_eligibility") {
       const anchor = semantic && alternativeOrderId ? context.userText : alternateAnchor ?? question.topic?.originalQuery ?? context.userText;
