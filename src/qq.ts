@@ -14,6 +14,7 @@ import { readQQReplyButtons, readQQReplyFormat, sendQQReply } from "./qq-reply.t
 import { RefundStore, readRefundDatabaseConfig } from "./refunds.ts";
 import { confirmRefundReply, markRefundReplyPresented } from "./refund-entry.ts";
 import { dispatchMerchantNotifications } from "./merchant-notifications.ts";
+import { createSupportSession, readSupportArchitecture } from "./support-session.ts";
 
 // Remove the leading transport mention/spaces (QQ may already have removed the mention).
 // Stripping embedded mentions/faces or trimming
@@ -62,6 +63,7 @@ async function main() {
   const { options, allowedGroups } = readQQConfig();
   const replyFormat = readQQReplyFormat();
   const replyButtons = readQQReplyButtons();
+  const architecture = readSupportArchitecture();
   const store = new CouponStore(createPool(readDatabaseConfig()));
   let afterSales: AfterSalesStore | undefined;
   let refunds: RefundStore | undefined;
@@ -78,7 +80,7 @@ async function main() {
       await refunds.ping();
     }
     const { modelRuntime, model } = await createConfiguredModelRuntime();
-    const secrets = [options.appSecret, process.env.DEEPSEEK_API_KEY, process.env.MODEL_API_KEY, process.env.DB_PASSWORD, process.env.AFTER_SALES_DB_PASSWORD, process.env.REFUND_DB_PASSWORD].filter((key): key is string => !!key);
+    const secrets = [options.appSecret, process.env.DEEPSEEK_API_KEY, process.env.MODEL_API_KEY, process.env.DASHSCOPE_API_KEY, process.env.DB_PASSWORD, process.env.AFTER_SALES_DB_PASSWORD, process.env.REFUND_DB_PASSWORD].filter((key): key is string => !!key);
     const redact = (text: string) => secrets.reduce((value, key) => value.replaceAll(key, "[redacted]"), text);
     const bot = new QQBot({
       ...options,
@@ -107,9 +109,12 @@ async function main() {
           const tag = await recordQQIdentity(options.appId, msg);
           console.log(`[qq] 未绑定模拟客户 identity=${tag}；管理员核对发信人与订单归属后运行 npm run qq:bind -- ${tag} <模拟客户ID>，不同客户须分别绑定。`);
         }
-        return createCouponSession(identity, store, modelRuntime, model, afterSales ? {
+        const business = afterSales ? {
           store: afterSales, sourceKey: merchantSourceKey(identity, msg.groupOpenid!), refunds,
-        } : undefined);
+        } : undefined;
+        return architecture === "controller"
+          ? createSupportSession(identity, store, modelRuntime, model, business, { groupOpenid: msg.groupOpenid! })
+          : createCouponSession(identity, store, modelRuntime, model, business);
       },
       async (target, _text, reply, requesterId) => {
         await sendQQReply(bot, target, reply, replyFormat, replyButtons ? requesterId : undefined);
@@ -131,6 +136,7 @@ async function main() {
         const identity = { appId: options.appId, senderId: msg.senderId };
         await markRefundReplyPresented(refunds, identity, merchantSourceKey(identity, msg.groupOpenid!), reply);
       },
+      { merchantEvents: architecture === "controller" ? "host" : "model" },
     );
     bot.on("message", async (_ctx, msg) => {
       await agent.handle(msg);
@@ -140,7 +146,7 @@ async function main() {
       if (afterSales && !stopMerchant) stopMerchant = startMockMerchant(afterSales, {
         afterProcess: () => dispatchMerchantNotifications(afterSales!, agent, options.appId, allowedGroups),
       });
-      console.log(`[qq] ${options.transport} 团购券客服已就绪；模型 ${model.provider}/${model.id}；${refunds ? "模拟协商与模拟退款已启用，无真实资金操作" : afterSales ? "模拟商家协商已启用，订单/资金只读" : "只读咨询"}。`);
+      console.log(`[qq] ${options.transport} 团购券客服已就绪；architecture=${architecture}；模型 ${model.provider}/${model.id}；${refunds ? "模拟协商与模拟退款已启用，无真实资金操作" : afterSales ? "模拟商家协商已启用，订单/资金只读" : "只读咨询"}。`);
     });
     const controller = new AbortController();
     const stop = () => controller.abort();
@@ -168,7 +174,7 @@ async function main() {
 if (import.meta.main) {
   main().catch((error: unknown) => {
     const text = error instanceof Error ? error.message : "QQ 启动失败。";
-    const secrets = [process.env.QQBOT_APP_SECRET, process.env.DEEPSEEK_API_KEY, process.env.MODEL_API_KEY, process.env.DB_PASSWORD, process.env.AFTER_SALES_DB_PASSWORD, process.env.REFUND_DB_PASSWORD].filter((key): key is string => !!key);
+    const secrets = [process.env.QQBOT_APP_SECRET, process.env.DEEPSEEK_API_KEY, process.env.MODEL_API_KEY, process.env.DASHSCOPE_API_KEY, process.env.DB_PASSWORD, process.env.AFTER_SALES_DB_PASSWORD, process.env.REFUND_DB_PASSWORD].filter((key): key is string => !!key);
     console.error(secrets.reduce((value, key) => value.replaceAll(key, "[redacted]"), text));
     process.exitCode = 1;
   });

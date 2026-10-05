@@ -22,3 +22,14 @@ console.log("模型配置检查通过：DeepSeek 默认配置、显式覆盖、�
 
 await import("./retrieval-check.ts");
 await import("./retrieval-context-check.ts");
+
+// Deterministic v2 checks only: faux Pi, in-memory services and mocked provider fetch.
+await import("./support-controller-check.ts");
+await import("./support-session-check.ts");
+await import("./support-notification-check.ts");
+await import("./support-v2-check.ts");
+await import("./retrieval-v2-ranking-check.ts");
+await import("./retrieval-v2-check.ts");
+const { checkSupportLiveDataset } = await import("./support-v2-live.ts");
+await checkSupportLiveDataset();
+console.log("v2 live 题集干检查通过；未开启 --live，不连接数据库或调用付费模型。");

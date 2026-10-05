@@ -4,6 +4,7 @@ import { rankKnowledge } from "./knowledge-retrieval.ts";
 export type QQIdentity = { appId: string; senderId: string };
 const unavailableOrder = "未找到当前客户可查询的订单，请核对订单号或联系人工客服。";
 const databaseFailure = "演示业务数据暂时无法查询，请稍后重试。";
+export class OrderAccessError extends Error {}
 
 export function readDatabaseConfig(env: NodeJS.ProcessEnv = process.env): PoolOptions {
   const host = env.DB_HOST?.trim() || "127.0.0.1";
@@ -64,8 +65,8 @@ export class CouponStore {
 
   async getOrder(identity: QQIdentity, orderId: string) {
     if (!/^COUPON-\d{4}$/.test(orderId)) throw new Error("演示订单号格式为 COUPON-1001。");
-    if (!validIdentity(identity)) throw new Error(unavailableOrder);
-    const notFound = new Error(unavailableOrder);
+    if (!validIdentity(identity)) throw new OrderAccessError(unavailableOrder);
+    const notFound = new OrderAccessError(unavailableOrder);
     let connection: PoolConnection | undefined;
     let started = false;
     try {

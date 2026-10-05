@@ -9,7 +9,7 @@ export type EvalCheck = {
   basis?: "trace" | "state" | "protocol" | "execution";
 };
 export type EvalObjectivePlan = {
-  version: 1;
+  version: 1 | 2;
   scope: "objective";
   answerQuality: "not_evaluated";
   cases: Array<{
@@ -26,6 +26,19 @@ export type EvalBatch = { id: string; repetition: number; plannedRepetitions: nu
 export type EvalUsage = {
   input: number; output: number; cacheRead: number; cacheWrite: number; totalTokens: number;
   estimatedCostUsd: number | null;
+};
+// v2 attribution is additive: old model/tool steps retain their original meaning.
+export type EvalSpan = {
+  id: string; parentSpanId: string | null;
+  actor: "agent" | "host"; trigger: "user" | "event" | "confirmation";
+  component: string; name: string; observedAt: string; durationMs: number | null;
+  outcome: "ok" | "denied" | "error";
+  input?: unknown; output?: unknown;
+  usage?: {
+    provider: string; model: string; kind: "llm" | "embedding" | "rerank";
+    inputTokens: number | null; outputTokens: number | null; totalTokens: number | null;
+    cost: { currency: "USD" | "CNY"; amount: number; source: "sdk_estimate" | "provider" } | null;
+  };
 };
 export type EvalStep = {
   index: number;
@@ -49,6 +62,7 @@ export type EvalTurn = {
   evidenceIds: string[];
   checks: EvalCheck[];
   steps: EvalStep[];
+  spans?: EvalSpan[];
   observations?: { before?: unknown; after?: unknown; protocol?: unknown };
   error?: string;
 };

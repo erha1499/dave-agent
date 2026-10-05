@@ -4,7 +4,8 @@ import { readDatabaseConfig, type QQIdentity } from "./coupon-store.ts";
 
 const unavailable = "未找到当前客户在本会话可操作的演示协商订单，请核对订单号或联系人工客服。";
 const failure = "演示商家协商暂时不可用，请稍后重试。";
-class BusinessError extends Error {}
+export class MerchantBusinessError extends Error {}
+const BusinessError = MerchantBusinessError;
 // Confirmation commands must survive display/copy without hidden characters changing their meaning.
 export const merchantReasonControls = /[\u0000-\u001f\u007f\u200b-\u200f\u2028-\u202e\u2060-\u206f]/u;
 

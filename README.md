@@ -26,6 +26,8 @@
 
 ## 本地运行
 
+v2 候选已提供 `SUPPORT_ARCHITECTURE=controller npm start`（QQ 同样支持），将六项模型工具收敛为 `support_action`，由宿主核验并执行内部依赖；精确确认继续走既有事务入口，商家通知使用固定卡且不调用模型。默认仍为 `atomic`。百炼目前用于离线检索选型，未替换在线知识服务；实测结果和待完成门槛见 [v2 实施记录](./docs/v2-implementation-results.md)。
+
 需要 Node.js >=22.19.0、npm、运行中的 Docker。Pi 直接依赖固定为 `1.0.0`，MySQL 镜像固定为 `8.4.11` 与 digest，完整依赖树见 `package-lock.json`。
 
 当前 `npm audit` 报告 Pi `1.0.0` 间接依赖 `brace-expansion@5.0.9` 存在 [资源耗尽漏洞](https://github.com/advisories/GHSA-q2hr-2g5m-vwhr)。Pi 发布包的 `npm-shrinkwrap.json` 固定了这个版本，本轮 `npm audit fix` 未能更新它；本应用不提供用户可控的 glob/文件搜索工具。升级 Pi 时需重新检查，当前不宣称依赖审计全通过。
@@ -91,6 +93,19 @@ P0 参考语料与基线、P1 词项检索改进已实现，第二轮补回被�
 运行 `node scripts/retrieval-baseline.ts`，schema 2 报告会在相同题集上比较冻结的 tags-only 基线与当前算法。选集 11 篇、44/26 道题的 Recall@5 从 P0 的 59.09%/3.85%，经 P1 第一轮 84.09%/30.77%，到当前 **86.36%/34.62%**；全量 35 篇、136/76 道从 55.88%/11.84%，经 79.41%/43.42%，到 **80.15%/44.74%**（常规/难题）。第二轮仅改善两道外带题，其余排名不变。另有修复前固定的 8/8 新问法与 18/18 规范词工程检查通过；该数据已披露，不是盲测。无 ctx/gold 查询改写或独立留出集，不代表真实模型效果与泛化提升。MRR、固定数据哈希和业务验收见 [检索说明](./docs/retrieval.md)。JSON/Markdown 报告保存在 `.runtime/`，尚未接入工作台 Recall/MRR 展示。
 
 上下文检索另有独立离线对照：`node scripts/retrieval-context.ts`。结果包含原问题、扩写输入、逐题退步及无答案诊断；增加上下文虽改善部分开发题，也会产生无关召回，因此暂不接线上。说明与结果见 [上下文比较](./docs/retrieval.md#上下文检索对照离线)。
+
+v2 新增共同业务合同与百炼 M0–M6 对照。以下 `--live`、`--smoke`、`--run` 会连接真实服务并可能产生费用；业务验收使用临时合成订单和本地 QQ 发送替身，结果进入同库 `support-business-v2` 套件。检索报告及缓存保存在忽略目录 `.runtime/retrieval-v2*`，未接入前端 Recall/MRR 展示。
+
+```sh
+# 仅检查题集，不调用数据库和模型
+node scripts/support-v2-live.ts
+# 两套架构共用相同业务合同，各跑三次
+node --env-file-if-exists=.env scripts/support-v2-live.ts --live --architecture atomic --repeat 3
+node --env-file-if-exists=.env scripts/support-v2-live.ts --live --architecture controller --repeat 3
+# 需 DASHSCOPE_API_KEY / DASHSCOPE_BASE_URL
+node --env-file-if-exists=.env scripts/retrieval-v2.ts --smoke
+node --env-file-if-exists=.env scripts/retrieval-v2.ts --run
+```
 
 ## QQ → Pi 联调
 

@@ -1,4 +1,5 @@
 import type { EvalCase, EvalObjectivePlan, EvalRun, EvalRunDetail, EvalStep, EvalTurn, EvalUsage } from "./evaluation.ts";
+import { analyzeSupportSpans, type SupportTraceAnalysis } from "./support-evaluation.ts";
 
 type Outcome = "passed" | "failed" | "skipped" | "missing";
 export type EvalCounts = { planned: number; passed: number; failed: number; skipped: number; missing: number; passRate: number | null };
@@ -22,6 +23,7 @@ export type EvalRunAnalysis = {
   execution: { toolCalls: number; toolErrors: number; expectedDenials: number; modelErrors: number };
   timing: { samples: number; durationP50Ms: number | null; durationP95Ms: number | null; measurement: string | null };
   retrieval: EvalRetrievalAnalysis | null;
+  attribution: SupportTraceAnalysis | null;
 };
 export type EvalCondition = { key: string; status: "equal" | "different" | "unknown" };
 export type EvalComparison = {
@@ -62,7 +64,7 @@ export function objectivePlan(run: EvalRun): { scope: EvalRunAnalysis["scope"]; 
   if (value === undefined) return { scope: "legacy", issues: ["该历史运行没有客观检查计划。"] };
   const invalid = (reason: string) => ({ scope: "invalid" as const, issues: [reason] });
   if (!record(value) || !exactKeys(value, ["version", "scope", "answerQuality", "cases"])
-    || value.version !== 1 || value.scope !== "objective" || value.answerQuality !== "not_evaluated" || !array(value.cases, 500))
+    || ![1, 2].includes(Number(value.version)) || typeof value.version !== "number" || value.scope !== "objective" || value.answerQuality !== "not_evaluated" || !array(value.cases, 500))
     return invalid("客观计划版本、范围或案例集合无效。");
   let turns = 0;
   const ids: string[] = [];
@@ -173,6 +175,7 @@ export function analyzeEvaluation(detail: EvalRunDetail): EvalRunAnalysis {
   const parsed = objectivePlan(run);
   const result: EvalRunAnalysis = {
     runId: run.id, scope: parsed.scope, answerQuality: "not_evaluated", issues: parsed.issues, counts: null, categories: [], coverage: [], cases: [], retrieval: null,
+    attribution: turns.some(turn => turn.spans !== undefined) ? analyzeSupportSpans(turns.flatMap(turn => Array.isArray(turn.spans) ? turn.spans : [])) : null,
     usage: usageAnalysis(steps),
     execution: { toolCalls: steps.filter(step => step.type === "tool").length,
       toolErrors: steps.filter(step => step.type === "tool" && step.isError && !step.expectedDenial).length,
@@ -182,6 +185,8 @@ export function analyzeEvaluation(detail: EvalRunDetail): EvalRunAnalysis {
       durationP95Ms: durations.length ? durations[Math.ceil(.95 * durations.length) - 1]! : null,
       measurement: nonempty(run.snapshot.content.measurement) ? run.snapshot.content.measurement : null },
   };
+  if (turns.some(turn => turn.spans !== undefined && !Array.isArray(turn.spans))) result.issues.push("v2 span 集合无效。");
+  if (result.attribution?.issues.length) result.issues.push(...result.attribution.issues);
   if (!parsed.plan) return result;
   const plannedCases = new Map(parsed.plan.cases.map(item => [item.id, item]));
   const foundCases = new Map<string, EvalCase>();
@@ -265,7 +270,7 @@ const model = (run: EvalRun) => {
 
 export function compareEvaluations(a: EvalRunDetail, b: EvalRunDetail): EvalComparison {
   const baseline = analyzeEvaluation(a), candidate = analyzeEvaluation(b);
-  const conditions = [condition("scope", baseline.scope === "objective" ? "objective-v1" : undefined, candidate.scope === "objective" ? "objective-v1" : undefined),
+  const conditions = [condition("scope", baseline.scope === "objective" ? `objective-v${objectivePlan(a.run).plan?.version}` : undefined, candidate.scope === "objective" ? `objective-v${objectivePlan(b.run).plan?.version}` : undefined),
     condition("suite", a.run.suiteId, b.run.suiteId), condition("kind", a.run.kind, b.run.kind),
     ...["dataset", "checker", "business"].map(key => condition(key, a.run.snapshot.hashes[key as keyof EvalRun["snapshot"]["hashes"]], b.run.snapshot.hashes[key as keyof EvalRun["snapshot"]["hashes"]])),
     condition("manifest", a.run.snapshot.content.evaluation, b.run.snapshot.content.evaluation),

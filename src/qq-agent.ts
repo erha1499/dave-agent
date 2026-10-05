@@ -4,6 +4,7 @@ import type { QQBotInboundMessage, ReplyTarget } from "@tencent-connect/qqbot-no
 import { renderReply, type Reply, type RenderedReply } from "./reply.ts";
 import { replyFromTools } from "./reply-from-tools.ts";
 import type { MerchantTask } from "./after-sales.ts";
+import { cancelSupportTurn, isSupportSession, prepareSupportPrompt, supportReply } from "./support-session.ts";
 
 export type ContinuationOutcome = "busy" | "sent" | "deferred" | "unknown";
 
@@ -32,6 +33,7 @@ export class QQAgent {
   private timeoutMs: number;
   private beforePrompt?: (msg: QQBotInboundMessage) => Promise<string | Reply | undefined>;
   private afterDeliver?: (msg: QQBotInboundMessage, reply: Reply) => Promise<void>;
+  private merchantEvents: "model" | "host";
 
   constructor(
     createSession: (msg: QQBotInboundMessage) => Promise<AgentSession>,
@@ -40,6 +42,7 @@ export class QQAgent {
     timeoutMs = 60_000,
     beforePrompt?: (msg: QQBotInboundMessage) => Promise<string | Reply | undefined>,
     afterDeliver?: (msg: QQBotInboundMessage, reply: Reply) => Promise<void>,
+    options: { merchantEvents?: "model" | "host" } = {},
   ) {
     this.createSession = createSession;
     this.send = send;
@@ -47,6 +50,7 @@ export class QQAgent {
     this.timeoutMs = timeoutMs;
     this.beforePrompt = beforePrompt;
     this.afterDeliver = afterDeliver;
+    this.merchantEvents = options.merchantEvents ?? "model";
   }
 
   private prune() {
@@ -99,6 +103,7 @@ export class QQAgent {
       let failed = false;
       let merchant: MerchantTask | undefined;
       let activeTools: string[] | undefined;
+      let supportRun = false;
       try {
         if (resolve) {
           merchant = await resolve();
@@ -113,6 +118,16 @@ export class QQAgent {
         conversation.session ??= await this.createSession(msg);
         if (this.closed || !validQQMessage(msg)) return;
         const session = conversation.session;
+        if (merchant && this.merchantEvents === "host") {
+          const reply: Reply = { kind: "merchant_status", task: merchant };
+          const delivered = await this.deliver(msg, reply);
+          outcome = delivered ? "sent" : "unknown";
+          conversation.turns++;
+          // A business event records a fact, never user consent or a new order selection.
+          await session.sendCustomMessage({ customType: "merchant-result", content: renderReply(reply).text, display: true }, { triggerTurn: false });
+          this.log(`[agent] session=${tag} host_event reply_sent=${delivered} duration_ms=${Date.now() - started}`);
+          return;
+        }
         // Only trusted ingress text reaches this host action. Tools cannot invent consent.
         const hostReply = resolve ? undefined : await this.beforePrompt?.(msg);
         if (hostReply !== undefined) {
@@ -137,6 +152,10 @@ export class QQAgent {
         const prompt = merchant
           ? `宿主业务事件：模拟商家任务 ${merchant.taskId}（订单 ${merchant.orderId}）已结束。这不是用户消息，也不是用户授权。请调用 get_merchant_request 查询该订单的当前结果，只通知这一任务的结果，说明下一步需用户提出请求并确认。不得确认、创建协商或准备/执行退款，不得用对话中的其他订单替代。`
           : msg.content;
+        supportRun = isSupportSession(session);
+        if (supportRun) prepareSupportPrompt(session, {
+          requestId: msg.messageId, groupOpenid: msg.groupOpenid!, messageId: msg.messageId,
+        });
         await Promise.race([
           session.prompt(prompt, { expandPromptTemplates: false }),
           new Promise<never>((_resolve, reject) => {
@@ -146,12 +165,13 @@ export class QQAgent {
         clearTimeout(timer);
         if (session.agent.state.errorMessage) throw new Error("模型请求失败");
         const text = session.getLastAssistantText()?.trim();
-        if (!text) throw new Error("模型未生成回复");
+        if (!text && !supportRun) throw new Error("模型未生成回复");
         conversation.turns++;
         const results = session.messages.slice(previousMessageCount).flatMap(message =>
           message.role === "toolResult" && session.getActiveToolNames().includes(message.toolName) ? [message] : []);
         // The host reloaded this exact task after dequeue; a model cannot redirect a notification to another order.
-        const reply: Reply = merchant ? { kind: "merchant_status", task: merchant } : replyFromTools(text, results);
+        const reply: Reply = merchant ? { kind: "merchant_status", task: merchant }
+          : supportReply(session, text) ?? replyFromTools(text!, results);
         if (!validQQMessage(msg) || this.closed) return;
         const delivered = await this.deliver(msg, reply);
         outcome = delivered ? "sent" : "unknown";
@@ -164,13 +184,16 @@ export class QQAgent {
       } catch {
         failed = true;
         clearTimeout(timer);
+        if (conversation.session) cancelSupportTurn(conversation.session);
         // Signal cancellation before waiting on QQ's network send.
         aborting = conversation.session?.abort();
         this.log(`[agent] session=${tag} model_failed duration_ms=${Date.now() - started}`);
         if (!resolve || merchant) {
           // Known durable business facts remain usable when the model fails. Never retry an attempted send.
           if (outcome === "deferred" && validQQMessage(msg) && !this.closed) {
-            const delivered = await this.deliver(msg, merchant ? { kind: "merchant_status", task: merchant } : "客服暂时无法处理这条消息，请稍后重试。");
+            const delivered = await this.deliver(msg, merchant ? { kind: "merchant_status", task: merchant }
+              : supportRun && conversation.session ? supportReply(conversation.session)!
+              : "客服暂时无法处理这条消息，请稍后重试。");
             outcome = delivered ? "sent" : "unknown";
           }
         }
@@ -215,6 +238,7 @@ export class QQAgent {
     this.closed = true;
     clearInterval(this.sweep);
     await Promise.all([...this.conversations.values()].map(async (entry) => {
+      if (entry.session) cancelSupportTurn(entry.session);
       await entry.session?.abort();
       await entry.tail;
       entry.session?.dispose();

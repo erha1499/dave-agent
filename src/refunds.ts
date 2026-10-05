@@ -3,7 +3,8 @@ import type { Pool, PoolConnection, PoolOptions, RowDataPacket } from "mysql2/pr
 import { readDatabaseConfig, type QQIdentity } from "./coupon-store.ts";
 
 const unavailable = "未找到当前客户在本会话可操作的模拟退款，请核对订单或重新获取退款方案。";
-class BusinessError extends Error {}
+export class RefundBusinessError extends Error {}
+const BusinessError = RefundBusinessError;
 const uuid = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
 export type RefundOperation = {
   operationId: string; orderId: string; taskId: string;

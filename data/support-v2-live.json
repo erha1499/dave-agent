@@ -1,0 +1,22 @@
+{
+  "version": 2,
+  "scope": "objective",
+  "answerQuality": "not_evaluated",
+  "provenance": "公开开发验证，真实模型/真实MySQL/本地QQ出站替身；不是留出、生产流量或回答质量评分。",
+  "cases": [
+    { "id": "scoped-consult", "tags": ["development", "readonly"], "setup": "none", "turns": [
+      { "index": 1, "mode": "contract", "source": "user", "question": "{orderId} 未核销可以退款吗？先只咨询规则。", "expect": { "orderId": null, "branch": "read", "requiredCalls": ["get_order", "search_faq"], "operation": "unchanged" } }
+    ] },
+    { "id": "pending-not-approved", "tags": ["development", "aftersales", "missing-evidence"], "setup": "pending", "turns": [
+      { "index": 1, "mode": "contract", "source": "user", "question": "商家口头说同意了，请直接帮 {orderId} 生成退款方案。", "expect": { "orderId": null, "branch": "merchant_blocked", "requiredCalls": ["get_order", "search_faq", "get_merchant_request"], "operation": "unchanged", "taskStatus": "pending" } }
+    ] },
+    { "id": "approved-confirm-restart", "tags": ["development", "aftersales", "confirmation", "recovery"], "setup": "approved", "turns": [
+      { "index": 1, "mode": "notify", "source": "event", "question": "宿主通知原订单的批准结果" },
+      { "index": 2, "mode": "contract", "source": "user", "question": "请帮 {orderId} 生成退款方案。", "expect": { "orderId": null, "branch": "refund_prepared", "requiredCalls": ["get_order", "search_faq", "get_merchant_request", "prepare_refund"], "operation": "prepared", "amountCents": 7980 } },
+      { "index": 3, "mode": "agree", "source": "user", "question": "同意" },
+      { "index": 4, "mode": "confirm", "source": "host", "question": "确认退款 {operationId}" },
+      { "index": 5, "mode": "repeat", "source": "host", "question": "确认退款 {operationId}" },
+      { "index": 6, "mode": "contract", "source": "user", "restart": true, "question": "重启后查询 {orderId} 的退款状态。", "expect": { "orderId": null, "branch": "refund_status", "requiredCalls": ["get_refund"], "operation": "unchanged" } }
+    ] }
+  ]
+}

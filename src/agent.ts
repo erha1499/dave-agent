@@ -144,9 +144,10 @@ export function createQQSession(modelRuntime: ModelRuntime, model: Model<Api>) {
   return createSession(modelRuntime, { ...model, maxTokens: Math.min(model.maxTokens, 2048) }, systemPrompt, tools, { skills: [], diagnostics: [] });
 }
 
-async function createSession(
+export async function createSession(
   modelRuntime: ModelRuntime, model: Model<Api>, systemPrompt: string,
   tools: ToolDefinition[], skills: ReturnType<ResourceLoader["getSkills"]>,
+  beforeStart?: (prompt: string) => Promise<string | undefined>,
 ) {
 
   const resourceLoader: ResourceLoader = {
@@ -155,7 +156,10 @@ async function createSession(
         path: "<host-prompt>",
         resolvedPath: "<host-prompt>",
         sourceInfo: createSyntheticSourceInfo("<host-prompt>", { source: "sdk" }),
-        handlers: new Map([["before_agent_start", [async () => ({ systemPrompt })]]]),
+        handlers: new Map([["before_agent_start", [async (event: unknown) => {
+          const context = await beforeStart?.((event as { prompt: string }).prompt);
+          return { systemPrompt, ...(context ? { message: { customType: "support-context", content: context, display: false } } : {}) };
+        }]]]),
         tools: new Map(), commands: new Map(), flags: new Map(), shortcuts: new Map(), messageRenderers: new Map(),
       }],
       errors: [],

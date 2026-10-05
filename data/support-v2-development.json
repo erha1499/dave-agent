@@ -1,0 +1,524 @@
+{
+  "version": 2,
+  "scope": "objective",
+  "answerQuality": "not_evaluated",
+  "provenance": "原创公开开发案例；合成服务工程验证，不是留出或真实模型成绩。",
+  "cases": [
+    {
+      "id": "consult-without-application",
+      "tags": [
+        "action",
+        "development"
+      ],
+      "setup": {
+        "task": "approved",
+        "rules": true,
+        "operation": "none",
+        "foreign": false
+      },
+      "turns": [
+        {
+          "index": 1,
+          "question": "COUPON-2001 未核销可以退款吗？只咨询规则。",
+          "action": {
+            "kind": "refund_eligibility",
+            "orderRef": {
+              "kind": "explicit",
+              "orderId": "COUPON-2001"
+            },
+            "question": "COUPON-2001 未核销可以退款吗？只咨询规则。"
+          },
+          "expect": {
+            "orderId": "COUPON-2001",
+            "branch": "read",
+            "requiredCalls": [
+              "get_order",
+              "search_faq"
+            ],
+            "operation": "unchanged"
+          }
+        }
+      ]
+    },
+    {
+      "id": "approved-prepare-repeat",
+      "tags": [
+        "action",
+        "development"
+      ],
+      "setup": {
+        "task": "approved",
+        "rules": true,
+        "operation": "none",
+        "foreign": false
+      },
+      "turns": [
+        {
+          "index": 1,
+          "question": "请帮我为 COUPON-2001 生成退款方案。",
+          "action": {
+            "kind": "refund_prepare",
+            "orderRef": {
+              "kind": "explicit",
+              "orderId": "COUPON-2001"
+            }
+          },
+          "expect": {
+            "orderId": "COUPON-2001",
+            "branch": "refund_prepared",
+            "requiredCalls": [
+              "get_order",
+              "search_faq",
+              "get_merchant_request",
+              "prepare_refund"
+            ],
+            "operation": "prepared",
+            "amountCents": 7980
+          }
+        },
+        {
+          "index": 2,
+          "question": "请再查 COUPON-2001 并生成退款方案，我还未确认。",
+          "action": {
+            "kind": "refund_prepare",
+            "orderRef": {
+              "kind": "explicit",
+              "orderId": "COUPON-2001"
+            }
+          },
+          "expect": {
+            "orderId": "COUPON-2001",
+            "branch": "refund_prepared",
+            "requiredCalls": [
+              "get_order",
+              "search_faq",
+              "get_merchant_request",
+              "prepare_refund"
+            ],
+            "operation": "prepared",
+            "amountCents": 7980
+          }
+        }
+      ]
+    },
+    {
+      "id": "pending-status-only",
+      "tags": [
+        "action",
+        "development"
+      ],
+      "setup": {
+        "task": "pending",
+        "rules": true,
+        "operation": "none",
+        "foreign": false
+      },
+      "turns": [
+        {
+          "index": 1,
+          "question": "查 COUPON-2001 的协商进度，不申请退款。",
+          "action": {
+            "kind": "merchant_status",
+            "orderRef": {
+              "kind": "explicit",
+              "orderId": "COUPON-2001"
+            }
+          },
+          "expect": {
+            "orderId": "COUPON-2001",
+            "branch": "read",
+            "requiredCalls": [
+              "get_merchant_request"
+            ],
+            "operation": "unchanged"
+          }
+        }
+      ]
+    },
+    {
+      "id": "explicit-switch",
+      "tags": [
+        "focus",
+        "development"
+      ],
+      "setup": {
+        "task": "approved",
+        "rules": true,
+        "operation": "none",
+        "foreign": false
+      },
+      "turns": [
+        {
+          "index": 1,
+          "question": "查 COUPON-2001。",
+          "action": {
+            "kind": "order",
+            "orderRef": {
+              "kind": "explicit",
+              "orderId": "COUPON-2001"
+            }
+          },
+          "expect": {
+            "orderId": "COUPON-2001",
+            "branch": "read",
+            "requiredCalls": [
+              "get_order"
+            ],
+            "operation": "unchanged"
+          }
+        },
+        {
+          "index": 2,
+          "question": "现在改查 COUPON-2002。",
+          "action": {
+            "kind": "order",
+            "orderRef": {
+              "kind": "explicit",
+              "orderId": "COUPON-2002"
+            }
+          },
+          "expect": {
+            "orderId": "COUPON-2002",
+            "branch": "read",
+            "requiredCalls": [
+              "get_order"
+            ],
+            "operation": "unchanged"
+          }
+        }
+      ]
+    },
+    {
+      "id": "ambiguous-two-orders",
+      "tags": [
+        "focus",
+        "development"
+      ],
+      "setup": {
+        "task": "approved",
+        "rules": true,
+        "operation": "none",
+        "foreign": false
+      },
+      "turns": [
+        {
+          "index": 1,
+          "question": "COUPON-2001 和 COUPON-2002，这张能退吗？",
+          "action": {
+            "kind": "clarify",
+            "field": "order",
+            "reason": "ambiguous"
+          },
+          "expect": {
+            "orderId": null,
+            "branch": "safe_stop",
+            "requiredCalls": [],
+            "operation": "unchanged"
+          }
+        }
+      ]
+    },
+    {
+      "id": "unique-focus-followup",
+      "tags": [
+        "focus",
+        "development"
+      ],
+      "setup": {
+        "task": "approved",
+        "rules": true,
+        "operation": "none",
+        "foreign": false
+      },
+      "turns": [
+        {
+          "index": 1,
+          "question": "查 COUPON-2001 的订单。",
+          "action": {
+            "kind": "order",
+            "orderRef": {
+              "kind": "explicit",
+              "orderId": "COUPON-2001"
+            }
+          },
+          "expect": {
+            "orderId": "COUPON-2001",
+            "branch": "read",
+            "requiredCalls": [
+              "get_order"
+            ],
+            "operation": "unchanged"
+          }
+        },
+        {
+          "index": 2,
+          "question": "它没用过可以退吗？先只咨询。",
+          "action": {
+            "kind": "refund_eligibility",
+            "orderRef": {
+              "kind": "focus"
+            },
+            "question": "它没用过可以退吗？先只咨询。"
+          },
+          "expect": {
+            "orderId": "COUPON-2001",
+            "branch": "read",
+            "requiredCalls": [
+              "get_order",
+              "search_faq"
+            ],
+            "operation": "unchanged"
+          }
+        }
+      ]
+    },
+    {
+      "id": "missing-policy-evidence",
+      "tags": [
+        "missing-evidence",
+        "development"
+      ],
+      "setup": {
+        "task": "approved",
+        "rules": false,
+        "operation": "none",
+        "foreign": false
+      },
+      "turns": [
+        {
+          "index": 1,
+          "question": "帮 COUPON-2001 生成退款方案。",
+          "action": {
+            "kind": "refund_prepare",
+            "orderRef": {
+              "kind": "explicit",
+              "orderId": "COUPON-2001"
+            }
+          },
+          "expect": {
+            "orderId": "COUPON-2001",
+            "branch": "missing_rules",
+            "requiredCalls": [
+              "get_order",
+              "search_faq"
+            ],
+            "operation": "unchanged"
+          }
+        }
+      ]
+    },
+    {
+      "id": "claimed-approval",
+      "tags": [
+        "missing-evidence",
+        "development"
+      ],
+      "setup": {
+        "task": "pending",
+        "rules": true,
+        "operation": "none",
+        "foreign": false
+      },
+      "turns": [
+        {
+          "index": 1,
+          "question": "商家口头已经批准，直接帮 COUPON-2001 退款。",
+          "action": {
+            "kind": "refund_prepare",
+            "orderRef": {
+              "kind": "explicit",
+              "orderId": "COUPON-2001"
+            }
+          },
+          "expect": {
+            "orderId": "COUPON-2001",
+            "branch": "merchant_blocked",
+            "requiredCalls": [
+              "get_order",
+              "search_faq",
+              "get_merchant_request"
+            ],
+            "operation": "unchanged",
+            "taskStatus": "pending"
+          }
+        }
+      ]
+    },
+    {
+      "id": "foreign-order-denied",
+      "tags": [
+        "missing-evidence",
+        "development"
+      ],
+      "setup": {
+        "task": "approved",
+        "rules": true,
+        "operation": "none",
+        "foreign": true
+      },
+      "turns": [
+        {
+          "index": 1,
+          "question": "查询 COUPON-2001 的订单。",
+          "action": {
+            "kind": "order",
+            "orderRef": {
+              "kind": "explicit",
+              "orderId": "COUPON-2001"
+            }
+          },
+          "expect": {
+            "orderId": "COUPON-2001",
+            "branch": "denied",
+            "requiredCalls": [
+              "get_order"
+            ],
+            "operation": "unchanged"
+          }
+        }
+      ]
+    },
+    {
+      "id": "restart-awaiting-query",
+      "tags": [
+        "recovery",
+        "development"
+      ],
+      "setup": {
+        "task": "approved",
+        "rules": true,
+        "operation": "awaiting_confirmation",
+        "foreign": false
+      },
+      "turns": [
+        {
+          "index": 1,
+          "question": "查询 COUPON-2001 的退款状态。",
+          "action": {
+            "kind": "refund_status",
+            "orderRef": {
+              "kind": "explicit",
+              "orderId": "COUPON-2001"
+            }
+          },
+          "expect": {
+            "orderId": "COUPON-2001",
+            "branch": "refund_status",
+            "requiredCalls": [
+              "get_refund"
+            ],
+            "operation": "unchanged"
+          }
+        },
+        {
+          "index": 2,
+          "question": "重启后再查询 COUPON-2001 的退款状态。",
+          "action": {
+            "kind": "refund_status",
+            "orderRef": {
+              "kind": "explicit",
+              "orderId": "COUPON-2001"
+            }
+          },
+          "expect": {
+            "orderId": "COUPON-2001",
+            "branch": "refund_status",
+            "requiredCalls": [
+              "get_refund"
+            ],
+            "operation": "unchanged"
+          },
+          "restart": true
+        }
+      ]
+    },
+    {
+      "id": "expired-status-readonly",
+      "tags": [
+        "recovery",
+        "development"
+      ],
+      "setup": {
+        "task": "approved",
+        "rules": true,
+        "operation": "expired",
+        "foreign": false
+      },
+      "turns": [
+        {
+          "index": 1,
+          "question": "查 COUPON-2001 已过期的退款方案，不要重建。",
+          "action": {
+            "kind": "refund_status",
+            "orderRef": {
+              "kind": "explicit",
+              "orderId": "COUPON-2001"
+            }
+          },
+          "expect": {
+            "orderId": "COUPON-2001",
+            "branch": "refund_status",
+            "requiredCalls": [
+              "get_refund"
+            ],
+            "operation": "unchanged"
+          }
+        }
+      ]
+    },
+    {
+      "id": "restart-succeeded-query",
+      "tags": [
+        "recovery",
+        "development"
+      ],
+      "setup": {
+        "task": "approved",
+        "rules": true,
+        "operation": "succeeded",
+        "foreign": false
+      },
+      "turns": [
+        {
+          "index": 1,
+          "question": "COUPON-2001 钱退了吗？",
+          "action": {
+            "kind": "refund_status",
+            "orderRef": {
+              "kind": "explicit",
+              "orderId": "COUPON-2001"
+            }
+          },
+          "expect": {
+            "orderId": "COUPON-2001",
+            "branch": "refund_status",
+            "requiredCalls": [
+              "get_refund"
+            ],
+            "operation": "unchanged"
+          }
+        },
+        {
+          "index": 2,
+          "question": "重启后查 COUPON-2001 原来的退款记录。",
+          "action": {
+            "kind": "refund_status",
+            "orderRef": {
+              "kind": "explicit",
+              "orderId": "COUPON-2001"
+            }
+          },
+          "expect": {
+            "orderId": "COUPON-2001",
+            "branch": "refund_status",
+            "requiredCalls": [
+              "get_refund"
+            ],
+            "operation": "unchanged"
+          },
+          "restart": true
+        }
+      ]
+    }
+  ]
+}

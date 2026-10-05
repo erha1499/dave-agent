@@ -1,14 +1,44 @@
 import { createInterface } from "node:readline/promises";
+import { randomUUID } from "node:crypto";
 import { stdin, stdout } from "node:process";
+import { pathToFileURL } from "node:url";
 import { createPool } from "mysql2/promise";
+import type { AgentSession } from "@earendil-works/pi-coding-agent";
 import { createConfiguredModelRuntime, createCouponSession } from "./agent.ts";
 import { CouponStore, readDatabaseConfig } from "./coupon-store.ts";
 import { AfterSalesStore, readAfterSalesDatabaseConfig, startMockMerchant } from "./after-sales.ts";
 import { confirmMerchantReply, merchantSourceKey } from "./after-sales-entry.ts";
 import { RefundStore, readRefundDatabaseConfig } from "./refunds.ts";
 import { confirmRefundReply, markRefundReplyPresented } from "./refund-entry.ts";
-import { renderReply } from "./reply.ts";
+import { renderReply, type Reply } from "./reply.ts";
 import { replyFromTools } from "./reply-from-tools.ts";
+import { cancelSupportTurn, createSupportSession, getSupportResult, prepareSupportPrompt, readSupportArchitecture, supportReply } from "./support-session.ts";
+
+export async function runCliPrompt(
+  session: AgentSession, text: string, write: (text: string) => Promise<void>,
+  afterDeliver?: (reply: Reply) => Promise<void>,
+) {
+  const previous = session.messages.length;
+  const requestId = randomUUID();
+  prepareSupportPrompt(session, { requestId, groupOpenid: "cli", messageId: requestId });
+  let modelFailed = false;
+  try {
+    await session.prompt(text, { expandPromptTemplates: false });
+    if (session.agent.state.errorMessage) throw new Error("模型请求失败。");
+  } catch {
+    modelFailed = true;
+    cancelSupportTurn(session);
+    await session.abort();
+    if (!getSupportResult(session)) throw new Error("模型请求失败，请检查模型配置或稍后重试。");
+  }
+  const results = session.messages.slice(previous).flatMap(message => message.role === "toolResult" ? [message] : []);
+  const assistantText = modelFailed ? "" : session.getLastAssistantText() ?? "未生成回复，请重试。";
+  const reply = supportReply(session, assistantText) ?? replyFromTools(assistantText, results);
+  // Delivery failures do not re-enter the model fallback or retry any business action.
+  await write(`客服：${renderReply(reply).text}\n`);
+  await afterDeliver?.(reply);
+  return reply;
+}
 
 async function main() {
   const senderId = process.env.CLI_DEMO_USER || "TEST_USER1";
@@ -29,7 +59,11 @@ async function main() {
     const { modelRuntime, model } = await createConfiguredModelRuntime();
     const identity = { appId: "TEST_APP", senderId };
     const sourceKey = merchantSourceKey(identity, "cli");
-    const session = await createCouponSession(identity, store, modelRuntime, model, afterSales ? { store: afterSales, sourceKey, refunds } : undefined);
+    const architecture = readSupportArchitecture();
+    const business = afterSales ? { store: afterSales, sourceKey, refunds } : undefined;
+    const session = architecture === "controller"
+      ? await createSupportSession(identity, store, modelRuntime, model, business)
+      : await createCouponSession(identity, store, modelRuntime, model, business);
     const input = createInterface({ input: stdin, output: stdout });
     console.log(`团购券客服演示（${senderId}）：券单 COUPON-1001${afterSales ? "；模拟协商 COUPON-2001 / 2002 / 2003" : "，只读咨询"}；输入 /exit 退出。全部是模拟数据。`);
     try {
@@ -46,13 +80,9 @@ async function main() {
             console.log(`客服：${receipt}`);
             continue;
           }
-          const previous = session.messages.length;
-          await session.prompt(text, { expandPromptTemplates: false });
-          if (session.agent.state.errorMessage) throw new Error("模型请求失败，请检查模型配置或稍后重试。");
-          const results = session.messages.slice(previous).flatMap(message => message.role === "toolResult" ? [message] : []);
-          const reply = replyFromTools(session.getLastAssistantText() ?? "未生成回复，请重试。", results);
-          await new Promise<void>((resolve, reject) => stdout.write(`客服：${renderReply(reply).text}\n`, error => error ? reject(error) : resolve()));
-          if (refunds) await markRefundReplyPresented(refunds, identity, sourceKey, reply);
+          await runCliPrompt(session, text,
+            output => new Promise<void>((resolve, reject) => stdout.write(output, error => error ? reject(error) : resolve())),
+            refunds ? reply => markRefundReplyPresented(refunds, identity, sourceKey, reply) : undefined);
         } catch (error) {
           console.error(error instanceof Error ? error.message : "本轮处理失败。");
         }
@@ -67,7 +97,9 @@ async function main() {
   }
 }
 
-main().catch((error: unknown) => {
-  console.error(error instanceof Error ? error.message : "启动失败。");
-  process.exitCode = 1;
-});
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch((error: unknown) => {
+    console.error(error instanceof Error ? error.message : "启动失败。");
+    process.exitCode = 1;
+  });
+}
