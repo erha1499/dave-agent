@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { isDeepStrictEqual } from "node:util";
 import { pathToFileURL } from "node:url";
-import { contentHash } from "../src/bailian.ts";
+import { contentHash, rerankInstruction } from "../src/bailian.ts";
 import { merchantSourceKey } from "../src/after-sales.ts";
 import { buildSupportEvidenceBinding, evidenceBindingVersion } from "../src/support-evidence-context.ts";
 import { acceptEvidence } from "../src/evidence-acceptance.ts";
@@ -16,11 +16,11 @@ import type { SupportCall, SupportKnowledgeContext, SupportResult, TrustedPolicy
 import { applyKnowledgeApplicabilityGate, finishKnowledgeApplicabilityAcceptance, knowledgeApplicabilitySettings, type KnowledgeTrace } from "../src/knowledge-service.ts";
 import { buildKnowledgeApplicabilityContext, gateKnowledgeApplicability, knowledgeApplicabilitySourceHash, validateKnowledgeApplicabilitySnapshot,
   type KnowledgeApplicabilityMode, type KnowledgeApplicabilitySnapshot } from "../src/knowledge-applicability.ts";
-import { rankLexical, scopeDocuments, type RetrievalDocument, type RetrievalScope } from "../src/retrieval-ranking.ts";
+import { rankLexical, scopeDocuments, serializeRetrievalDocument, type RetrievalDocument, type RetrievalScope } from "../src/retrieval-ranking.ts";
 import type { SessionTurnActual } from "./c1-session-live.ts";
 
 // Pure contracts/scoring only. No executor, generated validation questions, I/O or model judge.
-export const c1ValidationScoringVersion = "c1-session-validation-v4";
+export const c1ValidationScoringVersion = "c1-session-validation-v5";
 export const c1Families = ["order_state", "paid_amount", "alternative_order", "policy_followup", "refund_time", "appointment_actor"] as const;
 export const c1Strata = ["known", "missing", "competing", "direct_missing_fact", "boundary"] as const;
 type Family = typeof c1Families[number];
@@ -58,6 +58,7 @@ export type C1AnswerReview = { caseId: string; turn: number; reviewer: "codex"; 
 type Corpora = Record<C1ValidationCase["corpus"], readonly RetrievalDocument[]>;
 // Supplied by the frozen run configuration, never inferred from the report being scored.
 export type C1ValidationKnowledgeConfiguration = { applicability?: KnowledgeApplicabilityMode; applicabilitySnapshot?: KnowledgeApplicabilitySnapshot;
+  queryMode?: "combined" | "separated";
   // Frozen candidate requirement, independent of a trace's own version label.
   evidenceBindingVersion?: "order-evidence-binding-v2" };
 const nonempty = (value: unknown): value is string => typeof value === "string" && Boolean(value.trim());
@@ -141,6 +142,7 @@ function reviewPassed(turn: C1ValidationTurn, actual: C1ValidationActual | undef
 function reconstructKnowledgeBinding(actual: C1ValidationActual, call: SupportCall, corpus: readonly RetrievalDocument[],
   configuration: C1ValidationKnowledgeConfiguration, originalQuery: string | undefined, history: C1ValidationHistory) {
   const { context, trace } = call.knowledge!;
+  if (configuration.queryMode !== undefined) assert.equal(context.evidenceBindingVersion, evidenceBindingVersion, "Query plans require reconstructable current host context");
   if (configuration.evidenceBindingVersion) assert.equal(context.evidenceBindingVersion, configuration.evidenceBindingVersion, "Frozen binding version cannot be omitted or downgraded");
   if (!context.evidenceBindingVersion) {
     assert.equal(context.evidenceTarget, undefined); assert.equal(context.evidenceUse, undefined);
@@ -199,6 +201,17 @@ function reconstructKnowledgeBinding(actual: C1ValidationActual, call: SupportCa
     binding: { sourceKey, groupOpenid: ingress.groupOpenid, orderId: order?.id ?? null } });
   for (const key of ["evidenceBindingVersion", "evidenceTarget", "evidenceUse", "purpose", "facts", "effectiveQuery"] as const) assert.deepEqual(context[key], reconstructed[key], `Rebuilt ${key}`);
   assert.deepEqual(context.applicability ?? null, reconstructed.applicability ?? null);
+  if (configuration.queryMode !== undefined) {
+    assert.ok(configuration.queryMode === "combined" || configuration.queryMode === "separated");
+    assert.equal(context.retrievalQuery, reconstructed.retrievalQuery, "Compact query must come from fresh host reconstruction");
+    const queries = { version: "knowledge-query-plan-v1", mode: configuration.queryMode,
+      retrieval: configuration.queryMode === "separated" ? reconstructed.retrievalQuery : reconstructed.effectiveQuery,
+      evidence: reconstructed.effectiveQuery };
+    assert.deepEqual(trace.queries, queries, "Frozen query mode and both actual provider questions must match trusted context");
+    assert.equal(trace.query, queries.retrieval);
+    assert.equal(call.input.query, queries.evidence);
+    assert.equal(call.input.retrievalQuery, reconstructed.retrievalQuery);
+  }
   return reconstructed;
 }
 
@@ -206,13 +219,14 @@ function prepareKnowledgeEvidence(actual: C1ValidationActual, call: SupportCall,
   originalQuery?: string, history: C1ValidationHistory = [], corpus: readonly RetrievalDocument[] = documents) {
   const { trace, context } = call.knowledge!;
   const binding = reconstructKnowledgeBinding(actual, call, corpus, configuration, originalQuery, history);
+  const evidenceQuery = configuration.queryMode === undefined ? trace.query : binding!.effectiveQuery;
   let prepared = acceptEvidence({ query: trace.query, scope: trace.scope, documents, ranking: trace.rawRanking,
     config: trace.mode === "lexical" ? { mode: "off" } : { mode: "support", threshold: trace.threshold! } });
   const mode = configuration.applicability ?? "model_only";
   assert.equal(trace.applicability?.mode ?? "model_only", mode);
   if (mode === "model_only") {
     assert.equal(trace.applicability?.gate, undefined); assert.equal(trace.settings?.applicability, undefined);
-    return { prepared, gate: undefined };
+    return { prepared, gate: undefined, evidenceQuery };
   }
   assert.equal(mode, "declared"); assert.equal(trace.mode, "m4-support");
   const snapshot = configuration.applicabilitySnapshot;
@@ -241,7 +255,7 @@ function prepareKnowledgeEvidence(actual: C1ValidationActual, call: SupportCall,
   assert.deepEqual(trace.applicability?.gate, audit);
   assert.deepEqual(trace.settings?.applicability, knowledgeApplicabilitySettings(frozen));
   prepared = applyKnowledgeApplicabilityGate(prepared, gate);
-  return { prepared, gate };
+  return { prepared, gate, evidenceQuery };
 }
 
 // Reuse the production acceptance/binding checks against the frozen corpus; IDs alone are not evidence.
@@ -257,7 +271,8 @@ function knowledgeProofPassed(actual: C1ValidationActual | undefined, corpus: re
     for (const call of knowledgeCalls) {
       const { context, trace } = call.knowledge!;
       if (call.name !== "search_faq" || call.isError || trace.status === "unavailable" || trace.reason !== null
-        || call.input.query !== trace.query || context.effectiveQuery !== trace.query || context.originalQuery !== trace.originalQuery
+        || call.input.query !== context.effectiveQuery || context.originalQuery !== trace.originalQuery
+        || configuration.queryMode === undefined && context.effectiveQuery !== trace.query
         || !equal({ shopId: call.input.shopId ?? null, productId: call.input.productId ?? null },
           { shopId: trace.scope.shopId ?? null, productId: trace.scope.productId ?? null })) return false;
       const documents = scopeDocuments(corpus, trace.scope), sourceHash = contentHash(documents);
@@ -267,17 +282,28 @@ function knowledgeProofPassed(actual: C1ValidationActual | undefined, corpus: re
       if (trace.mode === "m4-support" && (trace.rawRanking.length !== documents.length || new Set(trace.rawRanking.map(row => row.id)).size !== documents.length
         || trace.rawRanking.some((row, index) => !documents.some(doc => doc.id === row.id) || typeof row.score !== "number" || !Number.isFinite(row.score)
           || row.score < 0 || row.score > 1 || index > 0 && row.score > trace.rawRanking[index - 1]!.score!))) return false;
-      const { prepared, gate } = prepareKnowledgeEvidence(actual, call, documents, configuration, originalQuery, history, corpus);
+      const { prepared, gate, evidenceQuery } = prepareKnowledgeEvidence(actual, call, documents, configuration, originalQuery, history, corpus);
+      if (configuration.queryMode !== undefined && trace.mode === "m4-support") {
+        const rerankCalls = trace.calls.filter(item => item.operation === "rerank");
+        if (rerankCalls.length !== (documents.length ? 1 : 0)) return false;
+        if (documents.length) {
+          const settings = trace.settings?.rerank, rerank = rerankCalls[0]!;
+          if (!settings || settings.rerankModel !== "qwen3-rerank" || settings.rerankInstruction !== rerankInstruction || settings.retries !== 0
+            || trace.settings?.serialization !== "json-title-tags-body-v1" || rerank.status !== "ok" || rerank.attempts.length !== 1
+            || rerank.attempts[0]!.outcome !== "ok" || rerank.requestHash !== contentHash({ endpoint: settings.endpoints.rerank,
+              body: { model: settings.rerankModel, query: trace.query, documents: documents.map(serializeRetrievalDocument), top_n: documents.length, instruct: rerankInstruction } })) return false;
+        }
+      }
       let acceptance = prepared;
       const supportCalls = trace.calls.filter(item => item.operation === "support");
       if (prepared.pendingSupport?.length) {
         const settings = trace.settings?.support, verification = trace.supportVerification;
         if (!settings || !verification || !validateEvidenceSupportVerification(verification,
-          { query: trace.query, scope: trace.scope, candidates: prepared.pendingSupport, settings })) return false;
+          { query: evidenceQuery, scope: trace.scope, candidates: prepared.pendingSupport, settings })) return false;
         if (supportCalls.length !== 1 || supportCalls[0]!.requestHash !== verification.requestHash
           || !equal(supportCalls[0]!.attempts, verification.attempts)
           || supportCalls[0]!.status !== (verification.validation?.status === "partial" ? "partial" : verification.validation?.status === "unavailable" ? "unavailable" : "ok")) return false;
-        acceptance = applyEvidenceSupport({ prepared, verification, query: trace.query, scope: trace.scope, documents, settings });
+        acceptance = applyEvidenceSupport({ prepared, verification, query: evidenceQuery, scope: trace.scope, documents, settings });
       } else if (trace.supportVerification || supportCalls.length) return false;
       acceptance = finishKnowledgeApplicabilityAcceptance(acceptance, gate);
       if (!equal(trace.acceptance, acceptance) || trace.status !== acceptance.status) return false;
@@ -368,9 +394,9 @@ export function scoreC1ValidationTurn(turn: C1ValidationTurn, actual: C1Validati
     const trace = call.knowledge.trace;
     try {
       const settings = trace.settings?.support, verification = trace.supportVerification;
-      const { prepared } = prepareKnowledgeEvidence(actual, call, scopeDocuments(corpus, trace.scope), configuration, turn.question, history, corpus);
+      const { prepared, evidenceQuery } = prepareKnowledgeEvidence(actual, call, scopeDocuments(corpus, trace.scope), configuration, turn.question, history, corpus);
       return settings && verification && validateEvidenceSupportVerification(verification,
-        { query: trace.query, scope: trace.scope, candidates: prepared.pendingSupport ?? [], settings }) ? verification.value : [];
+        { query: evidenceQuery, scope: trace.scope, candidates: prepared.pendingSupport ?? [], settings }) ? verification.value : [];
     } catch { return []; }
   });
   const unavailable = !complete || traces.some(trace => trace.supportFailure || trace.status === "unavailable");
@@ -767,7 +793,7 @@ export function checkC1ValidationScoring() {
   // and remains mandatory when metadata gating is disabled.
   const bindingConfiguration = { ...declaredConfiguration, evidenceBindingVersion };
   function boundActual(input: { question: string; action: ContextSupportAction; order?: Order; topic?: TrustedPolicyTopic;
-    requestId?: string; turn?: number; mode?: "model_only" | "declared" }, documents: RetrievalDocument[] = [doc, multiDoc]) {
+    requestId?: string; turn?: number; mode?: "model_only" | "declared"; queryMode?: "combined" | "separated" }, documents: RetrievalDocument[] = [doc, multiDoc]) {
     const value = structuredClone(actual), r = value.result!, knowledgeCall = value.calls[0]!, t = knowledgeCall.knowledge!.trace, ctx = knowledgeCall.knowledge!.context;
     value.requestId = input.requestId ?? "bound-request"; value.turn = input.turn ?? 1;
     value.ingress = { requestId: value.requestId, identity: { appId: "unit-app", senderId: "unit-user" }, groupOpenid: "unit-group", messageId: value.requestId + "-message" };
@@ -784,8 +810,10 @@ export function checkC1ValidationScoring() {
       ...buildSupportEvidenceBinding({ action: input.action, originalQuery: input.question, order: input.order, requestId: value.requestId,
         verifiedTopic: input.topic, binding: { sourceKey, groupOpenid: value.ingress.groupOpenid, orderId: input.order?.id ?? null } }) });
     if (input.topic) value.hostReference = { policyTopic: { requestId: input.topic.requestId } };
-    const query = ctx.effectiveQuery, visibleDocs = scopeDocuments(documents, scope);
-    knowledgeCall.input = { query, ...scope }; Object.assign(t, { query, originalQuery: input.question, scope,
+    const evidenceQuery = ctx.effectiveQuery, query = input.queryMode === "separated" ? ctx.retrievalQuery! : evidenceQuery, visibleDocs = scopeDocuments(documents, scope);
+    knowledgeCall.input = { query: evidenceQuery, ...(input.queryMode ? { retrievalQuery: ctx.retrievalQuery! } : {}), ...scope };
+    if (input.queryMode) t.queries = { version: "knowledge-query-plan-v1", mode: input.queryMode, retrieval: query, evidence: evidenceQuery };
+    Object.assign(t, { query, originalQuery: input.question, scope,
       sourceHashes: { before: contentHash(visibleDocs), after: contentHash(visibleDocs) }, rawRanking: visibleDocs.map((entry, index) => ({ id: entry.id, score: .9 - index * .1 })) });
     let prepared = acceptEvidence({ query, scope, documents: visibleDocs, ranking: t.rawRanking, config: { mode: "support", threshold: .5 } });
     const gate = input.mode === "model_only" ? undefined : gateKnowledgeApplicability({ snapshot: declaredSnapshot, context: ctx.applicability ?? null, scope, candidates: prepared.pendingSupport! });
@@ -793,12 +821,20 @@ export function checkC1ValidationScoring() {
     if (gate) { const { candidates: _candidates, ...audit } = gate; t.applicability = { mode: "declared", gate: audit };
       t.settings.applicability = knowledgeApplicabilitySettings(declaredSnapshot); prepared = applyKnowledgeApplicabilityGate(prepared, gate); }
     else t.applicability = { mode: "model_only" };
-    const supportInput = { query, scope, candidates: prepared.pendingSupport!, settings };
+    const supportInput = { query: evidenceQuery, scope, candidates: prepared.pendingSupport!, settings };
     const decisions = supportInput.candidates.map(entry => ({ id: entry.id, supported: true, category: "direct_fact" as const, quote: entry.body, reason: "Synthetic source proof" }));
     const verification: EvidenceSupportVerification = { value: decisions, inputHash: evidenceSupportInputHash(supportInput), requestHash: evidenceSupportRequestHash(supportInput),
       attempts: structuredClone(trace.supportVerification!.attempts), validation: { status: "complete", outputHash: contentHash(decisions), invalidDecisions: [] } };
     t.supportVerification = verification; t.calls = [{ operation: "support", requestHash: verification.requestHash, attempts: verification.attempts, status: "ok" }];
-    t.acceptance = finishKnowledgeApplicabilityAcceptance(applyEvidenceSupport({ prepared, verification, query, scope, documents: visibleDocs, settings }), gate);
+    if (input.queryMode && visibleDocs.length) {
+      const rerank = { endpoints: { origin: "https://unit.invalid", embedding: "https://unit.invalid/embedding", rerank: "https://unit.invalid/rerank" },
+        timeoutMs: 1000, retries: 0, embeddingModel: "text-embedding-v4", dimensions: 1024, rerankModel: "qwen3-rerank", rerankInstruction };
+      t.settings.rerank = rerank;
+      t.calls.unshift({ operation: "rerank", status: "ok", requestHash: contentHash({ endpoint: rerank.endpoints.rerank,
+        body: { model: rerank.rerankModel, query, documents: visibleDocs.map(serializeRetrievalDocument), top_n: visibleDocs.length, instruct: rerankInstruction } }),
+        attempts: [{ kind: "rerank", model: "qwen3-rerank", attempt: 1, durationMs: 1, httpStatus: 200, outcome: "ok", totalTokens: 1, requestId: null }] });
+    }
+    t.acceptance = finishKnowledgeApplicabilityAcceptance(applyEvidenceSupport({ prepared, verification, query: evidenceQuery, scope, documents: visibleDocs, settings }), gate);
     t.status = t.acceptance.status; t.reason = null;
     const output = t.acceptance.accepted.map(entry => ({ source: "demo-knowledge" as const, sourceId: entry.id, title: entry.title, body: entry.body, scope: { shopId: null, productId: null } }));
     knowledgeCall.output = output; t.sources = output.map(entry => ({ sourceId: entry.sourceId, version: contentHash(entry) }));
@@ -858,6 +894,40 @@ export function checkC1ValidationScoring() {
     assert.equal(scoreBound(follow, followTurn, bindingConfiguration, [{ question: previousQuestion, actual: forgedPrior }], [doc]).evidenceProofPassed, false); }
   const changedQuestion = { ...followTurn, question: "different actual input" };
   assert.equal(scoreBound(follow, changedQuestion, bindingConfiguration, priorHistory, [doc]).evidenceProofPassed, false);
+  for (const queryMode of ["combined", "separated"] as const) {
+    const configuration = { ...bindingConfiguration, queryMode };
+    const planned = boundActual({ question: boundQuestion, action: boundAction, order, queryMode });
+    const supportCandidates = prepareKnowledgeEvidence(planned, planned.calls[1]!, [doc, multiDoc], configuration, boundQuestion).prepared.pendingSupport!;
+    const proof = () => scoreBound(planned, boundTurn, configuration);
+    assert.equal(proof().passed, true, `${queryMode} binds independently reconstructed ranking and evidence inputs`);
+    assert.notEqual(planned.calls[1]!.knowledge!.context.retrievalQuery, planned.calls[1]!.knowledge!.context.effectiveQuery);
+    assert.equal(scoreBound(boundPolicy, boundTurn, configuration).evidenceProofPassed, false, "New runs cannot omit the versioned query plan");
+    for (const mutate of [
+      (value: C1ValidationActual) => { delete value.calls[1]!.knowledge!.trace.queries; },
+      (value: C1ValidationActual) => { value.calls[1]!.knowledge!.trace.queries!.mode = queryMode === "combined" ? "separated" : "combined"; },
+      (value: C1ValidationActual) => { const t = value.calls[1]!.knowledge!.trace; [t.queries!.retrieval, t.queries!.evidence] = [t.queries!.evidence, value.calls[1]!.knowledge!.context.retrievalQuery!]; },
+      (value: C1ValidationActual) => { delete value.calls[1]!.input.retrievalQuery; },
+      (value: C1ValidationActual) => { value.calls[1]!.knowledge!.context.retrievalQuery = "model-rewritten question"; },
+      (value: C1ValidationActual) => { value.calls[1]!.knowledge!.trace.calls.find(item => item.operation === "rerank")!.requestHash = "0".repeat(64); },
+      (value: C1ValidationActual) => {
+        const { context, trace } = value.calls[1]!.knowledge!;
+        context.effectiveQuery = context.retrievalQuery!; value.calls[1]!.input.query = context.effectiveQuery;
+        trace.queries!.evidence = context.effectiveQuery;
+        const verification = trace.supportVerification!, input = { query: context.effectiveQuery, scope: trace.scope,
+          candidates: supportCandidates, settings: trace.settings!.support! };
+        verification.inputHash = evidenceSupportInputHash(input); verification.requestHash = evidenceSupportRequestHash(input);
+        trace.calls.find(item => item.operation === "support")!.requestHash = verification.requestHash;
+        assert.equal(validateEvidenceSupportVerification(verification, input), true, "Mutation retains a valid support proof for the wrong shortened input");
+      },
+    ]) { const forged = structuredClone(planned); mutate(forged);
+      assert.equal(scoreBound(forged, boundTurn, configuration).evidenceProofPassed, false, "Self-consistent hashes cannot replace the full fresh facts/date query"); }
+    const priorPlanned = boundActual({ question: previousQuestion, action: previousAction, requestId: "prior-rule", queryMode }, [doc]);
+    priorPlanned.result!.verifiedPolicyTopic = prior;
+    const followPlanned = boundActual({ question: followQuestion, action: followAction, requestId: "follow-rule", turn: 2, topic: prior, queryMode }, [doc]);
+    assert.equal(scoreBound(followPlanned, followTurn, configuration, [{ question: previousQuestion, actual: priorPlanned }], [doc]).passed, true);
+    const forgedPrior = structuredClone(priorPlanned); forgedPrior.result!.verifiedPolicyTopic!.originalQuery = "invented historical question";
+    assert.equal(scoreBound(followPlanned, followTurn, configuration, [{ question: previousQuestion, actual: forgedPrior }], [doc]).evidenceProofPassed, false);
+  }
   // Amount candidates are real host displays; a model-written latest requestId
   // or selectedToken must not impersonate a user's deterministic selection.
   const amountOrder = structuredClone(order); amountOrder.status = "partially_redeemed";

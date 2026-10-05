@@ -6,18 +6,19 @@ export type SupportExperimentParameters = {
   knowledgeSupport: "binary" | "typed";
   knowledgeSupportModel: "configured" | "deepseek-v4-pro";
   knowledgeApplicability: "model_only" | "declared";
+  knowledgeQueryMode: "combined" | "separated";
   knowledgeThreshold: number;
   knowledgeTimeoutMs: number;
 };
 
 export function resolveSupportParameters(input: Partial<SupportExperimentParameters> = {}): SupportExperimentParameters {
   if (!input || typeof input !== "object" || Array.isArray(input)
-    || Object.keys(input).some(key => !["timeoutMs", "repairBudget", "merchantEvents", "knowledgeMode", "knowledgeSupport", "knowledgeSupportModel", "knowledgeApplicability", "knowledgeThreshold", "knowledgeTimeoutMs"].includes(key))) {
-    throw new Error("业务实验参数仅支持 timeoutMs、repairBudget、merchantEvents、knowledgeMode、knowledgeSupport、knowledgeSupportModel、knowledgeApplicability、knowledgeThreshold、knowledgeTimeoutMs。");
+    || Object.keys(input).some(key => !["timeoutMs", "repairBudget", "merchantEvents", "knowledgeMode", "knowledgeSupport", "knowledgeSupportModel", "knowledgeApplicability", "knowledgeQueryMode", "knowledgeThreshold", "knowledgeTimeoutMs"].includes(key))) {
+    throw new Error("业务实验参数仅支持 timeoutMs、repairBudget、merchantEvents、knowledgeMode、knowledgeSupport、knowledgeSupportModel、knowledgeApplicability、knowledgeQueryMode、knowledgeThreshold、knowledgeTimeoutMs。");
   }
   const parameters = { timeoutMs: 60_000, repairBudget: 1, merchantEvents: "architecture" as const,
     knowledgeMode: "lexical" as const, knowledgeSupport: "binary" as const, knowledgeSupportModel: "configured" as const,
-    knowledgeApplicability: "model_only" as const, knowledgeThreshold: .71, knowledgeTimeoutMs: 15_000, ...input };
+    knowledgeApplicability: "model_only" as const, knowledgeQueryMode: "combined" as const, knowledgeThreshold: .71, knowledgeTimeoutMs: 15_000, ...input };
   if (!Number.isInteger(parameters.timeoutMs) || parameters.timeoutMs < 10_000 || parameters.timeoutMs > 120_000) {
     throw new Error("timeoutMs 必须为 10000..120000 的整数。");
   }
@@ -34,6 +35,8 @@ export function resolveSupportParameters(input: Partial<SupportExperimentParamet
   if (parameters.knowledgeMode === "lexical" && parameters.knowledgeSupportModel !== "configured") throw new Error("knowledgeSupportModel deepseek-v4-pro 仅适用于 m4-support。");
   if (!["model_only", "declared"].includes(parameters.knowledgeApplicability)) throw new Error("knowledgeApplicability 仅支持 model_only 或 declared。");
   if (parameters.knowledgeMode !== "m4-support" && parameters.knowledgeApplicability === "declared") throw new Error("knowledgeApplicability declared 仅适用于 m4-support。");
+  if (!["combined", "separated"].includes(parameters.knowledgeQueryMode)) throw new Error("knowledgeQueryMode 仅支持 combined 或 separated。");
+  if (parameters.knowledgeQueryMode === "separated" && parameters.knowledgeMode !== "m4-support") throw new Error("knowledgeQueryMode separated 仅适用于 m4-support。");
   if (!Number.isFinite(parameters.knowledgeThreshold) || parameters.knowledgeThreshold < 0 || parameters.knowledgeThreshold > 1) {
     throw new Error("knowledgeThreshold 必须为 0..1 的数值。");
   }
@@ -55,16 +58,17 @@ export function resolveSupportRunParameters(architecture: "atomic" | "controller
     repairBudget: architecture === "controller" ? parameters.repairBudget : null };
 }
 
-export function readKnowledgeParameters(env: NodeJS.ProcessEnv = process.env): Pick<SupportExperimentParameters, "knowledgeMode" | "knowledgeSupport" | "knowledgeSupportModel" | "knowledgeApplicability" | "knowledgeThreshold" | "knowledgeTimeoutMs"> {
+export function readKnowledgeParameters(env: NodeJS.ProcessEnv = process.env): Pick<SupportExperimentParameters, "knowledgeMode" | "knowledgeSupport" | "knowledgeSupportModel" | "knowledgeApplicability" | "knowledgeQueryMode" | "knowledgeThreshold" | "knowledgeTimeoutMs"> {
   const threshold = env.KNOWLEDGE_THRESHOLD?.trim(), timeout = env.KNOWLEDGE_TIMEOUT_MS?.trim();
   if (threshold && !/^(?:\d+(?:\.\d+)?|\.\d+)$/.test(threshold)) throw new Error("KNOWLEDGE_THRESHOLD 应为 0..1 的数值。");
   if (timeout && !/^\d+$/.test(timeout)) throw new Error("KNOWLEDGE_TIMEOUT_MS 应为 1000..60000 的整数。");
-  const { knowledgeMode, knowledgeSupport, knowledgeSupportModel, knowledgeApplicability, knowledgeThreshold, knowledgeTimeoutMs } = resolveSupportParameters({
+  const { knowledgeMode, knowledgeSupport, knowledgeSupportModel, knowledgeApplicability, knowledgeQueryMode, knowledgeThreshold, knowledgeTimeoutMs } = resolveSupportParameters({
     knowledgeMode: (env.KNOWLEDGE_MODE?.trim() || "lexical") as SupportExperimentParameters["knowledgeMode"],
     knowledgeSupport: (env.KNOWLEDGE_SUPPORT?.trim() || "binary") as SupportExperimentParameters["knowledgeSupport"],
     knowledgeSupportModel: (env.KNOWLEDGE_SUPPORT_MODEL?.trim() || "configured") as SupportExperimentParameters["knowledgeSupportModel"],
     knowledgeApplicability: (env.KNOWLEDGE_APPLICABILITY?.trim() || "model_only") as SupportExperimentParameters["knowledgeApplicability"],
+    knowledgeQueryMode: (env.KNOWLEDGE_QUERY_MODE?.trim() || "combined") as SupportExperimentParameters["knowledgeQueryMode"],
     knowledgeThreshold: threshold ? Number(threshold) : .71, knowledgeTimeoutMs: timeout ? Number(timeout) : 15_000,
   });
-  return { knowledgeMode, knowledgeSupport, knowledgeSupportModel, knowledgeApplicability, knowledgeThreshold, knowledgeTimeoutMs };
+  return { knowledgeMode, knowledgeSupport, knowledgeSupportModel, knowledgeApplicability, knowledgeQueryMode, knowledgeThreshold, knowledgeTimeoutMs };
 }

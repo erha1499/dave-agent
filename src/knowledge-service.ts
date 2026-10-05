@@ -9,12 +9,15 @@ import { gateKnowledgeApplicability, loadKnowledgeApplicabilitySnapshot, validat
   type KnowledgeApplicabilitySnapshot } from "./knowledge-applicability.ts";
 
 export type KnowledgeMode = "lexical" | "m4-support";
+export type KnowledgeQueryMode = "combined" | "separated";
+export const knowledgeQueryPlanVersion = "knowledge-query-plan-v1";
 export type KnowledgeStage = "read" | "rerank" | "applicability" | "support" | "recheck";
 export type KnowledgeDocuments = Awaited<ReturnType<CouponStore["searchKnowledge"]>>;
 export type KnowledgeCall = { operation: "rerank"; requestHash: string | null; attempts: BailianAttempt[]; status: "ok" | "unavailable" }
   | { operation: "support"; requestHash: string | null; attempts: EvidenceSupportAttempt[]; status: "ok" | "partial" | "unavailable" };
 export type KnowledgeTrace = {
   mode: KnowledgeMode; threshold: number | null; query: string; originalQuery: string; scope: RetrievalScope;
+  queries?: { version: typeof knowledgeQueryPlanVersion; mode: KnowledgeQueryMode; retrieval: string; evidence: string };
   status: "accepted" | "rejected" | "unavailable";
   reason: null | "invalid_input" | "aborted" | "timeout" | "database_unavailable" | "provider_unavailable" | "source_changed" | "invalid_support_decision"
     | "metadata_binding_invalid" | "applicability_facts_unknown";
@@ -33,11 +36,12 @@ export type KnowledgeTrace = {
     applicability?: ReturnType<typeof knowledgeApplicabilitySettings> };
   stages?: Array<{ name: KnowledgeStage; observedAt: string; durationMs: number }>;
 };
-export type KnowledgeSearchInput = { query: string; originalQuery?: string; scope: RetrievalScope; applicabilityContext?: KnowledgeApplicabilityContext | null;
+export type KnowledgeSearchInput = { query: string; retrievalQuery?: string; originalQuery?: string; scope: RetrievalScope; applicabilityContext?: KnowledgeApplicabilityContext | null;
   signal?: AbortSignal; onStage?: (stage: KnowledgeStage) => void };
 export type KnowledgeSearchResult = { documents: KnowledgeDocuments; trace: KnowledgeTrace };
 export type KnowledgeService = { search(input: KnowledgeSearchInput): Promise<KnowledgeSearchResult> };
 export type KnowledgeServiceOptions = { mode?: KnowledgeMode; threshold?: number; timeoutMs?: number; supportProfile?: EvidenceSupportProfile; supportModel?: EvidenceSupportModel;
+  queryMode?: KnowledgeQueryMode;
   applicability?: KnowledgeApplicabilityMode; applicabilitySnapshot?: KnowledgeApplicabilitySnapshot;
   clients?: { rerank?: Pick<BailianClient, "settings" | "rerank">; support?: EvidenceSupportClient } };
 
@@ -71,6 +75,8 @@ export function finishKnowledgeApplicabilityAcceptance(acceptance: EvidenceAccep
 export function createKnowledgeService(store: Pick<CouponStore, "readKnowledgeDocuments">, options: KnowledgeServiceOptions = {}): KnowledgeService {
   const mode = options.mode ?? "lexical", threshold = options.threshold ?? .71, timeoutMs = options.timeoutMs ?? 60_000;
   const supportProfile = options.supportProfile ?? "binary", supportModel = options.supportModel ?? "configured";
+  const queryMode = options.queryMode ?? "combined";
+  if (!["combined", "separated"].includes(queryMode) || queryMode === "separated" && mode !== "m4-support") throw new Error("查询分离仅适用于 m4-support 知识检索。");
   const applicability = options.applicability ?? "model_only";
   if (!["model_only", "declared"].includes(applicability) || applicability === "declared" && mode !== "m4-support") throw new Error("声明前提门控仅适用于 m4-support 知识检索。");
   if (mode === "lexical" && supportModel !== "configured") throw new Error("固定支持判别模型仅适用于 m4-support 知识检索。");
@@ -89,9 +95,12 @@ export function createKnowledgeService(store: Pick<CouponStore, "readKnowledgeDo
     return validateKnowledgeApplicabilitySnapshot(manifest, sha256);
   }) : loadKnowledgeApplicabilitySnapshot();
   return { async search(input) {
+    // The host builds both inputs. Shortening retrieval never removes facts
+    // from support verification, nor adds an LLM rewrite stage.
+    const retrievalQuery = queryMode === "separated" ? input.retrievalQuery : input.query;
     const started = performance.now(), deadline = AbortSignal.timeout(timeoutMs);
     const signal = input.signal ? AbortSignal.any([input.signal, deadline]) : deadline;
-    const trace: KnowledgeTrace = { mode, supportProfile, supportModel, applicability: { mode: applicability }, threshold: mode === "lexical" ? null : threshold, query: input.query,
+    const trace: KnowledgeTrace = { mode, supportProfile, supportModel, applicability: { mode: applicability }, threshold: mode === "lexical" ? null : threshold, query: retrievalQuery ?? "",
       originalQuery: input.originalQuery ?? input.query, scope: { shopId: input.scope?.shopId ?? null, productId: input.scope?.productId ?? null },
       status: "unavailable", reason: null, rawRanking: [], acceptance: null, sources: [], sourceHashes: { before: null, after: null }, durationMs: 0, calls: [],
       usage: { rerankTokens: 0, supportTokens: 0, estimatedCny: 0, estimatedUsd: 0, incompleteCalls: 0 },
@@ -115,13 +124,16 @@ export function createKnowledgeService(store: Pick<CouponStore, "readKnowledgeDo
     let documents: KnowledgeDocuments = [];
     try {
       if (typeof input.query !== "string" || !input.query.trim() || input.query.length > 500
+        || typeof retrievalQuery !== "string" || !retrievalQuery.trim() || retrievalQuery.length > 500
+        || input.retrievalQuery !== undefined && (typeof input.retrievalQuery !== "string" || !input.retrievalQuery.trim() || input.retrievalQuery.length > 500)
         || typeof trace.originalQuery !== "string" || trace.originalQuery.length > 5000 || !input.scope) {
         trace.reason = "invalid_input"; throw new Error();
       }
       try { scopeDocuments([], input.scope); } catch { trace.reason = "invalid_input"; throw new Error(); }
+      trace.queries = { version: knowledgeQueryPlanVersion, mode: queryMode, retrieval: retrievalQuery, evidence: input.query };
       enter("read");
       const before = await read(); trace.sourceHashes.before = contentHash(before);
-      if (mode === "lexical") trace.rawRanking = rankLexical(input.query, before, trace.scope).map(id => ({ id, score: null }));
+      if (mode === "lexical") trace.rawRanking = rankLexical(retrievalQuery, before, trace.scope).map(id => ({ id, score: null }));
       else if (before.length) {
         enter("rerank");
         rerankClient ??= createBailianClient({ timeoutMs, retries: 0 });
@@ -134,7 +146,7 @@ export function createKnowledgeService(store: Pick<CouponStore, "readKnowledgeDo
         const recordCall = () => { if (!trace.calls.includes(call)) trace.calls.push(call); };
         try {
           let attempts = 0;
-          const result = await wait(() => rerankClient!.rerank(input.query, before.map(serializeRetrievalDocument), { beforeAttempt: () => {
+          const result = await wait(() => rerankClient!.rerank(retrievalQuery, before.map(serializeRetrievalDocument), { beforeAttempt: () => {
             if (signal.aborted || attempts++ !== 0) return false;
             recordCall(); return true;
           } }));
@@ -156,7 +168,7 @@ export function createKnowledgeService(store: Pick<CouponStore, "readKnowledgeDo
         }
       }
       trace.acceptance = acceptEvidence({ config: mode === "lexical" ? { mode: "off" } : { mode: "support", threshold },
-        query: input.query, documents: before, scope: trace.scope, ranking: trace.rawRanking });
+        query: retrievalQuery, documents: before, scope: trace.scope, ranking: trace.rawRanking });
       let applicabilityGate: KnowledgeApplicabilityResult | undefined;
       if (applicability === "declared") {
         enter("applicability");

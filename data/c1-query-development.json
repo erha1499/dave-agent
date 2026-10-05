@@ -1,0 +1,2247 @@
+{
+  "version": 1,
+  "suiteId": "c1-query-exposed-development-v1",
+  "stage": "knowledge-service-component-development",
+  "dataUse": "exposed-development",
+  "sourceRunId": "9652d6eb-4a35-4e95-a22d-4b72d7e10731",
+  "rawSha256": "8c2281cd8b3f425b5e1edaf52dbe64435a4c98a860a4ccf31d64b079586b4fd6",
+  "planSha256": "48284ac2fd65664e0f946aed24fe2417a2b19044f508636955a6cd46bdf5dda7",
+  "planHashSerialization": "sha256(JSON.stringify(sourceArtifact.plan))",
+  "selectionRule": "Include every planned turn in the complete source run whose plan.expected.knowledge is evidence or rejected, in original case/turn order. Copy every recorded knowledge-call input regardless of execution score, ranking, acceptance or reply quality. Keep planned targets without a recorded knowledge call as source_missing; do not synthesize actions, facts or topic references. No selection by case ID or observed success/failure.",
+  "interpretation": "Frozen inputs and original gold from an exposed synthetic-data real-model run. Rebuild both queries with the same current host builder. Compare combined versus separated retrieval; support always receives the full rebuilt effectiveQuery. This fixture does not validate Agent action selection, final replies, live MySQL or QQ. A source_missing entry stays in the planned denominator.",
+  "corpora": {
+    "online": [
+      {
+        "id": "KB-REFUND-UNUSED",
+        "shopId": null,
+        "productId": null,
+        "title": "未核销且未过期团购券退款规则",
+        "body": "【演示规则】已支付、未核销且尚未过期的团购券可以申请退款。必须先查本人订单确认支付、核销和有效期；可申请金额不超过尚未消费且未退款的实付金额。退款申请资格不等于商家已经批准或资金已经退回。当前助手只能查询与说明，不能申请、联系商家或执行退款。",
+        "tags": [
+          "退款",
+          "能退",
+          "可以退",
+          "未核销",
+          "没用",
+          "没使用",
+          "未使用",
+          "有效期",
+          "退钱",
+          "退款金额"
+        ],
+        "status": "active"
+      },
+      {
+        "id": "KB-REFUND-REDEEMED",
+        "shopId": null,
+        "productId": null,
+        "title": "已核销团购券售后规则",
+        "body": "【演示规则】已经核销的团购券不适用未核销自动退款规则，需由商家核实实际消费与售后原因后决定。没有商家核实结果时不能承诺可退、不可退或具体金额。当前助手无法联系商家或提交退款，只能解释规则并建议用户自行咨询商家。",
+        "tags": [
+          "退款",
+          "已经用",
+          "已使用",
+          "已核销",
+          "消费",
+          "吃过",
+          "售后",
+          "商家确认"
+        ],
+        "status": "active"
+      },
+      {
+        "id": "KB-REFUND-EXPIRED",
+        "shopId": null,
+        "productId": null,
+        "title": "过期团购券售后规则",
+        "body": "【演示规则】已过期但未核销的券需要商家确认能否退款、延期以及金额。知识库未提供过期自动退款或自动延期政策。不得把未过期券的规则套用到过期券，也不能自行编造门店承诺。当前助手只提供查询和说明。",
+        "tags": [
+          "退款",
+          "过期",
+          "失效",
+          "到期",
+          "延期",
+          "有效期",
+          "没用",
+          "未核销"
+        ],
+        "status": "active"
+      },
+      {
+        "id": "KB-REFUND-PARTIAL",
+        "shopId": null,
+        "productId": null,
+        "title": "部分核销订单退款规则",
+        "body": "【演示规则】同一订单有多张券时必须逐券核对。未核销、未过期、未退款部分可申请的金额按对应券的实付单价计算；已核销部分需商家另行核实，不能按整单实付金额承诺退款。查询工具提供的金额只是演示规则下的申请上限，尚未提交或完成退款。",
+        "tags": [
+          "退款",
+          "部分核销",
+          "用了一张",
+          "剩余",
+          "两张",
+          "退款金额",
+          "退一张"
+        ],
+        "status": "active"
+      },
+      {
+        "id": "KB-REFUND-PAYMENT",
+        "shopId": null,
+        "productId": null,
+        "title": "未支付订单和已退款订单",
+        "body": "【演示规则】未支付订单没有到账资金，因此没有可退金额；不能把订单标价当作实付金额。已完成退款的订单需以支付和退款历史为准，不得重复退款；展示已退金额时说明这是已有历史记录，并非本轮执行。当前查询助手不会取消订单或发起退款。",
+        "tags": [
+          "退款",
+          "未付款",
+          "未支付",
+          "待支付",
+          "已经退",
+          "已退款",
+          "重复退款",
+          "支付金额"
+        ],
+        "status": "active"
+      },
+      {
+        "id": "KB-SHOP-DEMO-1",
+        "shopId": "shop-demo-1",
+        "productId": null,
+        "title": "演示门店使用与预约说明",
+        "body": "【演示规则】云味餐厅演示店为虚构餐饮门店，演示地址为虚拟市演示路1号。常规午餐与晚餐套餐允许普通周末使用，到店前需用户自行与商家确认接待情况；助手目前不能预约、外呼、查询实时库存或安排接待。法定节假日、特殊活动和私享套餐使用限制没有录入，遇到这些问题应明确规则缺失并建议向商家核实。",
+        "tags": [
+          "门店",
+          "地址",
+          "周末",
+          "预约",
+          "营业",
+          "套餐",
+          "接待",
+          "节假日",
+          "五一",
+          "十一",
+          "私享"
+        ],
+        "status": "active"
+      },
+      {
+        "id": "KB-PRODUCT-LUNCH",
+        "shopId": "shop-demo-1",
+        "productId": "product-demo-1",
+        "title": "双人午餐套餐说明",
+        "body": "【演示规则】双人午餐团购券标价79.80元，一张券对应两人午餐套餐，核销一次即视为整张券已使用。每张券具体截止时间以订单返回的 expiresAt 为准，不能从标价推断实付金额。菜品明细、过敏原和特殊节假日可用性未录入。",
+        "tags": [
+          "午餐",
+          "双人",
+          "套餐",
+          "价格",
+          "两人",
+          "核销",
+          "有效期"
+        ],
+        "status": "active"
+      },
+      {
+        "id": "KB-PRODUCT-DINNER",
+        "shopId": "shop-demo-1",
+        "productId": "product-demo-2",
+        "title": "单人晚餐套餐说明",
+        "body": "【演示规则】单人晚餐团购券标价59.90元，一张券对应一人晚餐，核销一次即视为整张券已使用。订单购买两张券时可以分别核销，剩余券状态以订单查询为准。菜品明细、过敏原和特殊节假日可用性未录入。",
+        "tags": [
+          "晚餐",
+          "单人",
+          "套餐",
+          "价格",
+          "一人",
+          "两张",
+          "分别核销",
+          "剩余"
+        ],
+        "status": "active"
+      },
+      {
+        "id": "FIX-INACTIVE-SHOP",
+        "shopId": "shop-fixture-retired",
+        "productId": null,
+        "title": "演示门店使用与预约说明",
+        "body": "【演示规则】云味餐厅演示店为虚构餐饮门店，演示地址为虚拟市演示路1号。常规午餐与晚餐套餐允许普通周末使用，到店前需用户自行与商家确认接待情况；助手目前不能预约、外呼、查询实时库存或安排接待。法定节假日、特殊活动和私享套餐使用限制没有录入，遇到这些问题应明确规则缺失并建议向商家核实。",
+        "tags": [
+          "门店",
+          "地址",
+          "周末",
+          "预约",
+          "营业",
+          "套餐",
+          "接待",
+          "节假日",
+          "五一",
+          "十一",
+          "私享"
+        ],
+        "status": "inactive"
+      }
+    ],
+    "reference": [
+      {
+        "id": "RF001",
+        "title": "未核销团购券退款规则",
+        "body": "未核销且在有效期内的团购券,支持随时申请退款,退款金额为实际支付金额,无需商家同意。退款将原路退回至原支付账户,一般1-3个工作日到账,具体到账时间以支付渠道为准。若券已过有效期但未核销,同样支持过期退。",
+        "tags": [
+          "退款",
+          "未核销",
+          "随时退"
+        ],
+        "industry": "通用",
+        "shopId": null
+      },
+      {
+        "id": "RF002",
+        "title": "已核销订单退款规则",
+        "body": "订单一旦核销,视为服务已开始或已完成,原则上不支持退款。如确有特殊情况需要退款,须经商家同意后方可办理。平台会协助联系商家协商,商家同意与否由商家自主决定,平台不能代替商家决策。",
+        "tags": [
+          "退款",
+          "已核销",
+          "商家同意"
+        ],
+        "industry": "通用",
+        "shopId": null
+      },
+      {
+        "id": "RF003",
+        "title": "已预约订单的退款与改期",
+        "body": "已成功预约但尚未到店消费的订单,若需退款,需先取消预约。部分商家对临近预约时间的取消设有限制,例如24小时内取消不支持退款。建议优先选择改期而非退款,改期通常不受此限制,且需在预约时间前操作。",
+        "tags": [
+          "退款",
+          "预约",
+          "改期"
+        ],
+        "industry": "通用",
+        "shopId": null
+      },
+      {
+        "id": "RF004",
+        "title": "部分退款与差价处理",
+        "body": "多份购买的团购券支持部分退款,已核销的部分不可退,未核销的部分按未核销规则处理。使用优惠券或红包下单的订单,退款时优惠不予返还,仅退还实际支付金额。若下单时使用了满减,部分退款后不满足满减门槛,平台会按比例扣减优惠。",
+        "tags": [
+          "退款",
+          "部分退款",
+          "差价"
+        ],
+        "industry": "通用",
+        "shopId": null
+      },
+      {
+        "id": "RF005",
+        "title": "退款到账时间与查询",
+        "body": "退款审核通过后即发起退回,资金到账时间取决于支付渠道:余额与零钱通常实时到账,银行卡1-3个工作日,信用卡3-7个工作日。可在订单详情页的退款进度中查看当前状态。若超过7个工作日未到账,建议先核对支付渠道账单,再联系平台协助查询。",
+        "tags": [
+          "退款",
+          "到账",
+          "时效"
+        ],
+        "industry": "通用",
+        "shopId": null
+      },
+      {
+        "id": "RS001",
+        "title": "需提前预约的商品规则",
+        "body": "标注需提前预约的商品,须在到店前完成预约,未预约直接到店商家可能无法接待。常见预约提前量为1天或2天,具体以商品详情页的预约规则为准。节假日与周末预约较紧张,建议尽早预约。预约成功后会收到确认通知。",
+        "tags": [
+          "预约",
+          "提前",
+          "到店"
+        ],
+        "industry": "通用",
+        "shopId": null
+      },
+      {
+        "id": "RS002",
+        "title": "预约时段与营业时间",
+        "body": "预约时段须落在商家营业时间内,且部分商品限定可用时段,例如午市券仅限11:00-14:00使用,晚市券仅限17:00-21:00。法定节假日营业时间可能调整,以商家实际公告为准。超出可用时段到店,商家有权拒绝使用该券。",
+        "tags": [
+          "预约",
+          "时段",
+          "营业时间"
+        ],
+        "industry": "通用",
+        "shopId": null
+      },
+      {
+        "id": "RS003",
+        "title": "预约变更与取消",
+        "body": "预约成功后可在预约时间前申请变更或取消,通常允许在预约时间24小时前自由改期。距预约时间不足24小时的变更需商家同意。无故未到店(no-show)可能被商家标记,影响后续预约。如临时有事,建议尽早取消以便商家安排其他客人。",
+        "tags": [
+          "预约",
+          "改期",
+          "取消"
+        ],
+        "industry": "通用",
+        "shopId": null
+      },
+      {
+        "id": "VF001",
+        "title": "团购券核销方式",
+        "body": "到店后向商家出示订单中的券码或二维码,由商家扫码或输入码号完成核销。券码可在订单详情页查看。核销即代表本次消费开始,核销后不可撤销。请确认商家核销的是本次要使用的券,避免误核销其他订单。",
+        "tags": [
+          "核销",
+          "券码",
+          "使用"
+        ],
+        "industry": "通用",
+        "shopId": null
+      },
+      {
+        "id": "VF002",
+        "title": "误核销的处理",
+        "body": "若券在不知情的情况下被核销,或商家误核销了错误的订单,可通过平台发起申诉。需提供未实际消费的说明,平台会介入核实。核实确为误核销的,平台会协助恢复券状态或办理退款。建议在发现后尽快申诉,时间过久会增加核实难度。",
+        "tags": [
+          "核销",
+          "误核销",
+          "申诉"
+        ],
+        "industry": "通用",
+        "shopId": null
+      },
+      {
+        "id": "VF003",
+        "title": "团购券转赠规则",
+        "body": "多数团购券支持转赠给他人使用,可在订单详情页找到转赠入口,生成转赠链接分享给对方,对方领取后券归其所有。部分限定使用人的商品不支持转赠,例如注明限本人使用、限女士使用的商品。已核销或已预约的券不支持转赠。",
+        "tags": [
+          "转赠",
+          "赠送",
+          "使用人"
+        ],
+        "industry": "通用",
+        "shopId": null
+      },
+      {
+        "id": "VF004",
+        "title": "限购与叠加使用规则",
+        "body": "商品可能设有限购数量,如每人限购2份、每桌限用1张。多张券能否叠加使用以商品详情页的使用规则为准,通常不同商品的券可以同时使用,同一商品的多张券可能限制单次使用数量。如不确定,建议到店前与商家确认。",
+        "tags": [
+          "限购",
+          "叠加",
+          "同时使用"
+        ],
+        "industry": "通用",
+        "shopId": null
+      },
+      {
+        "id": "CY001",
+        "title": "餐饮团购券使用须知",
+        "body": "餐饮团购券一般不含包间费、餐位费、酒水与调料费,具体以商品详情为准。部分商家规定团购券不与店内其他优惠同享。如需包间,通常需另付包间费或达到最低消费。使用团购券时请先告知商家,再点单。",
+        "tags": [
+          "餐饮",
+          "包间",
+          "餐位费"
+        ],
+        "industry": "餐饮",
+        "shopId": null
+      },
+      {
+        "id": "CY002",
+        "title": "餐饮自带酒水与外带规则",
+        "body": "能否自带酒水由商家决定,部分商家允许自带但收取开瓶费。团购套餐通常限堂食,是否可打包外带需与商家确认。自助类团购一般不支持外带,且不可打包剩余食物。如对此有要求,建议到店前联系商家确认。",
+        "tags": [
+          "餐饮",
+          "自带酒水",
+          "打包"
+        ],
+        "industry": "餐饮",
+        "shopId": null
+      },
+      {
+        "id": "CY003",
+        "title": "餐饮排队与等位",
+        "body": "使用团购券不享受优先入座,与到店顾客一同排队等位。热门时段(周末、节假日、饭点)等位时间较长,建议提前预约或错峰前往。部分商家支持线上取号,可在到店前取号减少等待。当前实时排队情况需联系商家确认,平台无法查询。",
+        "tags": [
+          "餐饮",
+          "排队",
+          "等位"
+        ],
+        "industry": "餐饮",
+        "shopId": null
+      },
+      {
+        "id": "LR001",
+        "title": "丽人服务预约与技师选择",
+        "body": "丽人类服务通常需提前预约,指定技师可能需额外加价,以商家规定为准。团购价一般对应普通技师,总监或资深技师需补差价。服务时长以实际项目为准,预约时建议预留充足时间。如需指定技师,请在预约时明确告知。",
+        "tags": [
+          "丽人",
+          "技师",
+          "预约"
+        ],
+        "industry": "丽人",
+        "shopId": null
+      },
+      {
+        "id": "LR002",
+        "title": "美业团购券的项目范围",
+        "body": "美业团购券对应固定项目内容,超出部分需另行付费。例如染发券通常按短发计价,长发、发量多需补差价;美甲券的款式与款数有限定,加钻、延长等增项另收费。到店后建议先确认项目范围与可能的加价项。",
+        "tags": [
+          "丽人",
+          "项目",
+          "加价"
+        ],
+        "industry": "丽人",
+        "shopId": null
+      },
+      {
+        "id": "XY001",
+        "title": "休娱场次与时段限制",
+        "body": "休闲娱乐类团购常限定场次或时段,如平日场、周末场、夜场价格不同。购买时请确认所选场次,平日场不可用于周末。部分场馆对身高、年龄有限制,儿童可能需成人陪同。节假日可能不可用或需补差价,以商品详情为准。",
+        "tags": [
+          "休娱",
+          "场次",
+          "时段"
+        ],
+        "industry": "休娱",
+        "shopId": null
+      },
+      {
+        "id": "XY002",
+        "title": "休娱场馆的押金与装备",
+        "body": "部分场馆需缴纳押金,离场时无损坏可全额退还。团购价通常不含专业装备租赁与储物柜费用。如需自带装备,须符合场馆安全规定。具体收费项目建议到场后先向前台确认。",
+        "tags": [
+          "休娱",
+          "押金",
+          "装备"
+        ],
+        "industry": "休娱",
+        "shopId": null
+      },
+      {
+        "id": "JL001",
+        "title": "酒店预订与入住规则",
+        "body": "酒店团购需提前预约确认房态,未预约不保证有房。标准入住时间通常为14:00后,退房时间为12:00前,提前入住或延迟退房需另付费。入住需出示本人有效身份证件,入住人数不得超过房型限制。如需加床或加早,需在预约时说明并可能收费。",
+        "tags": [
+          "酒旅",
+          "入住",
+          "退房"
+        ],
+        "industry": "酒旅",
+        "shopId": null
+      },
+      {
+        "id": "JL002",
+        "title": "酒店订单的退订规则",
+        "body": "酒店订单退订规则按预约状态区分:未发起预约的部分支持退款;已确认预约的房晚,临近入住日期取消可能收取违约金或不可退。多晚连住订单可申请退订其中某一晚,需注明具体日期。旺季与特殊房型可能标注不可取消,下单前请留意。",
+        "tags": [
+          "酒旅",
+          "退订",
+          "多晚"
+        ],
+        "industry": "酒旅",
+        "shopId": null
+      },
+      {
+        "id": "PY001",
+        "title": "发票开具规则",
+        "body": "团购订单的发票一般由商家开具,需在消费时向商家索取,部分商家支持事后开票但有时限。平台仅提供交易凭证,不代开发票。如需专用发票,请在消费前与商家确认可否开具及所需信息。已退款的订单不可开票。",
+        "tags": [
+          "发票",
+          "开票"
+        ],
+        "industry": "通用",
+        "shopId": null
+      },
+      {
+        "id": "PY002",
+        "title": "重复支付与多扣款处理",
+        "body": "若出现重复支付或多扣款,多扣部分会自动退回原支付账户,通常1-3个工作日到账。如超时未退回,可提供支付凭证联系平台核查。页面显示金额与实付不一致时,请查看订单详情的支付明细,优惠券与红包抵扣会在明细中列出。",
+        "tags": [
+          "支付",
+          "重复扣款",
+          "退回"
+        ],
+        "industry": "通用",
+        "shopId": null
+      },
+      {
+        "id": "MC001",
+        "title": "联系商家的方式",
+        "body": "可在门店页面或订单详情页找到商家电话,直接致电咨询实时问题,例如当前是否有位、能否接待、临时闭店等。商家营业时间外可能无人接听。平台客服无法查询商家的实时经营状态,此类问题建议直接联系商家确认最准确。",
+        "tags": [
+          "联系商家",
+          "电话"
+        ],
+        "industry": "通用",
+        "shopId": null
+      },
+      {
+        "id": "MC002",
+        "title": "商家临时闭店与停业",
+        "body": "商家临时闭店或已停业导致无法消费的,支持全额退款,已核销但未实际消费的也可申诉退款。如到店发现闭店,建议拍摄现场照片作为凭证。商家长期停业的,平台会下架其商品并为已购用户办理退款。",
+        "tags": [
+          "闭店",
+          "停业",
+          "退款"
+        ],
+        "industry": "通用",
+        "shopId": null
+      },
+      {
+        "id": "ET001",
+        "title": "宠物与无障碍相关",
+        "body": "能否携带宠物由商家规定,多数餐饮场所不允许携带宠物入内,导盲犬等工作犬按相关规定可入内。是否有无障碍通道、电梯,需向商家确认。此类信息平台不一定完整收录,建议到店前电话咨询商家最准确。",
+        "tags": [
+          "宠物",
+          "无障碍"
+        ],
+        "industry": "通用",
+        "shopId": null
+      },
+      {
+        "id": "ET002",
+        "title": "停车与交通",
+        "body": "是否提供免费停车以商家说明为准,部分商家提供限时免费停车或消费抵扣停车费。商场内店铺通常使用商场停车场,需按商场规则收费。具体车位情况与优惠政策建议到店前联系商家确认,平台无法查询实时车位。",
+        "tags": [
+          "停车",
+          "交通"
+        ],
+        "industry": "通用",
+        "shopId": null
+      },
+      {
+        "id": "ET003",
+        "title": "遗失物品的处理",
+        "body": "在门店遗失物品,建议第一时间联系商家协助查找,商家通常会在店内保管一段时间。平台无法直接查询门店内的失物情况,需由商家核实。如涉及贵重物品,建议同时报警备案。",
+        "tags": [
+          "遗失",
+          "失物"
+        ],
+        "industry": "通用",
+        "shopId": null
+      },
+      {
+        "id": "ET004",
+        "title": "服务质量与投诉途径",
+        "body": "对服务质量不满意,可先与商家沟通协商解决。协商不成可通过平台发起投诉,提供订单信息与具体情况说明,平台会介入核实并协助处理。涉及食品安全、人身伤害等严重问题,建议同时向市场监管部门反映并保留证据。",
+        "tags": [
+          "投诉",
+          "服务质量"
+        ],
+        "industry": "通用",
+        "shopId": null
+      },
+      {
+        "id": "ET005",
+        "title": "团购价与到店价差异",
+        "body": "团购价为线上促销价,可能与到店挂牌价不同,以团购页面标示为准。商家不得要求使用团购券的顾客补足到店价差价,如遇要求加价才能使用,可拒绝并向平台反馈。但商品详情中已明示的加价项(如指定技师、加料)属正常收费。",
+        "tags": [
+          "价格",
+          "差价"
+        ],
+        "industry": "通用",
+        "shopId": null
+      },
+      {
+        "id": "ET006",
+        "title": "有效期与延期",
+        "body": "团购券有明确有效期,过期未使用可申请过期退。部分商家支持延期,需在有效期内联系商家或平台申请,过期后一般不可延期。节假日期间购买的券有效期可能较短,请注意查看。建议在有效期到期前尽早使用或处理。",
+        "tags": [
+          "有效期",
+          "过期",
+          "延期"
+        ],
+        "industry": "通用",
+        "shopId": null
+      },
+      {
+        "id": "ET007",
+        "title": "未成年人与代下单",
+        "body": "部分服务限成年人使用,未成年人需成人陪同或不可使用,以商品说明为准。代他人下单的,到店由实际使用人出示券码即可,但限本人使用的商品需与下单人一致。涉及酒精类商品不向未成年人销售。",
+        "tags": [
+          "未成年",
+          "代下单"
+        ],
+        "industry": "通用",
+        "shopId": null
+      },
+      {
+        "id": "ET008",
+        "title": "团购券与会员权益",
+        "body": "使用团购券消费通常不累积商家会员积分,也可能不享受会员折扣,具体以商家规定为准。团购券一般不与商家自有会员优惠叠加使用。如已是商家会员,建议比较会员价与团购价后选择更优方案。",
+        "tags": [
+          "会员",
+          "权益",
+          "叠加"
+        ],
+        "industry": "通用",
+        "shopId": null
+      },
+      {
+        "id": "SH001",
+        "title": "本店暑期活动说明",
+        "body": "本店2026年7-8月暑期活动:团购套餐加赠一份果盘,凭订单向服务员说明即可。活动期间包间免最低消费。活动不与其他优惠同享。",
+        "tags": [
+          "活动",
+          "暑期"
+        ],
+        "industry": "餐饮",
+        "shopId": "shop_1001"
+      },
+      {
+        "id": "SH002",
+        "title": "本店停车说明",
+        "body": "本店位于万达广场三层,可使用商场地下停车场,消费满100元可抵2小时停车费,凭小票到前台盖章。周末车位紧张建议乘坐公共交通。",
+        "tags": [
+          "停车"
+        ],
+        "industry": "餐饮",
+        "shopId": "shop_1001"
+      },
+      {
+        "id": "FIX-INACTIVE-PARKING",
+        "title": "本店停车说明",
+        "body": "本店位于万达广场三层,可使用商场地下停车场,消费满100元可抵2小时停车费,凭小票到前台盖章。周末车位紧张建议乘坐公共交通。",
+        "tags": [
+          "停车"
+        ],
+        "industry": "餐饮",
+        "shopId": "shop-fixture-retired",
+        "productId": null,
+        "status": "inactive"
+      }
+    ]
+  },
+  "applicabilitySnapshot": {
+    "version": 1,
+    "serialization": "knowledge-document-v1",
+    "documents": [
+      {
+        "sourceId": "KB-REFUND-UNUSED",
+        "scope": {
+          "shopId": null,
+          "productId": null
+        },
+        "sourceHash": "6a5f9cbdffe64ed0bb59c8772892022811ade454afbf911c216f5aa5981a314c",
+        "atLeastOneCouponInStates": [
+          "unused"
+        ],
+        "basis": [
+          {
+            "field": "atLeastOneCouponInStates",
+            "quote": "已支付、未核销且尚未过期的团购券可以申请退款。"
+          }
+        ],
+        "reviewNote": "仅声明当前订单至少存在未核销状态券这一必要条件；状态不是有效期，unused且expiresAt已过期仍可出现。支付、日期、具体券、金额和申请资格仍未被本门控证明。"
+      },
+      {
+        "sourceId": "KB-REFUND-REDEEMED",
+        "scope": {
+          "shopId": null,
+          "productId": null
+        },
+        "sourceHash": "595a4a3440a1a39164346563825db1c004492622071436bf6b123cc1ec93cd5c",
+        "atLeastOneCouponInStates": [
+          "redeemed"
+        ],
+        "basis": [
+          {
+            "field": "atLeastOneCouponInStates",
+            "quote": "已经核销的团购券不适用未核销自动退款规则，需由商家核实实际消费与售后原因后决定。"
+          }
+        ],
+        "reviewNote": "仅证明当前订单存在已核销券；不证明用户所指具体券就是它，不代表商家核实、批准或拒绝退款。"
+      },
+      {
+        "sourceId": "KB-REFUND-EXPIRED",
+        "scope": {
+          "shopId": null,
+          "productId": null
+        },
+        "sourceHash": "5c44c33ada0ae0242549a401b5b3c0545a8bc33a144c8dd6f808efffaf66e637",
+        "atLeastOneCouponInStates": [
+          "unused",
+          "expired"
+        ],
+        "basis": [
+          {
+            "field": "atLeastOneCouponInStates",
+            "quote": "已过期但未核销的券需要商家确认能否退款、延期以及金额。"
+          }
+        ],
+        "reviewNote": "未核销且过期的必要状态投影：原始status可为expired，也可仍为unused而expiresAt已过期。此处不检查时间，不把unused推断为未过期，也不把匹配推断为已过期；日期与商家确认仍由后续原文及事实判断。"
+      },
+      {
+        "sourceId": "KB-REFUND-PARTIAL",
+        "scope": {
+          "shopId": null,
+          "productId": null
+        },
+        "sourceHash": "655d41cbdce64f81cf75065ca25bd354658bd18f26a39d716d4c5d33d75249e5",
+        "minimumCouponCount": 2,
+        "basis": [
+          {
+            "field": "minimumCouponCount",
+            "quote": "同一订单有多张券时必须逐券核对。"
+          }
+        ],
+        "reviewNote": "多张只声明同订单券总数至少2；正文没有要求一定已核销一张，因此不凭标题或tags加该限制。不证明逐券资格、分摊金额或退款批准。"
+      },
+      {
+        "sourceId": "KB-REFUND-PAYMENT",
+        "scope": {
+          "shopId": null,
+          "productId": null
+        },
+        "sourceHash": "82a07decf07014e3579d13aac72b4760878292336afca620ef245b41a17bb69e",
+        "basis": [],
+        "reviewNote": "none_declared：本轮审阅未声明可独立执行的订单券数量/券状态必要前提；不是规则全面适用。本文其他范围、支付历史、商品、日期、未知事实或操作限制仍由原文与现有宿主/支持判别处理。"
+      },
+      {
+        "sourceId": "KB-SHOP-DEMO-1",
+        "scope": {
+          "shopId": "shop-demo-1",
+          "productId": null
+        },
+        "sourceHash": "19f2e70c05fc908845741ec17e78e9d686aa7ce34ad1c2df73e66d5acf0a0cb0",
+        "basis": [],
+        "reviewNote": "none_declared：本轮审阅未声明可独立执行的订单券数量/券状态必要前提；不是规则全面适用。本文其他范围、支付历史、商品、日期、未知事实或操作限制仍由原文与现有宿主/支持判别处理。"
+      },
+      {
+        "sourceId": "KB-PRODUCT-LUNCH",
+        "scope": {
+          "shopId": "shop-demo-1",
+          "productId": "product-demo-1"
+        },
+        "sourceHash": "63f35348e326895d5b51da7f4e1151ff2776228875c6de0293122e59c921c64d",
+        "basis": [],
+        "reviewNote": "none_declared：本轮审阅未声明可独立执行的订单券数量/券状态必要前提；不是规则全面适用。本文其他范围、支付历史、商品、日期、未知事实或操作限制仍由原文与现有宿主/支持判别处理。"
+      },
+      {
+        "sourceId": "KB-PRODUCT-DINNER",
+        "scope": {
+          "shopId": "shop-demo-1",
+          "productId": "product-demo-2"
+        },
+        "sourceHash": "1e69587d266e6b6ca51b8963075fa4776b64de2a996225f24afc6cdc1a95f251",
+        "basis": [],
+        "reviewNote": "none_declared：本轮审阅未声明可独立执行的订单券数量/券状态必要前提；不是规则全面适用。本文其他范围、支付历史、商品、日期、未知事实或操作限制仍由原文与现有宿主/支持判别处理。"
+      }
+    ],
+    "sha256": "c3af34125bf0e2d693a82bd3729aef1cf05be314a4ae60d7332c8b8c9c98eb4e"
+  },
+  "counts": {
+    "planned": 20,
+    "ready": 19,
+    "sourceMissing": 1,
+    "currentOrder": 9,
+    "ruleOnly": 10,
+    "previous": 4,
+    "retrievalChanged": 9,
+    "retrievalIdentical": 10
+  },
+  "subsets": {
+    "current_order": [
+      "c1-session-fixed-001:2",
+      "c1-session-fixed-007:3",
+      "c1-session-fixed-010:1",
+      "c1-session-fixed-010:2",
+      "c1-session-fixed-012:1",
+      "c1-session-fixed-012:2",
+      "c1-session-fixed-019:1",
+      "c1-session-fixed-020:1",
+      "c1-session-fixed-023:1"
+    ],
+    "rule_only": [
+      "c1-session-fixed-013:1",
+      "c1-session-fixed-013:2",
+      "c1-session-fixed-015:1",
+      "c1-session-fixed-015:2",
+      "c1-session-fixed-016:1",
+      "c1-session-fixed-016:2",
+      "c1-session-fixed-018:1",
+      "c1-session-fixed-018:2",
+      "c1-session-fixed-022:1",
+      "c1-session-fixed-024:1"
+    ],
+    "previous": [
+      "c1-session-fixed-010:2",
+      "c1-session-fixed-013:2",
+      "c1-session-fixed-015:2",
+      "c1-session-fixed-016:2"
+    ],
+    "retrieval_changed": [
+      "c1-session-fixed-001:2",
+      "c1-session-fixed-007:3",
+      "c1-session-fixed-010:1",
+      "c1-session-fixed-010:2",
+      "c1-session-fixed-012:1",
+      "c1-session-fixed-012:2",
+      "c1-session-fixed-019:1",
+      "c1-session-fixed-020:1",
+      "c1-session-fixed-023:1"
+    ],
+    "retrieval_identical": [
+      "c1-session-fixed-013:1",
+      "c1-session-fixed-013:2",
+      "c1-session-fixed-015:1",
+      "c1-session-fixed-015:2",
+      "c1-session-fixed-016:1",
+      "c1-session-fixed-016:2",
+      "c1-session-fixed-018:1",
+      "c1-session-fixed-018:2",
+      "c1-session-fixed-022:1",
+      "c1-session-fixed-024:1"
+    ]
+  },
+  "cases": [
+    {
+      "id": "c1-session-fixed-001:2",
+      "caseId": "c1-session-fixed-001",
+      "turn": 2,
+      "family": "order_state",
+      "stratum": "known",
+      "corpus": "online",
+      "scope": {
+        "shopId": "shop-demo-1",
+        "productId": "product-demo-1"
+      },
+      "expected": {
+        "outcome": "ready",
+        "knowledge": "evidence",
+        "gold": [
+          {
+            "sourceId": "KB-REFUND-PAYMENT",
+            "quote": "已完成退款的订单需以支付和退款历史为准，不得重复退款"
+          }
+        ]
+      },
+      "source": {
+        "planCaseIndex": 0,
+        "planTurnIndex": 1,
+        "rowIndex": 1,
+        "requestId": "9652d6eb-4a35-4e95-a22d-4b72d7e10731:c1-session-fixed-001:2",
+        "knowledgeCallIndex": 1
+      },
+      "status": "ready",
+      "builderInput": {
+        "action": {
+          "kind": "refund_eligibility",
+          "orderRef": {
+            "kind": "focus"
+          },
+          "protocol": "v2.2",
+          "question": "这笔订单现在重新核对的话还有退款申请资格吗？",
+          "questionContext": {
+            "kind": "standalone"
+          }
+        },
+        "originalQuery": "还是刚才那笔订单，现在重新核对的话还有退款申请资格吗？只咨询，不要办理。",
+        "order": {
+          "source": "demo-database",
+          "id": "COUPON-6001",
+          "status": "refunded",
+          "asOf": "2026-10-05T01:00:00.000Z",
+          "amounts": {
+            "totalCents": 7980,
+            "paidCents": 7980,
+            "refundedCents": 7980
+          },
+          "createdAt": "2026-10-05T00:00:00.000Z",
+          "paidAt": "2026-10-05T00:00:00.000Z",
+          "shop": {
+            "id": "shop-demo-1",
+            "name": "云味餐厅",
+            "merchantName": "演示商家",
+            "address": "演示地址"
+          },
+          "items": [
+            {
+              "productId": "product-demo-1",
+              "quantity": 1,
+              "unitPriceCents": 7980,
+              "totalCents": 7980,
+              "id": "COUPON-6001-item-0",
+              "productName": "双人午餐团购券"
+            }
+          ],
+          "coupons": [
+            {
+              "id": "COUPON-6001-coupon-0",
+              "orderItemId": "COUPON-6001-item-0",
+              "status": "refunded",
+              "expiresAt": "2026-11-04T00:00:00.000Z",
+              "redeemedAt": null,
+              "redeemedShopId": null
+            }
+          ],
+          "payments": [
+            {
+              "status": "succeeded",
+              "amountCents": 7980,
+              "paidAt": "2026-10-05T00:00:00.000Z"
+            }
+          ],
+          "refunds": [
+            {
+              "status": "succeeded",
+              "amountCents": 7980,
+              "completedAt": "2026-10-05T01:00:00.000Z"
+            }
+          ]
+        },
+        "binding": {
+          "sourceKey": "a68d5212ae45ef14dd0c444e10da910cc637fbd0f8b7d5d7a8aa033563eb81f4",
+          "groupOpenid": "C1_VALIDATION_GROUP_1",
+          "orderId": "COUPON-6001"
+        },
+        "requestId": "9652d6eb-4a35-4e95-a22d-4b72d7e10731:c1-session-fixed-001:2"
+      }
+    },
+    {
+      "id": "c1-session-fixed-007:3",
+      "caseId": "c1-session-fixed-007",
+      "turn": 3,
+      "family": "alternative_order",
+      "stratum": "known",
+      "corpus": "online",
+      "scope": {
+        "shopId": "shop-demo-1",
+        "productId": "product-demo-1"
+      },
+      "expected": {
+        "outcome": "ready",
+        "knowledge": "evidence",
+        "gold": [
+          {
+            "sourceId": "KB-REFUND-EXPIRED",
+            "quote": "已过期但未核销的券需要商家确认能否退款、延期以及金额。知识库未提供过期自动退款或自动延期政策"
+          }
+        ]
+      },
+      "source": {
+        "planCaseIndex": 6,
+        "planTurnIndex": 2,
+        "rowIndex": 14,
+        "requestId": "9652d6eb-4a35-4e95-a22d-4b72d7e10731:c1-session-fixed-007:3",
+        "knowledgeCallIndex": 1
+      },
+      "status": "ready",
+      "builderInput": {
+        "action": {
+          "kind": "policy",
+          "question": "按它当前的券状态，申请退款还需要谁确认？",
+          "questionContext": {
+            "kind": "standalone"
+          },
+          "orderRef": {
+            "kind": "alternative"
+          },
+          "protocol": "v2.2"
+        },
+        "originalQuery": "改看另一笔，按它当前的券状态，申请退款还需要谁确认？",
+        "order": {
+          "source": "demo-database",
+          "id": "COUPON-6003",
+          "status": "paid",
+          "asOf": "2026-10-05T00:00:00.000Z",
+          "amounts": {
+            "totalCents": 7980,
+            "paidCents": 7980,
+            "refundedCents": 0
+          },
+          "createdAt": "2026-10-05T00:00:00.000Z",
+          "paidAt": "2026-10-05T00:00:00.000Z",
+          "shop": {
+            "id": "shop-demo-1",
+            "name": "云味餐厅",
+            "merchantName": "演示商家",
+            "address": "演示地址"
+          },
+          "items": [
+            {
+              "productId": "product-demo-1",
+              "quantity": 1,
+              "unitPriceCents": 7980,
+              "totalCents": 7980,
+              "id": "COUPON-6003-item-0",
+              "productName": "双人午餐团购券"
+            }
+          ],
+          "coupons": [
+            {
+              "id": "COUPON-6003-coupon-0",
+              "orderItemId": "COUPON-6003-item-0",
+              "status": "expired",
+              "expiresAt": "2026-09-28T00:00:00.000Z",
+              "redeemedAt": null,
+              "redeemedShopId": null
+            }
+          ],
+          "payments": [
+            {
+              "status": "succeeded",
+              "amountCents": 7980,
+              "paidAt": "2026-10-05T00:00:00.000Z"
+            }
+          ],
+          "refunds": []
+        },
+        "binding": {
+          "sourceKey": "ad772a31ecee29ef6b291058479296a1f4d6dd36e2b6f086d83ae14f0cb88ded",
+          "groupOpenid": "C1_VALIDATION_GROUP_7",
+          "orderId": "COUPON-6003"
+        },
+        "requestId": "9652d6eb-4a35-4e95-a22d-4b72d7e10731:c1-session-fixed-007:3"
+      }
+    },
+    {
+      "id": "c1-session-fixed-010:1",
+      "caseId": "c1-session-fixed-010",
+      "turn": 1,
+      "family": "policy_followup",
+      "stratum": "known",
+      "corpus": "online",
+      "scope": {
+        "shopId": "shop-demo-1",
+        "productId": "product-demo-1"
+      },
+      "expected": {
+        "outcome": "ready",
+        "knowledge": "evidence",
+        "gold": [
+          {
+            "sourceId": "KB-PRODUCT-LUNCH",
+            "quote": "一张券对应两人午餐套餐，核销一次即视为整张券已使用"
+          }
+        ]
+      },
+      "source": {
+        "planCaseIndex": 9,
+        "planTurnIndex": 0,
+        "rowIndex": 21,
+        "requestId": "9652d6eb-4a35-4e95-a22d-4b72d7e10731:c1-session-fixed-010:1",
+        "knowledgeCallIndex": 1
+      },
+      "status": "ready",
+      "builderInput": {
+        "action": {
+          "kind": "policy",
+          "protocol": "v2.2",
+          "question": "双人午餐团购券，正常核销一次后，整张券是否就算已使用？",
+          "questionContext": {
+            "kind": "standalone"
+          },
+          "orderRef": {
+            "kind": "explicit",
+            "orderId": "COUPON-6001"
+          }
+        },
+        "originalQuery": "订单 COUPON-6001 的双人午餐团购券，正常核销一次后，整张券是否就算已使用？只解释规则。",
+        "order": {
+          "source": "demo-database",
+          "id": "COUPON-6001",
+          "status": "paid",
+          "asOf": "2026-10-05T00:00:00.000Z",
+          "amounts": {
+            "totalCents": 7980,
+            "paidCents": 7980,
+            "refundedCents": 0
+          },
+          "createdAt": "2026-10-05T00:00:00.000Z",
+          "paidAt": "2026-10-05T00:00:00.000Z",
+          "shop": {
+            "id": "shop-demo-1",
+            "name": "云味餐厅",
+            "merchantName": "演示商家",
+            "address": "演示地址"
+          },
+          "items": [
+            {
+              "productId": "product-demo-1",
+              "quantity": 1,
+              "unitPriceCents": 7980,
+              "totalCents": 7980,
+              "id": "COUPON-6001-item-0",
+              "productName": "双人午餐团购券"
+            }
+          ],
+          "coupons": [
+            {
+              "id": "COUPON-6001-coupon-0",
+              "orderItemId": "COUPON-6001-item-0",
+              "status": "unused",
+              "expiresAt": "2026-11-04T00:00:00.000Z",
+              "redeemedAt": null,
+              "redeemedShopId": null
+            }
+          ],
+          "payments": [
+            {
+              "status": "succeeded",
+              "amountCents": 7980,
+              "paidAt": "2026-10-05T00:00:00.000Z"
+            }
+          ],
+          "refunds": []
+        },
+        "binding": {
+          "sourceKey": "123022001273fc9ff516f1d278650892922244fd60d3cfe15450e8620e44506e",
+          "groupOpenid": "C1_VALIDATION_GROUP_10",
+          "orderId": "COUPON-6001"
+        },
+        "requestId": "9652d6eb-4a35-4e95-a22d-4b72d7e10731:c1-session-fixed-010:1"
+      }
+    },
+    {
+      "id": "c1-session-fixed-010:2",
+      "caseId": "c1-session-fixed-010",
+      "turn": 2,
+      "family": "policy_followup",
+      "stratum": "known",
+      "corpus": "online",
+      "scope": {
+        "shopId": "shop-demo-1",
+        "productId": "product-demo-1"
+      },
+      "expected": {
+        "outcome": "ready",
+        "knowledge": "evidence",
+        "gold": [
+          {
+            "sourceId": "KB-PRODUCT-LUNCH",
+            "quote": "一张券对应两人午餐套餐，核销一次即视为整张券已使用"
+          }
+        ]
+      },
+      "source": {
+        "planCaseIndex": 9,
+        "planTurnIndex": 1,
+        "rowIndex": 22,
+        "requestId": "9652d6eb-4a35-4e95-a22d-4b72d7e10731:c1-session-fixed-010:2",
+        "knowledgeCallIndex": 1
+      },
+      "status": "ready",
+      "builderInput": {
+        "action": {
+          "kind": "policy",
+          "orderRef": {
+            "kind": "focus"
+          },
+          "protocol": "v2.2",
+          "question": "沿用核销规则，能不能只算其中一人用了，把另一人的份额留到下次？",
+          "questionContext": {
+            "kind": "previous",
+            "requestId": "9652d6eb-4a35-4e95-a22d-4b72d7e10731:c1-session-fixed-010:1"
+          }
+        },
+        "originalQuery": "沿用刚才那条核销规则，能不能只算其中一人用了，把另一人的份额留到下次？",
+        "order": {
+          "source": "demo-database",
+          "id": "COUPON-6001",
+          "status": "paid",
+          "asOf": "2026-10-05T00:00:00.000Z",
+          "amounts": {
+            "totalCents": 7980,
+            "paidCents": 7980,
+            "refundedCents": 0
+          },
+          "createdAt": "2026-10-05T00:00:00.000Z",
+          "paidAt": "2026-10-05T00:00:00.000Z",
+          "shop": {
+            "id": "shop-demo-1",
+            "name": "云味餐厅",
+            "merchantName": "演示商家",
+            "address": "演示地址"
+          },
+          "items": [
+            {
+              "productId": "product-demo-1",
+              "quantity": 1,
+              "unitPriceCents": 7980,
+              "totalCents": 7980,
+              "id": "COUPON-6001-item-0",
+              "productName": "双人午餐团购券"
+            }
+          ],
+          "coupons": [
+            {
+              "id": "COUPON-6001-coupon-0",
+              "orderItemId": "COUPON-6001-item-0",
+              "status": "unused",
+              "expiresAt": "2026-11-04T00:00:00.000Z",
+              "redeemedAt": null,
+              "redeemedShopId": null
+            }
+          ],
+          "payments": [
+            {
+              "status": "succeeded",
+              "amountCents": 7980,
+              "paidAt": "2026-10-05T00:00:00.000Z"
+            }
+          ],
+          "refunds": []
+        },
+        "verifiedTopic": {
+          "requestId": "9652d6eb-4a35-4e95-a22d-4b72d7e10731:c1-session-fixed-010:1",
+          "sourceKey": "123022001273fc9ff516f1d278650892922244fd60d3cfe15450e8620e44506e",
+          "groupOpenid": "C1_VALIDATION_GROUP_10",
+          "originalQuery": "订单 COUPON-6001 的双人午餐团购券，正常核销一次后，整张券是否就算已使用？只解释规则。",
+          "orderId": "COUPON-6001",
+          "scope": {
+            "shopId": "shop-demo-1",
+            "productId": "product-demo-1"
+          },
+          "intent": "policy",
+          "sources": [
+            {
+              "sourceId": "KB-PRODUCT-LUNCH",
+              "version": "551653789f54c98d3449408d4b176e4f81b0a83539243dea0752d76967804c7f"
+            }
+          ]
+        },
+        "binding": {
+          "sourceKey": "123022001273fc9ff516f1d278650892922244fd60d3cfe15450e8620e44506e",
+          "groupOpenid": "C1_VALIDATION_GROUP_10",
+          "orderId": "COUPON-6001"
+        },
+        "requestId": "9652d6eb-4a35-4e95-a22d-4b72d7e10731:c1-session-fixed-010:2"
+      }
+    },
+    {
+      "id": "c1-session-fixed-012:1",
+      "caseId": "c1-session-fixed-012",
+      "turn": 1,
+      "family": "policy_followup",
+      "stratum": "competing",
+      "corpus": "online",
+      "scope": {
+        "shopId": "shop-demo-1",
+        "productId": "product-demo-1"
+      },
+      "expected": {
+        "outcome": "ready",
+        "knowledge": "evidence",
+        "gold": [
+          {
+            "sourceId": "KB-PRODUCT-LUNCH",
+            "quote": "一张券对应两人午餐套餐，核销一次即视为整张券已使用"
+          }
+        ]
+      },
+      "source": {
+        "planCaseIndex": 11,
+        "planTurnIndex": 0,
+        "rowIndex": 24,
+        "requestId": "9652d6eb-4a35-4e95-a22d-4b72d7e10731:c1-session-fixed-012:1",
+        "knowledgeCallIndex": 1
+      },
+      "status": "ready",
+      "builderInput": {
+        "action": {
+          "kind": "policy",
+          "protocol": "v2.2",
+          "question": "订单 COUPON-6001 的双人午餐团购券核销一次，是不是整张就算用掉？",
+          "questionContext": {
+            "kind": "standalone"
+          },
+          "orderRef": {
+            "kind": "explicit",
+            "orderId": "COUPON-6001"
+          }
+        },
+        "originalQuery": "订单 COUPON-6001 的双人午餐团购券核销一次，是不是整张就算用掉？",
+        "order": {
+          "source": "demo-database",
+          "id": "COUPON-6001",
+          "status": "paid",
+          "asOf": "2026-10-05T00:00:00.000Z",
+          "amounts": {
+            "totalCents": 7980,
+            "paidCents": 7980,
+            "refundedCents": 0
+          },
+          "createdAt": "2026-10-05T00:00:00.000Z",
+          "paidAt": "2026-10-05T00:00:00.000Z",
+          "shop": {
+            "id": "shop-demo-1",
+            "name": "云味餐厅",
+            "merchantName": "演示商家",
+            "address": "演示地址"
+          },
+          "items": [
+            {
+              "productId": "product-demo-1",
+              "quantity": 1,
+              "unitPriceCents": 7980,
+              "totalCents": 7980,
+              "id": "COUPON-6001-item-0",
+              "productName": "双人午餐团购券"
+            }
+          ],
+          "coupons": [
+            {
+              "id": "COUPON-6001-coupon-0",
+              "orderItemId": "COUPON-6001-item-0",
+              "status": "unused",
+              "expiresAt": "2026-11-04T00:00:00.000Z",
+              "redeemedAt": null,
+              "redeemedShopId": null
+            }
+          ],
+          "payments": [
+            {
+              "status": "succeeded",
+              "amountCents": 7980,
+              "paidAt": "2026-10-05T00:00:00.000Z"
+            }
+          ],
+          "refunds": []
+        },
+        "binding": {
+          "sourceKey": "ded95b970cd9d23e9e09caad835e7a83e728495a9fad4c5b09d21a76595317ae",
+          "groupOpenid": "C1_VALIDATION_GROUP_12",
+          "orderId": "COUPON-6001"
+        },
+        "requestId": "9652d6eb-4a35-4e95-a22d-4b72d7e10731:c1-session-fixed-012:1"
+      }
+    },
+    {
+      "id": "c1-session-fixed-012:2",
+      "caseId": "c1-session-fixed-012",
+      "turn": 2,
+      "family": "policy_followup",
+      "stratum": "competing",
+      "corpus": "online",
+      "scope": {
+        "shopId": "shop-demo-1",
+        "productId": "product-demo-2"
+      },
+      "expected": {
+        "outcome": "ready",
+        "knowledge": "evidence",
+        "gold": [
+          {
+            "sourceId": "KB-PRODUCT-DINNER",
+            "quote": "订单购买两张券时可以分别核销，剩余券状态以订单查询为准"
+          }
+        ]
+      },
+      "source": {
+        "planCaseIndex": 11,
+        "planTurnIndex": 1,
+        "rowIndex": 25,
+        "requestId": "9652d6eb-4a35-4e95-a22d-4b72d7e10731:c1-session-fixed-012:2",
+        "knowledgeCallIndex": 1
+      },
+      "status": "ready",
+      "builderInput": {
+        "action": {
+          "kind": "policy",
+          "orderRef": {
+            "kind": "explicit",
+            "orderId": "COUPON-6005"
+          },
+          "protocol": "v2.2",
+          "question": "订单 COUPON-6005 的两张单人晚餐团购券，规则上能分别核销吗？",
+          "questionContext": {
+            "kind": "standalone"
+          }
+        },
+        "originalQuery": "订单 COUPON-6005 的两张单人晚餐团购券，规则上能分别核销吗？",
+        "order": {
+          "source": "demo-database",
+          "id": "COUPON-6005",
+          "status": "partially_redeemed",
+          "asOf": "2026-10-05T00:00:00.000Z",
+          "amounts": {
+            "totalCents": 11980,
+            "paidCents": 11980,
+            "refundedCents": 0
+          },
+          "createdAt": "2026-10-05T00:00:00.000Z",
+          "paidAt": "2026-10-05T00:00:00.000Z",
+          "shop": {
+            "id": "shop-demo-1",
+            "name": "云味餐厅",
+            "merchantName": "演示商家",
+            "address": "演示地址"
+          },
+          "items": [
+            {
+              "productId": "product-demo-2",
+              "quantity": 2,
+              "unitPriceCents": 5990,
+              "totalCents": 11980,
+              "id": "COUPON-6005-item-0",
+              "productName": "单人晚餐团购券"
+            }
+          ],
+          "coupons": [
+            {
+              "id": "COUPON-6005-coupon-0",
+              "orderItemId": "COUPON-6005-item-0",
+              "status": "redeemed",
+              "expiresAt": "2026-11-04T00:00:00.000Z",
+              "redeemedAt": "2026-10-05T00:00:00.000Z",
+              "redeemedShopId": "shop-demo-1"
+            },
+            {
+              "id": "COUPON-6005-coupon-1",
+              "orderItemId": "COUPON-6005-item-0",
+              "status": "unused",
+              "expiresAt": "2026-11-04T00:00:00.000Z",
+              "redeemedAt": null,
+              "redeemedShopId": null
+            }
+          ],
+          "payments": [
+            {
+              "status": "succeeded",
+              "amountCents": 11980,
+              "paidAt": "2026-10-05T00:00:00.000Z"
+            }
+          ],
+          "refunds": []
+        },
+        "binding": {
+          "sourceKey": "ded95b970cd9d23e9e09caad835e7a83e728495a9fad4c5b09d21a76595317ae",
+          "groupOpenid": "C1_VALIDATION_GROUP_12",
+          "orderId": "COUPON-6005"
+        },
+        "requestId": "9652d6eb-4a35-4e95-a22d-4b72d7e10731:c1-session-fixed-012:2"
+      }
+    },
+    {
+      "id": "c1-session-fixed-013:1",
+      "caseId": "c1-session-fixed-013",
+      "turn": 1,
+      "family": "refund_time",
+      "stratum": "known",
+      "corpus": "reference",
+      "scope": {
+        "shopId": null,
+        "productId": null
+      },
+      "expected": {
+        "outcome": "ready",
+        "knowledge": "evidence",
+        "gold": [
+          {
+            "sourceId": "RF005",
+            "quote": "信用卡3-7个工作日"
+          }
+        ]
+      },
+      "source": {
+        "planCaseIndex": 12,
+        "planTurnIndex": 0,
+        "rowIndex": 27,
+        "requestId": "9652d6eb-4a35-4e95-a22d-4b72d7e10731:c1-session-fixed-013:1",
+        "knowledgeCallIndex": 0
+      },
+      "status": "ready",
+      "builderInput": {
+        "action": {
+          "kind": "policy",
+          "question": "信用卡支付的退款，通常需要等待几个工作日？",
+          "questionContext": {
+            "kind": "standalone"
+          },
+          "protocol": "v2.2"
+        },
+        "originalQuery": "只问一般规则：信用卡支付的退款，通常需要等待几个工作日？",
+        "binding": {
+          "sourceKey": "7fdfe182ef27deb72a5b5bf101f978ee2c7a1f1ca990541adb7346c9f18141ec",
+          "groupOpenid": "C1_VALIDATION_GROUP_13",
+          "orderId": null
+        },
+        "requestId": "9652d6eb-4a35-4e95-a22d-4b72d7e10731:c1-session-fixed-013:1"
+      }
+    },
+    {
+      "id": "c1-session-fixed-013:2",
+      "caseId": "c1-session-fixed-013",
+      "turn": 2,
+      "family": "refund_time",
+      "stratum": "known",
+      "corpus": "reference",
+      "scope": {
+        "shopId": null,
+        "productId": null
+      },
+      "expected": {
+        "outcome": "ready",
+        "knowledge": "evidence",
+        "gold": [
+          {
+            "sourceId": "RF005",
+            "quote": "若超过7个工作日未到账,建议先核对支付渠道账单,再联系平台协助查询"
+          }
+        ]
+      },
+      "source": {
+        "planCaseIndex": 12,
+        "planTurnIndex": 1,
+        "rowIndex": 28,
+        "requestId": "9652d6eb-4a35-4e95-a22d-4b72d7e10731:c1-session-fixed-013:2",
+        "knowledgeCallIndex": 0
+      },
+      "status": "ready",
+      "builderInput": {
+        "action": {
+          "kind": "policy",
+          "question": "还是刚才这个渠道，假如超过那个通常的最长工作日时限仍未到账，应该先核对什么？",
+          "questionContext": {
+            "kind": "previous",
+            "requestId": "9652d6eb-4a35-4e95-a22d-4b72d7e10731:c1-session-fixed-013:1"
+          },
+          "protocol": "v2.2"
+        },
+        "originalQuery": "还是刚才这个渠道，假如超过那个通常的最长工作日时限仍未到账，应该先核对什么？",
+        "verifiedTopic": {
+          "requestId": "9652d6eb-4a35-4e95-a22d-4b72d7e10731:c1-session-fixed-013:1",
+          "sourceKey": "7fdfe182ef27deb72a5b5bf101f978ee2c7a1f1ca990541adb7346c9f18141ec",
+          "groupOpenid": "C1_VALIDATION_GROUP_13",
+          "originalQuery": "只问一般规则：信用卡支付的退款，通常需要等待几个工作日？",
+          "orderId": null,
+          "scope": {
+            "shopId": null,
+            "productId": null
+          },
+          "intent": "policy",
+          "sources": [
+            {
+              "sourceId": "RF005",
+              "version": "776b28b8b504fac5f85d9c058a43275d1ef82dc0a35c7472c2a64d08fee4bdd5"
+            }
+          ]
+        },
+        "binding": {
+          "sourceKey": "7fdfe182ef27deb72a5b5bf101f978ee2c7a1f1ca990541adb7346c9f18141ec",
+          "groupOpenid": "C1_VALIDATION_GROUP_13",
+          "orderId": null
+        },
+        "requestId": "9652d6eb-4a35-4e95-a22d-4b72d7e10731:c1-session-fixed-013:2"
+      }
+    },
+    {
+      "id": "c1-session-fixed-015:1",
+      "caseId": "c1-session-fixed-015",
+      "turn": 1,
+      "family": "refund_time",
+      "stratum": "competing",
+      "corpus": "reference",
+      "scope": {
+        "shopId": null,
+        "productId": null
+      },
+      "expected": {
+        "outcome": "ready",
+        "knowledge": "evidence",
+        "gold": [
+          {
+            "sourceId": "RF005",
+            "quote": "信用卡3-7个工作日"
+          }
+        ]
+      },
+      "source": {
+        "planCaseIndex": 14,
+        "planTurnIndex": 0,
+        "rowIndex": 30,
+        "requestId": "9652d6eb-4a35-4e95-a22d-4b72d7e10731:c1-session-fixed-015:1",
+        "knowledgeCallIndex": 0
+      },
+      "status": "ready",
+      "builderInput": {
+        "action": {
+          "kind": "policy",
+          "question": "信用卡退款的一般到账时限是多久？",
+          "questionContext": {
+            "kind": "standalone"
+          },
+          "protocol": "v2.2"
+        },
+        "originalQuery": "先帮我说明信用卡退款的一般到账时限。",
+        "binding": {
+          "sourceKey": "305b708525851188e054a8b2155dd6e70c7c6c2bc106a3755d8aa06bf106baf4",
+          "groupOpenid": "C1_VALIDATION_GROUP_15",
+          "orderId": null
+        },
+        "requestId": "9652d6eb-4a35-4e95-a22d-4b72d7e10731:c1-session-fixed-015:1"
+      }
+    },
+    {
+      "id": "c1-session-fixed-015:2",
+      "caseId": "c1-session-fixed-015",
+      "turn": 2,
+      "family": "refund_time",
+      "stratum": "competing",
+      "corpus": "reference",
+      "scope": {
+        "shopId": null,
+        "productId": null
+      },
+      "expected": {
+        "outcome": "ready",
+        "knowledge": "evidence",
+        "gold": [
+          {
+            "sourceId": "RF005",
+            "quote": "银行卡1-3个工作日"
+          }
+        ]
+      },
+      "source": {
+        "planCaseIndex": 14,
+        "planTurnIndex": 1,
+        "rowIndex": 31,
+        "requestId": "9652d6eb-4a35-4e95-a22d-4b72d7e10731:c1-session-fixed-015:2",
+        "knowledgeCallIndex": 0
+      },
+      "status": "ready",
+      "builderInput": {
+        "action": {
+          "kind": "policy",
+          "question": "银行卡渠道退款通常等几个工作日？",
+          "questionContext": {
+            "kind": "previous",
+            "requestId": "9652d6eb-4a35-4e95-a22d-4b72d7e10731:c1-session-fixed-015:1"
+          },
+          "protocol": "v2.2"
+        },
+        "originalQuery": "再说明银行卡渠道通常等几个工作日。",
+        "verifiedTopic": {
+          "requestId": "9652d6eb-4a35-4e95-a22d-4b72d7e10731:c1-session-fixed-015:1",
+          "sourceKey": "305b708525851188e054a8b2155dd6e70c7c6c2bc106a3755d8aa06bf106baf4",
+          "groupOpenid": "C1_VALIDATION_GROUP_15",
+          "originalQuery": "先帮我说明信用卡退款的一般到账时限。",
+          "orderId": null,
+          "scope": {
+            "shopId": null,
+            "productId": null
+          },
+          "intent": "policy",
+          "sources": [
+            {
+              "sourceId": "RF005",
+              "version": "776b28b8b504fac5f85d9c058a43275d1ef82dc0a35c7472c2a64d08fee4bdd5"
+            }
+          ]
+        },
+        "binding": {
+          "sourceKey": "305b708525851188e054a8b2155dd6e70c7c6c2bc106a3755d8aa06bf106baf4",
+          "groupOpenid": "C1_VALIDATION_GROUP_15",
+          "orderId": null
+        },
+        "requestId": "9652d6eb-4a35-4e95-a22d-4b72d7e10731:c1-session-fixed-015:2"
+      }
+    },
+    {
+      "id": "c1-session-fixed-016:1",
+      "caseId": "c1-session-fixed-016",
+      "turn": 1,
+      "family": "appointment_actor",
+      "stratum": "known",
+      "corpus": "reference",
+      "scope": {
+        "shopId": null,
+        "productId": null
+      },
+      "expected": {
+        "outcome": "ready",
+        "knowledge": "evidence",
+        "gold": [
+          {
+            "sourceId": "RS003",
+            "quote": "距预约时间不足24小时的变更需商家同意"
+          }
+        ]
+      },
+      "source": {
+        "planCaseIndex": 15,
+        "planTurnIndex": 0,
+        "rowIndex": 33,
+        "requestId": "9652d6eb-4a35-4e95-a22d-4b72d7e10731:c1-session-fixed-016:1",
+        "knowledgeCallIndex": 0
+      },
+      "status": "ready",
+      "builderInput": {
+        "action": {
+          "kind": "policy",
+          "question": "假设预约距离现在只剩8小时，因为行程变动想改到次日，规则上能自行改吗？",
+          "questionContext": {
+            "kind": "standalone"
+          },
+          "protocol": "v2.2"
+        },
+        "originalQuery": "假设预约距离现在只剩8小时，因为行程变动想改到次日，规则上能自行改吗？",
+        "binding": {
+          "sourceKey": "53cd4764b238db11036334daa0cd2f5db02a9591dd2640679f9d318c0114dbb7",
+          "groupOpenid": "C1_VALIDATION_GROUP_16",
+          "orderId": null
+        },
+        "requestId": "9652d6eb-4a35-4e95-a22d-4b72d7e10731:c1-session-fixed-016:1"
+      }
+    },
+    {
+      "id": "c1-session-fixed-016:2",
+      "caseId": "c1-session-fixed-016",
+      "turn": 2,
+      "family": "appointment_actor",
+      "stratum": "known",
+      "corpus": "reference",
+      "scope": {
+        "shopId": null,
+        "productId": null
+      },
+      "expected": {
+        "outcome": "ready",
+        "knowledge": "evidence",
+        "gold": [
+          {
+            "sourceId": "RS003",
+            "quote": "距预约时间不足24小时的变更需商家同意"
+          }
+        ]
+      },
+      "source": {
+        "planCaseIndex": 15,
+        "planTurnIndex": 1,
+        "rowIndex": 34,
+        "requestId": "9652d6eb-4a35-4e95-a22d-4b72d7e10731:c1-session-fixed-016:2",
+        "knowledgeCallIndex": 0
+      },
+      "status": "ready",
+      "builderInput": {
+        "action": {
+          "kind": "policy",
+          "question": "距预约不足24小时想改到次日，是否必须先取得商家同意才能变更？",
+          "questionContext": {
+            "kind": "previous",
+            "requestId": "9652d6eb-4a35-4e95-a22d-4b72d7e10731:c1-session-fixed-016:1"
+          },
+          "protocol": "v2.2"
+        },
+        "originalQuery": "延续这次改期的前提，要先取得他的同意才可以变更，对吗？",
+        "verifiedTopic": {
+          "requestId": "9652d6eb-4a35-4e95-a22d-4b72d7e10731:c1-session-fixed-016:1",
+          "sourceKey": "53cd4764b238db11036334daa0cd2f5db02a9591dd2640679f9d318c0114dbb7",
+          "groupOpenid": "C1_VALIDATION_GROUP_16",
+          "originalQuery": "假设预约距离现在只剩8小时，因为行程变动想改到次日，规则上能自行改吗？",
+          "orderId": null,
+          "scope": {
+            "shopId": null,
+            "productId": null
+          },
+          "intent": "policy",
+          "sources": [
+            {
+              "sourceId": "RS003",
+              "version": "7358c22d03f69abfea89214532156a72b973b299495d0b2a9eb42afa5430eddf"
+            }
+          ]
+        },
+        "binding": {
+          "sourceKey": "53cd4764b238db11036334daa0cd2f5db02a9591dd2640679f9d318c0114dbb7",
+          "groupOpenid": "C1_VALIDATION_GROUP_16",
+          "orderId": null
+        },
+        "requestId": "9652d6eb-4a35-4e95-a22d-4b72d7e10731:c1-session-fixed-016:2"
+      }
+    },
+    {
+      "id": "c1-session-fixed-018:1",
+      "caseId": "c1-session-fixed-018",
+      "turn": 1,
+      "family": "appointment_actor",
+      "stratum": "competing",
+      "corpus": "reference",
+      "scope": {
+        "shopId": null,
+        "productId": null
+      },
+      "expected": {
+        "outcome": "ready",
+        "knowledge": "evidence",
+        "gold": [
+          {
+            "sourceId": "RS003",
+            "quote": "距预约时间不足24小时的变更需商家同意"
+          }
+        ]
+      },
+      "source": {
+        "planCaseIndex": 17,
+        "planTurnIndex": 0,
+        "rowIndex": 36,
+        "requestId": "9652d6eb-4a35-4e95-a22d-4b72d7e10731:c1-session-fixed-018:1",
+        "knowledgeCallIndex": 0
+      },
+      "status": "ready",
+      "builderInput": {
+        "action": {
+          "kind": "policy",
+          "question": "预约还有6小时才开始，临时改期需要谁同意？",
+          "questionContext": {
+            "kind": "standalone"
+          },
+          "protocol": "v2.2"
+        },
+        "originalQuery": "预约还有6小时才开始，临时改期需要谁同意？",
+        "binding": {
+          "sourceKey": "214bd1849eec02cd406b4271eb3187743355502d3ee3a3c68a139d6c993ca355",
+          "groupOpenid": "C1_VALIDATION_GROUP_18",
+          "orderId": null
+        },
+        "requestId": "9652d6eb-4a35-4e95-a22d-4b72d7e10731:c1-session-fixed-018:1"
+      }
+    },
+    {
+      "id": "c1-session-fixed-018:2",
+      "caseId": "c1-session-fixed-018",
+      "turn": 2,
+      "family": "appointment_actor",
+      "stratum": "competing",
+      "corpus": "reference",
+      "scope": {
+        "shopId": null,
+        "productId": null
+      },
+      "expected": {
+        "outcome": "ready",
+        "knowledge": "evidence",
+        "gold": [
+          {
+            "sourceId": "VF002",
+            "quote": "若券在不知情的情况下被核销,或商家误核销了错误的订单,可通过平台发起申诉。需提供未实际消费的说明,平台会介入核实"
+          }
+        ]
+      },
+      "source": {
+        "planCaseIndex": 17,
+        "planTurnIndex": 1,
+        "rowIndex": 37,
+        "requestId": "9652d6eb-4a35-4e95-a22d-4b72d7e10731:c1-session-fixed-018:2",
+        "knowledgeCallIndex": 0
+      },
+      "status": "ready",
+      "builderInput": {
+        "action": {
+          "kind": "policy",
+          "question": "券被误核销但没有实际消费，申诉后由谁介入核实？",
+          "questionContext": {
+            "kind": "standalone"
+          },
+          "protocol": "v2.2"
+        },
+        "originalQuery": "另一件事：券被误核销但没有实际消费，申诉后由谁介入核实？",
+        "binding": {
+          "sourceKey": "214bd1849eec02cd406b4271eb3187743355502d3ee3a3c68a139d6c993ca355",
+          "groupOpenid": "C1_VALIDATION_GROUP_18",
+          "orderId": null
+        },
+        "requestId": "9652d6eb-4a35-4e95-a22d-4b72d7e10731:c1-session-fixed-018:2"
+      }
+    },
+    {
+      "id": "c1-session-fixed-019:1",
+      "caseId": "c1-session-fixed-019",
+      "turn": 1,
+      "family": null,
+      "stratum": "direct_missing_fact",
+      "corpus": "online",
+      "scope": {
+        "shopId": "shop-demo-1",
+        "productId": "product-demo-1"
+      },
+      "expected": {
+        "outcome": "ready",
+        "knowledge": "rejected",
+        "gold": []
+      },
+      "source": {
+        "planCaseIndex": 18,
+        "planTurnIndex": 0,
+        "rowIndex": 39,
+        "requestId": "9652d6eb-4a35-4e95-a22d-4b72d7e10731:c1-session-fixed-019:1",
+        "knowledgeCallIndex": 1
+      },
+      "status": "ready",
+      "builderInput": {
+        "action": {
+          "kind": "policy",
+          "question": "订单 COUPON-6001 的双人午餐团购券，套餐具体含哪些过敏原？请列出名称。",
+          "questionContext": {
+            "kind": "standalone"
+          },
+          "orderRef": {
+            "kind": "explicit",
+            "orderId": "COUPON-6001"
+          },
+          "protocol": "v2.2"
+        },
+        "originalQuery": "订单 COUPON-6001 的双人午餐团购券，套餐具体含哪些过敏原？请列出名称。",
+        "order": {
+          "source": "demo-database",
+          "id": "COUPON-6001",
+          "status": "paid",
+          "asOf": "2026-10-05T00:00:00.000Z",
+          "amounts": {
+            "totalCents": 7980,
+            "paidCents": 7980,
+            "refundedCents": 0
+          },
+          "createdAt": "2026-10-05T00:00:00.000Z",
+          "paidAt": "2026-10-05T00:00:00.000Z",
+          "shop": {
+            "id": "shop-demo-1",
+            "name": "云味餐厅",
+            "merchantName": "演示商家",
+            "address": "演示地址"
+          },
+          "items": [
+            {
+              "productId": "product-demo-1",
+              "quantity": 1,
+              "unitPriceCents": 7980,
+              "totalCents": 7980,
+              "id": "COUPON-6001-item-0",
+              "productName": "双人午餐团购券"
+            }
+          ],
+          "coupons": [
+            {
+              "id": "COUPON-6001-coupon-0",
+              "orderItemId": "COUPON-6001-item-0",
+              "status": "unused",
+              "expiresAt": "2026-11-04T00:00:00.000Z",
+              "redeemedAt": null,
+              "redeemedShopId": null
+            }
+          ],
+          "payments": [
+            {
+              "status": "succeeded",
+              "amountCents": 7980,
+              "paidAt": "2026-10-05T00:00:00.000Z"
+            }
+          ],
+          "refunds": []
+        },
+        "binding": {
+          "sourceKey": "9fb09e04d01d53550afd6cb0dbadaed01b7e2443f3b2c98941cb138388718784",
+          "groupOpenid": "C1_VALIDATION_GROUP_19",
+          "orderId": "COUPON-6001"
+        },
+        "requestId": "9652d6eb-4a35-4e95-a22d-4b72d7e10731:c1-session-fixed-019:1"
+      }
+    },
+    {
+      "id": "c1-session-fixed-020:1",
+      "caseId": "c1-session-fixed-020",
+      "turn": 1,
+      "family": null,
+      "stratum": "direct_missing_fact",
+      "corpus": "online",
+      "scope": {
+        "shopId": "shop-demo-1",
+        "productId": "product-demo-3"
+      },
+      "expected": {
+        "outcome": "ready",
+        "knowledge": "rejected",
+        "gold": []
+      },
+      "source": {
+        "planCaseIndex": 19,
+        "planTurnIndex": 0,
+        "rowIndex": 40,
+        "requestId": "9652d6eb-4a35-4e95-a22d-4b72d7e10731:c1-session-fixed-020:1",
+        "knowledgeCallIndex": 1
+      },
+      "status": "ready",
+      "builderInput": {
+        "action": {
+          "kind": "policy",
+          "question": "订单 COUPON-6008 的私享套餐团购券，在2026年10月11日19点还剩几桌可以预约？",
+          "questionContext": {
+            "kind": "standalone"
+          },
+          "orderRef": {
+            "kind": "explicit",
+            "orderId": "COUPON-6008"
+          },
+          "productMention": "私享套餐",
+          "protocol": "v2.2"
+        },
+        "originalQuery": "订单 COUPON-6008 的私享套餐团购券，在2026年10月11日19点还剩几桌可以预约？",
+        "order": {
+          "source": "demo-database",
+          "id": "COUPON-6008",
+          "status": "paid",
+          "asOf": "2026-10-05T00:00:00.000Z",
+          "amounts": {
+            "totalCents": 9980,
+            "paidCents": 9980,
+            "refundedCents": 0
+          },
+          "createdAt": "2026-10-05T00:00:00.000Z",
+          "paidAt": "2026-10-05T00:00:00.000Z",
+          "shop": {
+            "id": "shop-demo-1",
+            "name": "云味餐厅",
+            "merchantName": "演示商家",
+            "address": "演示地址"
+          },
+          "items": [
+            {
+              "productId": "product-demo-3",
+              "quantity": 1,
+              "unitPriceCents": 9980,
+              "totalCents": 9980,
+              "id": "COUPON-6008-item-0",
+              "productName": "私享套餐团购券"
+            }
+          ],
+          "coupons": [
+            {
+              "id": "COUPON-6008-coupon-0",
+              "orderItemId": "COUPON-6008-item-0",
+              "status": "unused",
+              "expiresAt": "2026-11-04T00:00:00.000Z",
+              "redeemedAt": null,
+              "redeemedShopId": null
+            }
+          ],
+          "payments": [
+            {
+              "status": "succeeded",
+              "amountCents": 9980,
+              "paidAt": "2026-10-05T00:00:00.000Z"
+            }
+          ],
+          "refunds": []
+        },
+        "binding": {
+          "sourceKey": "fc6f85d5d82de991737126d720ba666eb132db3b5d13c38b483e670dab48fc33",
+          "groupOpenid": "C1_VALIDATION_GROUP_20",
+          "orderId": "COUPON-6008"
+        },
+        "requestId": "9652d6eb-4a35-4e95-a22d-4b72d7e10731:c1-session-fixed-020:1"
+      }
+    },
+    {
+      "id": "c1-session-fixed-021:1",
+      "caseId": "c1-session-fixed-021",
+      "turn": 1,
+      "family": null,
+      "stratum": "direct_missing_fact",
+      "corpus": "reference",
+      "scope": {
+        "shopId": null,
+        "productId": null
+      },
+      "expected": {
+        "outcome": "ready",
+        "knowledge": "rejected",
+        "gold": []
+      },
+      "source": {
+        "planCaseIndex": 20,
+        "planTurnIndex": 0,
+        "rowIndex": 41,
+        "requestId": "9652d6eb-4a35-4e95-a22d-4b72d7e10731:c1-session-fixed-021:1",
+        "knowledgeCallIndex": null
+      },
+      "status": "source_missing",
+      "originalQuery": "虚拟市星河路1号的星河商场地下停车场，现在还剩多少个空车位？",
+      "sourceMissing": {
+        "reason": "The source run recorded no knowledge call for this planned knowledge target; no action, order or topic is fabricated.",
+        "recordedExecution": "completed",
+        "recordedActionKind": "non_business"
+      }
+    },
+    {
+      "id": "c1-session-fixed-022:1",
+      "caseId": "c1-session-fixed-022",
+      "turn": 1,
+      "family": null,
+      "stratum": "direct_missing_fact",
+      "corpus": "reference",
+      "scope": {
+        "shopId": null,
+        "productId": null
+      },
+      "expected": {
+        "outcome": "ready",
+        "knowledge": "rejected",
+        "gold": []
+      },
+      "source": {
+        "planCaseIndex": 21,
+        "planTurnIndex": 0,
+        "rowIndex": 42,
+        "requestId": "9652d6eb-4a35-4e95-a22d-4b72d7e10731:c1-session-fixed-022:1",
+        "knowledgeCallIndex": 0
+      },
+      "status": "ready",
+      "builderInput": {
+        "action": {
+          "kind": "policy",
+          "question": "平台退款审核环节规定的最长耗时是多少分钟？",
+          "questionContext": {
+            "kind": "standalone"
+          },
+          "protocol": "v2.2"
+        },
+        "originalQuery": "平台退款审核环节规定的最长耗时是多少分钟？我问审核耗时，不问钱退回账户的时长。",
+        "binding": {
+          "sourceKey": "7e43b18b97418be0ea40b49bff8bb7adf6f2c5f25dbc6411b60a72ded8f7ec6e",
+          "groupOpenid": "C1_VALIDATION_GROUP_22",
+          "orderId": null
+        },
+        "requestId": "9652d6eb-4a35-4e95-a22d-4b72d7e10731:c1-session-fixed-022:1"
+      }
+    },
+    {
+      "id": "c1-session-fixed-023:1",
+      "caseId": "c1-session-fixed-023",
+      "turn": 1,
+      "family": null,
+      "stratum": "boundary",
+      "corpus": "online",
+      "scope": {
+        "shopId": "shop-demo-1",
+        "productId": "product-demo-1"
+      },
+      "expected": {
+        "outcome": "ready",
+        "knowledge": "evidence",
+        "gold": [
+          {
+            "sourceId": "KB-PRODUCT-LUNCH",
+            "quote": "菜品明细、过敏原和特殊节假日可用性未录入"
+          }
+        ]
+      },
+      "source": {
+        "planCaseIndex": 22,
+        "planTurnIndex": 0,
+        "rowIndex": 43,
+        "requestId": "9652d6eb-4a35-4e95-a22d-4b72d7e10731:c1-session-fixed-023:1",
+        "knowledgeCallIndex": 1
+      },
+      "status": "ready",
+      "builderInput": {
+        "action": {
+          "kind": "policy",
+          "question": "订单 COUPON-6001 的双人午餐团购券，现有商品资料有没有记录过敏原明细？",
+          "questionContext": {
+            "kind": "standalone"
+          },
+          "orderRef": {
+            "kind": "explicit",
+            "orderId": "COUPON-6001"
+          },
+          "protocol": "v2.2"
+        },
+        "originalQuery": "请核对订单 COUPON-6001 的双人午餐团购券：现有商品资料有没有记录过敏原明细？只问资料覆盖，不要求你列出成分。",
+        "order": {
+          "source": "demo-database",
+          "id": "COUPON-6001",
+          "status": "paid",
+          "asOf": "2026-10-05T00:00:00.000Z",
+          "amounts": {
+            "totalCents": 7980,
+            "paidCents": 7980,
+            "refundedCents": 0
+          },
+          "createdAt": "2026-10-05T00:00:00.000Z",
+          "paidAt": "2026-10-05T00:00:00.000Z",
+          "shop": {
+            "id": "shop-demo-1",
+            "name": "云味餐厅",
+            "merchantName": "演示商家",
+            "address": "演示地址"
+          },
+          "items": [
+            {
+              "productId": "product-demo-1",
+              "quantity": 1,
+              "unitPriceCents": 7980,
+              "totalCents": 7980,
+              "id": "COUPON-6001-item-0",
+              "productName": "双人午餐团购券"
+            }
+          ],
+          "coupons": [
+            {
+              "id": "COUPON-6001-coupon-0",
+              "orderItemId": "COUPON-6001-item-0",
+              "status": "unused",
+              "expiresAt": "2026-11-04T00:00:00.000Z",
+              "redeemedAt": null,
+              "redeemedShopId": null
+            }
+          ],
+          "payments": [
+            {
+              "status": "succeeded",
+              "amountCents": 7980,
+              "paidAt": "2026-10-05T00:00:00.000Z"
+            }
+          ],
+          "refunds": []
+        },
+        "binding": {
+          "sourceKey": "ef548655e4cbb63c7cc5c9c59667c370ba7f5fd4039fc40be0eca2a4c91c631a",
+          "groupOpenid": "C1_VALIDATION_GROUP_23",
+          "orderId": "COUPON-6001"
+        },
+        "requestId": "9652d6eb-4a35-4e95-a22d-4b72d7e10731:c1-session-fixed-023:1"
+      }
+    },
+    {
+      "id": "c1-session-fixed-024:1",
+      "caseId": "c1-session-fixed-024",
+      "turn": 1,
+      "family": null,
+      "stratum": "boundary",
+      "corpus": "reference",
+      "scope": {
+        "shopId": null,
+        "productId": null
+      },
+      "expected": {
+        "outcome": "ready",
+        "knowledge": "evidence",
+        "gold": [
+          {
+            "sourceId": "ET006",
+            "quote": "节假日期间购买的券有效期可能较短,请注意查看。"
+          }
+        ]
+      },
+      "source": {
+        "planCaseIndex": 23,
+        "planTurnIndex": 0,
+        "rowIndex": 44,
+        "requestId": "9652d6eb-4a35-4e95-a22d-4b72d7e10731:c1-session-fixed-024:1",
+        "knowledgeCallIndex": 0
+      },
+      "status": "ready",
+      "builderInput": {
+        "action": {
+          "kind": "policy",
+          "question": "只知道团购券是在节假日期间买的，能断定它的有效期一定比平常购买更短吗？",
+          "questionContext": {
+            "kind": "standalone"
+          },
+          "protocol": "v2.2"
+        },
+        "originalQuery": "只知道团购券是在节假日期间买的，能断定它的有效期一定比平常购买更短吗？",
+        "binding": {
+          "sourceKey": "a77a0a3d8d97cc3c97130e01c52067283bb4a3f953b25c6836298c48a8166020",
+          "groupOpenid": "C1_VALIDATION_GROUP_24",
+          "orderId": null
+        },
+        "requestId": "9652d6eb-4a35-4e95-a22d-4b72d7e10731:c1-session-fixed-024:1"
+      }
+    }
+  ]
+}

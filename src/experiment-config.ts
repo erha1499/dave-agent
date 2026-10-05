@@ -74,6 +74,8 @@ export const experimentFields: Record<"support" | "retrieval", Field[]> = {
       { value: "configured", label: "跟随已配置模型" }, { value: "deepseek-v4-pro", label: "DeepSeek V4 Pro" }], note: "仅 Controller + m4-support；Pro 只切换支持判别，业务 Agent 不变；要求当前 provider 为 DeepSeek" },
     { key: "knowledgeApplicability", label: "已声明必要前提", type: "select", options: [
       { value: "model_only", label: "模型判断" }, { value: "declared", label: "声明前提 + 模型判断" }], note: "declared 仅 Controller + m4-support；按版本化声明和本轮可信事实检查必要前提；通过不证明全部规则适用或获批，不新增模型调用；身份、范围与确认校验始终保留" },
+    { key: "knowledgeQueryMode", label: "排序查询", type: "select", options: [
+      { value: "combined", label: "完整事实共用" }, { value: "separated", label: "排序与判别分离" }], note: "默认 combined；separated 仅 Controller + m4-support，排序保留原问、可信前文和简短状态，判别仍使用完整事实；不新增模型阶段，不代表效果已提升" },
     { key: "knowledgeThreshold", label: "知识接收阈值", type: "number", min: 0, max: 1, step: .01, note: "仅 m4-support；默认冻结值 0.71，分数不是概率" },
     { key: "knowledgeTimeoutMs", label: "单次知识查询超时（ms）", type: "number", min: 1000, max: 60000, step: 1000, note: "包含读取、重排、支持判别和来源复检；无自动重试" },
   ],
@@ -112,6 +114,10 @@ export function experimentCatalog() {
       preset("support-knowledge-applicability-ab", "已声明必要前提 A/B", "support", [
         { id: "A", architecture: "controller", parameters: { knowledgeMode: "m4-support", knowledgeSupport: "typed", knowledgeSupportModel: "deepseek-v4-pro", knowledgeThreshold: .5, knowledgeApplicability: "model_only" } },
         { id: "B", architecture: "controller", parameters: { knowledgeMode: "m4-support", knowledgeSupport: "typed", knowledgeSupportModel: "deepseek-v4-pro", knowledgeThreshold: .5, knowledgeApplicability: "declared" } },
+      ]),
+      preset("support-knowledge-query-ab", "排序查询分离 A/B", "support", [
+        { id: "A", architecture: "controller", parameters: { knowledgeMode: "m4-support", knowledgeSupport: "typed", knowledgeSupportModel: "deepseek-v4-pro", knowledgeThreshold: .5, knowledgeApplicability: "declared", knowledgeTimeoutMs: 60000, knowledgeQueryMode: "combined" } },
+        { id: "B", architecture: "controller", parameters: { knowledgeMode: "m4-support", knowledgeSupport: "typed", knowledgeSupportModel: "deepseek-v4-pro", knowledgeThreshold: .5, knowledgeApplicability: "declared", knowledgeTimeoutMs: 60000, knowledgeQueryMode: "separated" } },
       ]),
       preset("retrieval-local", "本地检索 M0 / M1", "retrieval", [{ id: "A", modes: ["M0", "M1"] }]),
       preset("retrieval-rerank", "词项 / 全候选重排", "retrieval", [{ id: "A", modes: ["M0", "M4"] }]),

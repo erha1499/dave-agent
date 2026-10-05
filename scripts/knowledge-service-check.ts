@@ -21,6 +21,7 @@ const docs: RetrievalDocument[] = [
   { id: "D", title: "失效规则", body: "已失效。", tags: ["退款"], shopId: null, productId: null, status: "inactive" },
 ];
 const scope = { shopId: "shop-a", productId: "product-a" }, query = "未使用券可以退款吗？";
+let expectedRetrievalQuery = query, expectedEvidenceQuery = query;
 let rows = structuredClone(docs), reads = 0, reranks = 0, judges = 0, supports = true;
 let scores = [.9, .8], rerankError = false, rerankInvalid = false, supportInvalid = false;
 let onRerank = async () => {}, onSupport = async () => {};
@@ -30,7 +31,7 @@ const store = { async readKnowledgeDocuments(shopId?: string, productId?: string
 const rerank = createBailianClient({ timeoutMs: 1000, retries: 0, env: { DASHSCOPE_API_KEY: "fake-key-never-sent", DASHSCOPE_BASE_URL: "https://dashscope.aliyuncs.com" },
   fetch: async (_url, options) => {
     reranks++; await onRerank(); const body = JSON.parse(String(options?.body));
-    assert.equal(body.query, query); assert.equal(body.documents.length, 2);
+    assert.equal(body.query, expectedRetrievalQuery); assert.equal(body.documents.length, 2);
     assert.ok(!/gold|expectedBehavior|history|customerId/.test(JSON.stringify(body)));
     const parsed = body.documents.map((text: string) => JSON.parse(text));
     assert.deepEqual(parsed.map((doc: { title: string }) => doc.title), [docs[0]!.title, docs[1]!.title]);
@@ -41,7 +42,7 @@ const model = { provider: "deepseek", id: resolveEvidenceSupportModel().model, a
   cost: { input: .1, output: .2, cacheRead: .01, cacheWrite: 0 } };
 const support = await createEvidenceSupportClient({ timeoutMs: 1000, runtime: { model, complete: async (context, options): Promise<AssistantMessage> => {
   judges++; await onSupport(); assert.equal(options.maxRetries, 0); assert.deepEqual(context.tools, []);
-  const payload = JSON.parse(String(context.messages[0]!.content)); assert.equal(payload.query, query);
+  const payload = JSON.parse(String(context.messages[0]!.content)); assert.equal(payload.query, expectedEvidenceQuery);
   assert.ok(!/gold|expectedBehavior|history|customerId/.test(JSON.stringify(payload)));
   return { role: "assistant", api: "openai-completions", provider: model.provider, model: model.id, stopReason: "stop", timestamp: 0,
     content: [{ type: "text", text: JSON.stringify({ decisions: payload.documents.map((doc: { id: string; body: string }) => ({
@@ -382,4 +383,41 @@ assert.equal(modelOnly.trace.status, "accepted"); assert.equal(modelOnly.documen
 assert.deepEqual(modelOnly.trace.applicability, { mode: "model_only" }); assert.equal(modelOnly.trace.settings!.applicability, undefined);
 assert.equal(contentHash(modelOnly.trace.rawRanking), contentHash(declared.trace.rawRanking));
 assert.throws(() => createKnowledgeService(gateStore, { applicability: "declared" }));
-console.log("Knowledge service checks passed: compatible lexical/model_only, declared Top5 filtering/unknown/bindings, scope/source recheck, cancellation, timeout and honest usage.");
+
+// The actual provider requests must diverge only at ranking; fact verification
+// and its hash still bind the complete host evidence, including dates/counts.
+rows = structuredClone(docs); scores = [.9, .8]; supports = true;
+const compactQuery = "未使用券可以退款吗？\n已核实订单商品：午餐套餐。\n订单状态对应的规则条件：未核销退款。";
+const fullQuery = `${compactQuery}\n本单共1张，未核销1张、已核销0张。有效期截至2027-01-01。`;
+expectedEvidenceQuery = fullQuery;
+const queryRuns = [];
+for (const queryMode of ["combined", "separated"] as const) {
+  expectedRetrievalQuery = queryMode === "combined" ? fullQuery : compactQuery;
+  const before: { reads: number; reranks: number; judges: number } = { reads, reranks, judges };
+  const result = await createKnowledgeService(store, { ...options, queryMode }).search({
+    query: fullQuery, retrievalQuery: compactQuery, originalQuery: query, scope,
+  });
+  assert.equal(result.trace.status, "accepted");
+  assert.deepEqual(result.trace.queries, { version: "knowledge-query-plan-v1", mode: queryMode, retrieval: expectedRetrievalQuery, evidence: fullQuery });
+  assert.equal(result.trace.query, expectedRetrievalQuery);
+  assert.equal(result.trace.originalQuery, query);
+  assert.deepEqual({ reads: reads - before.reads, reranks: reranks - before.reranks, judges: judges - before.judges }, { reads: 2, reranks: 1, judges: 1 });
+  const candidates = docs.slice(0, 2).map((doc, index) => ({ ...doc, score: scores[index]!, rank: index + 1 }));
+  assert.equal(result.trace.supportVerification!.inputHash, evidenceSupportInputHash({ query: fullQuery, scope, settings: support.settings, candidates }));
+  assert.notEqual(result.trace.supportVerification!.inputHash, evidenceSupportInputHash({ query: compactQuery, scope, settings: support.settings, candidates }));
+  queryRuns.push(result);
+}
+assert.deepEqual(queryRuns[0]!.documents, queryRuns[1]!.documents);
+assert.notEqual(queryRuns[0]!.trace.calls[0]!.requestHash, queryRuns[1]!.trace.calls[0]!.requestHash);
+assert.equal(queryRuns[0]!.trace.supportVerification!.requestHash, queryRuns[1]!.trace.supportVerification!.requestHash);
+const splitService = createKnowledgeService(store, { ...options, queryMode: "separated" });
+const beforeInvalidQuery = { reads, reranks, judges };
+for (const retrievalQuery of [undefined, "", "  ", "x".repeat(501)]) {
+  const result = await splitService.search({ query: fullQuery, retrievalQuery, scope });
+  assert.equal(result.trace.status, "unavailable"); assert.equal(result.trace.reason, "invalid_input");
+  assert.deepEqual(result.trace.calls, []); assert.deepEqual(result.documents, []);
+}
+assert.deepEqual({ reads, reranks, judges }, beforeInvalidQuery, "Missing/invalid compact queries never silently fall back or call providers");
+assert.throws(() => createKnowledgeService(store, { queryMode: "separated" }));
+assert.throws(() => createKnowledgeService(store, { ...options, queryMode: "typo" as "combined" }));
+console.log("Knowledge service checks passed: ranking/evidence query separation, compatible lexical/model_only, declared Top5 filtering/unknown/bindings, scope/source recheck, cancellation, timeout and honest usage.");

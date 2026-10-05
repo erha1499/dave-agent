@@ -69,7 +69,7 @@ async function main() {
   const replyButtons = readQQReplyButtons();
   const store = new CouponStore(createPool(readDatabaseConfig()));
   const knowledge = architecture === "controller" ? createKnowledgeService(store, { mode: parameters.knowledgeMode,
-    applicability: parameters.knowledgeApplicability, supportProfile: parameters.knowledgeSupport, supportModel: parameters.knowledgeSupportModel, threshold: parameters.knowledgeThreshold, timeoutMs: parameters.knowledgeTimeoutMs }) : undefined;
+    applicability: parameters.knowledgeApplicability, queryMode: parameters.knowledgeQueryMode, supportProfile: parameters.knowledgeSupport, supportModel: parameters.knowledgeSupportModel, threshold: parameters.knowledgeThreshold, timeoutMs: parameters.knowledgeTimeoutMs }) : undefined;
   let afterSales: AfterSalesStore | undefined;
   let refunds: RefundStore | undefined;
   let stopMerchant: (() => Promise<void>) | undefined;

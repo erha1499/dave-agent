@@ -20,7 +20,7 @@ import type { RenderedReply } from "../src/reply.ts";
 import { checkSupportContract, supportCheckSpecs, type SupportExpectation, type SupportState } from "../src/support-evaluation.ts";
 import { createSupportSession, getSupportResult } from "../src/support-session.ts";
 import { resolveSupportRunParameters, type SupportExperimentParameters } from "../src/support-parameters.ts";
-import { createKnowledgeService } from "../src/knowledge-service.ts";
+import { createKnowledgeService, knowledgeQueryPlanVersion } from "../src/knowledge-service.ts";
 import { knowledgeProviderSpans } from "../src/knowledge-evaluation.ts";
 import type { SupportCall } from "../src/support-controller.ts";
 import { createMerchantFixture } from "./merchant-test-fixture.ts";
@@ -85,19 +85,30 @@ function skipped(round: Round): EvalTurn {
     checks: specs(round).map(spec => ({ ...spec, status: "skipped", reason: "前序依赖未通过，保留固定分母。" })) };
 }
 
-export function auditSupportKnowledgeCall(call: Pick<EvalSpan, "id" | "knowledge" | "output" | "usage">,
-  parameters: Pick<SupportExperimentParameters, "knowledgeMode" | "knowledgeSupport" | "knowledgeSupportModel" | "knowledgeApplicability">,
+export function auditSupportKnowledgeCall(call: Pick<EvalSpan, "id" | "input" | "knowledge" | "output" | "usage">,
+  parameters: Pick<SupportExperimentParameters, "knowledgeMode" | "knowledgeSupport" | "knowledgeSupportModel" | "knowledgeApplicability" | "knowledgeQueryMode">,
   expectedDatabaseError = false) {
-  const trace = call.knowledge?.trace;
+  const trace = call.knowledge?.trace, context = call.knowledge?.context, queries = trace?.queries;
+  const input = call.input && typeof call.input === "object" && !Array.isArray(call.input) ? call.input as Record<string, unknown> : undefined;
+  const queryPlan = typeof queries?.evidence === "string" && queries.evidence.trim().length > 0
+    && typeof queries.retrieval === "string" && queries.retrieval.trim().length > 0
+    && queries.version === knowledgeQueryPlanVersion && queries.mode === parameters.knowledgeQueryMode
+    && queries.evidence === context?.effectiveQuery && queries.retrieval === (parameters.knowledgeQueryMode === "separated" ? context?.retrievalQuery : context?.effectiveQuery)
+    && trace?.query === queries.retrieval && trace.originalQuery === context?.originalQuery
+    && input?.query === context?.effectiveQuery && input?.retrievalQuery === (context?.retrievalQuery ?? context?.effectiveQuery)
+    ? "complete" : "incomplete";
   const applicability = expectedDatabaseError ? "not_evaluated" : parameters.knowledgeApplicability !== "declared" ? "not_enabled"
     : trace?.applicability?.gate?.integrity === true ? "complete" : "incomplete";
-  const passed = trace?.mode === parameters.knowledgeMode && trace.applicability?.mode === parameters.knowledgeApplicability
+  const passed = queryPlan === "complete" && trace?.mode === parameters.knowledgeMode && trace.applicability?.mode === parameters.knowledgeApplicability
     && trace.supportProfile === parameters.knowledgeSupport && trace.supportModel === parameters.knowledgeSupportModel && Array.isArray(call.output)
     && (expectedDatabaseError ? trace.status === "unavailable" && trace.reason === "database_unavailable" && call.output.length === 0
         && trace.calls.length === 0
       : trace.status !== "unavailable" && applicability !== "incomplete" && trace.calls.every(provider => provider.status === "ok"))
     && !call.usage;
-  return { spanId: call.id, kind: expectedDatabaseError ? "expected_database_error" : "knowledge_query", applicability, passed };
+  // A plan fingerprint distinguishes inputs/configuration; it is not a substitute
+  // for the corpus-backed provider-request proofs in the semantic evidence audit.
+  return { spanId: call.id, kind: expectedDatabaseError ? "expected_database_error" : "knowledge_query", applicability,
+    queryPlan, queryPlanHash: queries ? hash(queries) : null, passed };
 }
 
 // Explicit call only. Importing this module performs no model call, DB connection, or fixture mutation.
@@ -167,7 +178,7 @@ export async function runSupportV2Live({ architecture, label, batch, parameters,
   const sales = architecture === "atomic" ? traced(merchant, { prepare: "prepare_merchant_request", getTask: "get_merchant_request" }, "business-service") : merchant;
   const refundTools = architecture === "atomic" ? traced(refunds, { prepare: "prepare_refund", get: "get_refund" }, "business-service") : refunds;
   const refundHost = traced(refunds, { confirm: "confirm_refund", markPresented: "mark_presented" }, "confirmation-service");
-  const knowledge = createKnowledgeService(fixtureStore, { mode: resolved.knowledgeMode, applicability: resolved.knowledgeApplicability, supportProfile: resolved.knowledgeSupport, supportModel: resolved.knowledgeSupportModel, threshold: resolved.knowledgeThreshold, timeoutMs: resolved.knowledgeTimeoutMs });
+  const knowledge = createKnowledgeService(fixtureStore, { mode: resolved.knowledgeMode, applicability: resolved.knowledgeApplicability, queryMode: resolved.knowledgeQueryMode, supportProfile: resolved.knowledgeSupport, supportModel: resolved.knowledgeSupportModel, threshold: resolved.knowledgeThreshold, timeoutMs: resolved.knowledgeTimeoutMs });
   function onControllerCall(call: SupportCall) {
     if (!current || call.parentSpanId !== current.id) return;
     const span: EvalSpan = { id: call.id, parentSpanId: current.id, actor: "host", trigger: current.trigger,
@@ -396,7 +407,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     const { plan } = await checkSupportLiveDataset();
     console.log(`v2真实入口就绪：${plan.cases.length}案例/${plan.cases.reduce((sum, item) => sum + item.turns.length, 0)}轮；未连接数据库或调用模型。需显式 --live --architecture atomic|controller --repeat 3。`);
   } else {
-    const flags = ["--architecture", "--repeat", "--label", "--dataset", "--knowledge-mode", "--knowledge-support", "--knowledge-support-model", "--applicability", "--knowledge-threshold", "--knowledge-timeout-ms"];
+    const flags = ["--architecture", "--repeat", "--label", "--dataset", "--knowledge-mode", "--knowledge-support", "--knowledge-support-model", "--applicability", "--query-mode", "--knowledge-threshold", "--knowledge-timeout-ms"];
     assert.ok(args.every((arg, index) => arg === "--live" || flags.includes(arg) || flags.includes(args[index - 1] ?? "")), "未知参数");
     const value = (name: string) => args[args.indexOf(name) + 1];
     const architecture = value("--architecture"); assert.ok(architecture === "atomic" || architecture === "controller", "必须明确选择architecture");
@@ -407,6 +418,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
       ...(args.includes("--knowledge-mode") ? { knowledgeMode: value("--knowledge-mode") as SupportExperimentParameters["knowledgeMode"] } : {}),
       ...(args.includes("--knowledge-support") ? { knowledgeSupport: value("--knowledge-support") as SupportExperimentParameters["knowledgeSupport"] } : {}),
       ...(args.includes("--applicability") ? { knowledgeApplicability: value("--applicability") as SupportExperimentParameters["knowledgeApplicability"] } : {}),
+      ...(args.includes("--query-mode") ? { knowledgeQueryMode: value("--query-mode") as SupportExperimentParameters["knowledgeQueryMode"] } : {}),
       ...(args.includes("--knowledge-support-model") ? { knowledgeSupportModel: value("--knowledge-support-model") as SupportExperimentParameters["knowledgeSupportModel"] } : {}),
       ...(args.includes("--knowledge-threshold") ? { knowledgeThreshold: Number(value("--knowledge-threshold")) } : {}),
       ...(args.includes("--knowledge-timeout-ms") ? { knowledgeTimeoutMs: Number(value("--knowledge-timeout-ms")) } : {}),

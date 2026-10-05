@@ -152,6 +152,7 @@ export async function loadC1ValidationExecution(planPath: string, manifestPath: 
   assert.deepEqual(configuration.dependencySnapshot, await readC1ValidationDependencies(), "Actual runtime dependencies differ from frozen candidate");
   assert.deepEqual(configuration.limits, c1ValidationLimits);
   assert.deepEqual(resolveSupportRunParameters("controller", parameters), parameters, "Freeze resolved parameters, not implicit defaults");
+  assert.ok(parameters.knowledgeQueryMode === "combined" || parameters.knowledgeQueryMode === "separated", "Freeze the query mode explicitly for this candidate");
   assert.equal(parameters.timeoutMs, c1ValidationLimits.turnTimeoutMs); assert.equal(parameters.knowledgeMode, "m4-support");
   assert.equal(configuration.providerRetries, 0); assert.equal(configuration.sessionAutomaticRetries, 2);
   assert.equal(configuration.rerank.retries, 0); assert.equal(configuration.rerank.timeoutMs, parameters.knowledgeTimeoutMs);
@@ -244,7 +245,7 @@ export async function runC1SessionValidation(planPath: string, manifestPath: str
     answerReviewInputs: reviewInputs(plan, rows), reviews: [] as C1AnswerReview[], runIntegrityPassed: false, admitted: false };
   const save = () => writeFile(path, `${JSON.stringify(artifact, null, 2)}\n`);
   const knowledgeConfiguration = { applicability: p.knowledgeApplicability, applicabilitySnapshot: setup.applicabilitySnapshot,
-    evidenceBindingVersion: config.evidenceBindingVersion };
+    evidenceBindingVersion: config.evidenceBindingVersion, queryMode: p.knowledgeQueryMode };
   await save();
   let restoreStream: (() => void) | undefined;
   try {
@@ -288,7 +289,7 @@ export async function runC1SessionValidation(planPath: string, manifestPath: str
       try {
         const knowledge = createKnowledgeService({ readKnowledgeDocuments: async () => structuredClone(setup.corpora[item.corpus]) },
           { mode: p.knowledgeMode, threshold: p.knowledgeThreshold, timeoutMs: p.knowledgeTimeoutMs, supportProfile: p.knowledgeSupport,
-            supportModel: p.knowledgeSupportModel, applicability: p.knowledgeApplicability, applicabilitySnapshot: setup.applicabilitySnapshot, clients: { rerank, support } });
+            supportModel: p.knowledgeSupportModel, queryMode: p.knowledgeQueryMode, applicability: p.knowledgeApplicability, applicabilitySnapshot: setup.applicabilitySnapshot, clients: { rerank, support } });
         session = await createSupportSession(fixture.actor, controlled.store, modelRuntime, model, undefined,
           { groupOpenid: fixture.groupOpenid, repairBudget: p.repairBudget, knowledge });
         let priorPassed = true;

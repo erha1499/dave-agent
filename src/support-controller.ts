@@ -26,7 +26,7 @@ export type SupportCall = {
   knowledge?: { context: SupportKnowledgeContext; trace: KnowledgeTrace };
 };
 export type SupportKnowledgeContext = {
-  originalQuery: string; modelQuestion: string | null; effectiveQuery: string;
+  originalQuery: string; modelQuestion: string | null; effectiveQuery: string; retrievalQuery?: string;
   purpose: "user_policy" | "refund_eligibility" | "business_prerequisite" | "current_order";
   orderSource: "current_explicit" | "verified_focus" | "verified_alternative" | "none";
   scopeSource: "fresh_order" | "global";
@@ -323,10 +323,13 @@ export class SupportController {
     };
     const getRules = async (knowledgeContext: SupportKnowledgeContext, order?: Order) => {
       const query = knowledgeContext.effectiveQuery;
+      // A service may select the compact candidate by query mode. The legacy
+      // store-only path still ranks the full query and records that actual input.
+      const retrievalQuery = this.services.knowledge ? knowledgeContext.retrievalQuery ?? query : query;
       const scope = { shopId: order?.shop.id ?? null, productId: order?.items[0]?.productId ?? null };
-      const documents = await call("search_faq", { query, shopId: scope.shopId ?? undefined, productId: scope.productId ?? undefined }, async step => {
+      const documents = await call("search_faq", { query, retrievalQuery, shopId: scope.shopId ?? undefined, productId: scope.productId ?? undefined }, async step => {
         const started = performance.now();
-        const response = this.services.knowledge ? await this.services.knowledge.search({ query, originalQuery: context.userText, scope,
+        const response = this.services.knowledge ? await this.services.knowledge.search({ query, retrievalQuery, originalQuery: context.userText, scope,
           applicabilityContext: knowledgeContext.applicability ?? null, signal: context.signal }) : undefined;
         const docs = response?.documents ?? await this.services.store.searchKnowledge(query, scope.shopId ?? undefined, scope.productId ?? undefined);
         const trace: KnowledgeTrace = response?.trace ?? {

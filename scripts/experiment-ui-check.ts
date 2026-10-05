@@ -76,7 +76,7 @@ const counts = (planned: number, passed: number, failed: number, skipped: number
   ({ planned, passed, failed, skipped, missing, passRate: planned ? passed / planned : null });
 const supportParams = (over: Record<string, unknown> = {}): any => ({
   timeoutMs: 60000, repairBudget: 1, merchantEvents: "architecture",
-  knowledgeMode: "lexical", knowledgeSupport: "binary", knowledgeSupportModel: "configured", knowledgeApplicability: "model_only",
+  knowledgeMode: "lexical", knowledgeSupport: "binary", knowledgeSupportModel: "configured", knowledgeApplicability: "model_only", knowledgeQueryMode: "combined",
   knowledgeThreshold: 0.71, knowledgeTimeoutMs: 15000, ...over,
 });
 const retrievalParams = (over: Record<string, unknown> = {}): any => ({
@@ -100,7 +100,7 @@ const catalog = (): any => ({
       { id: "A", architecture: "controller", parameters: supportParams({ knowledgeMode: "m4-support", knowledgeSupport: "typed", knowledgeSupportModel: "configured", knowledgeThreshold: 0.5 }) },
       { id: "B", architecture: "controller", parameters: supportParams({ knowledgeMode: "m4-support", knowledgeSupport: "typed", knowledgeSupportModel: "deepseek-v4-pro", knowledgeThreshold: 0.5 }) }] } },
     { id: "support-knowledge-applicability-ab", name: "规则适用条件 A/B", config: { version: 1, kind: "support", label: "规则适用条件 A/B", repeat: 1, allowRemote: false, variants: [
-      { id: "A", architecture: "controller", parameters: supportParams({ knowledgeMode: "m4-support", knowledgeSupport: "typed", knowledgeSupportModel: "deepseek-v4-pro", knowledgeApplicability: "model_only", knowledgeThreshold: 0.5 }) },
+      { id: "A", architecture: "controller", parameters: supportParams({ knowledgeMode: "m4-support", knowledgeSupport: "typed", knowledgeSupportModel: "deepseek-v4-pro", knowledgeApplicability: "model_only", knowledgeQueryMode: "combined", knowledgeThreshold: 0.5 }) },
       { id: "B", architecture: "controller", parameters: supportParams({ knowledgeMode: "m4-support", knowledgeSupport: "typed", knowledgeSupportModel: "deepseek-v4-pro", knowledgeApplicability: "declared", knowledgeThreshold: 0.5 }) }] } },
     { id: "retrieval-local", name: "本地检索 M0 / M1", config: { version: 1, kind: "retrieval", label: "本地检索 M0 / M1", repeat: 1, allowRemote: false, variants: [
       { id: "A", modes: ["M0", "M1"], parameters: retrievalParams() } ] } },

@@ -16,7 +16,7 @@ import type { SupportCall } from "../src/support-controller.ts";
 import { readKnowledgeParameters, resolveSupportParameters, resolveSupportRunParameters, type SupportExperimentParameters } from "../src/support-parameters.ts";
 import { runSupportV2Live } from "./support-v2-live.ts";
 
-const knowledgeDefaults = { knowledgeMode: "lexical", knowledgeSupport: "binary", knowledgeSupportModel: "configured", knowledgeApplicability: "model_only", knowledgeThreshold: .71, knowledgeTimeoutMs: 15_000 };
+const knowledgeDefaults = { knowledgeMode: "lexical", knowledgeSupport: "binary", knowledgeSupportModel: "configured", knowledgeApplicability: "model_only", knowledgeQueryMode: "combined", knowledgeThreshold: .71, knowledgeTimeoutMs: 15_000 };
 assert.deepEqual(resolveSupportParameters(), { timeoutMs: 60_000, repairBudget: 1, merchantEvents: "architecture", ...knowledgeDefaults });
 assert.deepEqual(resolveSupportParameters({ timeoutMs: 10_000, repairBudget: 0, merchantEvents: "host" }),
   { timeoutMs: 10_000, repairBudget: 0, merchantEvents: "host", ...knowledgeDefaults });
@@ -28,7 +28,7 @@ assert.deepEqual(resolveSupportRunParameters("atomic", { merchantEvents: "host",
   { timeoutMs: 60_000, repairBudget: null, merchantEvents: "host", ...knowledgeDefaults });
 assert.deepEqual(readKnowledgeParameters({}), knowledgeDefaults);
 assert.deepEqual(readKnowledgeParameters({ KNOWLEDGE_MODE: "m4-support", KNOWLEDGE_THRESHOLD: "0.8", KNOWLEDGE_TIMEOUT_MS: "12000" }),
-  { knowledgeMode: "m4-support", knowledgeSupport: "binary", knowledgeSupportModel: "configured", knowledgeApplicability: "model_only", knowledgeThreshold: .8, knowledgeTimeoutMs: 12_000 });
+  { knowledgeMode: "m4-support", knowledgeSupport: "binary", knowledgeSupportModel: "configured", knowledgeApplicability: "model_only", knowledgeQueryMode: "combined", knowledgeThreshold: .8, knowledgeTimeoutMs: 12_000 });
 assert.equal(readKnowledgeParameters({ KNOWLEDGE_MODE: "m4-support", KNOWLEDGE_SUPPORT: "typed" }).knowledgeSupport, "typed");
 for (const env of [{ KNOWLEDGE_MODE: "typo" }, { KNOWLEDGE_THRESHOLD: "NaN" }, { KNOWLEDGE_THRESHOLD: "1.01" },
   { KNOWLEDGE_THRESHOLD: "0x1" }, { KNOWLEDGE_TIMEOUT_MS: "0" }, { KNOWLEDGE_TIMEOUT_MS: "1.1" }, { KNOWLEDGE_TIMEOUT_MS: "60001" },

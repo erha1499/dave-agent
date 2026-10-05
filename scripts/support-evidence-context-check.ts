@@ -31,7 +31,9 @@ const knowledge: KnowledgeService = { async search(input) {
   calls.push("search_faq"); observed.push(structuredClone(input));
   const gate = gateKnowledgeApplicability({ snapshot, context: input.applicabilityContext ?? null, scope: input.scope, candidates });
   const documents = gate.candidates.map(doc => ({ source: "demo-knowledge" as const, sourceId: doc.id, title: doc.title, body: doc.body, scope: { shopId: null, productId: null } }));
-  const trace: KnowledgeTrace = { mode: "lexical", threshold: null, query: input.query, originalQuery: input.originalQuery ?? input.query, scope: input.scope,
+  // The injected service selects the compact candidate; Controller must preserve
+  // its actual ranking query independently of the full evidence query/span input.
+  const trace: KnowledgeTrace = { mode: "lexical", threshold: null, query: input.retrievalQuery ?? input.query, originalQuery: input.originalQuery ?? input.query, scope: input.scope,
     status: documents.length ? "accepted" : "rejected", reason: null, rawRanking: candidates.map(doc => ({ id: doc.id, score: doc.score })),
     acceptance: null, sources: [], sourceHashes: { before: null, after: null }, durationMs: 0, calls: [],
     usage: { rerankTokens: 0, supportTokens: 0, estimatedCny: 0, estimatedUsd: 0, incompleteCalls: 0 },
@@ -56,6 +58,12 @@ for (const kind of ["policy", "refund_eligibility"] as const) {
   assert.ok(binding.effectiveQuery.startsWith("该订单 现在还符合哪些处理条件？"));
   assert.ok(binding.effectiveQuery.includes("已过期0张") && binding.effectiveQuery.includes("日期已过期1张"));
   assert.ok(!binding.effectiveQuery.includes("无关问题"));
+  assert.equal(binding.retrievalQuery, "该订单 现在还符合哪些处理条件？\n已核实订单商品：测试套餐。\n订单状态对应的规则条件：过期退款。");
+  assert.equal(observed.at(-1)!.query, binding.effectiveQuery); assert.equal(observed.at(-1)!.retrievalQuery, binding.retrievalQuery);
+  assert.equal(observed.at(-1)!.originalQuery, question);
+  const span = result.evidence.actualCalls.find(call => call.name === "search_faq")!;
+  assert.equal(span.input.query, binding.effectiveQuery); assert.equal(span.input.retrievalQuery, binding.retrievalQuery);
+  assert.equal(span.knowledge!.trace.query, binding.retrievalQuery, "Controller must not relabel the service's actual ranking query as the full query");
 }
 assert.deepEqual(current[0], current[1], "Near-synonym action kinds share query, facts, purpose and gate binding");
 assert.deepEqual(calls, ["get_order", "search_faq", "get_order", "search_faq"]);
@@ -67,6 +75,8 @@ assert.equal(explanation.evidenceUse, "explanation"); assert.equal(observed.at(-
 assert.deepEqual(explanation.facts, current[0]!.facts, "Rule-only keeps actual fresh facts in the audit without using them as hypothetical conditions");
 assert.ok(explanation.effectiveQuery.includes(basis) && explanation.effectiveQuery.includes("不证明当前订单已满足"));
 assert.ok(!explanation.effectiveQuery.includes("已核实本单券数"), "Actual coupon state must not overwrite an explicit hypothetical");
+assert.equal(explanation.retrievalQuery, explanation.effectiveQuery, "Hypothetical ranking keeps its basis and explanation boundary, without current lifecycle facts");
+assert.ok(!explanation.retrievalQuery!.includes("过期退款"));
 assert.ok(explained.evidence.rules.some(doc => doc.sourceId === "USED"));
 assert.deepEqual(explained.evidence.actualCalls.map(call => call.name), ["get_order", "search_faq"]);
 
@@ -75,6 +85,7 @@ const follow = action("policy", { orderRef: { kind: "focus" }, questionContext: 
 const followed = await controller.createTurn(context(followQuestion, { focusOrderId: orderId, policyTopic: topic })).execute(follow);
 assert.equal(followed.evidence.knowledge[0]!.context.evidenceTarget!.basisSource, "previous_policy_topic");
 assert.equal(followed.evidence.knowledge[0]!.context.evidenceTarget!.basisRequestId, topic.requestId);
+assert.ok(followed.evidence.knowledge[0]!.context.retrievalQuery!.includes(hypothetical.replaceAll(orderId, "该订单")));
 for (const changed of [{ ...topic, sourceKey: "other-owner" }, { ...topic, groupOpenid: "other-group" },
   { ...topic, orderId: "COUPON-2302" }, { ...topic, requestId: "unknown-request" }, { ...topic, sources: [] }]) {
   const before = calls.length;
@@ -93,6 +104,7 @@ const prepared = await controller.createTurn(context(`${orderId} 请准备退款
 const prerequisite = prepared.evidence.knowledge[0]!.context;
 assert.equal(prerequisite.evidenceUse, "current_order"); assert.equal(prerequisite.purpose, "business_prerequisite");
 assert.equal(prerequisite.applicability!.requestId, prepared.evidence.requestId);
+assert.equal(prerequisite.retrievalQuery, "过期退款\n已核实订单商品：测试套餐。", "Write prerequisites retain the fixed business-policy query instead of user commands");
 assert.deepEqual(prepared.evidence.actualCalls.map(call => call.name), ["get_order", "search_faq"]);
 assert.equal(prepared.outcome, "blocked", "Absent business approval/services are not supplied by explanation evidence");
 
@@ -123,6 +135,8 @@ const beforeQuery = dateBefore.evidence.knowledge[0]!.context.effectiveQuery, af
 assert.notEqual(beforeQuery, afterQuery, "Swapping expiry between unused/redeemed coupons must change the question's fresh facts");
 assert.match(beforeQuery, /未核销券：日期已过期1张、未到期0张/);
 assert.match(afterQuery, /未核销券：日期已过期0张、未到期1张/);
+assert.equal(dateBefore.evidence.knowledge[0]!.context.retrievalQuery, dateAfter.evidence.knowledge[0]!.context.retrievalQuery,
+  "Ranking excludes date/count detail while verification still distinguishes which coupon expired");
 const priorQuestion = `${orderId} 我想先弄清楚这笔订单的券各自有什么使用日期限制，尤其是未核销与已核销的券如何区分；这里仅咨询规则，不要求立即退款。`;
 const prior = await controller.createTurn(context(priorQuestion)).execute(action("policy"));
 assert.equal(prior.outcome, "ready");
@@ -134,12 +148,35 @@ assert.equal(longFollow.outcome, "ready", "A standard previous question plus mix
 const longQuery = longFollow.evidence.knowledge[0]!.context.effectiveQuery;
 assert.ok(longQuery.length <= 500);
 assert.ok(longQuery.includes(longerFollowup) && longQuery.includes(priorQuestion.replaceAll(orderId, "该订单")), "Neither question is truncated to fit fresh facts");
+const longRetrieval = longFollow.evidence.knowledge[0]!.context.retrievalQuery!;
+assert.ok(longRetrieval.includes(longerFollowup) && longRetrieval.includes(priorQuestion.replaceAll(orderId, "该订单")), "Compact query preserves both actual questions");
+assert.ok(!longRetrieval.includes("已核实本单券数") && !longRetrieval.includes("有效期事实"));
+
+const alternativeOrder = structuredClone(order); alternativeOrder.id = "COUPON-2302";
+const alternative = buildSupportEvidenceBinding({ action: { protocol: "v2.2", kind: "refund_eligibility", question: "模型改写不能替代原问",
+  questionContext: { kind: "previous", requestId: topic.requestId }, orderRef: { kind: "alternative" } },
+  originalQuery: "那另一张还能申请退款吗？", order: alternativeOrder, requestId: "alternative-request",
+  verifiedTopic: { ...topic, intent: "refund_eligibility", originalQuery: `${orderId} 已退款了，是否可以再次申请？` },
+  binding: { sourceKey, groupOpenid, orderId: alternativeOrder.id } });
+assert.ok(alternative.retrievalQuery.startsWith("那另一张还能申请退款吗？\n本轮继续咨询新选定订单的退款申请资格与条件。"));
+assert.ok(alternative.retrievalQuery.includes("过期退款") && !alternative.retrievalQuery.includes("已退款了"), "Cross-order ranking carries intent plus new facts, never old order state");
 
 const global = buildSupportEvidenceBinding({ action: { protocol: "v2.2", kind: "policy", question: "一般条件", questionContext: { kind: "standalone" } },
   originalQuery: "一般条件如何规定？", binding: { sourceKey, groupOpenid, orderId: null }, requestId: "global" });
 assert.equal(global.evidenceUse, "explanation"); assert.equal(global.facts, null); assert.equal(global.applicability, undefined);
+assert.equal(global.retrievalQuery, global.effectiveQuery);
 fresh = structuredClone(order);
 const legacy = await controller.createTurn(context(question)).execute({ kind: "policy", question: "旧协议", orderRef: { kind: "explicit", orderId } });
 assert.equal(legacy.evidence.knowledge[0]!.context.evidenceBindingVersion, undefined);
 assert.equal(legacy.evidence.knowledge[0]!.context.effectiveQuery, "该订单 现在还符合哪些处理条件？\n已核实订单商品：测试套餐。", "Historical replay query is unchanged");
-console.log("Support evidence binding checks passed: paired actions, fresh status/date split, explicit hypothetical, previous provenance, repair and prepare isolation; 0 API.");
+assert.equal(legacy.evidence.knowledge[0]!.context.retrievalQuery, undefined, "Historical binding has no newly inferred compact query");
+assert.equal(observed.at(-1)!.retrievalQuery, observed.at(-1)!.query);
+let storeQuery: string | undefined;
+const fallback = new SupportController({ store: { async getOrder() { return structuredClone(order); }, async searchKnowledge(query) { storeQuery = query; return []; } } });
+const fallbackResult = await fallback.createTurn(context(question)).execute(action("policy"));
+const fallbackSpan = fallbackResult.evidence.actualCalls.find(call => call.name === "search_faq")!;
+assert.equal(storeQuery, fallbackSpan.knowledge!.context.effectiveQuery);
+assert.equal(fallbackSpan.input.query, storeQuery); assert.equal(fallbackSpan.input.retrievalQuery, storeQuery);
+assert.equal(fallbackSpan.knowledge!.trace.query, storeQuery, "Store-only legacy lexical mode records its actual full ranking input");
+assert.notEqual(fallbackSpan.knowledge!.context.retrievalQuery, storeQuery, "Audit can retain the compact candidate without claiming it was executed");
+console.log("Support evidence binding checks passed: paired actions, separate ranking/evidence queries, fresh status/date split, hypothetical/previous/alternative provenance and legacy fallback; 0 API.");

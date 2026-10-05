@@ -101,7 +101,11 @@ export function buildSupportEvidenceBinding(input: TargetInput & { order?: Order
   }
   if (prerequisite) query = orderRefundState(order!);
   if (order) query += `\n已核实订单商品：${order.items[0]!.productName}。`;
+  // Ranking gets the same trusted question/object with a short lifecycle hint;
+  // support verification retains all fresh counts and status-bound dates below.
+  let retrievalQuery = query;
   if (target.kind === "current_order") {
+    if (!prerequisite) retrievalQuery += `\n订单状态对应的规则条件：${facts!.refundState}。`;
     const counts = facts!.couponCounts, dates = facts!.couponDates;
     const dateGroups = (["unused", "redeemed", "expired", "refunded"] as const).flatMap((status, index) => {
       const rows = dates.filter(row => row.status === status);
@@ -112,8 +116,9 @@ export function buildSupportEvidenceBinding(input: TargetInput & { order?: Order
       + `\n有效期事实（截至${facts!.asOf}）：${dateGroups.join("；")}。`;
   } else {
     query += `\n仅解释所问规则条件${target.basis ? `（原文依据：${target.basis}）` : ""}，不证明当前订单已满足，也不构成退款批准。`;
+    retrievalQuery = query;
   }
-  if (order) query = query.replaceAll(`订单 ${order.id}`, "该订单").replaceAll(`订单${order.id}`, "该订单").replaceAll(order.id, "该订单");
+  const normalizeLocator = (text: string) => order ? text.replaceAll(`订单 ${order.id}`, "该订单").replaceAll(`订单${order.id}`, "该订单").replaceAll(order.id, "该订单") : text;
   return { evidenceBindingVersion, evidenceTarget: target, evidenceUse: target.kind === "current_order" ? "current_order" as const : "explanation" as const,
-    purpose, facts, ...(applicability ? { applicability } : {}), effectiveQuery: query };
+    purpose, facts, ...(applicability ? { applicability } : {}), effectiveQuery: normalizeLocator(query), retrievalQuery: normalizeLocator(retrievalQuery) };
 }

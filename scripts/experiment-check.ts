@@ -7,10 +7,10 @@ import { promisify } from "node:util";
 import { readKnowledgeParameters, resolveSupportRunParameters } from "../src/support-parameters.ts";
 import { experimentCatalog, resolveExperimentConfig, remoteRequired, requireExperimentExecution, ExperimentInputError } from "../src/experiment-config.ts";
 import { parseExperimentArgs } from "./experiment.ts";
-import { auditSupportKnowledgeCall } from "./support-v2-live.ts";
-import type { KnowledgeTrace } from "../src/knowledge-service.ts";
+import { auditSupportKnowledgeCall, type runSupportV2Live } from "./support-v2-live.ts";
+import { knowledgeQueryPlanVersion, type KnowledgeTrace } from "../src/knowledge-service.ts";
 import { createEvaluationServer } from "../src/eval-server.ts";
-import { ExperimentBusyError, type ExperimentJob } from "../src/experiment-jobs.ts";
+import { executeExperiment, ExperimentBusyError, type ExperimentJob } from "../src/experiment-jobs.ts";
 
 const catalog = experimentCatalog(), local = catalog.presets.find(p => p.id === "retrieval-local")!.config;
 assert.equal(local.kind, "retrieval");
@@ -30,7 +30,7 @@ assert.ok(knowledgeAB.variants.every(variant => variant.parameters.knowledgeThre
 assert.deepEqual(resolveExperimentConfig(JSON.parse(await readFile("configs/experiments/support-knowledge-ab.json", "utf8"))), knowledgeAB);
 assert.throws(() => requireExperimentExecution(knowledgeAB));
 assert.throws(() => resolveExperimentConfig({ ...support, variants: [{ id: "A", architecture: "atomic", parameters: { knowledgeMode: "m4-support" } }] }));
-for (const key of ["knowledgeMode", "knowledgeSupport", "knowledgeSupportModel", "knowledgeApplicability", "knowledgeThreshold", "knowledgeTimeoutMs"]) assert.ok(catalog.fields.support.some(field => field.key === key));
+for (const key of ["knowledgeMode", "knowledgeSupport", "knowledgeSupportModel", "knowledgeApplicability", "knowledgeQueryMode", "knowledgeThreshold", "knowledgeTimeoutMs"]) assert.ok(catalog.fields.support.some(field => field.key === key));
 const profileAB = catalog.presets.find(preset => preset.id === "support-knowledge-profile-ab")!.config;
 assert.equal(profileAB.kind, "support");
 if (profileAB.kind !== "support") throw new Error("profile preset kind");
@@ -52,13 +52,40 @@ if (applicabilityAB.kind !== "support") throw new Error("applicability preset ki
 assert.deepEqual(applicabilityAB.variants.map(v => v.parameters.knowledgeApplicability), ["model_only", "declared"]);
 assert.deepEqual(resolveExperimentConfig(JSON.parse(await readFile("configs/experiments/support-knowledge-applicability-ab.json", "utf8"))), applicabilityAB);
 const declaredParameters = applicabilityAB.variants[1]!.parameters;
+const queryAB = catalog.presets.find(preset => preset.id === "support-knowledge-query-ab")!.config;
+if (queryAB.kind !== "support") throw new Error("query preset kind");
+assert.deepEqual(queryAB.variants.map(v => v.parameters.knowledgeQueryMode), ["combined", "separated"]);
+assert.deepEqual(queryAB.variants.map(v => ({ ...v.parameters, knowledgeQueryMode: "same" }))[0],
+  queryAB.variants.map(v => ({ ...v.parameters, knowledgeQueryMode: "same" }))[1], "query A/B changes one parameter only");
+assert.ok(queryAB.variants.every(v => v.architecture === "controller" && v.parameters.knowledgeMode === "m4-support"
+  && v.parameters.knowledgeSupport === "typed" && v.parameters.knowledgeSupportModel === "deepseek-v4-pro"
+  && v.parameters.knowledgeThreshold === .5 && v.parameters.knowledgeApplicability === "declared"));
+assert.equal(queryAB.allowRemote, false); assert.throws(() => requireExperimentExecution(queryAB));
+assert.equal(readKnowledgeParameters({}).knowledgeQueryMode, "combined");
+assert.equal(readKnowledgeParameters({ KNOWLEDGE_MODE: "m4-support", KNOWLEDGE_QUERY_MODE: "separated" }).knowledgeQueryMode, "separated");
+for (const KNOWLEDGE_QUERY_MODE of ["typo", "0", "SEPARATED"]) assert.throws(() => readKnowledgeParameters({ KNOWLEDGE_MODE: "m4-support", KNOWLEDGE_QUERY_MODE }), /knowledgeQueryMode/);
+assert.throws(() => readKnowledgeParameters({ KNOWLEDGE_QUERY_MODE: "separated" }), /仅适用于/);
+for (const parameters of [{ knowledgeQueryMode: "separated" }, { knowledgeMode: "m4-support", knowledgeQueryMode: "typo" },
+  { knowledgeMode: "m4-support", knowledgeQueryMode: null }, { knowledgeMode: "m4-support", knowledgeQueryMode: undefined }]) {
+  assert.throws(() => resolveExperimentConfig({ ...support, variants: [{ id: "A", architecture: "controller", parameters }] }));
+}
+assert.throws(() => resolveSupportRunParameters("atomic", { knowledgeMode: "m4-support", knowledgeQueryMode: "separated" }), /atomic/);
+for (const variant of queryAB.variants) {
+  let actual: Parameters<typeof runSupportV2Live>[0] | undefined;
+  await assert.rejects(executeExperiment({ config: { ...queryAB, allowRemote: true }, variant, jobId: "query-check", repetition: 1,
+    batch: { id: "query-check", repetition: 1, plannedRepetitions: 1 } }, {
+    runSupport: async options => { actual = structuredClone(options); return "query-run-check"; }, readSupport: async () => undefined,
+  }), /没有可回读记录/);
+  assert.deepEqual(actual?.parameters, variant.parameters, "actual job adapter passes both resolved query modes to the runner (no services)");
+}
 const auditTrace: KnowledgeTrace = { mode: "m4-support", supportProfile: "typed", supportModel: "deepseek-v4-pro", threshold: .5,
   applicability: { mode: "declared" }, query: "synthetic check", originalQuery: "synthetic check", scope: { shopId: null, productId: null },
+  queries: { version: knowledgeQueryPlanVersion, mode: "combined", retrieval: "synthetic check", evidence: "synthetic check" },
   status: "accepted", reason: null, rawRanking: [], acceptance: null, sourceHashes: { before: null, after: null }, durationMs: 0, calls: [],
   usage: { rerankTokens: 0, supportTokens: 0, estimatedCny: 0, estimatedUsd: 0, incompleteCalls: 0 },
   pricing: { estimated: true, rerankCnyPerMillionTokens: null, rerankAsOf: "2026-10-05", supportSource: "Pi model catalog" } };
-const auditCall = { id: "synthetic-knowledge", output: [], knowledge: { trace: auditTrace, context: {
-  originalQuery: auditTrace.originalQuery, modelQuestion: null, effectiveQuery: auditTrace.query, purpose: "user_policy" as const,
+const auditCall = { id: "synthetic-knowledge", input: { query: "synthetic check", retrievalQuery: "short question" }, output: [], knowledge: { trace: auditTrace, context: {
+  originalQuery: auditTrace.originalQuery, modelQuestion: null, effectiveQuery: auditTrace.query, retrievalQuery: "short question", purpose: "user_policy" as const,
   orderSource: "none" as const, scopeSource: "global" as const, facts: null, policyTopic: null, objectReference: null } } };
 assert.equal(auditSupportKnowledgeCall(auditCall, declaredParameters).passed, false, "missing gate is incomplete");
 auditTrace.applicability!.gate = { version: "declared-order-preconditions-v1", snapshotHash: "a".repeat(64), contextHash: null,
@@ -66,6 +93,25 @@ auditTrace.applicability!.gate = { version: "declared-order-preconditions-v1", s
 assert.equal(auditSupportKnowledgeCall(auditCall, declaredParameters).passed, false, "positive evidence cannot hide unknown necessary facts");
 auditTrace.applicability!.gate.integrity = true;
 assert.equal(auditSupportKnowledgeCall(auditCall, declaredParameters).passed, true);
+const separatedCall = structuredClone(auditCall), separatedParameters = { ...declaredParameters, knowledgeQueryMode: "separated" as const };
+separatedCall.knowledge.trace.queries!.mode = "separated";
+separatedCall.knowledge.trace.queries!.retrieval = separatedCall.knowledge.trace.query = "short question";
+const separatedAudit = auditSupportKnowledgeCall(separatedCall, separatedParameters);
+assert.equal(separatedAudit.passed, true); assert.equal(separatedAudit.queryPlan, "complete");
+assert.notEqual(separatedAudit.queryPlanHash, auditSupportKnowledgeCall(auditCall, declaredParameters).queryPlanHash,
+  "ranking/evidence input and mode produce distinct audit fingerprints");
+for (const mutate of [
+  (call: typeof separatedCall) => { delete call.knowledge.trace.queries; },
+  (call: typeof separatedCall) => { call.knowledge.trace.queries!.mode = "combined"; },
+  (call: typeof separatedCall) => { call.knowledge.trace.query = "synthetic check"; },
+  (call: typeof separatedCall) => { call.knowledge.trace.queries!.evidence = "short question"; },
+  (call: typeof separatedCall) => { call.knowledge.trace.queries!.retrieval = "different question"; },
+  (call: typeof separatedCall) => { call.input.query = "short question"; },
+  (call: typeof separatedCall) => { call.input.retrievalQuery = "synthetic check"; },
+]) {
+  const tampered = structuredClone(separatedCall); mutate(tampered);
+  assert.equal(auditSupportKnowledgeCall(tampered, separatedParameters).passed, false, "no silent query-plan mismatch or full-facts removal");
+}
 delete auditTrace.applicability!.gate; auditTrace.status = "unavailable"; auditTrace.reason = "database_unavailable";
 const expectedFault = auditSupportKnowledgeCall(auditCall, declaredParameters, true);
 assert.equal(expectedFault.passed, true); assert.equal(expectedFault.applicability, "not_evaluated");
@@ -91,6 +137,14 @@ await assert.rejects(promisify(execFile)(process.execPath, ["scripts/support-v2-
     assert.equal(failure.code, 1); assert.match(failure.stderr ?? "", /knowledgeApplicability declared 仅适用于/);
     assert.doesNotMatch(failure.stderr ?? "", /未知参数|DB_PASSWORD|API_KEY|QQBOT_APP_SECRET/); return true;
   });
+for (const [args, errorPattern] of [
+  [["--query-mode", "separated"], /knowledgeQueryMode separated 仅适用于/],
+  [["--knowledge-mode", "m4-support", "--query-mode", "typo"], /knowledgeQueryMode 仅支持/],
+] as const) await assert.rejects(promisify(execFile)(process.execPath,
+  ["scripts/support-v2-live.ts", "--live", "--architecture", "controller", "--repeat", "1", ...args], { env: {}, timeout: 5000 }),
+  (error: unknown) => { const failure = error as { code?: number; stderr?: string };
+    assert.equal(failure.code, 1); assert.match(failure.stderr ?? "", errorPattern);
+    assert.doesNotMatch(failure.stderr ?? "", /未知参数|DB_PASSWORD|API_KEY|QQBOT_APP_SECRET/); return true; });
 for (const entry of ["src/cli.ts", "src/qq.ts"]) {
   await assert.rejects(promisify(execFile)(process.execPath, [entry], {
     env: { SUPPORT_ARCHITECTURE: "atomic", KNOWLEDGE_MODE: "m4-support" }, timeout: 5000,
@@ -192,6 +246,10 @@ const supportCli = await promisify(execFile)(process.execPath, ["scripts/experim
   env: { PATH: process.env.PATH }, maxBuffer: 100_000,
 });
 assert.deepEqual(JSON.parse(supportCli.stdout).config, supportValidation, "support verifier preview does not read model credentials");
+const queryCli = await promisify(execFile)(process.execPath, ["scripts/experiment.ts", "--preset", "support-knowledge-query-ab", "--dry-run"], {
+  env: { PATH: process.env.PATH }, maxBuffer: 100_000,
+});
+assert.deepEqual(JSON.parse(queryCli.stdout).config, queryAB, "query A/B preview resolves without model/DB credentials");
 
 let starts = 0, busy = false;
 const job: ExperimentJob = {
