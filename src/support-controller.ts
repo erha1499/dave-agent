@@ -4,7 +4,7 @@ import { MerchantBusinessError, merchantReasonControls, merchantSourceKey, type 
 import { OrderAccessError, type CouponStore, type QQIdentity } from "./coupon-store.ts";
 import type { KnowledgeService, KnowledgeTrace } from "./knowledge-service.ts";
 import type { KnowledgeApplicabilityContext } from "./knowledge-applicability.ts";
-import { buildSupportEvidenceBinding, validateSupportEvidenceTarget, SupportEvidenceFactsError, orderRefundState as refundQuery,
+import { buildSupportEvidenceBinding, validateSupportEvidenceTarget, policyTopicQueries, policyTopicQueryContext, SupportEvidenceFactsError, orderRefundState as refundQuery,
   type SupportEvidenceTarget, type SupportOrderFacts } from "./support-evidence-context.ts";
 import { RefundBusinessError, type RefundStore } from "./refunds.ts";
 import { isRefundOperation, type Reply } from "./reply.ts";
@@ -14,6 +14,7 @@ export { parseAnySupportAction as parseExecutedSupportAction } from "./support-c
 import { amountChoiceNotice, compareRemainingAmount, createAmountReference, resolveAmountReference, selectAlternativeOrder, supportObjectReference,
   type RemainingAmountComparison, type TrustedAmountReference, type TrustedAmountChoices, type TrustedOrderChoices } from "./support-context.ts";
 export type { RemainingAmountComparison, TrustedAmountReference, TrustedAmountChoices, TrustedOrderChoices } from "./support-context.ts";
+import { currentReferenceChoices, referenceChoiceNotice, resolveReferenceChoice, type TrustedReferenceChoices } from "./support-reference-selection.ts";
 
 type Order = Awaited<ReturnType<CouponStore["getOrder"]>>;
 type Knowledge = Awaited<ReturnType<CouponStore["searchKnowledge"]>>;
@@ -48,6 +49,7 @@ export type TrustedPolicyTopic = {
   scope: { shopId: string | null; productId: string | null };
   sources: Array<{ sourceId: string; version: string }>;
   intent?: "policy" | "refund_eligibility";
+  priorQueries?: Array<{ requestId: string; originalQuery: string }>;
 };
 
 // Legacy v2.1 replay only. Current v2.2 sessions select bounded references in the
@@ -77,7 +79,7 @@ export function resolveSupportPolicyQuestion(input: {
 }
 export function policyTopicMatches(topic: TrustedPolicyTopic | undefined, input: { sourceKey: string; groupOpenid: string; orderId: string | null }): boolean {
   return Boolean(topic && topic.sourceKey === input.sourceKey && topic.groupOpenid === input.groupOpenid && topic.orderId === input.orderId
-    && typeof topic.originalQuery === "string" && topic.originalQuery.trim() && topic.originalQuery.length <= 500 && topic.requestId
+    && policyTopicQueries(topic)
     && Array.isArray(topic.sources) && topic.sources.length > 0 && topic.sources.length <= 5
     && new Set(topic.sources.map(source => source.sourceId)).size === topic.sources.length
     && topic.sources.every(source => source.sourceId && /^[a-f0-9]{64}$/.test(source.version)));
@@ -96,6 +98,8 @@ export type SupportTurnContext = {
   trustedRoute: { groupOpenid: string; messageId: string };
   userText: string; focusOrderId?: string; policyTopic?: TrustedPolicyTopic; signal?: AbortSignal;
   orderChoices?: TrustedOrderChoices; amountReference?: TrustedAmountReference; amountChoices?: TrustedAmountChoices;
+  policyChoices?: TrustedReferenceChoices; orderReferenceChoices?: TrustedReferenceChoices;
+  pendingReferenceKind?: "order" | "policy";
   onCall?: (call: SupportCall) => void;
 };
 export type EvidenceBundle = {
@@ -107,6 +111,7 @@ export type EvidenceBundle = {
   amountComparison?: RemainingAmountComparison;
   displayedPaidUnit?: TrustedAmountReference;
   amountChoices?: TrustedAmountChoices;
+  policyChoices?: TrustedReferenceChoices; orderReferenceChoices?: TrustedReferenceChoices;
   task?: MerchantTask | null;
   operation?: Awaited<ReturnType<RefundStore["get"]>> | null;
 };
@@ -117,6 +122,8 @@ export type SupportResult = {
   verifiedOrderId?: string;
   verifiedPolicyTopic?: TrustedPolicyTopic;
   verifiedAmountReference?: TrustedAmountReference;
+  pendingReferenceKind?: "order" | "policy";
+  referencePresentation?: "order" | "policy";
 };
 export type SupportServices = {
   store: Pick<CouponStore, "getOrder" | "searchKnowledge">;
@@ -130,6 +137,11 @@ function orderReply(order: Order, ids: string[], text: string): Reply {
   return { kind: "order", text, orders: [{ id: order.id, status: order.status,
     paidCents: order.amounts.paidCents, refundedCents: order.amounts.refundedCents,
     couponStatuses: order.coupons.map(coupon => coupon.status) }], evidenceIds: ids };
+}
+function selectedPolicyTopic(context: SupportTurnContext): TrustedPolicyTopic | undefined {
+  if (!context.policyChoices) return context.policyTopic;
+  const reference = resolveReferenceChoice(context.policyChoices, { sourceKey: context.sourceKey, groupOpenid: context.trustedRoute.groupOpenid });
+  return reference?.kind === "policy" ? reference.topic : undefined;
 }
 export class SupportController {
   private services: SupportServices;
@@ -145,6 +157,8 @@ export class SupportController {
     const trusted = { ...context, identity: { ...context.identity }, trustedRoute: { ...context.trustedRoute },
       ...(context.policyTopic ? { policyTopic: structuredClone(context.policyTopic) } : {}),
       ...(context.orderChoices ? { orderChoices: structuredClone(context.orderChoices) } : {}),
+      ...(context.policyChoices ? { policyChoices: structuredClone(context.policyChoices) } : {}),
+      ...(context.orderReferenceChoices ? { orderReferenceChoices: structuredClone(context.orderReferenceChoices) } : {}),
       ...(context.amountChoices ? { amountChoices: structuredClone(context.amountChoices) } : {}),
       ...(context.amountReference ? { amountReference: structuredClone(context.amountReference) } : {}) };
     let accepted: AnySupportAction | undefined;
@@ -172,7 +186,14 @@ export class SupportController {
         const orderId = action.orderRef?.kind === "explicit" ? action.orderRef.orderId : action.orderRef?.kind === "alternative"
           ? selectAlternativeOrder(trusted.orderChoices, { sourceKey: trusted.sourceKey, groupOpenid: trusted.trustedRoute.groupOpenid }, trusted.focusOrderId)
           : action.orderRef ? trusted.focusOrderId : undefined;
-        validateSupportEvidenceTarget({ action, originalQuery: trusted.userText, verifiedTopic: trusted.policyTopic,
+        const topic = selectedPolicyTopic(trusted);
+        const topicOrderId = action.orderRef?.kind === "alternative" ? trusted.focusOrderId ?? null : orderId ?? null;
+        // An unresolved reference needs a user selection, not a model repair that
+        // turns an otherwise valid old requestId into authority.
+        if (action.questionContext.kind === "previous" && (!policyTopicMatches(topic, {
+          sourceKey: trusted.sourceKey, groupOpenid: trusted.trustedRoute.groupOpenid, orderId: topicOrderId,
+        }) || topic!.requestId !== action.questionContext.requestId)) return action;
+        validateSupportEvidenceTarget({ action, originalQuery: trusted.userText, verifiedTopic: topic,
           binding: { sourceKey: trusted.sourceKey, groupOpenid: trusted.trustedRoute.groupOpenid, orderId: orderId ?? null } });
       }
       return action;
@@ -198,17 +219,23 @@ export class SupportController {
     const evidence: EvidenceBundle = { version: 1, requestId: context.requestId, trustedRoute: { ...context.trustedRoute }, action,
       actualCalls: [], rules: [], knowledge: [] };
     if (context.amountChoices) evidence.amountChoices = structuredClone(context.amountChoices);
+    if (context.policyChoices) evidence.policyChoices = structuredClone(context.policyChoices);
+    if (context.orderReferenceChoices) evidence.orderReferenceChoices = structuredClone(context.orderReferenceChoices);
     const binding = { sourceKey: context.sourceKey, groupOpenid: context.trustedRoute.groupOpenid };
     // A supplied candidate list is authoritative: the model cannot bypass its
     // ambiguity by naming any otherwise valid historical requestId.
     const amountReference = context.amountChoices ? resolveAmountReference(context.amountChoices, binding) : context.amountReference;
+    const policyTopic = selectedPolicyTopic(context);
+    let pendingReferenceKind = context.pendingReferenceKind;
+    let referencePresentation: SupportResult["referencePresentation"];
     let verifiedOrderId: string | undefined;
     let verifiedPolicyTopic: TrustedPolicyTopic | undefined;
     let verifiedAmountReference: TrustedAmountReference | undefined;
     let sequence = 0;
     const result = (reply: Reply, outcome: SupportResult["outcome"] = "ready", needsAnswer = false): SupportResult =>
       ({ action, outcome, reply, evidence, needsAnswer, ...(verifiedOrderId ? { verifiedOrderId } : {}),
-        ...(verifiedPolicyTopic ? { verifiedPolicyTopic } : {}), ...(verifiedAmountReference ? { verifiedAmountReference } : {}) });
+        ...(verifiedPolicyTopic ? { verifiedPolicyTopic } : {}), ...(verifiedAmountReference ? { verifiedAmountReference } : {}),
+        ...(pendingReferenceKind ? { pendingReferenceKind } : {}), ...(referencePresentation ? { referencePresentation } : {}) });
     const emit = (step: SupportCall) => {
       // Telemetry is not part of the business transaction and cannot turn a completed prepare into a retry.
       try { context.onCall?.(structuredClone(step)); }
@@ -240,7 +267,15 @@ export class SupportController {
       context.signal?.throwIfAborted();
       return value;
     };
-    const clarify = (field: ContextClarificationField) => result(notice({
+    const clarify = (field: ContextClarificationField) => {
+      const referenceKind = field === "order" ? "order" : ["policy_topic", "time_channel", "actor"].includes(field) ? "policy" : undefined;
+      if (referenceKind && (pendingReferenceKind !== "order" || referenceKind === "order")) pendingReferenceKind = referenceKind;
+      const choices = referenceKind === "order" ? context.orderReferenceChoices : context.policyChoices;
+      const now = Date.now(), current = referenceKind ? currentReferenceChoices(choices, binding, now) : undefined;
+      const candidates = referenceKind && current?.kind === referenceKind && current.candidates.length
+        ? `\n${referenceChoiceNotice(referenceKind, choices, binding, now)}` : "";
+      if (candidates) referencePresentation = referenceKind;
+      return result(notice({
       order: "请明确本次要查询或操作的模拟订单号。",
       reason: "请说明希望联系商家协商的原因。",
       intent: "请明确本次先处理哪项需求：政策咨询、协商进度、退款申请或退款状态。若续问前文，请补充所指规则、时间或对象。",
@@ -248,13 +283,22 @@ export class SupportController {
       policy_topic: "请补充你指的具体使用规则或上一次问题；如果有几种规则，请明确要继续问哪一种，我再按相应条件查询。",
       time_channel: "请说明支付渠道，以及你说的时间是退款审核期限还是到账时限；如果前面有几个时限，请明确指哪一个，并补充具体天数。",
       actor: "请说明是哪项操作，以及你说的“他/对方”指商家还是平台；我再核对该操作是否需要其许可。",
-    }[field]), "clarification");
+      }[field] + candidates), "clarification");
+    };
+    const restatePolicy = () => {
+      pendingReferenceKind = "policy";
+      return result(notice("前文问题链已超过本轮可可靠恢复的范围。请完整重述当前问题，写明具体对象、条件和要确认的内容；不能省略或截断旧条件后继续判断。"), "clarification");
+    };
     if (action.kind === "clarify") return clarify(action.field);
     if (action.kind === "non_business") return result(notice(action.reason === "greeting"
       ? "你好，我可以查询模拟团购券订单、说明套餐规则，以及办理模拟协商和退款。请告诉我你的问题。"
       : "当前仅支持模拟团购券咨询、订单查询、协商和退款，不支持这项请求。"), "non_business");
 
     const semantic = isContextSupportAction(action);
+    if (context.pendingReferenceKind === "order" && (action.orderRef?.kind === "focus" || action.orderRef?.kind === "alternative"
+      || semantic && (action.kind === "policy" || action.kind === "refund_eligibility") && action.questionContext.kind === "previous")) return clarify("order");
+    if (context.pendingReferenceKind === "policy" && semantic && (action.kind === "policy" || action.kind === "refund_eligibility")
+      && action.questionContext.kind === "previous") return clarify("policy_topic");
     const objectReference = semantic ? action.kind === "paid_amount_compare" ? "remaining_amount"
       : action.orderRef?.kind === "alternative" ? "alternative_order" : null : supportObjectReference(context.userText);
     const readOnlyQuestion = action.kind === "policy" || action.kind === "refund_eligibility" || action.kind === "paid_amount_compare";
@@ -267,8 +311,8 @@ export class SupportController {
       if (objectReference === "alternative_order") {
         if ((!semantic && action.orderRef.kind !== "focus") || !context.focusOrderId) return clarify("order");
         alternativeOrderId = selectAlternativeOrder(context.orderChoices, binding, context.focusOrderId);
-        if (!alternativeOrderId || !semantic && (!policyTopicMatches(context.policyTopic, { ...binding, orderId: context.focusOrderId })
-          || !["policy", "refund_eligibility"].includes(context.policyTopic!.intent ?? ""))) return clarify("order");
+        if (!alternativeOrderId || !semantic && (!policyTopicMatches(policyTopic, { ...binding, orderId: context.focusOrderId })
+          || !["policy", "refund_eligibility"].includes(policyTopic!.intent ?? ""))) return clarify("order");
       } else {
         if (!amountReference || amountReference.sourceKey !== context.sourceKey || amountReference.groupOpenid !== binding.groupOpenid
           || action.kind === "paid_amount_compare" && action.amountRef.requestId !== amountReference.requestId) return clarify("amount_basis");
@@ -290,26 +334,29 @@ export class SupportController {
     if (action.kind !== "policy" && !orderId) return clarify("order");
     if (action.orderRef && !orderId) return clarify("order");
     if (!orderId && action.kind === "policy" && (semantic ? Boolean(action.productMention) : needsOrderScope(context.userText))) return clarify("order");
-    const alternateAnchor = !semantic && alternativeOrderId ? context.policyTopic!.originalQuery.replaceAll(context.focusOrderId!, alternativeOrderId) : undefined;
+    const alternateAnchor = !semantic && alternativeOrderId ? policyTopic!.originalQuery.replaceAll(context.focusOrderId!, alternativeOrderId) : undefined;
     let question = semantic ? { query: context.userText, topic: null as TrustedPolicyTopic | null, needsClarification: false }
       : objectReference === "remaining_amount"
       ? { query: `${context.userText}\n已解析为同单唯一剩余未核销券的实付单价比较。规则问题：剩余券退款申请金额是否按对应券实付单价计算？具体金额由宿主本轮订单事实单独核对。`,
-        topic: policyTopicMatches(context.policyTopic, { ...binding, orderId: orderId! }) ? structuredClone(context.policyTopic!) : null, needsClarification: false }
+        topic: policyTopicMatches(policyTopic, { ...binding, orderId: orderId! }) ? structuredClone(policyTopic!) : null, needsClarification: false }
       : !semantic && alternativeOrderId ? { query: `${context.userText}\n继续咨询已重新选定订单的问题：${alternateAnchor}。旧问题中的订单状态假设不沿用，以本轮订单事实为准。`,
-        topic: structuredClone(context.policyTopic!), needsClarification: false }
+        topic: structuredClone(policyTopic!), needsClarification: false }
       : resolveSupportPolicyQuestion({ originalQuery: context.userText, sourceKey: context.sourceKey,
-        groupOpenid: context.trustedRoute.groupOpenid, orderId: orderId ?? null, policyTopic: context.policyTopic });
+        groupOpenid: context.trustedRoute.groupOpenid, orderId: orderId ?? null, policyTopic: policyTopic });
     if (semantic && (action.kind === "policy" || action.kind === "refund_eligibility") && action.questionContext.kind === "previous") {
-      if (!policyTopicMatches(context.policyTopic, { ...binding, orderId: alternativeOrderId ? context.focusOrderId! : orderId ?? null })
-        || action.questionContext.requestId !== context.policyTopic!.requestId) return clarify("intent");
-      if (alternativeOrderId && (action.kind !== "refund_eligibility" || context.policyTopic!.intent !== "refund_eligibility")) return clarify("intent");
+      if (!policyTopicMatches(policyTopic, { ...binding, orderId: alternativeOrderId ? context.focusOrderId! : orderId ?? null })
+        || action.questionContext.requestId !== policyTopic!.requestId) return clarify("policy_topic");
+      if (alternativeOrderId && (action.kind !== "refund_eligibility" || policyTopic!.intent !== "refund_eligibility")) return clarify("policy_topic");
+      const prior = policyTopicQueries(policyTopic!)!;
+      if (!alternativeOrderId && (prior.length > 4 || prior.some(row => row.requestId === context.requestId)
+        || prior.reduce((sum, row) => sum + row.originalQuery.length, context.userText.length) > 500)) return restatePolicy();
       // A historical question can contain old order-state assumptions. Moving to
       // another order carries only this bounded intent, never the old sentence.
       question = { query: alternativeOrderId ? `${context.userText}\n本轮继续咨询新选定订单的退款申请资格与条件。`
-        : `${context.userText}\n上轮已完成取证的问题（仅用于理解本轮指代）：${context.policyTopic!.originalQuery}`,
-        topic: structuredClone(context.policyTopic!), needsClarification: false };
+        : `${context.userText}\n${policyTopicQueryContext(policyTopic!)}`,
+        topic: structuredClone(policyTopic!), needsClarification: false };
     }
-    if ((action.kind === "policy" || action.kind === "refund_eligibility") && question.needsClarification) return clarify("intent");
+    if ((action.kind === "policy" || action.kind === "refund_eligibility") && question.needsClarification) return clarify("policy_topic");
 
     const getOrder = async () => {
       const order = await call("get_order", { orderId }, async () => {
@@ -412,11 +459,12 @@ export class SupportController {
     }
     if (order && new Set(order.items.map(item => item.productId)).size !== 1) return clarify("order");
     const prerequisite = action.kind === "merchant_prepare" || action.kind === "refund_prepare";
-    const refundQuestion = !semantic && alternativeOrderId ? context.policyTopic!.intent === "refund_eligibility"
+    const refundQuestion = !semantic && alternativeOrderId ? policyTopic!.intent === "refund_eligibility"
       : action.kind === "refund_eligibility" || objectReference === "remaining_amount";
     // The model may classify the request, but cannot replace an unknown fact with an easier policy question.
     const currentScope = { shopId: order?.shop.id ?? null, productId: order?.items[0]?.productId ?? null };
-    if (question.topic && !alternativeOrderId && !isDeepStrictEqual(question.topic.scope, currentScope)) return clarify("intent");
+    if (question.topic && context.policyChoices && !isDeepStrictEqual(selectedPolicyTopic(context), question.topic)) return clarify("policy_topic");
+    if (question.topic && !alternativeOrderId && !isDeepStrictEqual(question.topic.scope, currentScope)) return clarify("policy_topic");
     let evidenceBinding: ReturnType<typeof buildSupportEvidenceBinding> | undefined;
     try {
       if (semantic) evidenceBinding = buildSupportEvidenceBinding({ action, originalQuery: context.userText,
@@ -432,7 +480,8 @@ export class SupportController {
     // The authorized ID selects the scope, not semantic evidence. Preserve it in
     // originalQuery/facts while normalizing only this known locator for retrieval.
     if (order) query = query.replaceAll(`订单 ${order.id}`, "该订单").replaceAll(`订单${order.id}`, "该订单").replaceAll(order.id, "该订单");
-    if (query.length > 500) return result(notice("请缩短本次政策问题，保留要确认的具体条件与订单号。"), "clarification");
+    if (query.length > 500) return question.topic ? restatePolicy()
+      : result(notice("请缩短本次政策问题，保留要确认的具体条件与订单号。"), "clarification");
     const purpose = prerequisite ? "business_prerequisite" : refundQuestion ? "refund_eligibility" : "user_policy";
     const knowledgeContext: SupportKnowledgeContext = { originalQuery: context.userText,
       modelQuestion: "question" in action ? action.question : null, effectiveQuery: query,
@@ -449,13 +498,14 @@ export class SupportController {
       ...evidenceBinding };
     const ids = await getRules(knowledgeContext, order);
     if (action.kind === "policy" || action.kind === "refund_eligibility") {
-      const anchor = semantic && alternativeOrderId ? context.userText : alternateAnchor ?? question.topic?.originalQuery ?? context.userText;
+      const anchor = semantic ? context.userText : alternateAnchor ?? question.topic?.originalQuery ?? context.userText;
       // A single handled question may have several real sources; source count is not an intent count.
-      if (ids.length > 0 && ids.length <= 5 && (objectReference !== "remaining_amount" || question.topic)
+      if (ids.length > 0 && ids.length <= 5 && (!semantic || anchor.length <= 500) && (objectReference !== "remaining_amount" || question.topic)
         && (semantic || !/[；;、\n]|[?？].*\S|(?:以及|同时|另外|并且|顺便|和|与)/u.test(anchor))) {
         verifiedPolicyTopic = { requestId: context.requestId, sourceKey: context.sourceKey, groupOpenid: context.trustedRoute.groupOpenid,
           originalQuery: anchor, orderId: order?.id ?? null, scope: currentScope,
-          intent: !semantic && alternativeOrderId ? context.policyTopic!.intent : action.kind,
+          intent: !semantic && alternativeOrderId ? policyTopic!.intent : action.kind,
+          ...(semantic ? { priorQueries: question.topic && !alternativeOrderId ? policyTopicQueries(question.topic)! : [] } : {}),
           sources: evidence.rules.map(rule => ({ sourceId: rule.sourceId, version: rule.version })) };
       }
       if (evidence.amountComparison) {

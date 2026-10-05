@@ -114,7 +114,7 @@ function scoreRow(row: Row, rows: Row[], completed: boolean) {
   if (row.turn === 4) {
     const receipt = row.hostReceipt, source = candidateB(rows[2]!);
     checks.hostSelection = !result && row.requests.length === 0 && row.steps.length === 0 && row.calls.length === 0 && row.reads.length === 0
-      && receipt?.outcome === "selected" && receipt.sourceKey === binding.sourceKey && receipt.requestId === ingress.requestId
+      && receipt?.version === "amount-selection-v1" && receipt.outcome === "selected" && receipt.sourceKey === binding.sourceKey && receipt.requestId === ingress.requestId
       && isDeepStrictEqual(receipt.trustedRoute, { groupOpenid, messageId: ingress.messageId }) && receipt.selectedRequestId === source.reference.requestId
       && receipt.choices.selectedToken === source.token && isDeepStrictEqual(receipt.choices.candidates, rows[2]!.result!.evidence.amountChoices!.candidates)
       && isDeepStrictEqual(row.actualReply, receipt.reply) && !receipt.historyFailed;
@@ -314,6 +314,10 @@ export async function checkAmountSelectionProbe() {
   assert.equal(result.cleanup.remainingOrders, 0); assert.equal(result.cleanup.sessionDisposed, true);
   const tampered = structuredClone(result.rows); tampered[3]!.hostReceipt!.selectedRequestId = "not-displayed";
   scoreRow(tampered[3]!, tampered, true); assert.equal(tampered[3]!.status, "failed");
+  const wrongReceiptKind = structuredClone(result.rows);
+  Object.assign(wrongReceiptKind[3]!.hostReceipt!, { version: "reference-selection-v1" });
+  scoreRow(wrongReceiptKind[3]!, wrongReceiptKind, true); assert.equal(wrongReceiptKind[3]!.engineeringChecks.hostSelection, false,
+    "A reference selection receipt must not count as an amount-basis selection");
   const fakeOrder = structuredClone(result.rows); fakeOrder[4]!.result!.evidence.order!.shop.name = "forged-read";
   scoreRow(fakeOrder[4]!, fakeOrder, true); assert.equal(fakeOrder[4]!.engineeringChecks.freshOrder, false);
   forceKnowledge = true; responseIndex = 0;

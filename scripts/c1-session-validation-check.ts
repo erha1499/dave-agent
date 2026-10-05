@@ -21,7 +21,7 @@ import { rankLexical, scopeDocuments, serializeRetrievalDocument, type Retrieval
 import type { SessionTurnActual } from "./c1-session-live.ts";
 
 // Pure contracts/scoring only. No executor, generated validation questions, I/O or model judge.
-export const c1ValidationScoringVersion = "c1-session-validation-v6";
+export const c1ValidationScoringVersion = "c1-session-validation-v7";
 export const c1Families = ["order_state", "paid_amount", "alternative_order", "policy_followup", "refund_time", "appointment_actor"] as const;
 export const c1Strata = ["known", "missing", "competing", "direct_missing_fact", "boundary"] as const;
 type Family = typeof c1Families[number];
@@ -192,7 +192,8 @@ function reconstructKnowledgeBinding(actual: C1ValidationActual, call: SupportCa
     const previousContext = previousResult.evidence.knowledge[0]?.context;
     assert.ok(previousContext && previousResult.evidence.rules.length > 0);
     const priorIsAlternative = previousResult.action.orderRef?.kind === "alternative";
-    assert.equal(topic.originalQuery, priorIsAlternative ? donor.question : previousContext.policyTopic?.originalQuery ?? donor.question);
+    assert.equal(topic.originalQuery, topic.priorQueries !== undefined ? donor.question
+      : priorIsAlternative ? donor.question : previousContext.policyTopic?.originalQuery ?? donor.question);
     assert.deepEqual(topic.sources, previousResult.evidence.rules.map(rule => ({ sourceId: rule.sourceId, version: rule.version })));
     if (action.orderRef?.kind === "alternative") {
       assert.equal(topic.orderId, actual.hostReference?.orderId, "Alternative-order intent belongs to the actual prior focus");
@@ -200,6 +201,25 @@ function reconstructKnowledgeBinding(actual: C1ValidationActual, call: SupportCa
     } else assert.deepEqual(topic.scope, scope);
   }
   assert.deepEqual(context.policyTopic, topic);
+  const producedTopic = result.verifiedPolicyTopic;
+  if (producedTopic?.priorQueries !== undefined) {
+    assert.equal(result.outcome, "ready"); assert.ok(result.evidence.rules.length > 0);
+    assert.ok(action.kind === "policy" || action.kind === "refund_eligibility");
+    assert.equal(producedTopic.requestId, ingress.requestId); assert.equal(producedTopic.sourceKey, sourceKey);
+    assert.equal(producedTopic.groupOpenid, ingress.groupOpenid); assert.equal(producedTopic.originalQuery, originalQuery);
+    assert.equal(producedTopic.intent, action.kind); assert.equal(producedTopic.orderId, order?.id ?? null);
+    assert.deepEqual(producedTopic.scope, scope);
+    assert.deepEqual(producedTopic.sources, result.evidence.rules.map(rule => ({ sourceId: rule.sourceId, version: rule.version })));
+    // The donor has recursively passed its own proof above. Rebuild the exact
+    // bounded chain from real turns; a matching self-reported hash is not proof.
+    const queries = topic && action.orderRef?.kind !== "alternative"
+      ? [...(topic.priorQueries ?? []), { requestId: topic.requestId,
+        originalQuery: history.find(row => row.actual.caseId === actual.caseId && row.actual.turn < actual.turn
+          && row.actual.requestId === topic!.requestId)!.question }] : [];
+    assert.ok(queries.length <= 4 && queries.reduce((length, query) => length + query.originalQuery.length, originalQuery.length) <= 500,
+      "Oversized topic history requires clarification, never silently dropping earlier questions");
+    assert.deepEqual(producedTopic.priorQueries, queries, "Topic chain must match completed earlier turns and bounded host history");
+  }
   const reconstructed = buildSupportEvidenceBinding({ action, originalQuery, order, requestId: ingress.requestId, verifiedTopic: topic,
     binding: { sourceKey, groupOpenid: ingress.groupOpenid, orderId: order?.id ?? null } });
   for (const key of ["evidenceBindingVersion", "evidenceTarget", "evidenceUse", "purpose", "facts", "effectiveQuery"] as const) assert.deepEqual(context[key], reconstructed[key], `Rebuilt ${key}`);
@@ -372,10 +392,11 @@ function amountProofPassed(actual: C1ValidationActual | undefined, originalQuery
     }
     if (choices.selectedToken) {
       assert.equal(actual.hostReference?.orderId, order.id, "Changing an explicit target cannot preserve an old selection");
-      const selections = history.filter(row => row.actual.caseId === actual.caseId && row.actual.turn < actual.turn && row.actual.hostReceipt?.outcome === "selected"
+      const selections = history.filter(row => row.actual.caseId === actual.caseId && row.actual.turn < actual.turn
+        && row.actual.hostReceipt?.version === "amount-selection-v1" && row.actual.hostReceipt.outcome === "selected"
         && row.actual.hostReceipt.choices.selectedToken === choices.selectedToken);
       const selected = selections.at(-1); assert.ok(selected?.actual.ingress, "Selected token needs a real host receipt");
-      const receipt = selected.actual.hostReceipt!;
+      const receipt = selected.actual.hostReceipt!; assert.ok(receipt.version === "amount-selection-v1");
       assert.equal(selected.question.trim(), `选择金额基准 ${choices.selectedToken}`); assert.equal(selected.actual.execution, "completed");
       assert.equal(selected.actual.result, undefined); assert.deepEqual(selected.actual.calls, []); assert.deepEqual(selected.actual.requests, []);
       assert.equal(receipt.version, "amount-selection-v1"); assert.notEqual(receipt.historyFailed, true); assert.equal(receipt.requestId, selected.actual.requestId);
@@ -384,7 +405,8 @@ function amountProofPassed(actual: C1ValidationActual | undefined, originalQuery
       assert.deepEqual(selected.actual.reply, receipt.reply); assert.equal(receipt.selectedRequestId, reference.requestId);
       assert.deepEqual(receipt.choices.candidates.find(row => row.token === choices.selectedToken), choices.candidates.find(row => row.token === choices.selectedToken));
       assert.ok(!history.some(row => row.actual.turn > selected.actual.turn && row.actual.turn < actual.turn
-        && (row.actual.result?.verifiedAmountReference || row.actual.hostReceipt)), "New displays or later selection receipts invalidate an earlier explicit selection");
+        && (row.actual.result?.verifiedAmountReference || row.actual.hostReceipt?.version === "amount-selection-v1")),
+      "New amount displays or later amount selection receipts invalidate an earlier explicit selection");
     }
     assert.deepEqual(result.evidence.amountComparison, compareRemainingAmount(order, reference, binding));
     return true;
@@ -946,6 +968,76 @@ export function checkC1ValidationScoring() {
     assert.equal(scoreBound(follow, followTurn, bindingConfiguration, [{ question: previousQuestion, actual: forgedPrior }], [doc]).evidenceProofPassed, false); }
   const changedQuestion = { ...followTurn, question: "different actual input" };
   assert.equal(scoreBound(follow, changedQuestion, bindingConfiguration, priorHistory, [doc]).evidenceProofPassed, false);
+  // New topic snapshots preserve each actual question. Legacy snapshots above
+  // intentionally retain their historical single-anchor interpretation.
+  const newPrevious = structuredClone(previous), newPrior = { ...structuredClone(prior), priorQueries: [] };
+  newPrevious.result!.verifiedPolicyTopic = newPrior;
+  const newHistory = [{ question: previousQuestion, actual: newPrevious }];
+  const newFollow = boundActual({ question: followQuestion, action: followAction, requestId: "follow-rule", turn: 2, topic: newPrior }, [doc]);
+  const newFollowTopic: TrustedPolicyTopic = { ...structuredClone(newPrior), requestId: newFollow.requestId!, originalQuery: followQuestion,
+    priorQueries: [{ requestId: newPrior.requestId, originalQuery: previousQuestion }],
+    sources: newFollow.result!.evidence.rules.map(rule => ({ sourceId: rule.sourceId, version: rule.version })) };
+  newFollow.result!.verifiedPolicyTopic = newFollowTopic;
+  assert.equal(scoreBound(newFollow, followTurn, bindingConfiguration, newHistory, [doc]).passed, true);
+  const secondQuestion = "那这条规则的适用条件呢？";
+  const secondFollow = boundActual({ question: secondQuestion, action: { ...followAction, question: secondQuestion,
+    questionContext: { kind: "previous", requestId: newFollow.requestId! } }, requestId: "second-follow", turn: 3, topic: newFollowTopic }, [doc]);
+  const secondTurn = { ...followTurn, question: secondQuestion }, fullHistory = [...newHistory, { question: followQuestion, actual: newFollow }];
+  assert.equal(scoreBound(secondFollow, secondTurn, bindingConfiguration, fullHistory, [doc]).passed, true,
+    "Second follow-up uses the latest real question with its independently verified earlier chain");
+  assert.equal(scoreBound(secondFollow, secondTurn, bindingConfiguration, fullHistory.slice(1), [doc]).evidenceProofPassed, false,
+    "A trace's valid topic and provider hashes cannot replace missing earlier successful turns");
+  for (const mutate of [
+    (topic: TrustedPolicyTopic) => { topic.originalQuery = previousQuestion; },
+    (topic: TrustedPolicyTopic) => { topic.priorQueries = []; },
+    (topic: TrustedPolicyTopic) => { topic.priorQueries![0]!.requestId = "invented-request"; },
+    (topic: TrustedPolicyTopic) => { topic.priorQueries![0]!.originalQuery = "invented actual question"; },
+    (topic: TrustedPolicyTopic) => { topic.priorQueries!.push({ requestId: "unobserved", originalQuery: "fabricated history" }); },
+  ]) { const forged = structuredClone(newFollow); mutate(forged.result!.verifiedPolicyTopic!);
+    assert.equal(scoreBound(forged, followTurn, bindingConfiguration, newHistory, [doc]).evidenceProofPassed, false); }
+  const standaloneWithHistory = structuredClone(newPrevious);
+  standaloneWithHistory.result!.verifiedPolicyTopic!.priorQueries = [{ requestId: "prior-request", originalQuery: "unrelated prior query" }];
+  assert.equal(scoreBound(standaloneWithHistory, { ...positive, question: previousQuestion }, bindingConfiguration, [], [doc]).evidenceProofPassed, false,
+    "A standalone query must reset the topic chain");
+  const alternatePrevious = structuredClone(boundRefund), alternateOrder = { ...structuredClone(order), id: "COUPON-8877" };
+  const alternatePrior: TrustedPolicyTopic = { ...structuredClone(newPrior), requestId: alternatePrevious.requestId!, originalQuery: boundQuestion,
+    orderId: order.id, scope: { shopId: order.shop.id, productId: order.items[0]!.productId }, intent: "refund_eligibility",
+    sources: alternatePrevious.result!.evidence.rules.map(rule => ({ sourceId: rule.sourceId, version: rule.version })) };
+  alternatePrevious.result!.verifiedPolicyTopic = alternatePrior;
+  const alternateQuestion = "另一单也符合退款条件吗？", alternate = boundActual({ question: alternateQuestion,
+    action: { protocol: "v2.2", kind: "refund_eligibility", question: alternateQuestion, questionContext: { kind: "previous", requestId: alternatePrior.requestId },
+      orderRef: { kind: "alternative" } }, requestId: "alternate-follow", turn: 2, order: alternateOrder, topic: alternatePrior });
+  alternate.calls[1]!.knowledge!.context.orderSource = "verified_alternative";
+  alternate.hostReference = { orderId: order.id, alternativeOrderId: alternateOrder.id, policyTopic: { requestId: alternatePrior.requestId } };
+  alternate.result!.verifiedPolicyTopic = { ...structuredClone(alternatePrior), requestId: alternate.requestId!, originalQuery: alternateQuestion,
+    orderId: alternateOrder.id, priorQueries: [], sources: alternate.result!.evidence.rules.map(rule => ({ sourceId: rule.sourceId, version: rule.version })) };
+  const alternateHistory = [{ question: boundQuestion, actual: alternatePrevious }], alternateTurn = { ...boundTurn, question: alternateQuestion };
+  assert.equal(scoreBound(alternate, alternateTurn, bindingConfiguration, alternateHistory).evidenceProofPassed, true);
+  alternate.result!.verifiedPolicyTopic.priorQueries = [{ requestId: alternatePrior.requestId, originalQuery: boundQuestion }];
+  assert.equal(scoreBound(alternate, alternateTurn, bindingConfiguration, alternateHistory).evidenceProofPassed, false,
+    "An alternative-order query must reset the chain instead of carrying the old object's questions");
+  const boundedHistory = [...newHistory]; let donorTopic: TrustedPolicyTopic = newPrior;
+  for (let index = 2; index <= 6; index++) {
+    const question = `第${index}次追问适用条件。`, value = boundActual({ question, action: { ...followAction, question,
+      questionContext: { kind: "previous", requestId: donorTopic.requestId } }, requestId: `bounded-follow-${index}`, turn: index, topic: donorTopic }, [doc]);
+    value.result!.verifiedPolicyTopic = { ...structuredClone(donorTopic), requestId: value.requestId!, originalQuery: question,
+      priorQueries: [...donorTopic.priorQueries!, { requestId: donorTopic.requestId, originalQuery: donorTopic.originalQuery }],
+      sources: value.result!.evidence.rules.map(rule => ({ sourceId: rule.sourceId, version: rule.version })) };
+    assert.equal(scoreBound(value, { ...followTurn, question }, bindingConfiguration, boundedHistory, [doc]).evidenceProofPassed, index <= 5,
+      "A success with five previous questions must fail even if every donor actually succeeded");
+    if (index <= 5) { boundedHistory.push({ question, actual: value }); donorTopic = value.result!.verifiedPolicyTopic; }
+    else {
+      value.result!.verifiedPolicyTopic.priorQueries!.shift();
+      assert.equal(scoreBound(value, { ...followTurn, question }, bindingConfiguration, boundedHistory, [doc]).evidenceProofPassed, false,
+        "Silently truncating a real chain cannot turn an over-budget success into a valid one");
+    }
+  }
+  const oversizedQuestion = "请说明".repeat(165), oversized = boundActual({ question: oversizedQuestion,
+    action: { ...followAction, question: oversizedQuestion }, requestId: "oversized-follow", turn: 2, topic: newPrior }, [doc]);
+  oversized.result!.verifiedPolicyTopic = { ...structuredClone(newFollowTopic), requestId: oversized.requestId!, originalQuery: oversizedQuestion,
+    sources: oversized.result!.evidence.rules.map(rule => ({ sourceId: rule.sourceId, version: rule.version })) };
+  assert.equal(scoreBound(oversized, { ...followTurn, question: oversizedQuestion }, bindingConfiguration, newHistory, [doc]).evidenceProofPassed, false,
+    "The current question participates in the complete 500-character topic-chain budget");
   for (const queryMode of ["combined", "separated"] as const) {
     const configuration = { ...bindingConfiguration, queryMode };
     const planned = boundActual({ question: boundQuestion, action: boundAction, order, queryMode });
@@ -1035,6 +1127,7 @@ export function checkC1ValidationScoring() {
     (value: C1ValidationActual) => { value.hostReceipt!.sourceKey = "another actor"; },
     (value: C1ValidationActual) => { value.hostReceipt!.selectedRequestId = "forged-display"; },
     (value: C1ValidationActual) => { value.hostReceipt!.historyFailed = true; },
+    (value: C1ValidationActual) => { Object.assign(value.hostReceipt!, { version: "reference-selection-v1" }); },
   ]) { const forged = structuredClone(selection); mutate(forged);
     assert.equal(scoreAmount(selectedAmount, [...twoDisplays, { question: selectedHistory[2]!.question, actual: forged }]).amountEvidenceProofPassed, false); }
   assert.equal(scoreAmount(selectedAmount, [...twoDisplays, { question: "请你帮我选最新的金额", actual: selection }]).amountEvidenceProofPassed, false);
@@ -1043,6 +1136,10 @@ export function checkC1ValidationScoring() {
   rejectedSelection.hostReceipt!.outcome = "rejected"; delete rejectedSelection.hostReceipt!.selectedRequestId;
   assert.equal(scoreAmount(afterRejected, [...selectedHistory, { question: "选择金额基准 invalid", actual: rejectedSelection }]).amountEvidenceProofPassed, false,
     "A later rejected selection must not revive an earlier selected token");
+  const unrelatedReceipt = structuredClone(rejectedSelection);
+  Object.assign(unrelatedReceipt.hostReceipt!, { version: "reference-selection-v1" });
+  assert.equal(scoreAmount(afterRejected, [...selectedHistory, { question: "选择订单 invalid", actual: unrelatedReceipt }]).amountEvidenceProofPassed, true,
+    "A different receipt version is not an amount selection or an amount-candidate change");
   const expired = structuredClone(comparison); expired.result!.evidence.amountChoices!.candidates[0]!.expiresAt = now;
   assert.equal(scoreAmount(expired).amountEvidenceProofPassed, false, "TTL is checked at the actual read time");
   const extended = structuredClone(comparison); extended.result!.evidence.amountChoices!.candidates[0]!.expiresAt += 60_000;

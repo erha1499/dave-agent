@@ -220,7 +220,7 @@ export async function runC1ContextCheck(live = false, split: C1Split = "original
   resolveEvidenceSupportModel(knowledgeSupportModel);
   const data = await loadC1ContextDataset(split), adapter = await loadActionAdapter(), clients = live ? undefined : await mockClients(knowledgeSupport, knowledgeSupportModel), runId = randomUUID();
   const rows: Row[] = [];
-  const codeFiles = ["scripts/c1-context-check.ts", "src/support-controller.ts", "src/support-context.ts", "src/support-evidence-context.ts", "src/support-context-action.ts", "src/knowledge-service.ts", "src/knowledge-applicability.ts", "data/knowledge-applicability.json", "src/support-parameters.ts", "src/evidence-support.ts", "src/evidence-acceptance.ts", "src/retrieval-ranking.ts", "src/bailian.ts"];
+  const codeFiles = ["scripts/c1-context-check.ts", "src/support-controller.ts", "src/support-context.ts", "src/support-reference-selection.ts", "src/support-evidence-context.ts", "src/support-context-action.ts", "src/knowledge-service.ts", "src/knowledge-applicability.ts", "data/knowledge-applicability.json", "src/support-parameters.ts", "src/evidence-support.ts", "src/evidence-acceptance.ts", "src/retrieval-ranking.ts", "src/bailian.ts"];
   const codeHashes = async () => Object.fromEntries(await Promise.all(codeFiles.map(async file => [file, hash(await readFile(new URL(file, root)))])));
   const codeBefore = await codeHashes();
   for (const test of data.dataset.cases) {

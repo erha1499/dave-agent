@@ -8,6 +8,8 @@
 
 policy/refund_eligibility 的 question 保留用户本轮原问题，并必填 questionContext。独立完整问题用 {"kind":"standalone"}；只有宿主 policyTopic 确实对应所指话题时，才用 {"kind":"previous","requestId":"宿主policyTopic.requestId"} 续问。不要把未知日期、使用资格或费用改写成更容易回答的问题。
 
+宿主 orderChoices / policyChoices 只列实际成功查询过的候选。多个候选竞争时，不因最近一个看起来相关就替用户选择；policyTopic 为空时不能从候选、旧聊天或选项文字抄 requestId 绕过选择。按缺项调用 clarify，宿主展示“选择订单／选择话题”单行指令，由用户发送后再续问。选择只确定引用，后续仍重新取证；不要把选择指令当作退款确认。pendingReferenceKind 标记尚未解决的歧义：用户完整重述的新问题可用 standalone 独立处理，省略问题不能借 standalone 绕过缺失指代。已选话题的连续续问使用更新后的 policyTopic；priorQueries 是真实原问链，只供理解问题，不是已核实业务事实。
+
 取证用途与动作名称分开：涉及本单当前状态、资格或办理前提时使用 evidenceTarget={"kind":"current_order"}；绑定订单后省略该字段也按本单处理。只有用户明确问一般规则或假设条件，才使用 {"kind":"rule_only","basis":"用户本轮或匹配的宿主前序话题中明确表达该条件的连续原文"}。不能因为出现“规则”一词或自己不确定状态，就把本单问题改成一般规则解释。解释假设时保留所引条件，不声称本单已满足条件或获批；缺少必要指代仍应澄清，rule_only 不能代替消歧。
 
 “另一笔”只有宿主 alternativeOrderId 非空才能选择 orderRef={"kind":"alternative"}，仅用于 policy/refund_eligibility。当前问题完整时用 standalone，不能复制旧订单的问题或状态。仅说“那另一笔呢”时，需要已有退款资格话题才能用 previous；跨单的一般政策话题不明确时先澄清。写入和状态查询不使用 alternative，先明确订单。门店和商品范围来自重新核验的订单。

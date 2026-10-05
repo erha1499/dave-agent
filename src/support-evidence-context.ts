@@ -24,6 +24,25 @@ type TargetInput = {
   binding: { sourceKey: string; groupOpenid: string; orderId: string | null };
 };
 
+// Keep a bounded chain of actual user questions, never model summaries. Missing
+// priorQueries is the historical one-question contract.
+export function policyTopicQueries(topic: TrustedPolicyTopic): Array<{ requestId: string; originalQuery: string }> | undefined {
+  if (topic.priorQueries !== undefined && (!Array.isArray(topic.priorQueries) || topic.priorQueries.length > 4)) return undefined;
+  const queries = [...(topic.priorQueries ?? []), { requestId: topic.requestId, originalQuery: topic.originalQuery }];
+  if (queries.some(row => !row || typeof row.requestId !== "string" || !row.requestId || row.requestId.length > 512
+    || typeof row.originalQuery !== "string" || !row.originalQuery.trim())
+    || new Set(queries.map(row => row.requestId)).size !== queries.length
+    || queries.reduce((sum, row) => sum + row.originalQuery.length, 0) > 500) return undefined;
+  return queries.map(row => ({ requestId: row.requestId, originalQuery: row.originalQuery }));
+}
+
+export function policyTopicQueryContext(topic: TrustedPolicyTopic): string {
+  const queries = policyTopicQueries(topic);
+  if (!queries) throw new SupportProtocolError("前序问题链不完整或超过恢复预算，请完整重述当前问题。");
+  return `上轮已完成取证的问题（仅用于理解本轮指代）：${topic.originalQuery}`
+    + (queries.length > 1 ? `\n更早的已取证原问（按先后顺序，仅用于理解本轮指代）：${queries.slice(0, -1).map(row => row.originalQuery).join("\n")}` : "");
+}
+
 // Source checks establish provenance, not arbitrary natural-language meaning.
 // The read-only explanation channel cannot authorize a later business operation.
 export function validateSupportEvidenceTarget(input: TargetInput): SupportEvidenceTarget {
@@ -43,11 +62,12 @@ export function validateSupportEvidenceTarget(input: TargetInput): SupportEviden
   if (action.questionContext.kind === "previous" && action.orderRef?.kind !== "alternative" && topic
     && topic.requestId === action.questionContext.requestId && topic.sourceKey === binding.sourceKey
     && topic.groupOpenid === binding.groupOpenid && topic.orderId === binding.orderId
-    && topic.originalQuery.trim() && topic.originalQuery.length <= 500 && topic.originalQuery.includes(basis)
+    && policyTopicQueries(topic)?.some(row => row.originalQuery.includes(basis))
     && topic.sources.length > 0 && topic.sources.length <= 5
     && new Set(topic.sources.map(source => source.sourceId)).size === topic.sources.length
     && topic.sources.every(source => source.sourceId && /^[a-f0-9]{64}$/.test(source.version))) {
-    return { kind: "rule_only", basis, basisSource: "previous_policy_topic", basisRequestId: topic.requestId };
+    return { kind: "rule_only", basis, basisSource: "previous_policy_topic",
+      basisRequestId: policyTopicQueries(topic)!.findLast(row => row.originalQuery.includes(basis))!.requestId };
   }
   throw new SupportProtocolError("规则解释依据不在当前原文或匹配的可信前序中；不能补造条件或搬用另一订单的假设。");
 }
@@ -90,13 +110,13 @@ export function buildSupportEvidenceBinding(input: TargetInput & { order?: Order
   let query = input.originalQuery.trim();
   if ((action.kind === "policy" || action.kind === "refund_eligibility") && action.questionContext.kind === "previous") {
     if (!topic || topic.requestId !== action.questionContext.requestId || topic.sourceKey !== input.binding.sourceKey
-      || topic.groupOpenid !== input.binding.groupOpenid) throw new SupportProtocolError("知识续问缺少真实匹配的前序话题。");
+      || topic.groupOpenid !== input.binding.groupOpenid || !policyTopicQueries(topic)) throw new SupportProtocolError("知识续问缺少真实匹配的前序话题。");
     if (action.orderRef?.kind === "alternative") {
       if (action.kind !== "refund_eligibility" || topic.intent !== "refund_eligibility") throw new SupportProtocolError("跨单续问只能延续明确退款意图。");
       query += "\n本轮继续咨询新选定订单的退款申请资格与条件。";
     } else {
       if (topic.orderId !== input.binding.orderId) throw new SupportProtocolError("前序政策话题属于另一订单。");
-      query += `\n上轮已完成取证的问题（仅用于理解本轮指代）：${topic.originalQuery}`;
+      query += `\n${policyTopicQueryContext(topic)}`;
     }
   }
   if (prerequisite) query = orderRefundState(order!);

@@ -769,7 +769,8 @@ console.log("[support-controller] v2.2 fresh coupon cardinality/status counts an
     const result = await test.controller.createTurn(test.context(text, { focusOrderId: orderId, policyTopic })).execute(action);
     assert.equal(result.outcome, "clarification"); assert.equal(result.evidence.actualCalls.length, 0);
     assert.equal(result.needsAnswer, false); assert.ok(result.reply.kind === "notice");
-    assert.match(result.reply.text, /先处理哪项需求.*若续问前文，请补充所指规则、时间或对象/);
+    assert.match(result.reply.text, /具体使用规则或上一次问题/);
+    assert.equal(result.pendingReferenceKind, "policy");
   }
   const changedScope = structuredClone(topic); changedScope.scope.productId = "old-product";
   const rejectedScope = await test.controller.createTurn(test.context(text, { focusOrderId: orderId, policyTopic: changedScope })).execute(action);

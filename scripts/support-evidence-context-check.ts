@@ -89,7 +89,8 @@ assert.ok(followed.evidence.knowledge[0]!.context.retrievalQuery!.includes(hypot
 for (const changed of [{ ...topic, sourceKey: "other-owner" }, { ...topic, groupOpenid: "other-group" },
   { ...topic, orderId: "COUPON-2302" }, { ...topic, requestId: "unknown-request" }, { ...topic, sources: [] }]) {
   const before = calls.length;
-  await assert.rejects(controller.createTurn(context(followQuestion, { focusOrderId: orderId, policyTopic: changed })).execute(follow), SupportProtocolError);
+  const unresolved = await controller.createTurn(context(followQuestion, { focusOrderId: orderId, policyTopic: changed })).execute(follow);
+  assert.equal(unresolved.outcome, "clarification"); assert.equal(unresolved.pendingReferenceKind, "policy");
   assert.equal(calls.length, before, "Foreign or missing previous-basis references fail before any business call");
 }
 const repairing = controller.createTurn(context(hypothetical)), beforeRepair = calls.length;
