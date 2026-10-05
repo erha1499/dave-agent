@@ -1,0 +1,930 @@
+{
+  "version": 1,
+  "stage": "exposed-development-fixed-input-provider-ablation",
+  "sourceCommit": "5fa144e",
+  "runId": "7740f402-e083-4193-a684-9411f2817ac5",
+  "rawSha256": "32edf46fb1f55c65a312508735a9b93a5a9d579df4b2929c9e192ec21fa6d392",
+  "datasetSha256": "286e2c31d7c72325fb8b10c19911978a091dfea3c3d4fe6797f90ff6c5afc973",
+  "manifestSha256": "d343a9764f8b512e8b55604f8f5b7ad47917960527a41f01effd82149661ab13",
+  "startedAt": "2026-10-05T22:34:51.635Z",
+  "finishedAt": "2026-10-05T22:35:59.625Z",
+  "scope": "Fixed synthetic inputs and production knowledge service; real rerank/support; no Agent, SQL, QQ, reply or business authorization validation.",
+  "integrityPassed": true,
+  "codeStable": true,
+  "summary": {
+    "combined": {
+      "planned": 20,
+      "completed": 19,
+      "sourceMissing": 1,
+      "failedOrNotRun": 0,
+      "exactEvidenceSet": 17,
+      "known": 16,
+      "rawGoldAt5": 15,
+      "acceptedGold": 15,
+      "extraEvidence": 1,
+      "noAnswer": 4,
+      "noAnswerRejected": 2,
+      "noAnswerFalseAccepted": 1,
+      "invalidSupportDecisions": 0,
+      "p50Ms": 1846.2288329999992,
+      "p95Ms": 2714.4361659999995
+    },
+    "separated": {
+      "planned": 20,
+      "completed": 19,
+      "sourceMissing": 1,
+      "failedOrNotRun": 0,
+      "exactEvidenceSet": 18,
+      "known": 16,
+      "rawGoldAt5": 16,
+      "acceptedGold": 16,
+      "extraEvidence": 1,
+      "noAnswer": 4,
+      "noAnswerRejected": 2,
+      "noAnswerFalseAccepted": 1,
+      "invalidSupportDecisions": 0,
+      "p50Ms": 2044.0404170000002,
+      "p95Ms": 2717.9376250000005
+    }
+  },
+  "costs": {
+    "combined": {
+      "rerank": {
+        "requests": 19,
+        "unknownCosts": 0,
+        "knownEstimatedCost": 0.032786499999999996,
+        "currency": "CNY",
+        "totalTokens": 65573
+      },
+      "support": {
+        "requests": 17,
+        "unknownCosts": 0,
+        "knownEstimatedCost": 0.013065359999999996,
+        "currency": "USD",
+        "totalTokens": 31138
+      }
+    },
+    "separated": {
+      "rerank": {
+        "requests": 19,
+        "unknownCosts": 0,
+        "knownEstimatedCost": 0.029591999999999997,
+        "currency": "CNY",
+        "totalTokens": 59184
+      },
+      "support": {
+        "requests": 17,
+        "unknownCosts": 0,
+        "knownEstimatedCost": 0.013275328,
+        "currency": "USD",
+        "totalTokens": 30378
+      }
+    }
+  },
+  "subsets": {
+    "changed": {
+      "combined": {
+        "planned": 9,
+        "completed": 9,
+        "sourceMissing": 0,
+        "failedOrNotRun": 0,
+        "exactEvidenceSet": 7,
+        "known": 7,
+        "rawGoldAt5": 6,
+        "acceptedGold": 6,
+        "extraEvidence": 1,
+        "noAnswer": 2,
+        "noAnswerRejected": 1,
+        "noAnswerFalseAccepted": 1,
+        "invalidSupportDecisions": 0,
+        "p50Ms": 1835.3372080000001,
+        "p95Ms": 2714.4361659999995
+      },
+      "separated": {
+        "planned": 9,
+        "completed": 9,
+        "sourceMissing": 0,
+        "failedOrNotRun": 0,
+        "exactEvidenceSet": 8,
+        "known": 7,
+        "rawGoldAt5": 7,
+        "acceptedGold": 7,
+        "extraEvidence": 1,
+        "noAnswer": 2,
+        "noAnswerRejected": 1,
+        "noAnswerFalseAccepted": 1,
+        "invalidSupportDecisions": 0,
+        "p50Ms": 2044.0404170000002,
+        "p95Ms": 2717.9376250000005
+      }
+    },
+    "unchanged": {
+      "combined": {
+        "planned": 10,
+        "completed": 10,
+        "sourceMissing": 0,
+        "failedOrNotRun": 0,
+        "exactEvidenceSet": 10,
+        "known": 9,
+        "rawGoldAt5": 9,
+        "acceptedGold": 9,
+        "extraEvidence": 0,
+        "noAnswer": 1,
+        "noAnswerRejected": 1,
+        "noAnswerFalseAccepted": 0,
+        "invalidSupportDecisions": 0,
+        "p50Ms": 1901.705875000007,
+        "p95Ms": 2620.3577920000025
+      },
+      "separated": {
+        "planned": 10,
+        "completed": 10,
+        "sourceMissing": 0,
+        "failedOrNotRun": 0,
+        "exactEvidenceSet": 10,
+        "known": 9,
+        "rawGoldAt5": 9,
+        "acceptedGold": 9,
+        "extraEvidence": 0,
+        "noAnswer": 1,
+        "noAnswerRejected": 1,
+        "noAnswerFalseAccepted": 0,
+        "invalidSupportDecisions": 0,
+        "p50Ms": 1920.724000000002,
+        "p95Ms": 2491.7765
+      }
+    }
+  },
+  "rows": [
+    {
+      "caseId": "c1-session-fixed-001",
+      "turn": 2,
+      "mode": "combined",
+      "execution": "completed",
+      "proofPassed": true,
+      "changedInput": true,
+      "gold": [
+        "KB-REFUND-PAYMENT"
+      ],
+      "rawGoldRanks": [
+        {
+          "id": "KB-REFUND-PAYMENT",
+          "rank": 6
+        }
+      ],
+      "accepted": [],
+      "traceHash": "103a2f0706ed30ce1f90b1b6369f9cc3381add1fba5a62e1ac1d34f6318aeb8e"
+    },
+    {
+      "caseId": "c1-session-fixed-001",
+      "turn": 2,
+      "mode": "separated",
+      "execution": "completed",
+      "proofPassed": true,
+      "changedInput": true,
+      "gold": [
+        "KB-REFUND-PAYMENT"
+      ],
+      "rawGoldRanks": [
+        {
+          "id": "KB-REFUND-PAYMENT",
+          "rank": 4
+        }
+      ],
+      "accepted": [
+        "KB-REFUND-PAYMENT"
+      ],
+      "traceHash": "b37461e9618c967236c761c95d28cf3f472321aacfdace4c606c2ae39283416b"
+    },
+    {
+      "caseId": "c1-session-fixed-007",
+      "turn": 3,
+      "mode": "combined",
+      "execution": "completed",
+      "proofPassed": true,
+      "changedInput": true,
+      "gold": [
+        "KB-REFUND-EXPIRED"
+      ],
+      "rawGoldRanks": [
+        {
+          "id": "KB-REFUND-EXPIRED",
+          "rank": 4
+        }
+      ],
+      "accepted": [
+        "KB-REFUND-EXPIRED"
+      ],
+      "traceHash": "04a084ab601fe8da45a6766a8a901accd786a7f6b97f6d5b6a137937b5820efa"
+    },
+    {
+      "caseId": "c1-session-fixed-007",
+      "turn": 3,
+      "mode": "separated",
+      "execution": "completed",
+      "proofPassed": true,
+      "changedInput": true,
+      "gold": [
+        "KB-REFUND-EXPIRED"
+      ],
+      "rawGoldRanks": [
+        {
+          "id": "KB-REFUND-EXPIRED",
+          "rank": 4
+        }
+      ],
+      "accepted": [
+        "KB-REFUND-EXPIRED"
+      ],
+      "traceHash": "dbbf53750f8485d29d0541b409fc67dfb41d46611fdc93e2e1395d84f6a5fbdb"
+    },
+    {
+      "caseId": "c1-session-fixed-010",
+      "turn": 1,
+      "mode": "combined",
+      "execution": "completed",
+      "proofPassed": true,
+      "changedInput": true,
+      "gold": [
+        "KB-PRODUCT-LUNCH"
+      ],
+      "rawGoldRanks": [
+        {
+          "id": "KB-PRODUCT-LUNCH",
+          "rank": 1
+        }
+      ],
+      "accepted": [
+        "KB-PRODUCT-LUNCH"
+      ],
+      "traceHash": "3a832d3d278ef4b62ae55de52e0ea2dffdaea33eae32ac5754e42fd96a247e6d"
+    },
+    {
+      "caseId": "c1-session-fixed-010",
+      "turn": 1,
+      "mode": "separated",
+      "execution": "completed",
+      "proofPassed": true,
+      "changedInput": true,
+      "gold": [
+        "KB-PRODUCT-LUNCH"
+      ],
+      "rawGoldRanks": [
+        {
+          "id": "KB-PRODUCT-LUNCH",
+          "rank": 1
+        }
+      ],
+      "accepted": [
+        "KB-PRODUCT-LUNCH"
+      ],
+      "traceHash": "d589287f65108175dcd535f3835e2cc1b121b8d7c84033ec48d1ceda694daf2a"
+    },
+    {
+      "caseId": "c1-session-fixed-010",
+      "turn": 2,
+      "mode": "combined",
+      "execution": "completed",
+      "proofPassed": true,
+      "changedInput": true,
+      "gold": [
+        "KB-PRODUCT-LUNCH"
+      ],
+      "rawGoldRanks": [
+        {
+          "id": "KB-PRODUCT-LUNCH",
+          "rank": 1
+        }
+      ],
+      "accepted": [
+        "KB-PRODUCT-LUNCH"
+      ],
+      "traceHash": "6db425f154efc8e7249dee84d562e8b560b1544603a92f698c02390e279ab481"
+    },
+    {
+      "caseId": "c1-session-fixed-010",
+      "turn": 2,
+      "mode": "separated",
+      "execution": "completed",
+      "proofPassed": true,
+      "changedInput": true,
+      "gold": [
+        "KB-PRODUCT-LUNCH"
+      ],
+      "rawGoldRanks": [
+        {
+          "id": "KB-PRODUCT-LUNCH",
+          "rank": 1
+        }
+      ],
+      "accepted": [
+        "KB-PRODUCT-LUNCH"
+      ],
+      "traceHash": "be4dd4930c891729b96054b1ba8ca83cd05493acc8b3cc35eefdbb2ca81c6cfd"
+    },
+    {
+      "caseId": "c1-session-fixed-012",
+      "turn": 1,
+      "mode": "combined",
+      "execution": "completed",
+      "proofPassed": true,
+      "changedInput": true,
+      "gold": [
+        "KB-PRODUCT-LUNCH"
+      ],
+      "rawGoldRanks": [
+        {
+          "id": "KB-PRODUCT-LUNCH",
+          "rank": 1
+        }
+      ],
+      "accepted": [
+        "KB-PRODUCT-LUNCH"
+      ],
+      "traceHash": "cb135f8722f2d2a56a1c623f3aaef11c1fe4cfdf3306d739b8d014608e645e18"
+    },
+    {
+      "caseId": "c1-session-fixed-012",
+      "turn": 1,
+      "mode": "separated",
+      "execution": "completed",
+      "proofPassed": true,
+      "changedInput": true,
+      "gold": [
+        "KB-PRODUCT-LUNCH"
+      ],
+      "rawGoldRanks": [
+        {
+          "id": "KB-PRODUCT-LUNCH",
+          "rank": 1
+        }
+      ],
+      "accepted": [
+        "KB-PRODUCT-LUNCH"
+      ],
+      "traceHash": "8eb30369d81303adf0330f89865b59c250759fd1bac51628ca1af71845d82487"
+    },
+    {
+      "caseId": "c1-session-fixed-012",
+      "turn": 2,
+      "mode": "combined",
+      "execution": "completed",
+      "proofPassed": true,
+      "changedInput": true,
+      "gold": [
+        "KB-PRODUCT-DINNER"
+      ],
+      "rawGoldRanks": [
+        {
+          "id": "KB-PRODUCT-DINNER",
+          "rank": 1
+        }
+      ],
+      "accepted": [
+        "KB-PRODUCT-DINNER"
+      ],
+      "traceHash": "e2feb15a7febb7b01aee6bd22157ff80ee1f60572b17d65c6f5cb6f9f85c8042"
+    },
+    {
+      "caseId": "c1-session-fixed-012",
+      "turn": 2,
+      "mode": "separated",
+      "execution": "completed",
+      "proofPassed": true,
+      "changedInput": true,
+      "gold": [
+        "KB-PRODUCT-DINNER"
+      ],
+      "rawGoldRanks": [
+        {
+          "id": "KB-PRODUCT-DINNER",
+          "rank": 1
+        }
+      ],
+      "accepted": [
+        "KB-PRODUCT-DINNER"
+      ],
+      "traceHash": "9e4fc74bbdb45c63de6a7689d61b14323b47a2af8e7973c6990891eeb3d08abd"
+    },
+    {
+      "caseId": "c1-session-fixed-013",
+      "turn": 1,
+      "mode": "combined",
+      "execution": "completed",
+      "proofPassed": true,
+      "changedInput": false,
+      "gold": [
+        "RF005"
+      ],
+      "rawGoldRanks": [
+        {
+          "id": "RF005",
+          "rank": 1
+        }
+      ],
+      "accepted": [
+        "RF005"
+      ],
+      "traceHash": "4e9423d43fbd50fb5ced599df8cf371db9594e610b4312d8f787f8cd50c6b48a"
+    },
+    {
+      "caseId": "c1-session-fixed-013",
+      "turn": 1,
+      "mode": "separated",
+      "execution": "completed",
+      "proofPassed": true,
+      "changedInput": false,
+      "gold": [
+        "RF005"
+      ],
+      "rawGoldRanks": [
+        {
+          "id": "RF005",
+          "rank": 1
+        }
+      ],
+      "accepted": [
+        "RF005"
+      ],
+      "traceHash": "274e59caa23713814473d728f6d8b03e82f56148e795360da0b790eb9824ed50"
+    },
+    {
+      "caseId": "c1-session-fixed-013",
+      "turn": 2,
+      "mode": "combined",
+      "execution": "completed",
+      "proofPassed": true,
+      "changedInput": false,
+      "gold": [
+        "RF005"
+      ],
+      "rawGoldRanks": [
+        {
+          "id": "RF005",
+          "rank": 1
+        }
+      ],
+      "accepted": [
+        "RF005"
+      ],
+      "traceHash": "d7e192b5df19f588a3ea7544ae076fa8450c1c5e29c9eb1df0cd4ce723609214"
+    },
+    {
+      "caseId": "c1-session-fixed-013",
+      "turn": 2,
+      "mode": "separated",
+      "execution": "completed",
+      "proofPassed": true,
+      "changedInput": false,
+      "gold": [
+        "RF005"
+      ],
+      "rawGoldRanks": [
+        {
+          "id": "RF005",
+          "rank": 1
+        }
+      ],
+      "accepted": [
+        "RF005"
+      ],
+      "traceHash": "0a4d798b3fe31a9a56112d3b21e839674d3a35f9f4f85d22f26020f91a7aa108"
+    },
+    {
+      "caseId": "c1-session-fixed-015",
+      "turn": 1,
+      "mode": "combined",
+      "execution": "completed",
+      "proofPassed": true,
+      "changedInput": false,
+      "gold": [
+        "RF005"
+      ],
+      "rawGoldRanks": [
+        {
+          "id": "RF005",
+          "rank": 1
+        }
+      ],
+      "accepted": [
+        "RF005"
+      ],
+      "traceHash": "a18becce04a56d60af892b4a2d4f4c759314fbb2969f4d5bac89b6633d629f1c"
+    },
+    {
+      "caseId": "c1-session-fixed-015",
+      "turn": 1,
+      "mode": "separated",
+      "execution": "completed",
+      "proofPassed": true,
+      "changedInput": false,
+      "gold": [
+        "RF005"
+      ],
+      "rawGoldRanks": [
+        {
+          "id": "RF005",
+          "rank": 1
+        }
+      ],
+      "accepted": [
+        "RF005"
+      ],
+      "traceHash": "92e2f5c70dc69fefe3bcf171eee4f930487bc9f207420394e99e95c46782cac5"
+    },
+    {
+      "caseId": "c1-session-fixed-015",
+      "turn": 2,
+      "mode": "combined",
+      "execution": "completed",
+      "proofPassed": true,
+      "changedInput": false,
+      "gold": [
+        "RF005"
+      ],
+      "rawGoldRanks": [
+        {
+          "id": "RF005",
+          "rank": 1
+        }
+      ],
+      "accepted": [
+        "RF005"
+      ],
+      "traceHash": "7ee7a28e6f4b83ccadbacbff6ea1643d5b0f8535a3a79f611da23998f30160d0"
+    },
+    {
+      "caseId": "c1-session-fixed-015",
+      "turn": 2,
+      "mode": "separated",
+      "execution": "completed",
+      "proofPassed": true,
+      "changedInput": false,
+      "gold": [
+        "RF005"
+      ],
+      "rawGoldRanks": [
+        {
+          "id": "RF005",
+          "rank": 1
+        }
+      ],
+      "accepted": [
+        "RF005"
+      ],
+      "traceHash": "ebde999c435fb0196bacf9188aeaf4579a883d1e1de186a280dbdd505ecdade1"
+    },
+    {
+      "caseId": "c1-session-fixed-016",
+      "turn": 1,
+      "mode": "combined",
+      "execution": "completed",
+      "proofPassed": true,
+      "changedInput": false,
+      "gold": [
+        "RS003"
+      ],
+      "rawGoldRanks": [
+        {
+          "id": "RS003",
+          "rank": 1
+        }
+      ],
+      "accepted": [
+        "RS003"
+      ],
+      "traceHash": "457c6a82027a060677f8289f5525159a411f1db058706988ff9fd268463d5cde"
+    },
+    {
+      "caseId": "c1-session-fixed-016",
+      "turn": 1,
+      "mode": "separated",
+      "execution": "completed",
+      "proofPassed": true,
+      "changedInput": false,
+      "gold": [
+        "RS003"
+      ],
+      "rawGoldRanks": [
+        {
+          "id": "RS003",
+          "rank": 1
+        }
+      ],
+      "accepted": [
+        "RS003"
+      ],
+      "traceHash": "38bf0a30d7a74cd51ebbb86a8f605f575606582c3f15119e273afa7eb783d118"
+    },
+    {
+      "caseId": "c1-session-fixed-016",
+      "turn": 2,
+      "mode": "combined",
+      "execution": "completed",
+      "proofPassed": true,
+      "changedInput": false,
+      "gold": [
+        "RS003"
+      ],
+      "rawGoldRanks": [
+        {
+          "id": "RS003",
+          "rank": 1
+        }
+      ],
+      "accepted": [
+        "RS003"
+      ],
+      "traceHash": "2806cf900c016b5bc75e758b684e8244bb47eccdedb96abf4f05e5713407d5ac"
+    },
+    {
+      "caseId": "c1-session-fixed-016",
+      "turn": 2,
+      "mode": "separated",
+      "execution": "completed",
+      "proofPassed": true,
+      "changedInput": false,
+      "gold": [
+        "RS003"
+      ],
+      "rawGoldRanks": [
+        {
+          "id": "RS003",
+          "rank": 1
+        }
+      ],
+      "accepted": [
+        "RS003"
+      ],
+      "traceHash": "4e7da36837ac24de4e01df6c35f1460c39ed3ac615e45f941ad344e429bbfe54"
+    },
+    {
+      "caseId": "c1-session-fixed-018",
+      "turn": 1,
+      "mode": "combined",
+      "execution": "completed",
+      "proofPassed": true,
+      "changedInput": false,
+      "gold": [
+        "RS003"
+      ],
+      "rawGoldRanks": [
+        {
+          "id": "RS003",
+          "rank": 1
+        }
+      ],
+      "accepted": [
+        "RS003"
+      ],
+      "traceHash": "f960d08129201bbbc37fc27c0f1ca4e0fba8bb7bd8a7ee7dcce97ca1bc74e2da"
+    },
+    {
+      "caseId": "c1-session-fixed-018",
+      "turn": 1,
+      "mode": "separated",
+      "execution": "completed",
+      "proofPassed": true,
+      "changedInput": false,
+      "gold": [
+        "RS003"
+      ],
+      "rawGoldRanks": [
+        {
+          "id": "RS003",
+          "rank": 1
+        }
+      ],
+      "accepted": [
+        "RS003"
+      ],
+      "traceHash": "0d231eb4d9b6353623447e9a6b5ecdd8333ba5ea9cc7819dc8dc95eecb585c19"
+    },
+    {
+      "caseId": "c1-session-fixed-018",
+      "turn": 2,
+      "mode": "combined",
+      "execution": "completed",
+      "proofPassed": true,
+      "changedInput": false,
+      "gold": [
+        "VF002"
+      ],
+      "rawGoldRanks": [
+        {
+          "id": "VF002",
+          "rank": 1
+        }
+      ],
+      "accepted": [
+        "VF002"
+      ],
+      "traceHash": "9969c52e13171606f0941bd175e80f3d5d1fa9ee1cd728fd12b6e1a29cbb5a9a"
+    },
+    {
+      "caseId": "c1-session-fixed-018",
+      "turn": 2,
+      "mode": "separated",
+      "execution": "completed",
+      "proofPassed": true,
+      "changedInput": false,
+      "gold": [
+        "VF002"
+      ],
+      "rawGoldRanks": [
+        {
+          "id": "VF002",
+          "rank": 1
+        }
+      ],
+      "accepted": [
+        "VF002"
+      ],
+      "traceHash": "700ea9cf721d5ad8af6193523d4798ce6d309f3ac43bb7626b992852ea0e6066"
+    },
+    {
+      "caseId": "c1-session-fixed-019",
+      "turn": 1,
+      "mode": "combined",
+      "execution": "completed",
+      "proofPassed": true,
+      "changedInput": true,
+      "gold": [],
+      "rawGoldRanks": [],
+      "accepted": [
+        "KB-PRODUCT-LUNCH"
+      ],
+      "traceHash": "a951b3dd3788db51962c24e90fe61e9e6ad3a56edf83fb22d1b1b3b7f7f742d4"
+    },
+    {
+      "caseId": "c1-session-fixed-019",
+      "turn": 1,
+      "mode": "separated",
+      "execution": "completed",
+      "proofPassed": true,
+      "changedInput": true,
+      "gold": [],
+      "rawGoldRanks": [],
+      "accepted": [
+        "KB-PRODUCT-LUNCH"
+      ],
+      "traceHash": "0a2a26f5edf0a4a70ba513a337756b071b6e6f81221af150d7c323233d9cde7e"
+    },
+    {
+      "caseId": "c1-session-fixed-020",
+      "turn": 1,
+      "mode": "combined",
+      "execution": "completed",
+      "proofPassed": true,
+      "changedInput": true,
+      "gold": [],
+      "rawGoldRanks": [],
+      "accepted": [],
+      "traceHash": "8cf98efbc558d50fc51757c9fce9ac6aee9f5aa17ac37b2869f65d1a423069c9"
+    },
+    {
+      "caseId": "c1-session-fixed-020",
+      "turn": 1,
+      "mode": "separated",
+      "execution": "completed",
+      "proofPassed": true,
+      "changedInput": true,
+      "gold": [],
+      "rawGoldRanks": [],
+      "accepted": [],
+      "traceHash": "9482cbabe889fc8999aa4e5abeee432206f8af00a2ac148c60d2ca56577ce691"
+    },
+    {
+      "caseId": "c1-session-fixed-021",
+      "turn": 1,
+      "mode": "combined",
+      "execution": "source_missing",
+      "proofPassed": null,
+      "changedInput": false,
+      "gold": [],
+      "rawGoldRanks": [],
+      "accepted": [],
+      "traceHash": null
+    },
+    {
+      "caseId": "c1-session-fixed-021",
+      "turn": 1,
+      "mode": "separated",
+      "execution": "source_missing",
+      "proofPassed": null,
+      "changedInput": false,
+      "gold": [],
+      "rawGoldRanks": [],
+      "accepted": [],
+      "traceHash": null
+    },
+    {
+      "caseId": "c1-session-fixed-022",
+      "turn": 1,
+      "mode": "combined",
+      "execution": "completed",
+      "proofPassed": true,
+      "changedInput": false,
+      "gold": [],
+      "rawGoldRanks": [],
+      "accepted": [],
+      "traceHash": "1f7d0405c79ea0384d790f1e508b1eddef9911164f2babdfa38203edfa5c2c30"
+    },
+    {
+      "caseId": "c1-session-fixed-022",
+      "turn": 1,
+      "mode": "separated",
+      "execution": "completed",
+      "proofPassed": true,
+      "changedInput": false,
+      "gold": [],
+      "rawGoldRanks": [],
+      "accepted": [],
+      "traceHash": "5b6e378dcbefa50a64350048c3128899c87ff3cb946bf12d81d584294e293349"
+    },
+    {
+      "caseId": "c1-session-fixed-023",
+      "turn": 1,
+      "mode": "combined",
+      "execution": "completed",
+      "proofPassed": true,
+      "changedInput": true,
+      "gold": [
+        "KB-PRODUCT-LUNCH"
+      ],
+      "rawGoldRanks": [
+        {
+          "id": "KB-PRODUCT-LUNCH",
+          "rank": 1
+        }
+      ],
+      "accepted": [
+        "KB-PRODUCT-LUNCH"
+      ],
+      "traceHash": "de179030fbf41be98016197b8aaace3443205d7dde21396f3996ba88f4ec2c07"
+    },
+    {
+      "caseId": "c1-session-fixed-023",
+      "turn": 1,
+      "mode": "separated",
+      "execution": "completed",
+      "proofPassed": true,
+      "changedInput": true,
+      "gold": [
+        "KB-PRODUCT-LUNCH"
+      ],
+      "rawGoldRanks": [
+        {
+          "id": "KB-PRODUCT-LUNCH",
+          "rank": 1
+        }
+      ],
+      "accepted": [
+        "KB-PRODUCT-LUNCH"
+      ],
+      "traceHash": "25952b82a23e0ae42b07db7e9765b6ea57a9f220d5e58b9d5ae88588fb405448"
+    },
+    {
+      "caseId": "c1-session-fixed-024",
+      "turn": 1,
+      "mode": "combined",
+      "execution": "completed",
+      "proofPassed": true,
+      "changedInput": false,
+      "gold": [
+        "ET006"
+      ],
+      "rawGoldRanks": [
+        {
+          "id": "ET006",
+          "rank": 1
+        }
+      ],
+      "accepted": [
+        "ET006"
+      ],
+      "traceHash": "962e518c1c40335c0861465b972b307cd7e796848a1114906b3c8d4a01e2e079"
+    },
+    {
+      "caseId": "c1-session-fixed-024",
+      "turn": 1,
+      "mode": "separated",
+      "execution": "completed",
+      "proofPassed": true,
+      "changedInput": false,
+      "gold": [
+        "ET006"
+      ],
+      "rawGoldRanks": [
+        {
+          "id": "ET006",
+          "rank": 1
+        }
+      ],
+      "accepted": [
+        "ET006"
+      ],
+      "traceHash": "f9786f7dd2268f80fded14b17be319b3a92758b9c78903e1c6c52bc42ee722ea"
+    }
+  ]
+}
