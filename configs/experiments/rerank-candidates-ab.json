@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "kind": "retrieval",
+  "label": "M6 候选数 10 / 20",
+  "repeat": 1,
+  "allowRemote": false,
+  "variants": [
+    { "id": "A", "modes": ["M6"], "parameters": { "candidateTopK": 10, "cache": "reuse", "maxRequests": 1200 } },
+    { "id": "B", "modes": ["M6"], "parameters": { "candidateTopK": 20, "cache": "reuse", "maxRequests": 1200 } }
+  ]
+}

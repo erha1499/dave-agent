@@ -489,3 +489,65 @@ footer{padding:0 16px 20px;flex-direction:column;gap:5px}
 .batch-case-list>summary{font-size:11px;color:var(--sage-deep);cursor:pointer}
 .batch-case-list>summary:hover{color:var(--sage)}
 .batch-case-list .batch-cases{margin-top:10px}
+
+/* ===== 实验调试 tab ===== */
+.exp-layout{display:grid;grid-template-columns:minmax(0,6fr) minmax(0,5fr);gap:22px;align-items:start}
+.exp-form-body{padding:15px 18px 17px;display:grid;gap:14px}
+.exp-fields{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1.4fr) minmax(90px,.5fr);gap:12px}
+.exp-field{display:flex;flex-direction:column;gap:5px;font-size:11px;color:var(--muted);min-width:0}
+.exp-field-label{font-size:10px;letter-spacing:.05em}
+.exp-field input,.exp-field select{font-size:12px;padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);width:100%}
+.exp-field input:focus-visible{outline:2px solid var(--sage);outline-offset:1px}
+.exp-variants{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px}
+.exp-variant{border:1px solid var(--line);border-radius:var(--radius);padding:12px 14px;background:var(--panel-soft);display:grid;gap:10px;align-content:start}
+.exp-variant-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.exp-variant-head h4{font-size:12px;color:var(--sage-deep);letter-spacing:.05em}
+.exp-variant-head .quiet-button{margin-left:0;padding:4px 10px}
+.exp-modes{display:flex;flex-wrap:wrap;gap:6px}
+.exp-mode{display:inline-flex;align-items:center;gap:5px;font-size:10px;padding:3px 9px;border:1px solid var(--line);border-radius:999px;cursor:pointer;background:var(--panel);color:var(--muted)}
+.exp-mode.active{border-color:var(--sage);background:var(--sage-tint);color:var(--sage-deep)}
+.exp-mode input{margin:0;cursor:pointer}
+.exp-params{display:grid;gap:9px;padding-top:10px}
+.exp-param{display:grid;grid-template-columns:minmax(90px,1fr) minmax(0,1.2fr);gap:3px 10px;align-items:center;font-size:11px;color:var(--muted)}
+.exp-param input,.exp-param select{font-size:11px;padding:6px 9px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);width:100%}
+.exp-param.disabled{opacity:.55}
+.exp-param .exp-note{grid-column:1/-1}
+.exp-note{font-size:10px;color:var(--muted)}
+.exp-advanced{border-top:1px dashed var(--line);padding-top:10px}
+.exp-advanced>summary{font-size:11px}
+.exp-diff{display:grid;gap:8px}
+.exp-remote{border:1px solid var(--line);border-radius:var(--radius);padding:10px 13px;display:grid;gap:5px;background:var(--panel-soft)}
+.exp-remote.needed{border-color:#e7d9ba;background:#f7f1e4}
+.exp-allow{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;cursor:pointer}
+.exp-allow input{cursor:pointer}
+.exp-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.exp-hint{font-size:11px;color:#937029}
+.exp-side{min-width:0;display:grid;gap:16px;align-content:start}
+.exp-jobs{display:grid;padding:6px 10px 10px;max-height:300px;overflow:auto}
+.exp-job{display:block;width:100%;text-align:left;padding:10px 11px;background:transparent;border:1px solid transparent;border-radius:var(--radius)}
+.exp-job:hover{background:var(--panel-soft)}
+.exp-job.selected{background:var(--sage-tint);border-color:#d3e0d0}
+.exp-job-title{display:block;font-size:12px;font-weight:600;overflow-wrap:anywhere}
+.exp-job-row{display:flex;align-items:center;gap:8px;margin-top:5px}
+.exp-job-body{padding:13px 18px 15px;display:grid;gap:10px}
+.exp-progress{display:flex;align-items:center;gap:8px;font-size:12px;flex-wrap:wrap}
+.exp-job-config{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.exp-result{border-top:1px dashed var(--line);padding-top:10px;display:grid;gap:8px}
+.exp-result-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12px}
+.exp-result-title{font-weight:600}
+.exp-summary{display:grid;gap:4px}
+.exp-summary-line{font-size:11px;color:var(--muted)}
+.exp-table{min-width:900px}
+.exp-table th,.exp-table td{white-space:nowrap}
+.exp-table td:last-child{min-width:150px;white-space:normal;overflow-wrap:anywhere}
+
+@media(max-width:1000px){.exp-layout{grid-template-columns:1fr}}
+@media(max-width:760px){
+.exp-fields{grid-template-columns:1fr}
+.exp-form-body{padding:13px 14px 15px}
+.exp-job-body{padding:11px 14px 13px}
+.exp-param{grid-template-columns:1fr}
+.exp-table{min-width:640px}
+.exp-table td:last-child{min-width:120px}
+.exp-jobs{max-height:none}
+}

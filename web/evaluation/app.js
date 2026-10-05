@@ -96,11 +96,17 @@ function setView(view) {
   state.view = view;
   $("overview").hidden = view !== "overview";
   $("comparison").hidden = view !== "compare";
-  for (const [id, active] of [["overview-tab", view === "overview"], ["compare-tab", view === "compare"]]) {
-    $(id).classList.toggle("active", active);
-    if (active) $(id).setAttribute("aria-current", "page");
-    else $(id).removeAttribute("aria-current");
+  const experimentsPanel = $("experiments");
+  if (experimentsPanel) experimentsPanel.hidden = view !== "experiments";
+  for (const [id, active] of [["overview-tab", view === "overview"], ["compare-tab", view === "compare"], ["experiments-tab", view === "experiments"]]) {
+    const tab = $(id);
+    if (!tab) continue;
+    tab.classList.toggle("active", active);
+    if (active) tab.setAttribute("aria-current", "page");
+    else tab.removeAttribute("aria-current");
   }
+  // 实验调试 tab 由 experiments.js 实现；未加载（离线检查或旧缓存页面）时守卫跳过。
+  if (typeof experimentViewChanged === "function") experimentViewChanged(view);
 }
 
 // 大量案例时按状态比例渲染分段条；少量案例保留逐案例校准块。
@@ -795,6 +801,7 @@ async function compare() {
 
 $("overview-tab").addEventListener("click", () => setView("overview"));
 $("compare-tab").addEventListener("click", () => setView("compare"));
+$("experiments-tab")?.addEventListener("click", () => setView("experiments"));
 $("refresh").addEventListener("click", loadRuns);
 $("kind").addEventListener("change", () => { state.kind = $("kind").value; state.selected = null; loadRuns(); });
 $("compare-button").addEventListener("click", compare);

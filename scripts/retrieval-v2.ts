@@ -3,7 +3,8 @@ import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { BailianBudgetStop, BailianError, contentHash, createBailianClient, validVector, type BailianAttempt, type BailianClient } from "../src/bailian.ts";
-import { scopeDocuments, rankLexical, rankBm25, rankDense, reciprocalRankFusion, serializeRetrievalDocument, type RetrievalDocument, type RetrievalScope, type RankedDocument } from "../src/retrieval-ranking.ts";
+import { scopeDocuments, rankLexical, rankBm25, rankDense, reciprocalRankFusion, serializeRetrievalDocument, resolveRetrievalParameters,
+  type RetrievalExperimentParameters, type RetrievalDocument, type RetrievalScope, type RankedDocument } from "../src/retrieval-ranking.ts";
 import { loadRetrievalData } from "./retrieval-data.ts";
 
 export const retrievalModes = ["M0", "M1", "M2", "M3", "M4", "M5", "M6"] as const;
@@ -121,15 +122,33 @@ export function summarizeV2(results: V2Result[], calls: Call[], plan: PlannedCas
 }
 
 export async function runRetrievalV2(options: { label: string; modes?: RetrievalMode[]; dataset?: V2Dataset; client?: BailianClient;
-  allowRemote?: boolean; cacheDir?: string; outputDir?: string; maxRequests?: number; consecutiveFailureLimit?: number }) {
+  allowRemote?: boolean; cacheDir?: string; outputDir?: string; maxRequests?: number; consecutiveFailureLimit?: number;
+  parameters?: Partial<RetrievalExperimentParameters> }) {
   const modes = options.modes ?? ["M0", "M1"];
   if (!modes.length || new Set(modes).size !== modes.length || modes.some(mode => !retrievalModes.includes(mode))
     || !options.label.trim() || options.label.length > 120) throw new Error("检索实验模式或 label 无效。");
   if (modes.some(remoteMode) && !options.allowRemote) throw new Error("远程实验必须显式设置 allowRemote。");
-  const client = modes.some(remoteMode) ? options.client ?? createBailianClient() : undefined;
-  const maxRequests = options.maxRequests ?? 1200, consecutiveFailureLimit = options.consecutiveFailureLimit ?? 5;
-  if (!Number.isSafeInteger(maxRequests) || maxRequests < 1 || maxRequests > 100_000 || !Number.isSafeInteger(consecutiveFailureLimit)
-    || consecutiveFailureLimit < 1 || consecutiveFailureLimit > 20) throw new Error("检索实验请求预算无效。");
+  // Validate before spreading so arrays, unknown keys and explicitly undefined values cannot be silently accepted.
+  resolveRetrievalParameters(options.parameters);
+  for (const name of ["maxRequests", "consecutiveFailureLimit"] as const) {
+    if (options[name] !== undefined && options.parameters?.[name] !== undefined && options[name] !== options.parameters[name]) {
+      throw new Error(`检索实验参数 ${name} 与旧预算选项冲突。`);
+    }
+  }
+  const injectedClient = modes.some(remoteMode) ? options.client : undefined;
+  for (const name of ["timeoutMs", "retries"] as const) {
+    if (injectedClient && options.parameters?.[name] !== undefined && options.parameters[name] !== injectedClient.settings[name]) {
+      throw new Error(`检索实验参数 ${name} 与注入 client 的实际配置冲突。`);
+    }
+  }
+  const parameters = resolveRetrievalParameters({
+    ...(injectedClient ? { timeoutMs: injectedClient.settings.timeoutMs, retries: injectedClient.settings.retries } : {}),
+    ...options.parameters,
+    ...(options.maxRequests !== undefined ? { maxRequests: options.maxRequests } : {}),
+    ...(options.consecutiveFailureLimit !== undefined ? { consecutiveFailureLimit: options.consecutiveFailureLimit } : {}),
+  });
+  const client = modes.some(remoteMode) ? injectedClient ?? createBailianClient({ timeoutMs: parameters.timeoutMs, retries: parameters.retries }) : undefined;
+  const { maxRequests, consecutiveFailureLimit } = parameters;
   let networkRequests = 0, consecutiveFailures = 0, fatalProviderStatus: number | null = null, stopReason: string | null = null;
   const controls = {
     beforeAttempt: () => {
@@ -149,7 +168,8 @@ export async function runRetrievalV2(options: { label: string; modes?: Retrieval
   const cacheDir = options.cacheDir ?? join(root, ".runtime/retrieval-v2-cache"), outputDir = options.outputDir ?? join(root, ".runtime/retrieval-v2");
   const runId = randomUUID(), calls: Call[] = [], results: V2Result[] = [];
   const plan = dataset.corpora.flatMap(corpus => corpus.questions.flatMap(question => modes.map(mode => ({ corpus: corpus.id, id: question.id, suite: question.suite, mode }))));
-  const settings = { modes, provider: client?.settings ?? null, bm25: { k1: 1.2, b: .75 }, rrf: { k: 60, window: 20 }, topN: 5,
+  const settings = { modes, parameters, provider: client?.settings ?? null, bm25: { k1: parameters.bm25K1, b: parameters.bm25B },
+    rrf: { k: parameters.rrfK, window: parameters.rrfWindow }, topN: 5,
     budget: { maxRequests, consecutiveFailureLimit }, pricing: { currency: "CNY", asOf: "2026-10-05", region: "China Beijing", estimated: true,
       perMillionInputTokens: pricePerMillionCny, source: "https://help.aliyun.com/zh/model-studio/model-pricing", note: "Only configured Beijing endpoint; reported total_tokens, not an invoice; other region prices unknown." },
     context: "query-only", acceptance: "not-calibrated; raw ranking only", fallback: "diagnostic lexical; excluded from rerank score" };
@@ -161,14 +181,14 @@ export async function runRetrievalV2(options: { label: string; modes?: Retrieval
     implementation: Object.fromEntries(await Promise.all(files.map(async file => [file, contentHash(await readFile(join(root, file), "utf8"))]))) };
   const report = { version: 2, runId, label: options.label.trim(), startedAt: new Date().toISOString(), finishedAt: null as string | null,
     status: "running", stopReason: null as string | null, answerQuality: "not_evaluated", snapshot, plan, calls, results, summary: summarizeV2(results, calls, plan, pricePerMillionCny),
-    measurement: "Offline retrieval development experiment. MRR@5 is comparable; full MRR is only within recorded ranking depth. Candidate recall uses top20 except M4's complete scoped input. Timings reuse measured shared query stages and exclude document indexing; cache hits are identified in call ledger. Ledger usage is the actual experiment cost, not independent per-mode production cost. Cache replay is not an independent model repetition. Version 1 scopeViolations mixed authorization scope with forbidden Top5 hits; version 2 separates scopeViolations from boundaryFailures/forbiddenHitCases without removing forbidden or required checks. No answer nonempty is diagnostic. API failures stay in planned denominator. No acceptance policy, live business or QQ changes." };
+    measurement: "Offline retrieval development experiment. MRR@5 is comparable; full MRR is only within recorded ranking depth. Candidate recall uses configured candidateTopK except M4's complete scoped input. Timings reuse measured shared query stages and exclude document indexing; cache hits are identified in call ledger. Ledger usage is the actual experiment cost, not independent per-mode production cost. Cache replay is not an independent model repetition. Version 1 scopeViolations mixed authorization scope with forbidden Top5 hits; version 2 separates scopeViolations from boundaryFailures/forbiddenHitCases without removing forbidden or required checks. No answer nonempty is diagnostic. API failures stay in planned denominator. No acceptance policy, live business or QQ changes." };
   const path = join(outputDir, `${runId}.json`);
   await atomicJson(path, report);
 
   async function cached<T>(operation: "embedding" | "rerank", purpose: Call["purpose"], input: unknown, validate: (value: unknown) => value is T,
     execute: () => Promise<{ value: T; requestHash: string; attempts: BailianAttempt[] }>): Promise<{ value: T; callId: string }> {
     const inputHash = contentHash({ operation, provider: client!.settings, input }), cachePath = join(cacheDir, `${inputHash}.json`), id = randomUUID();
-    try {
+    if (parameters.cache === "reuse") try {
       const saved = JSON.parse(await readFile(cachePath, "utf8"));
       if (saved.version !== 1 || saved.inputHash !== inputHash || saved.valueHash !== contentHash(saved.value) || !validate(saved.value)) throw new Error("检索缓存校验失败；未自动覆盖。");
       calls.push({ id, operation, purpose, cache: "hit", inputHash, requestHash: saved.requestHash, attempts: [], status: "ok" });
@@ -178,7 +198,7 @@ export async function runRetrievalV2(options: { label: string; modes?: Retrieval
       const response = await execute();
       if (!validate(response.value)) throw new Error("检索 provider 返回值无效。");
       calls.push({ id, operation, purpose, cache: "miss", inputHash, requestHash: response.requestHash, attempts: response.attempts, status: "ok" });
-      await atomicJson(cachePath, { version: 1, inputHash, requestHash: response.requestHash, createdAt: new Date().toISOString(), value: response.value, valueHash: contentHash(response.value) });
+      if (parameters.cache === "reuse") await atomicJson(cachePath, { version: 1, inputHash, requestHash: response.requestHash, createdAt: new Date().toISOString(), value: response.value, valueHash: contentHash(response.value) });
       return { value: response.value, callId: id };
     } catch (error) {
       if (!calls.some(call => call.id === id)) calls.push({ id, operation, purpose, cache: "miss", inputHash, requestHash: null,
@@ -206,7 +226,7 @@ export async function runRetrievalV2(options: { label: string; modes?: Retrieval
     for (const corpus of dataset.corpora) for (const question of corpus.questions) {
       const scope = { shopId: question.shopId, productId: question.productId ?? null }, visible = scopeDocuments(corpus.documents, scope);
       let start = performance.now(); const lexical = rankLexical(question.query, corpus.documents, scope); const lexicalMs = performance.now() - start;
-      start = performance.now(); const bm25 = rankBm25(question.query, corpus.documents, scope); const bm25Ms = performance.now() - start;
+      start = performance.now(); const bm25 = rankBm25(question.query, corpus.documents, scope, { k1: parameters.bm25K1, b: parameters.bm25B }); const bm25Ms = performance.now() - start;
       let dense: RankedDocument[] | undefined, fused: RankedDocument[] | undefined, denseError = embeddingSetupError;
       const sharedCalls = [...documentCalls];
       const denseStarted = performance.now();
@@ -220,7 +240,7 @@ export async function runRetrievalV2(options: { label: string; modes?: Retrieval
         } catch (error) { if (!(error instanceof BailianError) || error instanceof BailianBudgetStop) throw error; denseError = error.message; sharedCalls.push(...calls.slice(before).map(call => call.id)); }
       }
       const denseMs = performance.now() - denseStarted;
-      start = performance.now(); fused = dense ? reciprocalRankFusion([bm25, dense]) : []; const fusionMs = performance.now() - start;
+      start = performance.now(); fused = dense ? reciprocalRankFusion([bm25, dense], { k: parameters.rrfK, topK: parameters.rrfWindow }) : []; const fusionMs = performance.now() - start;
       for (const mode of modes) {
         const started = performance.now(), callIds = modesNeedingDense.has(mode) ? [...sharedCalls] : [];
         let candidates: string[] = [], ranking: V2Result["ranking"] = [], status: V2Result["status"] = "ok", errorMessage: string | null = null;
@@ -231,9 +251,9 @@ export async function runRetrievalV2(options: { label: string; modes?: Retrieval
           if (mode === "M1") ranking = bm25;
           if (mode === "M2") ranking = dense ?? [];
           if (mode === "M3") ranking = fused ?? [];
-          if (["M0", "M1", "M2", "M3"].includes(mode)) candidates = ranking.slice(0, 20).map(row => row.id);
+          if (["M0", "M1", "M2", "M3"].includes(mode)) candidates = ranking.slice(0, parameters.candidateTopK).map(row => row.id);
           else {
-            candidates = (mode === "M4" ? visible.map(doc => doc.id) : mode === "M5" ? lexical.slice(0, 20) : (fused ?? []).slice(0, 20).map(row => row.id));
+            candidates = (mode === "M4" ? visible.map(doc => doc.id) : mode === "M5" ? lexical.slice(0, parameters.candidateTopK) : (fused ?? []).slice(0, parameters.candidateTopK).map(row => row.id));
             if (candidates.length > 500) { status = "not_applicable"; errorMessage = "单次 rerank 候选超过 500，不分批拼接不可比的分数。"; }
             else if (candidates.length) {
               // Canonical request order avoids introducing upstream rank order as a hidden input difference.
@@ -255,7 +275,7 @@ export async function runRetrievalV2(options: { label: string; modes?: Retrieval
           ...checkV2Boundaries(question, corpus.documents, ranked),
           empty: status === "ok" ? !ranking.length : null,
           durationMs: performance.now() - started + (mode === "M0" || mode === "M5" ? lexicalMs : mode === "M1" ? bm25Ms : mode === "M2" ? denseMs : mode === "M3" || mode === "M6" ? denseMs + bm25Ms + fusionMs : 0), callIds,
-          fallback: status === "provider_error" ? { mode: "M0", ranking: lexical, metrics: metrics(question.relevant, lexical, lexical.slice(0, 20)) } : null, error: errorMessage });
+          fallback: status === "provider_error" ? { mode: "M0", ranking: lexical, metrics: metrics(question.relevant, lexical, lexical.slice(0, parameters.candidateTopK)) } : null, error: errorMessage });
       }
       report.summary = summarizeV2(results, calls, plan, pricePerMillionCny); await atomicJson(path, report);
     }

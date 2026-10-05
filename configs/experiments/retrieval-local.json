@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "kind": "retrieval",
+  "label": "本地检索 M0 / M1",
+  "repeat": 1,
+  "allowRemote": false,
+  "variants": [
+    { "id": "A", "modes": ["M0", "M1"], "parameters": { "candidateTopK": 20, "bm25K1": 1.2, "bm25B": 0.75 } }
+  ]
+}

@@ -19,6 +19,7 @@ import { RefundBusinessError, RefundStore, readRefundDatabaseConfig } from "../s
 import type { RenderedReply } from "../src/reply.ts";
 import { checkSupportContract, supportCheckSpecs, type SupportExpectation, type SupportState } from "../src/support-evaluation.ts";
 import { createSupportSession, getSupportResult } from "../src/support-session.ts";
+import { resolveSupportRunParameters, type SupportExperimentParameters } from "../src/support-parameters.ts";
 import { createMerchantFixture } from "./merchant-test-fixture.ts";
 import { createObjectiveSnapshot, hash } from "./objective-support.ts";
 
@@ -64,8 +65,13 @@ function skipped(round: Round): EvalTurn {
 }
 
 // Explicit call only. Importing this module performs no model call, DB connection, or fixture mutation.
-export async function runSupportV2Live({ architecture, label, batch }: { architecture: Architecture; label: string; batch?: EvalBatch }): Promise<string> {
+export async function runSupportV2Live({ architecture, label, batch, parameters, experiment }: {
+  architecture: Architecture; label: string; batch?: EvalBatch; parameters?: Partial<SupportExperimentParameters>;
+  experiment?: { id: string; variantId: string };
+}): Promise<string> {
   assert.ok(["atomic", "controller"].includes(architecture)); assert.ok(label.trim() && label.length <= 120);
+  const resolved = resolveSupportRunParameters(architecture, parameters);
+  if (experiment) assert.ok([experiment.id, experiment.variantId].every(value => typeof value === "string" && value.trim() && value.length <= 128), "experiment id/variantId 无效");
   const { dataset, plan } = await checkSupportLiveDataset();
   const configs = { order: readDatabaseConfig(), merchant: readAfterSalesDatabaseConfig(), refund: readRefundDatabaseConfig(), history: readEvalDatabaseConfig() };
   const { modelRuntime, model } = await createConfiguredModelRuntime();
@@ -110,7 +116,7 @@ export async function runSupportV2Live({ architecture, label, batch }: { archite
   async function openSession() {
     const afterSales = { store: sales, sourceKey, refunds: refundTools };
     session = architecture === "controller"
-      ? await createSupportSession(fixture!.identity, read, modelRuntime, model, afterSales, { groupOpenid: group })
+      ? await createSupportSession(fixture!.identity, read, modelRuntime, model, afterSales, { groupOpenid: group, repairBudget: resolved.repairBudget! })
       : await createCouponSession(fixture!.identity, read, modelRuntime, model, afterSales);
     session.subscribe(event => {
       capture?.receive(event);
@@ -122,14 +128,14 @@ export async function runSupportV2Live({ architecture, label, batch }: { archite
   }
   function makeAgent() {
     return new QQAgent(async () => session ?? await openSession(), async (target, _text, reply, requester) => { receipts.push({ target, reply, requester }); },
-      line => logs.push(line), 60_000, async message => {
+      line => logs.push(line), resolved.timeoutMs, async message => {
         const before = current?.spans.length ?? 0;
         const reply = await confirmRefundReply(refundHost, fixture!.identity, sourceKey, message.content)
           ?? await confirmMerchantReply(merchant, fixture!.identity, sourceKey, message.content);
         if (current?.spans.slice(before).some(span => span.name === "confirm_refund")) hostConfirmCalls++;
         return reply;
       }, async (_message, reply) => { await markRefundReplyPresented(refundHost, fixture!.identity, sourceKey, reply); },
-      { merchantEvents: architecture === "controller" ? "host" : "model" });
+      { merchantEvents: resolved.merchantEvents });
   }
   async function closeAgent() { if (agent) await agent.close(); else session?.dispose(); agent = undefined; session = undefined; }
   async function state(orderId: string): Promise<SupportState> {
@@ -152,19 +158,21 @@ export async function runSupportV2Live({ architecture, label, batch }: { archite
       .map(({ name, description, parameters }) => ({ name, description, parameters }));
     const snapshot = await createObjectiveSnapshot({ plan, dataset, tools,
       model: { provider: session!.model!.provider, id: session!.model!.id, maxTokens: session!.model!.maxTokens, thinking: session!.thinkingLevel, temperature: null },
-      files: ["scripts/support-v2-live.ts", "data/support-v2-live.json", "scripts/merchant-test-fixture.ts", "src/support-evaluation.ts", "src/support-controller.ts", "src/support-action.ts", "src/support-session.ts",
+      files: ["scripts/support-v2-live.ts", "data/support-v2-live.json", "scripts/merchant-test-fixture.ts", "src/support-evaluation.ts", "src/support-controller.ts", "src/support-action.ts", "src/support-session.ts", "src/support-parameters.ts",
         "src/agent.ts", "src/qq-agent.ts", "src/coupon-store.ts", "src/knowledge-retrieval.ts", "src/refunds.ts", "src/refund-entry.ts", "src/after-sales.ts", "src/after-sales-entry.ts", "src/merchant-notifications.ts", "src/reply.ts", "src/reply-from-tools.ts"],
       business: { knowledge, shops, products, identityBindings, scenarios: initialOrders.map(order => ({ source: order.source, status: order.status, amounts: order.amounts,
         shop: order.shop, items: order.items.map(({ productId, productName, quantity, unitPriceCents, totalCents }) => ({ productId, productName, quantity, unitPriceCents, totalCents })),
         coupons: order.coupons.map(coupon => ({ status: coupon.status, valid: Boolean(coupon.expiresAt && Date.parse(coupon.expiresAt) > Date.parse(order.asOf)) })),
         payments: order.payments.map(({ status, amountCents }) => ({ status, amountCents })), refunds: order.refunds })) },
-      settings: { architecture, timeoutMs: 60_000, retries: 2, compaction: false, merchantDelayMs: 5000, merchantHoldMs: 180_000, qqSend: "local substitute", fixturePreparationMeasured: false },
+      settings: { architecture, ...resolved,
+        retries: 2, compaction: false, merchantDelayMs: 5000, merchantHoldMs: 180_000, qqSend: "local substitute", fixturePreparationMeasured: false },
       measurement: "QQAgent complete turn, excluding nonce fixture preparation/state readback/restart; actual model and service spans; local QQ send substitute; 180-second fixture-only waiting window is not production SLA; no natural-language scoring." });
     if (architecture === "controller") {
       const [prompt, skill] = await Promise.all([readFile(new URL("../prompts/customer-service-v2.md", import.meta.url), "utf8"), readFile(new URL("../skills/shop-support-v2/SKILL.md", import.meta.url), "utf8")]);
       snapshot.content.prompt = prompt; snapshot.content.skill = skill; snapshot.hashes.prompt = hash(prompt); snapshot.hashes.skill = hash(skill);
     }
     snapshot.content.initialOrders = initialOrders;
+    if (experiment) snapshot.content.experiment = { ...experiment };
     snapshot.hashes.checker = hash({ specs: plan, source: await readFile(new URL("../src/support-evaluation.ts", import.meta.url), "utf8"), runner: await readFile(new URL("./support-v2-live.ts", import.meta.url), "utf8") });
     run = { id: randomUUID(), suiteId: "support-business-v2", suiteName: "v2共同业务开发验收", kind: "model", label, status: "running", startedAt: new Date().toISOString(), finishedAt: null,
       plannedCases: plan.cases.length, plannedTurns: plan.cases.reduce((sum, item) => sum + item.turns.length, 0), snapshot, metrics: null, ...(batch ? { batch } : {}) };

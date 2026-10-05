@@ -10,7 +10,9 @@
 
 本轮验收：`npm run validate` 通过，含 15 组前端回归（新增 v2 标签/归因、无效 span 诊断、atomic 商家事件有模型步骤但回执由宿主生成）。Chrome 1440px 与 390px 检查通过，覆盖版本对比、键盘展开、逐轮执行分工及窄屏标题换行；核心指标从约 989px 前移至 325px，场景列表从约 1222px 前移至 558px（同一默认运行、1440px 视口的页面坐标）。没有新增运行时依赖或重跑付费评测。本机截图与检查日志保存在忽略的 `.runtime/` 中。
 
-请阅读 `docs/evaluation-api.md` 的完整合同及 `plan.md` 第 8.1 节。继续维护现有明亮柔和、简洁的工作台。旧 GET 运行列表与详情兼容；新 GET 提供单运行 analysis、两次 compare 与 batches 稳定性，HTTP 保持只读。
+后续实验开关迭代新增“实验调试”页签，合同见 `docs/experiment-controls.md`，由同一 Kimi CLI K3 + Max 会话维护；方案预设与参数来自后端 catalog。历史接口继续只读，唯一 POST 启动本机实验；表单不能修改在线 QQ 或接受命令/密钥。结果取关联记录的真实摘要，缺失/失败及缓存复用需显式展示。
+
+请阅读 `docs/evaluation-api.md` 的完整合同及 `plan.md` 第 8.1 节。继续维护现有明亮柔和、简洁的工作台。旧 GET 运行列表与详情兼容；新 GET 提供单运行 analysis、两次 compare 与 batches 稳定性。
 
 前端交付：
 

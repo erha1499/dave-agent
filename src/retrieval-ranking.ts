@@ -7,7 +7,33 @@ export type RetrievalDocument = {
 export type RetrievalScope = { shopId?: string | null; productId?: string | null };
 export type RankedDocument = { id: string; score: number };
 
-export const retrievalRankingSettings = Object.freeze({ bm25: Object.freeze({ k1: 1.2, b: 0.75 }), rrf: Object.freeze({ k: 60, topK: 20 }),
+export type RetrievalExperimentParameters = {
+  candidateTopK: number; bm25K1: number; bm25B: number; rrfK: number; rrfWindow: number;
+  cache: "reuse" | "refresh"; timeoutMs: number; retries: number; maxRequests: number; consecutiveFailureLimit: number;
+};
+const parameterDefaults: Readonly<RetrievalExperimentParameters> = Object.freeze({ candidateTopK: 20, bm25K1: 1.2, bm25B: .75,
+  rrfK: 60, rrfWindow: 20, cache: "reuse", timeoutMs: 15_000, retries: 1, maxRequests: 1200, consecutiveFailureLimit: 5 });
+
+export function resolveRetrievalParameters(input: Partial<RetrievalExperimentParameters> = {}): RetrievalExperimentParameters {
+  if (!input || typeof input !== "object" || Array.isArray(input)
+    || ![Object.prototype, null].includes(Object.getPrototypeOf(input))
+    || Reflect.ownKeys(input).some(key => typeof key !== "string" || !Object.hasOwn(parameterDefaults, key))) {
+    throw new Error("检索实验参数包含未知字段或无效对象。");
+  }
+  const parameters = { ...parameterDefaults, ...input };
+  const ranges = { candidateTopK: [1, 100], bm25K1: [.1, 3], bm25B: [0, 1], rrfK: [1, 200], rrfWindow: [1, 100],
+    timeoutMs: [1000, 60_000], retries: [0, 2], maxRequests: [1, 10_000], consecutiveFailureLimit: [1, 20] } as const;
+  for (const name of Object.keys(ranges) as Array<keyof typeof ranges>) {
+    const value = parameters[name], [minimum, maximum] = ranges[name];
+    if (typeof value !== "number" || !Number.isFinite(value) || value < minimum || value > maximum
+      || (!["bm25K1", "bm25B"].includes(name) && !Number.isSafeInteger(value))) throw new Error(`检索实验参数 ${name} 无效。`);
+  }
+  if (parameters.cache !== "reuse" && parameters.cache !== "refresh") throw new Error("检索实验参数 cache 无效。");
+  return parameters;
+}
+
+export const retrievalRankingSettings = Object.freeze({ bm25: Object.freeze({ k1: parameterDefaults.bm25K1, b: parameterDefaults.bm25B }),
+  rrf: Object.freeze({ k: parameterDefaults.rrfK, topK: parameterDefaults.rrfWindow }),
   tokenizer: "lexical-normalization-icu-domain-terms-v1", serialization: "json-title-tags-body-v1" });
 
 const compareId = (a: string, b: string) => a < b ? -1 : a > b ? 1 : 0;
@@ -80,7 +106,9 @@ function frequencies(value: string, domainTerms: ReadonlySet<string>): Map<strin
   return result;
 }
 
-export function rankBm25(query: string, documents: readonly RetrievalDocument[], scope: RetrievalScope): RankedDocument[] {
+export function rankBm25(query: string, documents: readonly RetrievalDocument[], scope: RetrievalScope,
+  options: { k1?: number; b?: number } = {}): RankedDocument[] {
+  const { bm25K1: k1, bm25B: b } = resolveRetrievalParameters({ bm25K1: options.k1 ?? parameterDefaults.bm25K1, bm25B: options.b ?? parameterDefaults.bm25B });
   const visible = scopeDocuments(documents, scope);
   if (!visible.length) return [];
   const domainTerms = new Set([...Object.keys(synonyms), ...visible.flatMap(document => document.tags.map(normalize))]
@@ -97,7 +125,6 @@ export function rankBm25(query: string, documents: readonly RetrievalDocument[],
     const frequency = corpus.filter(document => document.counts.has(term)).length;
     return [term, Math.log(1 + (corpus.length - frequency + 0.5) / (frequency + 0.5))];
   }));
-  const { k1, b } = retrievalRankingSettings.bm25;
   return ranked(corpus.map(document => ({ id: document.id, score: terms.reduce((score, term) => {
     const tf = document.counts.get(term) ?? 0;
     return score + idf.get(term)! * tf * (k1 + 1) / (tf + k1 * (1 - b + b * document.length / averageLength));
@@ -130,9 +157,10 @@ export function rankDense(queryVector: readonly number[], documents: readonly Re
 }
 
 // Input order is the ranking, including each route's deterministic tie order. Scores are validated
-// but not blended: only the first 20 positions per route contribute, with 1-based ranks and k=60.
-export function reciprocalRankFusion(rankings: readonly (readonly RankedDocument[])[]): RankedDocument[] {
-  const scores = new Map<string, number>(), { k, topK } = retrievalRankingSettings.rrf;
+// but not blended. Defaults use the first 20 positions per route, with 1-based ranks and k=60.
+export function reciprocalRankFusion(rankings: readonly (readonly RankedDocument[])[], options: { k?: number; topK?: number } = {}): RankedDocument[] {
+  const { rrfK: k, rrfWindow: topK } = resolveRetrievalParameters({ rrfK: options.k ?? parameterDefaults.rrfK, rrfWindow: options.topK ?? parameterDefaults.rrfWindow });
+  const scores = new Map<string, number>();
   for (const ranking of rankings) {
     const ids = new Set<string>();
     ranking.forEach((document, index) => {

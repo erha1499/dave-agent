@@ -10,6 +10,7 @@ import type { RefundStore } from "./refunds.ts";
 import type { Reply } from "./reply.ts";
 import { parseSupportAction, supportActionParameters } from "./support-action.ts";
 import { SupportController, type SupportCall, type SupportResult } from "./support-controller.ts";
+import { resolveSupportParameters } from "./support-parameters.ts";
 
 export type SupportPrompt = {
   requestId: string; groupOpenid: string; messageId: string;
@@ -57,8 +58,9 @@ export function supportReply(session: AgentSession, text = ""): Reply | undefine
 export async function createSupportSession(
   identity: QQIdentity, store: CouponStore, runtime: ModelRuntime, model: Model<Api>,
   afterSales?: { store: AfterSalesStore; sourceKey: string; refunds?: RefundStore },
-  options: { groupOpenid?: string; focus?: SupportFocus; onCall?: (call: SupportCall) => void } = {},
+  options: { groupOpenid?: string; focus?: SupportFocus; onCall?: (call: SupportCall) => void; repairBudget?: number } = {},
 ) {
+  const { repairBudget } = resolveSupportParameters(options.repairBudget === undefined ? {} : { repairBudget: options.repairBudget });
   const groupOpenid = options.groupOpenid ?? "cli";
   const sourceKey = merchantSourceKey(identity, groupOpenid);
   if (afterSales && afterSales.sourceKey !== sourceKey) throw new Error("业务会话与可信路由不一致。");
@@ -140,7 +142,7 @@ export async function createSupportSession(
         parseSupportAction(part.arguments.action);
       } catch { state.invalidActions++; }
     }
-    if (state.invalidActions > 1) {
+    if (state.invalidActions > repairBudget) {
       state.turnError = true;
       state.abort?.abort();
       // Do not await settlement inside the synchronous event listener.

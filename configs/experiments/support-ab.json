@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "kind": "support",
+  "label": "业务架构 A/B",
+  "repeat": 1,
+  "allowRemote": false,
+  "variants": [
+    { "id": "A", "architecture": "atomic", "parameters": { "timeoutMs": 60000, "merchantEvents": "architecture" } },
+    { "id": "B", "architecture": "controller", "parameters": { "timeoutMs": 60000, "repairBudget": 1, "merchantEvents": "architecture" } }
+  ]
+}

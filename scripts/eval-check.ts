@@ -96,3 +96,6 @@ try {
 
 await import("./eval-analysis-check.ts");
 await import("./objective-eval-check.ts");
+await import("./experiment-check.ts");
+await import("./experiment-jobs-check.ts");
+await import("./experiment-ui-check.ts");

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { BailianError, createBailianClient, resolveBailianEndpoints, embeddingDimensions, validVector } from "../src/bailian.ts";
@@ -97,6 +97,53 @@ try {
   const second = await runRetrievalV2({ ...options, modes: [...retrievalModes] });
   assert.ok(second.report.summary.usage.every(row => row.requests === 0 && row.completeTokens === null && row.cacheHits > 0));
   assert.deepEqual(second.report.results.map(row => row.ranking), first.report.results.map(row => row.ranking));
+  const cacheContents = async () => Promise.all((await readdir(options.cacheDir)).sort().map(async file => [file, await readFile(join(options.cacheDir, file), "utf8")]));
+  const savedCache = await cacheContents();
+  const refreshed = await runRetrievalV2({ ...options, modes: ["M4"], parameters: { cache: "refresh" } });
+  assert.equal(refreshed.report.summary.usage.find(row => row.operation === "rerank")!.requests, 3);
+  assert.ok(refreshed.report.calls.every(call => call.cache === "miss"));
+  assert.deepEqual(await cacheContents(), savedCache, "refresh bypasses both reading and writing persistent cache");
+  const unusedCache = join(directory, "never-created");
+  await runRetrievalV2({ ...options, modes: ["M4"], cacheDir: unusedCache, parameters: { cache: "refresh" } });
+  await assert.rejects(readdir(unusedCache), { code: "ENOENT" });
+  const refreshedBudget = await runRetrievalV2({ ...options, modes: ["M4"], parameters: { cache: "refresh", maxRequests: 1 } });
+  assert.equal(refreshedBudget.report.status, "budget_stopped", "existing warm cache must not defeat a refresh budget");
+  assert.equal(refreshedBudget.report.summary.usage.find(row => row.operation === "rerank")!.requests, 1);
+  await assert.rejects(runRetrievalV2({ ...options, modes: ["M4"], maxRequests: 2, parameters: { maxRequests: 1 } }), /冲突/);
+  await assert.rejects(runRetrievalV2({ ...options, modes: ["M4"], parameters: { retries: 1 } }), /实际配置冲突/);
+  const narrowed: V2Dataset = { source: "candidate parameter oracle", corpora: [{ id: "candidates", documents:
+    ["A", "B", "C"].map(id => ({ id, title: "alpha", body: "alpha", tags: ["alpha"], shopId: null })),
+    questions: [{ id: "same-query", query: "alpha", suite: "standard", shopId: null, relevant: ["B"] }] }] };
+  const payloadSizes: number[] = [];
+  const recordingClient = createBailianClient({ env, timeoutMs: 2000, retries: 0, fetch: fake((url, init) => {
+    payloadSizes.push(JSON.parse(String(init.body)).documents.length); return normal(url, init);
+  }) });
+  const candidateOptions = { ...options, dataset: narrowed, client: recordingClient, modes: ["M5"] as const };
+  const narrow = await runRetrievalV2({ ...candidateOptions, modes: [...candidateOptions.modes],
+    parameters: { candidateTopK: 1, timeoutMs: 2000, retries: 0, cache: "refresh" } });
+  const wide = await runRetrievalV2({ ...candidateOptions, modes: [...candidateOptions.modes],
+    parameters: { candidateTopK: 2, timeoutMs: 2000, retries: 0, cache: "refresh" } });
+  assert.deepEqual(payloadSizes, [1, 2], "candidateTopK reaches the actual rerank request");
+  assert.deepEqual(narrow.report.results[0]!.candidateIds, ["A"]); assert.deepEqual(wide.report.results[0]!.candidateIds, ["A", "B"]);
+  assert.equal(narrow.report.results[0]!.metrics?.recallAt5, 0); assert.equal(wide.report.results[0]!.metrics?.recallAt5, 1);
+  assert.equal(wide.report.snapshot.settings.parameters.timeoutMs, 2000);
+  assert.equal(wide.report.snapshot.settings.provider!.timeoutMs, 2000);
+  assert.equal(wide.report.snapshot.settings.topN, 5, "Top5 evaluation remains fixed when candidate count changes");
+  const variableLengths: V2Dataset = { source: "BM25 parameter oracle", corpora: [{ id: "lengths", documents: [
+    { id: "long", title: "", body: "alpha alpha alpha beta gamma delta epsilon zeta eta theta", tags: [], shopId: null },
+    { id: "short", title: "", body: "alpha", tags: [], shopId: null },
+  ], questions: [{ id: "alpha", query: "alpha", suite: "standard", shopId: null, relevant: ["short"] }] }] };
+  const unpenalized = await runRetrievalV2({ ...options, dataset: variableLengths, modes: ["M1"], parameters: { bm25B: 0 } });
+  const penalized = await runRetrievalV2({ ...options, dataset: variableLengths, modes: ["M1"], parameters: { bm25B: 1 } });
+  assert.equal(unpenalized.report.results[0]!.ranking[0]!.id, "long");
+  assert.equal(penalized.report.results[0]!.ranking[0]!.id, "short", "the runner passes BM25 normalization through to actual ranking");
+  const saturated = await runRetrievalV2({ ...options, dataset: variableLengths, modes: ["M1"], parameters: { bm25B: 0, bm25K1: .1 } });
+  assert.notEqual(saturated.report.results[0]!.ranking[0]!.score, unpenalized.report.results[0]!.ranking[0]!.score);
+  const shortFusion = await runRetrievalV2({ ...options, dataset: narrowed, modes: ["M3"], parameters: { rrfWindow: 1, rrfK: 1 } });
+  const longFusion = await runRetrievalV2({ ...options, dataset: narrowed, modes: ["M3"], parameters: { rrfWindow: 2, rrfK: 200 } });
+  assert.deepEqual(shortFusion.report.results[0]!.ranking, [{ id: "A", score: 1 }]);
+  assert.deepEqual(longFusion.report.results[0]!.ranking.map(row => row.id), ["A", "B"]);
+  assert.equal(longFusion.report.results[0]!.ranking[0]!.score, 2 / 201, "the runner passes both RRF window and k to fusion");
   const boundaryDataset = structuredClone(dataset);
   boundaryDataset.corpora[0]!.questions = [{ ...boundaryQuestion, id: "same-scope-forbidden" }];
   const boundary = await runRetrievalV2({ ...options, dataset: boundaryDataset, modes: ["M4"] });

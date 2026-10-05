@@ -1,6 +1,6 @@
 # 内置评测工作台
 
-工作台和 Agent 使用同一个 MySQL `dave_agent`，由本项目的 Node 原生 HTTP 服务展示历史，不依赖外部评测平台。网页只读；评测通过 CLI 执行，复用现有 Pi 会话和业务工具。当前入口使用独立客观套件，下面的 D1/D2、D3 与 P1 记录保留为历史混合口径。
+工作台和 Agent 使用同一个 MySQL `dave_agent`，由本项目的 Node 原生 HTTP 服务展示历史，不依赖外部评测平台。历史页面只读；新增“实验调试”可显式启动本机 v2 业务与离线检索实验，并保留 CLI，复用现有 Pi 会话和业务工具。配置与任务状态保存在本机 `.runtime/experiments/`，业务结果仍进入 MySQL，检索仍保存完整 JSON 报告。详见 [实验配置](./experiment-controls.md)。当前入口使用独立客观套件，下面的 D1/D2、D3 与 P1 记录保留为历史混合口径。
 
 ## 当前客观评测
 
@@ -172,7 +172,7 @@ npm run check:model -- --label "未知政策说明调整"
 
 案例落盘使用事务，历史不覆盖。快照保留 Git commit 与脏状态、模型配置、Prompt、Skill、实际工具定义、固定问题与检查版本、实际合成业务事实；哈希帮助定位变更，原内容帮助解释变更。业务快照包含评测日期与采集时间，不能只凭 seed 文件没改就认定数据条件一样。D1/D2 保存完整初始订单，同时对随机 fixture 编号、创建/付款时刻和有效期作注明的语义归一化，用于条件比较；另记录生成脚本、D1/D2 源码、数据库结构、QQ 入口及模板哈希。
 
-网页 GET API：`/api/runs?kind=model&limit=50`、`/api/runs/<UUID>`。列表不携带大段快照正文；详情提供完整合成快照。HTTP 输入有范围检查、只读方法限制、Host/Origin 校验和 CSP，正文按文本展示。网页不运行 Shell、不绑定 QQ 身份、不持有管理员操作入口。
+网页历史 GET API：`/api/runs?kind=model&limit=50`、`/api/runs/<UUID>`。列表不携带大段快照正文；详情提供完整合成快照。历史接口限制只读；仅独立的 `POST /api/experiments` 可启动严格白名单配置的本机评测。HTTP 输入有范围检查、Host/Origin 校验和 CSP，正文按文本展示。网页不运行 Shell、不绑定 QQ 身份、不持有管理员操作入口。
 
 前后端协作：Kimi 通过本机 CLI（K3 + Max）负责 `web/evaluation/`，Codex 负责后端、题集和联调。前端使用后端分析的固定分母、比较条件与完整性，不重算或写死成绩；详见 [API 合同](./evaluation-api.md) 与 [前端任务范围](./kimi-evaluation-handoff.md)。继续复用四张 JSON 表。
 

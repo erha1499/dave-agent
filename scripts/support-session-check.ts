@@ -12,6 +12,38 @@ import { createSupportSession, getSupportResult, isSupportSession, prepareSuppor
   type SupportFocus } from "../src/support-session.ts";
 import type { SupportAction } from "../src/support-action.ts";
 import type { SupportCall } from "../src/support-controller.ts";
+import { resolveSupportParameters, resolveSupportRunParameters, type SupportExperimentParameters } from "../src/support-parameters.ts";
+import { runSupportV2Live } from "./support-v2-live.ts";
+
+assert.deepEqual(resolveSupportParameters(), { timeoutMs: 60_000, repairBudget: 1, merchantEvents: "architecture" });
+assert.deepEqual(resolveSupportParameters({ timeoutMs: 10_000, repairBudget: 0, merchantEvents: "host" }),
+  { timeoutMs: 10_000, repairBudget: 0, merchantEvents: "host" });
+assert.deepEqual(resolveSupportParameters({ timeoutMs: 120_000, repairBudget: 2, merchantEvents: "model" }),
+  { timeoutMs: 120_000, repairBudget: 2, merchantEvents: "model" });
+assert.deepEqual(resolveSupportRunParameters("atomic"), { timeoutMs: 60_000, repairBudget: null, merchantEvents: "model" });
+assert.deepEqual(resolveSupportRunParameters("controller"), { timeoutMs: 60_000, repairBudget: 1, merchantEvents: "host" });
+assert.deepEqual(resolveSupportRunParameters("atomic", { merchantEvents: "host", repairBudget: 2 }),
+  { timeoutMs: 60_000, repairBudget: null, merchantEvents: "host" });
+assert.throws(() => resolveSupportRunParameters("unknown" as "atomic"), /业务架构/);
+assert.throws(() => resolveSupportRunParameters("controller", { merchantEvents: "model" }), /controller 仅支持宿主/);
+const originalEnv = process.env;
+let credentialReads = 0;
+process.env = new Proxy(originalEnv, { get(target, key) {
+  if (typeof key === "string" && /DB_|API_KEY/.test(key)) { credentialReads++; throw new Error("preflight unexpectedly read service credentials"); }
+  return Reflect.get(target, key);
+} });
+try {
+  await assert.rejects(runSupportV2Live({ architecture: "controller", label: "invalid combination preflight", parameters: { merchantEvents: "model" } }), /controller 仅支持宿主/);
+  assert.equal(credentialReads, 0);
+} finally { process.env = originalEnv; }
+for (const input of [null, [], { timeoutMs: 9999 }, { timeoutMs: 120001 }, { timeoutMs: 60_000.5 }, { timeoutMs: "60000" },
+  { timeoutMs: Infinity }, { repairBudget: -1 }, { repairBudget: 3 }, { repairBudget: 0.5 }, { repairBudget: null },
+  { merchantEvents: "typo" }, { merchantEvents: undefined }, { unauthorized: true }]) {
+  const parameters = input as Partial<SupportExperimentParameters>;
+  assert.throws(() => resolveSupportParameters(parameters));
+  await assert.rejects(runSupportV2Live({ architecture: "controller", label: "invalid preflight", parameters }), /业务实验参数|timeoutMs|repairBudget|merchantEvents/);
+}
+console.log("[support-session] experiment defaults, bounds and invalid runner preflight without services PASS");
 
 // Real Pi lifecycle and tool validation; business spies do not connect to a database or a live model.
 const runtime = await createModelRuntime(), faux = fauxProvider();
@@ -227,6 +259,30 @@ try {
   await run("你好", [choose({ kind: "non_business", reason: "greeting" }), finish]);
   assert.equal(getSupportResult(session)?.outcome, "non_business", "a new request gets a fresh bounded repair budget");
   console.log("[support-session] format repair budget blocks later execution after repeated invalid arguments PASS");
+
+  for (const repairBudget of [0, 2]) {
+    session.dispose();
+    session = await createSupportSession(identity, store, runtime, faux.getModel(), { store: merchant, sourceKey, refunds },
+      { groupOpenid: group, focus: focusStore, repairBudget });
+    const allowed = await run(`查询 ${orderId}`, [
+      ...Array.from({ length: repairBudget }, () => malformed), choose({ kind: "order", orderRef: explicit() }), finish,
+    ]);
+    assert.deepEqual(allowed.map(result => result.isError), [...Array.from({ length: repairBudget }, () => true), false]);
+    assert.equal(getSupportResult(session)?.action.kind, "order");
+    const before = calls.length, modelBefore = faux.state.callCount;
+    const aborted = await run(`查询 ${orderId}`, [
+      ...Array.from({ length: repairBudget + 1 }, () => malformed), choose({ kind: "order", orderRef: explicit() }), finish,
+    ], 2);
+    assert.ok(aborted.every(result => result.isError));
+    assert.equal(faux.state.callCount, modelBefore + repairBudget + 1);
+    assert.equal(calls.length, before, "aborting at the selected repair budget must block every later business action");
+    assert.equal(getSupportResult(session), undefined);
+    faux.setResponses([]);
+    await run("你好", [choose({ kind: "non_business", reason: "greeting" }), finish]);
+    assert.equal(getSupportResult(session)?.outcome, "non_business");
+  }
+  await assert.rejects(createSupportSession(identity, store, runtime, faux.getModel(), undefined, { repairBudget: 3 }), /repairBudget/);
+  console.log("[support-session] repairBudget 0 and 2 enforce actual model abort, valid repairs and per-turn reset PASS");
 
   const cliSource = merchantSourceKey(identity, "cli"), delivery: string[] = [];
   let cliPrepares = 0, markFailure = false;

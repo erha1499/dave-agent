@@ -1,6 +1,6 @@
 # 客观评测 API 合同
 
-本机工作台继续使用四张 `eval_*` JSON 表，所有接口只读。原 `/api/runs?kind=model&limit=50` 和 `/api/runs/<UUID>` 响应不变；新增字段均为可选。新接口不评回答质量、不使用 LLM judge，也不把历史措辞检查转换为客观检查。
+本机工作台继续使用四张 `eval_*` JSON 表，本文的历史与分析接口保持只读。原 `/api/runs?kind=model&limit=50` 和 `/api/runs/<UUID>` 响应不变；新增字段均为可选。独立的实验配置与启动接口见 [实验调试合同](./experiment-controls.md)，不改变既有历史记录。新接口不评回答质量、不使用 LLM judge，也不把历史措辞检查转换为客观检查。
 
 ## 计划与批次元数据
 
@@ -111,7 +111,7 @@ type SupportTraceAnalysis = {
 
 `denied` 是服务的已知业务拒绝，`error` 是执行错误；两者不决定案例得分。Controller 的正常 `blocked` 不一定产生 denied，不要将 denied 数当全部拦截数。provider 的 requests 只覆盖带有效 usage 对象的 span，缺整个 usage 的 span 不在该分母；宜标“归因中已记录请求”，不可据此声称所有请求用量完整。Tokens 与 costs 都是已知部分，USD/CNY 及 `sdk_estimate`/`provider` 分别显示、不换汇合计，缺价格显示未知。首屏继续使用原 `analysis.usage` 口径，归因明细默认折叠。
 
-M0–M6 的百炼检索报告目前仅位于 `.runtime/retrieval-v2/`，**尚未接入工作台 API**。此合同支持未来 embedding/rerank usage，但页面不能凭开发报告写死 Recall/MRR 或暗示在线业务已使用 rerank。
+M0–M6 的完整百炼检索报告位于 `.runtime/retrieval-v2/`，未导入旧历史运行 API。新实验入口仅在任务结果中提供其关联报告的实际摘要；不扫描导入旧离线报告，不凭开发报告写死 Recall/MRR，也不暗示在线业务已使用 rerank。
 
 `missing` 是计划存在但没有记录，`skipped` 是明确跳过。两者均不通过。只统计计划中的检查；额外、重复、错类别或不完整计划会返回 `scope: invalid`、`counts: null` 和原因。没有计划的旧记录返回 `legacy`，不生成客观通过率。模型请求/用量/执行耗时是步骤遥测，可在 legacy 页面显示。
 
