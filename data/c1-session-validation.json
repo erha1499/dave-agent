@@ -1,0 +1,3167 @@
+{
+  "version": 1,
+  "suiteId": "c1-session-v2.2-fixed-validation-1",
+  "validationPolicy": "fixed-validation-not-blind",
+  "cases": [
+    {
+      "id": "c1-session-fixed-001",
+      "family": "order_state",
+      "stratum": "known",
+      "corpus": "online",
+      "turns": [
+        {
+          "question": "先查一下我的订单 COUPON-6001，看看目前支付和券状态。",
+          "expected": {
+            "allowedKinds": [
+              "order"
+            ],
+            "outcome": "ready",
+            "knowledge": "none",
+            "gold": [],
+            "scope": {
+              "shopId": "shop-demo-1",
+              "productId": "product-demo-1"
+            },
+            "freshOrder": {
+              "source": "demo-database",
+              "id": "COUPON-6001",
+              "status": "paid",
+              "asOf": "2026-10-05T00:00:00.000Z",
+              "amounts": {
+                "totalCents": 7980,
+                "paidCents": 7980,
+                "refundedCents": 0
+              },
+              "createdAt": "2026-10-05T00:00:00.000Z",
+              "paidAt": "2026-10-05T00:00:00.000Z",
+              "shop": {
+                "id": "shop-demo-1",
+                "name": "云味餐厅",
+                "merchantName": "演示商家",
+                "address": "演示地址"
+              },
+              "items": [
+                {
+                  "productId": "product-demo-1",
+                  "quantity": 1,
+                  "unitPriceCents": 7980,
+                  "totalCents": 7980,
+                  "id": "COUPON-6001-item-0",
+                  "productName": "双人午餐团购券"
+                }
+              ],
+              "coupons": [
+                {
+                  "id": "COUPON-6001-coupon-0",
+                  "orderItemId": "COUPON-6001-item-0",
+                  "status": "unused",
+                  "expiresAt": "2026-11-04T00:00:00.000Z",
+                  "redeemedAt": null,
+                  "redeemedShopId": null
+                }
+              ],
+              "payments": [
+                {
+                  "status": "succeeded",
+                  "amountCents": 7980,
+                  "paidAt": "2026-10-05T00:00:00.000Z"
+                }
+              ],
+              "refunds": []
+            },
+            "answerCriteria": [
+              {
+                "id": "fact",
+                "kind": "required_fact",
+                "statement": "展示本人订单 COUPON-6001 的查询事实：状态 paid，实付 79.80 元，历史已退 0.00 元；券状态与本轮快照一致。",
+                "basis": "setup中 COUPON-6001 完整Order快照及实际成功get_order输出"
+              },
+              {
+                "id": "no_invention",
+                "kind": "forbidden_claim",
+                "statement": "不得说本轮已执行退款、商家已批准或已修改券状态。",
+                "basis": "setup中 COUPON-6001 完整Order快照及实际成功get_order输出"
+              },
+              {
+                "id": "conditions",
+                "kind": "condition",
+                "statement": "这是只读订单查询；实付和历史退款是数据库事实。",
+                "basis": "setup中 COUPON-6001 完整Order快照及实际成功get_order输出"
+              }
+            ]
+          }
+        },
+        {
+          "question": "还是刚才那笔订单，现在重新核对的话还有退款申请资格吗？只咨询，不要办理。",
+          "expected": {
+            "allowedKinds": [
+              "refund_eligibility"
+            ],
+            "outcome": "ready",
+            "knowledge": "evidence",
+            "gold": [
+              {
+                "sourceId": "KB-REFUND-PAYMENT",
+                "quote": "已完成退款的订单需以支付和退款历史为准，不得重复退款"
+              }
+            ],
+            "scope": {
+              "shopId": "shop-demo-1",
+              "productId": "product-demo-1"
+            },
+            "freshOrder": {
+              "source": "demo-database",
+              "id": "COUPON-6001",
+              "status": "refunded",
+              "asOf": "2026-10-05T01:00:00.000Z",
+              "amounts": {
+                "totalCents": 7980,
+                "paidCents": 7980,
+                "refundedCents": 7980
+              },
+              "createdAt": "2026-10-05T00:00:00.000Z",
+              "paidAt": "2026-10-05T00:00:00.000Z",
+              "shop": {
+                "id": "shop-demo-1",
+                "name": "云味餐厅",
+                "merchantName": "演示商家",
+                "address": "演示地址"
+              },
+              "items": [
+                {
+                  "productId": "product-demo-1",
+                  "quantity": 1,
+                  "unitPriceCents": 7980,
+                  "totalCents": 7980,
+                  "id": "COUPON-6001-item-0",
+                  "productName": "双人午餐团购券"
+                }
+              ],
+              "coupons": [
+                {
+                  "id": "COUPON-6001-coupon-0",
+                  "orderItemId": "COUPON-6001-item-0",
+                  "status": "refunded",
+                  "expiresAt": "2026-11-04T00:00:00.000Z",
+                  "redeemedAt": null,
+                  "redeemedShopId": null
+                }
+              ],
+              "payments": [
+                {
+                  "status": "succeeded",
+                  "amountCents": 7980,
+                  "paidAt": "2026-10-05T00:00:00.000Z"
+                }
+              ],
+              "refunds": [
+                {
+                  "status": "succeeded",
+                  "amountCents": 7980,
+                  "completedAt": "2026-10-05T01:00:00.000Z"
+                }
+              ]
+            },
+            "answerCriteria": [
+              {
+                "id": "fact",
+                "kind": "required_fact",
+                "statement": "说明当前订单已退款，历史已退79.80元，不能对同笔资金再次退款。",
+                "basis": "KB-REFUND-PAYMENT: 已完成退款的订单需以支付和退款历史为准，不得重复退款"
+              },
+              {
+                "id": "no_invention",
+                "kind": "forbidden_claim",
+                "statement": "不得沿用上一轮未使用/未退款快照承诺再退，也不得称历史退款由本轮完成。",
+                "basis": "KB-REFUND-PAYMENT: 已完成退款的订单需以支付和退款历史为准，不得重复退款"
+              },
+              {
+                "id": "conditions",
+                "kind": "condition",
+                "statement": "以当前支付和退款历史为准；只读咨询。",
+                "basis": "KB-REFUND-PAYMENT: 已完成退款的订单需以支付和退款历史为准，不得重复退款"
+              }
+            ]
+          },
+          "stateChange": {
+            "orderId": "COUPON-6001",
+            "before": {
+              "source": "demo-database",
+              "id": "COUPON-6001",
+              "status": "paid",
+              "asOf": "2026-10-05T00:00:00.000Z",
+              "amounts": {
+                "totalCents": 7980,
+                "paidCents": 7980,
+                "refundedCents": 0
+              },
+              "createdAt": "2026-10-05T00:00:00.000Z",
+              "paidAt": "2026-10-05T00:00:00.000Z",
+              "shop": {
+                "id": "shop-demo-1",
+                "name": "云味餐厅",
+                "merchantName": "演示商家",
+                "address": "演示地址"
+              },
+              "items": [
+                {
+                  "productId": "product-demo-1",
+                  "quantity": 1,
+                  "unitPriceCents": 7980,
+                  "totalCents": 7980,
+                  "id": "COUPON-6001-item-0",
+                  "productName": "双人午餐团购券"
+                }
+              ],
+              "coupons": [
+                {
+                  "id": "COUPON-6001-coupon-0",
+                  "orderItemId": "COUPON-6001-item-0",
+                  "status": "unused",
+                  "expiresAt": "2026-11-04T00:00:00.000Z",
+                  "redeemedAt": null,
+                  "redeemedShopId": null
+                }
+              ],
+              "payments": [
+                {
+                  "status": "succeeded",
+                  "amountCents": 7980,
+                  "paidAt": "2026-10-05T00:00:00.000Z"
+                }
+              ],
+              "refunds": []
+            },
+            "after": {
+              "source": "demo-database",
+              "id": "COUPON-6001",
+              "status": "refunded",
+              "asOf": "2026-10-05T01:00:00.000Z",
+              "amounts": {
+                "totalCents": 7980,
+                "paidCents": 7980,
+                "refundedCents": 7980
+              },
+              "createdAt": "2026-10-05T00:00:00.000Z",
+              "paidAt": "2026-10-05T00:00:00.000Z",
+              "shop": {
+                "id": "shop-demo-1",
+                "name": "云味餐厅",
+                "merchantName": "演示商家",
+                "address": "演示地址"
+              },
+              "items": [
+                {
+                  "productId": "product-demo-1",
+                  "quantity": 1,
+                  "unitPriceCents": 7980,
+                  "totalCents": 7980,
+                  "id": "COUPON-6001-item-0",
+                  "productName": "双人午餐团购券"
+                }
+              ],
+              "coupons": [
+                {
+                  "id": "COUPON-6001-coupon-0",
+                  "orderItemId": "COUPON-6001-item-0",
+                  "status": "refunded",
+                  "expiresAt": "2026-11-04T00:00:00.000Z",
+                  "redeemedAt": null,
+                  "redeemedShopId": null
+                }
+              ],
+              "payments": [
+                {
+                  "status": "succeeded",
+                  "amountCents": 7980,
+                  "paidAt": "2026-10-05T00:00:00.000Z"
+                }
+              ],
+              "refunds": [
+                {
+                  "status": "succeeded",
+                  "amountCents": 7980,
+                  "completedAt": "2026-10-05T01:00:00.000Z"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "c1-session-fixed-002",
+      "family": "order_state",
+      "stratum": "missing",
+      "corpus": "online",
+      "turns": [
+        {
+          "question": "这张券现在还符合退款申请条件吗？请以最新状态判断。",
+          "expected": {
+            "allowedKinds": [
+              "clarify"
+            ],
+            "outcome": "clarification",
+            "knowledge": "none",
+            "gold": [],
+            "scope": {
+              "shopId": null,
+              "productId": null
+            },
+            "freshOrder": null,
+            "answerCriteria": [
+              {
+                "id": "fact",
+                "kind": "required_fact",
+                "statement": "询问要查询的订单号或明确哪张券，不猜测订单或券状态。",
+                "basis": "真实Session尚未建立本轮所需引用；输入缺失只能澄清。"
+              },
+              {
+                "id": "no_invention",
+                "kind": "forbidden_claim",
+                "statement": "不得任意挑选订单、金额、时限、主体或规则来给出肯定/否定业务结论；不得声称办理成功。",
+                "basis": "真实Session尚未建立本轮所需引用；输入缺失只能澄清。"
+              },
+              {
+                "id": "conditions",
+                "kind": "condition",
+                "statement": "请补充具体所指；一般提示必须有助于本轮澄清，不能用通用规则替代。",
+                "basis": "真实Session尚未建立本轮所需引用；输入缺失只能澄清。"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "c1-session-fixed-003",
+      "family": "order_state",
+      "stratum": "competing",
+      "corpus": "online",
+      "competingCandidates": [
+        "COUPON-6001 未用券",
+        "COUPON-6004 已退款券"
+      ],
+      "ambiguityReason": "两笔订单均已真实查询；当前说“前面这两笔里的那张”未选定对象，不能仅凭最后focus替用户决定。",
+      "turns": [
+        {
+          "question": "帮我查订单 COUPON-6001。",
+          "expected": {
+            "allowedKinds": [
+              "order"
+            ],
+            "outcome": "ready",
+            "knowledge": "none",
+            "gold": [],
+            "scope": {
+              "shopId": "shop-demo-1",
+              "productId": "product-demo-1"
+            },
+            "freshOrder": {
+              "source": "demo-database",
+              "id": "COUPON-6001",
+              "status": "paid",
+              "asOf": "2026-10-05T00:00:00.000Z",
+              "amounts": {
+                "totalCents": 7980,
+                "paidCents": 7980,
+                "refundedCents": 0
+              },
+              "createdAt": "2026-10-05T00:00:00.000Z",
+              "paidAt": "2026-10-05T00:00:00.000Z",
+              "shop": {
+                "id": "shop-demo-1",
+                "name": "云味餐厅",
+                "merchantName": "演示商家",
+                "address": "演示地址"
+              },
+              "items": [
+                {
+                  "productId": "product-demo-1",
+                  "quantity": 1,
+                  "unitPriceCents": 7980,
+                  "totalCents": 7980,
+                  "id": "COUPON-6001-item-0",
+                  "productName": "双人午餐团购券"
+                }
+              ],
+              "coupons": [
+                {
+                  "id": "COUPON-6001-coupon-0",
+                  "orderItemId": "COUPON-6001-item-0",
+                  "status": "unused",
+                  "expiresAt": "2026-11-04T00:00:00.000Z",
+                  "redeemedAt": null,
+                  "redeemedShopId": null
+                }
+              ],
+              "payments": [
+                {
+                  "status": "succeeded",
+                  "amountCents": 7980,
+                  "paidAt": "2026-10-05T00:00:00.000Z"
+                }
+              ],
+              "refunds": []
+            },
+            "answerCriteria": [
+              {
+                "id": "fact",
+                "kind": "required_fact",
+                "statement": "展示本人订单 COUPON-6001 的查询事实：状态 paid，实付 79.80 元，历史已退 0.00 元；券状态与本轮快照一致。",
+                "basis": "setup中 COUPON-6001 完整Order快照及实际成功get_order输出"
+              },
+              {
+                "id": "no_invention",
+                "kind": "forbidden_claim",
+                "statement": "不得说本轮已执行退款、商家已批准或已修改券状态。",
+                "basis": "setup中 COUPON-6001 完整Order快照及实际成功get_order输出"
+              },
+              {
+                "id": "conditions",
+                "kind": "condition",
+                "statement": "这是只读订单查询；实付和历史退款是数据库事实。",
+                "basis": "setup中 COUPON-6001 完整Order快照及实际成功get_order输出"
+              }
+            ]
+          }
+        },
+        {
+          "question": "也查一下订单 COUPON-6004。",
+          "expected": {
+            "allowedKinds": [
+              "order"
+            ],
+            "outcome": "ready",
+            "knowledge": "none",
+            "gold": [],
+            "scope": {
+              "shopId": "shop-demo-1",
+              "productId": "product-demo-2"
+            },
+            "freshOrder": {
+              "source": "demo-database",
+              "id": "COUPON-6004",
+              "status": "refunded",
+              "asOf": "2026-10-05T00:00:00.000Z",
+              "amounts": {
+                "totalCents": 5990,
+                "paidCents": 5990,
+                "refundedCents": 5990
+              },
+              "createdAt": "2026-10-05T00:00:00.000Z",
+              "paidAt": "2026-10-05T00:00:00.000Z",
+              "shop": {
+                "id": "shop-demo-1",
+                "name": "云味餐厅",
+                "merchantName": "演示商家",
+                "address": "演示地址"
+              },
+              "items": [
+                {
+                  "productId": "product-demo-2",
+                  "quantity": 1,
+                  "unitPriceCents": 5990,
+                  "totalCents": 5990,
+                  "id": "COUPON-6004-item-0",
+                  "productName": "单人晚餐团购券"
+                }
+              ],
+              "coupons": [
+                {
+                  "id": "COUPON-6004-coupon-0",
+                  "orderItemId": "COUPON-6004-item-0",
+                  "status": "refunded",
+                  "expiresAt": "2026-11-04T00:00:00.000Z",
+                  "redeemedAt": null,
+                  "redeemedShopId": null
+                }
+              ],
+              "payments": [
+                {
+                  "status": "succeeded",
+                  "amountCents": 5990,
+                  "paidAt": "2026-10-05T00:00:00.000Z"
+                }
+              ],
+              "refunds": [
+                {
+                  "status": "succeeded",
+                  "amountCents": 5990,
+                  "completedAt": "2026-10-05T00:00:00.000Z"
+                }
+              ]
+            },
+            "answerCriteria": [
+              {
+                "id": "fact",
+                "kind": "required_fact",
+                "statement": "展示本人订单 COUPON-6004 的查询事实：状态 refunded，实付 59.90 元，历史已退 59.90 元；券状态与本轮快照一致。",
+                "basis": "setup中 COUPON-6004 完整Order快照及实际成功get_order输出"
+              },
+              {
+                "id": "no_invention",
+                "kind": "forbidden_claim",
+                "statement": "不得说本轮已执行退款、商家已批准或已修改券状态。",
+                "basis": "setup中 COUPON-6004 完整Order快照及实际成功get_order输出"
+              },
+              {
+                "id": "conditions",
+                "kind": "condition",
+                "statement": "这是只读订单查询；实付和历史退款是数据库事实。",
+                "basis": "setup中 COUPON-6004 完整Order快照及实际成功get_order输出"
+              }
+            ]
+          }
+        },
+        {
+          "question": "前面这两笔里的那张，现在还符合退款申请条件吗？",
+          "expected": {
+            "allowedKinds": [
+              "clarify"
+            ],
+            "outcome": "clarification",
+            "knowledge": "none",
+            "gold": [],
+            "scope": {
+              "shopId": null,
+              "productId": null
+            },
+            "freshOrder": null,
+            "answerCriteria": [
+              {
+                "id": "fact",
+                "kind": "required_fact",
+                "statement": "请求明确是哪笔订单，再查对应状态；可以列出COUPON-6001与COUPON-6004辅助选择。",
+                "basis": "两笔订单均已真实查询；当前说“前面这两笔里的那张”未选定对象，不能仅凭最后focus替用户决定。"
+              },
+              {
+                "id": "no_invention",
+                "kind": "forbidden_claim",
+                "statement": "不得任意挑选订单、金额、时限、主体或规则来给出肯定/否定业务结论；不得声称办理成功。",
+                "basis": "两笔订单均已真实查询；当前说“前面这两笔里的那张”未选定对象，不能仅凭最后focus替用户决定。"
+              },
+              {
+                "id": "conditions",
+                "kind": "condition",
+                "statement": "请补充具体所指；一般提示必须有助于本轮澄清，不能用通用规则替代。",
+                "basis": "两笔订单均已真实查询；当前说“前面这两笔里的那张”未选定对象，不能仅凭最后focus替用户决定。"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "c1-session-fixed-004",
+      "family": "paid_amount",
+      "stratum": "known",
+      "corpus": "online",
+      "turns": [
+        {
+          "question": "请查订单 COUPON-6005，给我看一下实际付款和每张券的金额。",
+          "expected": {
+            "allowedKinds": [
+              "order"
+            ],
+            "outcome": "ready",
+            "knowledge": "none",
+            "gold": [],
+            "scope": {
+              "shopId": "shop-demo-1",
+              "productId": "product-demo-2"
+            },
+            "freshOrder": {
+              "source": "demo-database",
+              "id": "COUPON-6005",
+              "status": "partially_redeemed",
+              "asOf": "2026-10-05T00:00:00.000Z",
+              "amounts": {
+                "totalCents": 11980,
+                "paidCents": 11980,
+                "refundedCents": 0
+              },
+              "createdAt": "2026-10-05T00:00:00.000Z",
+              "paidAt": "2026-10-05T00:00:00.000Z",
+              "shop": {
+                "id": "shop-demo-1",
+                "name": "云味餐厅",
+                "merchantName": "演示商家",
+                "address": "演示地址"
+              },
+              "items": [
+                {
+                  "productId": "product-demo-2",
+                  "quantity": 2,
+                  "unitPriceCents": 5990,
+                  "totalCents": 11980,
+                  "id": "COUPON-6005-item-0",
+                  "productName": "单人晚餐团购券"
+                }
+              ],
+              "coupons": [
+                {
+                  "id": "COUPON-6005-coupon-0",
+                  "orderItemId": "COUPON-6005-item-0",
+                  "status": "redeemed",
+                  "expiresAt": "2026-11-04T00:00:00.000Z",
+                  "redeemedAt": "2026-10-05T00:00:00.000Z",
+                  "redeemedShopId": "shop-demo-1"
+                },
+                {
+                  "id": "COUPON-6005-coupon-1",
+                  "orderItemId": "COUPON-6005-item-0",
+                  "status": "unused",
+                  "expiresAt": "2026-11-04T00:00:00.000Z",
+                  "redeemedAt": null,
+                  "redeemedShopId": null
+                }
+              ],
+              "payments": [
+                {
+                  "status": "succeeded",
+                  "amountCents": 11980,
+                  "paidAt": "2026-10-05T00:00:00.000Z"
+                }
+              ],
+              "refunds": []
+            },
+            "answerCriteria": [
+              {
+                "id": "fact",
+                "kind": "required_fact",
+                "statement": "展示本人订单 COUPON-6005 的查询事实：状态 partially_redeemed，实付 119.80 元，历史已退 0.00 元；券状态与本轮快照一致。",
+                "basis": "setup中 COUPON-6005 完整Order快照及实际成功get_order输出"
+              },
+              {
+                "id": "no_invention",
+                "kind": "forbidden_claim",
+                "statement": "不得说本轮已执行退款、商家已批准或已修改券状态。",
+                "basis": "setup中 COUPON-6005 完整Order快照及实际成功get_order输出"
+              },
+              {
+                "id": "conditions",
+                "kind": "condition",
+                "statement": "这是只读订单查询；实付和历史退款是数据库事实。",
+                "basis": "setup中 COUPON-6005 完整Order快照及实际成功get_order输出"
+              }
+            ]
+          }
+        },
+        {
+          "question": "余下那张没核销的券，实付价与前面展示的每券实付相同吗？只比较数字，不申请退款。",
+          "expected": {
+            "allowedKinds": [
+              "paid_amount_compare"
+            ],
+            "outcome": "ready",
+            "knowledge": "none",
+            "gold": [],
+            "scope": {
+              "shopId": "shop-demo-1",
+              "productId": "product-demo-2"
+            },
+            "freshOrder": {
+              "source": "demo-database",
+              "id": "COUPON-6005",
+              "status": "partially_redeemed",
+              "asOf": "2026-10-05T00:00:00.000Z",
+              "amounts": {
+                "totalCents": 11980,
+                "paidCents": 11980,
+                "refundedCents": 0
+              },
+              "createdAt": "2026-10-05T00:00:00.000Z",
+              "paidAt": "2026-10-05T00:00:00.000Z",
+              "shop": {
+                "id": "shop-demo-1",
+                "name": "云味餐厅",
+                "merchantName": "演示商家",
+                "address": "演示地址"
+              },
+              "items": [
+                {
+                  "productId": "product-demo-2",
+                  "quantity": 2,
+                  "unitPriceCents": 5990,
+                  "totalCents": 11980,
+                  "id": "COUPON-6005-item-0",
+                  "productName": "单人晚餐团购券"
+                }
+              ],
+              "coupons": [
+                {
+                  "id": "COUPON-6005-coupon-0",
+                  "orderItemId": "COUPON-6005-item-0",
+                  "status": "redeemed",
+                  "expiresAt": "2026-11-04T00:00:00.000Z",
+                  "redeemedAt": "2026-10-05T00:00:00.000Z",
+                  "redeemedShopId": "shop-demo-1"
+                },
+                {
+                  "id": "COUPON-6005-coupon-1",
+                  "orderItemId": "COUPON-6005-item-0",
+                  "status": "unused",
+                  "expiresAt": "2026-11-04T00:00:00.000Z",
+                  "redeemedAt": null,
+                  "redeemedShopId": null
+                }
+              ],
+              "payments": [
+                {
+                  "status": "succeeded",
+                  "amountCents": 11980,
+                  "paidAt": "2026-10-05T00:00:00.000Z"
+                }
+              ],
+              "refunds": []
+            },
+            "reference": "amount",
+            "amount": {
+              "couponId": "COUPON-6005-coupon-1",
+              "remainingUnitPaidCents": 5990,
+              "referencePaidCents": 5990,
+              "comparisonEqual": true
+            },
+            "answerCriteria": [
+              {
+                "id": "fact",
+                "kind": "required_fact",
+                "statement": "明确剩余唯一未核销券的每券实付59.90元，与此前真实展示59.90元相同。",
+                "basis": "完整订单/支付快照，前序宿主真实展示引用和当前fresh金额比较输出"
+              },
+              {
+                "id": "no_invention",
+                "kind": "forbidden_claim",
+                "statement": "不得说这是获批退款额、申请上限、商家批准或本轮退款成功。",
+                "basis": "完整订单/支付快照，前序宿主真实展示引用和当前fresh金额比较输出"
+              },
+              {
+                "id": "conditions",
+                "kind": "condition",
+                "statement": "只核对实付；本轮知识请求和规则均为0。",
+                "basis": "完整订单/支付快照，前序宿主真实展示引用和当前fresh金额比较输出"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "c1-session-fixed-005",
+      "family": "paid_amount",
+      "stratum": "missing",
+      "corpus": "online",
+      "turns": [
+        {
+          "question": "订单 COUPON-6005 剩下那张的实付，和之前显示的每券金额一样吗？",
+          "expected": {
+            "allowedKinds": [
+              "clarify"
+            ],
+            "outcome": "clarification",
+            "knowledge": "none",
+            "gold": [],
+            "scope": {
+              "shopId": null,
+              "productId": null
+            },
+            "freshOrder": null,
+            "answerCriteria": [
+              {
+                "id": "fact",
+                "kind": "required_fact",
+                "statement": "说明当前没有可引用的之前金额展示，先补充或重新查询，不凭订单号补造历史金额引用。",
+                "basis": "真实Session尚未建立本轮所需引用；输入缺失只能澄清。"
+              },
+              {
+                "id": "no_invention",
+                "kind": "forbidden_claim",
+                "statement": "不得任意挑选订单、金额、时限、主体或规则来给出肯定/否定业务结论；不得声称办理成功。",
+                "basis": "真实Session尚未建立本轮所需引用；输入缺失只能澄清。"
+              },
+              {
+                "id": "conditions",
+                "kind": "condition",
+                "statement": "请补充具体所指；一般提示必须有助于本轮澄清，不能用通用规则替代。",
+                "basis": "真实Session尚未建立本轮所需引用；输入缺失只能澄清。"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "c1-session-fixed-006",
+      "family": "paid_amount",
+      "stratum": "competing",
+      "corpus": "online",
+      "competingCandidates": [
+        "COUPON-6001 每券实付79.80元",
+        "COUPON-6005 每券实付59.90元"
+      ],
+      "ambiguityReason": "对话中真实展示两笔不同金额；本轮说“看混了/那个数”没有选出基准金额，当前订单虽明确也不能把最后amountReference当用户选定。",
+      "turns": [
+        {
+          "question": "先看订单 COUPON-6001 的每券实付。",
+          "expected": {
+            "allowedKinds": [
+              "order"
+            ],
+            "outcome": "ready",
+            "knowledge": "none",
+            "gold": [],
+            "scope": {
+              "shopId": "shop-demo-1",
+              "productId": "product-demo-1"
+            },
+            "freshOrder": {
+              "source": "demo-database",
+              "id": "COUPON-6001",
+              "status": "paid",
+              "asOf": "2026-10-05T00:00:00.000Z",
+              "amounts": {
+                "totalCents": 7980,
+                "paidCents": 7980,
+                "refundedCents": 0
+              },
+              "createdAt": "2026-10-05T00:00:00.000Z",
+              "paidAt": "2026-10-05T00:00:00.000Z",
+              "shop": {
+                "id": "shop-demo-1",
+                "name": "云味餐厅",
+                "merchantName": "演示商家",
+                "address": "演示地址"
+              },
+              "items": [
+                {
+                  "productId": "product-demo-1",
+                  "quantity": 1,
+                  "unitPriceCents": 7980,
+                  "totalCents": 7980,
+                  "id": "COUPON-6001-item-0",
+                  "productName": "双人午餐团购券"
+                }
+              ],
+              "coupons": [
+                {
+                  "id": "COUPON-6001-coupon-0",
+                  "orderItemId": "COUPON-6001-item-0",
+                  "status": "unused",
+                  "expiresAt": "2026-11-04T00:00:00.000Z",
+                  "redeemedAt": null,
+                  "redeemedShopId": null
+                }
+              ],
+              "payments": [
+                {
+                  "status": "succeeded",
+                  "amountCents": 7980,
+                  "paidAt": "2026-10-05T00:00:00.000Z"
+                }
+              ],
+              "refunds": []
+            },
+            "answerCriteria": [
+              {
+                "id": "fact",
+                "kind": "required_fact",
+                "statement": "展示本人订单 COUPON-6001 的查询事实：状态 paid，实付 79.80 元，历史已退 0.00 元；券状态与本轮快照一致。",
+                "basis": "setup中 COUPON-6001 完整Order快照及实际成功get_order输出"
+              },
+              {
+                "id": "no_invention",
+                "kind": "forbidden_claim",
+                "statement": "不得说本轮已执行退款、商家已批准或已修改券状态。",
+                "basis": "setup中 COUPON-6001 完整Order快照及实际成功get_order输出"
+              },
+              {
+                "id": "conditions",
+                "kind": "condition",
+                "statement": "这是只读订单查询；实付和历史退款是数据库事实。",
+                "basis": "setup中 COUPON-6001 完整Order快照及实际成功get_order输出"
+              }
+            ]
+          }
+        },
+        {
+          "question": "再看订单 COUPON-6005 的每券实付。",
+          "expected": {
+            "allowedKinds": [
+              "order"
+            ],
+            "outcome": "ready",
+            "knowledge": "none",
+            "gold": [],
+            "scope": {
+              "shopId": "shop-demo-1",
+              "productId": "product-demo-2"
+            },
+            "freshOrder": {
+              "source": "demo-database",
+              "id": "COUPON-6005",
+              "status": "partially_redeemed",
+              "asOf": "2026-10-05T00:00:00.000Z",
+              "amounts": {
+                "totalCents": 11980,
+                "paidCents": 11980,
+                "refundedCents": 0
+              },
+              "createdAt": "2026-10-05T00:00:00.000Z",
+              "paidAt": "2026-10-05T00:00:00.000Z",
+              "shop": {
+                "id": "shop-demo-1",
+                "name": "云味餐厅",
+                "merchantName": "演示商家",
+                "address": "演示地址"
+              },
+              "items": [
+                {
+                  "productId": "product-demo-2",
+                  "quantity": 2,
+                  "unitPriceCents": 5990,
+                  "totalCents": 11980,
+                  "id": "COUPON-6005-item-0",
+                  "productName": "单人晚餐团购券"
+                }
+              ],
+              "coupons": [
+                {
+                  "id": "COUPON-6005-coupon-0",
+                  "orderItemId": "COUPON-6005-item-0",
+                  "status": "redeemed",
+                  "expiresAt": "2026-11-04T00:00:00.000Z",
+                  "redeemedAt": "2026-10-05T00:00:00.000Z",
+                  "redeemedShopId": "shop-demo-1"
+                },
+                {
+                  "id": "COUPON-6005-coupon-1",
+                  "orderItemId": "COUPON-6005-item-0",
+                  "status": "unused",
+                  "expiresAt": "2026-11-04T00:00:00.000Z",
+                  "redeemedAt": null,
+                  "redeemedShopId": null
+                }
+              ],
+              "payments": [
+                {
+                  "status": "succeeded",
+                  "amountCents": 11980,
+                  "paidAt": "2026-10-05T00:00:00.000Z"
+                }
+              ],
+              "refunds": []
+            },
+            "answerCriteria": [
+              {
+                "id": "fact",
+                "kind": "required_fact",
+                "statement": "展示本人订单 COUPON-6005 的查询事实：状态 partially_redeemed，实付 119.80 元，历史已退 0.00 元；券状态与本轮快照一致。",
+                "basis": "setup中 COUPON-6005 完整Order快照及实际成功get_order输出"
+              },
+              {
+                "id": "no_invention",
+                "kind": "forbidden_claim",
+                "statement": "不得说本轮已执行退款、商家已批准或已修改券状态。",
+                "basis": "setup中 COUPON-6005 完整Order快照及实际成功get_order输出"
+              },
+              {
+                "id": "conditions",
+                "kind": "condition",
+                "statement": "这是只读订单查询；实付和历史退款是数据库事实。",
+                "basis": "setup中 COUPON-6005 完整Order快照及实际成功get_order输出"
+              }
+            ]
+          }
+        },
+        {
+          "question": "我在前面那两个每券金额之间看混了，COUPON-6005 剩下那张和那个数相同吗？",
+          "expected": {
+            "allowedKinds": [
+              "clarify"
+            ],
+            "outcome": "clarification",
+            "knowledge": "none",
+            "gold": [],
+            "scope": {
+              "shopId": "shop-demo-1",
+              "productId": "product-demo-2"
+            },
+            "freshOrder": {
+              "source": "demo-database",
+              "id": "COUPON-6005",
+              "status": "partially_redeemed",
+              "asOf": "2026-10-05T00:00:00.000Z",
+              "amounts": {
+                "totalCents": 11980,
+                "paidCents": 11980,
+                "refundedCents": 0
+              },
+              "createdAt": "2026-10-05T00:00:00.000Z",
+              "paidAt": "2026-10-05T00:00:00.000Z",
+              "shop": {
+                "id": "shop-demo-1",
+                "name": "云味餐厅",
+                "merchantName": "演示商家",
+                "address": "演示地址"
+              },
+              "items": [
+                {
+                  "productId": "product-demo-2",
+                  "quantity": 2,
+                  "unitPriceCents": 5990,
+                  "totalCents": 11980,
+                  "id": "COUPON-6005-item-0",
+                  "productName": "单人晚餐团购券"
+                }
+              ],
+              "coupons": [
+                {
+                  "id": "COUPON-6005-coupon-0",
+                  "orderItemId": "COUPON-6005-item-0",
+                  "status": "redeemed",
+                  "expiresAt": "2026-11-04T00:00:00.000Z",
+                  "redeemedAt": "2026-10-05T00:00:00.000Z",
+                  "redeemedShopId": "shop-demo-1"
+                },
+                {
+                  "id": "COUPON-6005-coupon-1",
+                  "orderItemId": "COUPON-6005-item-0",
+                  "status": "unused",
+                  "expiresAt": "2026-11-04T00:00:00.000Z",
+                  "redeemedAt": null,
+                  "redeemedShopId": null
+                }
+              ],
+              "payments": [
+                {
+                  "status": "succeeded",
+                  "amountCents": 11980,
+                  "paidAt": "2026-10-05T00:00:00.000Z"
+                }
+              ],
+              "refunds": []
+            },
+            "answerCriteria": [
+              {
+                "id": "fact",
+                "kind": "required_fact",
+                "statement": "请求明确作为比较基准的是哪个前序金额；可以列举79.80元和59.90元帮助确认，不擅自采用最近展示的一个。",
+                "basis": "对话中真实展示两笔不同金额；本轮说“看混了/那个数”没有选出基准金额，当前订单虽明确也不能把最后amountReference当用户选定。"
+              },
+              {
+                "id": "no_invention",
+                "kind": "forbidden_claim",
+                "statement": "不得任意挑选订单、金额、时限、主体或规则来给出肯定/否定业务结论；不得声称办理成功。",
+                "basis": "对话中真实展示两笔不同金额；本轮说“看混了/那个数”没有选出基准金额，当前订单虽明确也不能把最后amountReference当用户选定。"
+              },
+              {
+                "id": "conditions",
+                "kind": "condition",
+                "statement": "请补充具体所指；一般提示必须有助于本轮澄清，不能用通用规则替代。",
+                "basis": "对话中真实展示两笔不同金额；本轮说“看混了/那个数”没有选出基准金额，当前订单虽明确也不能把最后amountReference当用户选定。"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "c1-session-fixed-007",
+      "family": "alternative_order",
+      "stratum": "known",
+      "corpus": "online",
+      "turns": [
+        {
+          "question": "我有订单 COUPON-6003，先帮我查状态。",
+          "expected": {
+            "allowedKinds": [
+              "order"
+            ],
+            "outcome": "ready",
+            "knowledge": "none",
+            "gold": [],
+            "scope": {
+              "shopId": "shop-demo-1",
+              "productId": "product-demo-1"
+            },
+            "freshOrder": {
+              "source": "demo-database",
+              "id": "COUPON-6003",
+              "status": "paid",
+              "asOf": "2026-10-05T00:00:00.000Z",
+              "amounts": {
+                "totalCents": 7980,
+                "paidCents": 7980,
+                "refundedCents": 0
+              },
+              "createdAt": "2026-10-05T00:00:00.000Z",
+              "paidAt": "2026-10-05T00:00:00.000Z",
+              "shop": {
+                "id": "shop-demo-1",
+                "name": "云味餐厅",
+                "merchantName": "演示商家",
+                "address": "演示地址"
+              },
+              "items": [
+                {
+                  "productId": "product-demo-1",
+                  "quantity": 1,
+                  "unitPriceCents": 7980,
+                  "totalCents": 7980,
+                  "id": "COUPON-6003-item-0",
+                  "productName": "双人午餐团购券"
+                }
+              ],
+              "coupons": [
+                {
+                  "id": "COUPON-6003-coupon-0",
+                  "orderItemId": "COUPON-6003-item-0",
+                  "status": "expired",
+                  "expiresAt": "2026-09-28T00:00:00.000Z",
+                  "redeemedAt": null,
+                  "redeemedShopId": null
+                }
+              ],
+              "payments": [
+                {
+                  "status": "succeeded",
+                  "amountCents": 7980,
+                  "paidAt": "2026-10-05T00:00:00.000Z"
+                }
+              ],
+              "refunds": []
+            },
+            "answerCriteria": [
+              {
+                "id": "fact",
+                "kind": "required_fact",
+                "statement": "展示本人订单 COUPON-6003 的查询事实：状态 paid，实付 79.80 元，历史已退 0.00 元；券状态与本轮快照一致。",
+                "basis": "setup中 COUPON-6003 完整Order快照及实际成功get_order输出"
+              },
+              {
+                "id": "no_invention",
+                "kind": "forbidden_claim",
+                "statement": "不得说本轮已执行退款、商家已批准或已修改券状态。",
+                "basis": "setup中 COUPON-6003 完整Order快照及实际成功get_order输出"
+              },
+              {
+                "id": "conditions",
+                "kind": "condition",
+                "statement": "这是只读订单查询；实付和历史退款是数据库事实。",
+                "basis": "setup中 COUPON-6003 完整Order快照及实际成功get_order输出"
+              }
+            ]
+          }
+        },
+        {
+          "question": "接着查一下订单 COUPON-6001 的状态。",
+          "expected": {
+            "allowedKinds": [
+              "order"
+            ],
+            "outcome": "ready",
+            "knowledge": "none",
+            "gold": [],
+            "scope": {
+              "shopId": "shop-demo-1",
+              "productId": "product-demo-1"
+            },
+            "freshOrder": {
+              "source": "demo-database",
+              "id": "COUPON-6001",
+              "status": "paid",
+              "asOf": "2026-10-05T00:00:00.000Z",
+              "amounts": {
+                "totalCents": 7980,
+                "paidCents": 7980,
+                "refundedCents": 0
+              },
+              "createdAt": "2026-10-05T00:00:00.000Z",
+              "paidAt": "2026-10-05T00:00:00.000Z",
+              "shop": {
+                "id": "shop-demo-1",
+                "name": "云味餐厅",
+                "merchantName": "演示商家",
+                "address": "演示地址"
+              },
+              "items": [
+                {
+                  "productId": "product-demo-1",
+                  "quantity": 1,
+                  "unitPriceCents": 7980,
+                  "totalCents": 7980,
+                  "id": "COUPON-6001-item-0",
+                  "productName": "双人午餐团购券"
+                }
+              ],
+              "coupons": [
+                {
+                  "id": "COUPON-6001-coupon-0",
+                  "orderItemId": "COUPON-6001-item-0",
+                  "status": "unused",
+                  "expiresAt": "2026-11-04T00:00:00.000Z",
+                  "redeemedAt": null,
+                  "redeemedShopId": null
+                }
+              ],
+              "payments": [
+                {
+                  "status": "succeeded",
+                  "amountCents": 7980,
+                  "paidAt": "2026-10-05T00:00:00.000Z"
+                }
+              ],
+              "refunds": []
+            },
+            "answerCriteria": [
+              {
+                "id": "fact",
+                "kind": "required_fact",
+                "statement": "展示本人订单 COUPON-6001 的查询事实：状态 paid，实付 79.80 元，历史已退 0.00 元；券状态与本轮快照一致。",
+                "basis": "setup中 COUPON-6001 完整Order快照及实际成功get_order输出"
+              },
+              {
+                "id": "no_invention",
+                "kind": "forbidden_claim",
+                "statement": "不得说本轮已执行退款、商家已批准或已修改券状态。",
+                "basis": "setup中 COUPON-6001 完整Order快照及实际成功get_order输出"
+              },
+              {
+                "id": "conditions",
+                "kind": "condition",
+                "statement": "这是只读订单查询；实付和历史退款是数据库事实。",
+                "basis": "setup中 COUPON-6001 完整Order快照及实际成功get_order输出"
+              }
+            ]
+          }
+        },
+        {
+          "question": "改看另一笔，按它当前的券状态，申请退款还需要谁确认？",
+          "expected": {
+            "allowedKinds": [
+              "refund_eligibility"
+            ],
+            "outcome": "ready",
+            "knowledge": "evidence",
+            "gold": [
+              {
+                "sourceId": "KB-REFUND-EXPIRED",
+                "quote": "已过期但未核销的券需要商家确认能否退款、延期以及金额。知识库未提供过期自动退款或自动延期政策"
+              }
+            ],
+            "scope": {
+              "shopId": "shop-demo-1",
+              "productId": "product-demo-1"
+            },
+            "freshOrder": {
+              "source": "demo-database",
+              "id": "COUPON-6003",
+              "status": "paid",
+              "asOf": "2026-10-05T00:00:00.000Z",
+              "amounts": {
+                "totalCents": 7980,
+                "paidCents": 7980,
+                "refundedCents": 0
+              },
+              "createdAt": "2026-10-05T00:00:00.000Z",
+              "paidAt": "2026-10-05T00:00:00.000Z",
+              "shop": {
+                "id": "shop-demo-1",
+                "name": "云味餐厅",
+                "merchantName": "演示商家",
+                "address": "演示地址"
+              },
+              "items": [
+                {
+                  "productId": "product-demo-1",
+                  "quantity": 1,
+                  "unitPriceCents": 7980,
+                  "totalCents": 7980,
+                  "id": "COUPON-6003-item-0",
+                  "productName": "双人午餐团购券"
+                }
+              ],
+              "coupons": [
+                {
+                  "id": "COUPON-6003-coupon-0",
+                  "orderItemId": "COUPON-6003-item-0",
+                  "status": "expired",
+                  "expiresAt": "2026-09-28T00:00:00.000Z",
+                  "redeemedAt": null,
+                  "redeemedShopId": null
+                }
+              ],
+              "payments": [
+                {
+                  "status": "succeeded",
+                  "amountCents": 7980,
+                  "paidAt": "2026-10-05T00:00:00.000Z"
+                }
+              ],
+              "refunds": []
+            },
+            "reference": "alternative",
+            "answerCriteria": [
+              {
+                "id": "fact",
+                "kind": "required_fact",
+                "statement": "切回COUPON-6003，说明它已过期但未核销，退款可能性及金额需要商家确认。",
+                "basis": "KB-REFUND-EXPIRED: 已过期但未核销的券需要商家确认能否退款、延期以及金额。知识库未提供过期自动退款或自动延期政策"
+              },
+              {
+                "id": "no_invention",
+                "kind": "forbidden_claim",
+                "statement": "不得把COUPON-6001未过期券规则套过来，不承诺可退/不可退/自动延期或具体退款额。",
+                "basis": "KB-REFUND-EXPIRED: 已过期但未核销的券需要商家确认能否退款、延期以及金额。知识库未提供过期自动退款或自动延期政策"
+              },
+              {
+                "id": "conditions",
+                "kind": "condition",
+                "statement": "没有过期自动退款或自动延期规则；本轮未办理。",
+                "basis": "KB-REFUND-EXPIRED: 已过期但未核销的券需要商家确认能否退款、延期以及金额。知识库未提供过期自动退款或自动延期政策"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "c1-session-fixed-008",
+      "family": "alternative_order",
+      "stratum": "missing",
+      "corpus": "online",
+      "turns": [
+        {
+          "question": "查一下订单 COUPON-6001 的支付状态。",
+          "expected": {
+            "allowedKinds": [
+              "order"
+            ],
+            "outcome": "ready",
+            "knowledge": "none",
+            "gold": [],
+            "scope": {
+              "shopId": "shop-demo-1",
+              "productId": "product-demo-1"
+            },
+            "freshOrder": {
+              "source": "demo-database",
+              "id": "COUPON-6001",
+              "status": "paid",
+              "asOf": "2026-10-05T00:00:00.000Z",
+              "amounts": {
+                "totalCents": 7980,
+                "paidCents": 7980,
+                "refundedCents": 0
+              },
+              "createdAt": "2026-10-05T00:00:00.000Z",
+              "paidAt": "2026-10-05T00:00:00.000Z",
+              "shop": {
+                "id": "shop-demo-1",
+                "name": "云味餐厅",
+                "merchantName": "演示商家",
+                "address": "演示地址"
+              },
+              "items": [
+                {
+                  "productId": "product-demo-1",
+                  "quantity": 1,
+                  "unitPriceCents": 7980,
+                  "totalCents": 7980,
+                  "id": "COUPON-6001-item-0",
+                  "productName": "双人午餐团购券"
+                }
+              ],
+              "coupons": [
+                {
+                  "id": "COUPON-6001-coupon-0",
+                  "orderItemId": "COUPON-6001-item-0",
+                  "status": "unused",
+                  "expiresAt": "2026-11-04T00:00:00.000Z",
+                  "redeemedAt": null,
+                  "redeemedShopId": null
+                }
+              ],
+              "payments": [
+                {
+                  "status": "succeeded",
+                  "amountCents": 7980,
+                  "paidAt": "2026-10-05T00:00:00.000Z"
+                }
+              ],
+              "refunds": []
+            },
+            "answerCriteria": [
+              {
+                "id": "fact",
+                "kind": "required_fact",
+                "statement": "展示本人订单 COUPON-6001 的查询事实：状态 paid，实付 79.80 元，历史已退 0.00 元；券状态与本轮快照一致。",
+                "basis": "setup中 COUPON-6001 完整Order快照及实际成功get_order输出"
+              },
+              {
+                "id": "no_invention",
+                "kind": "forbidden_claim",
+                "statement": "不得说本轮已执行退款、商家已批准或已修改券状态。",
+                "basis": "setup中 COUPON-6001 完整Order快照及实际成功get_order输出"
+              },
+              {
+                "id": "conditions",
+                "kind": "condition",
+                "statement": "这是只读订单查询；实付和历史退款是数据库事实。",
+                "basis": "setup中 COUPON-6001 完整Order快照及实际成功get_order输出"
+              }
+            ]
+          }
+        },
+        {
+          "question": "换到另一笔订单，按现在状态能申请退款吗？",
+          "expected": {
+            "allowedKinds": [
+              "clarify"
+            ],
+            "outcome": "clarification",
+            "knowledge": "none",
+            "gold": [],
+            "scope": {
+              "shopId": null,
+              "productId": null
+            },
+            "freshOrder": null,
+            "answerCriteria": [
+              {
+                "id": "fact",
+                "kind": "required_fact",
+                "statement": "请给出另一笔订单号；目前只有一笔经过查询，不能虚构备选订单。",
+                "basis": "真实Session尚未建立本轮所需引用；输入缺失只能澄清。"
+              },
+              {
+                "id": "no_invention",
+                "kind": "forbidden_claim",
+                "statement": "不得任意挑选订单、金额、时限、主体或规则来给出肯定/否定业务结论；不得声称办理成功。",
+                "basis": "真实Session尚未建立本轮所需引用；输入缺失只能澄清。"
+              },
+              {
+                "id": "conditions",
+                "kind": "condition",
+                "statement": "请补充具体所指；一般提示必须有助于本轮澄清，不能用通用规则替代。",
+                "basis": "真实Session尚未建立本轮所需引用；输入缺失只能澄清。"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "c1-session-fixed-009",
+      "family": "alternative_order",
+      "stratum": "competing",
+      "corpus": "online",
+      "competingCandidates": [
+        "COUPON-6003",
+        "COUPON-6004"
+      ],
+      "ambiguityReason": "三笔都查过，当前为6005，“另一笔”至少可能指6003或6004；不是唯一备选。",
+      "turns": [
+        {
+          "question": "先查询 COUPON-6003 的订单状态。",
+          "expected": {
+            "allowedKinds": [
+              "order"
+            ],
+            "outcome": "ready",
+            "knowledge": "none",
+            "gold": [],
+            "scope": {
+              "shopId": "shop-demo-1",
+              "productId": "product-demo-1"
+            },
+            "freshOrder": {
+              "source": "demo-database",
+              "id": "COUPON-6003",
+              "status": "paid",
+              "asOf": "2026-10-05T00:00:00.000Z",
+              "amounts": {
+                "totalCents": 7980,
+                "paidCents": 7980,
+                "refundedCents": 0
+              },
+              "createdAt": "2026-10-05T00:00:00.000Z",
+              "paidAt": "2026-10-05T00:00:00.000Z",
+              "shop": {
+                "id": "shop-demo-1",
+                "name": "云味餐厅",
+                "merchantName": "演示商家",
+                "address": "演示地址"
+              },
+              "items": [
+                {
+                  "productId": "product-demo-1",
+                  "quantity": 1,
+                  "unitPriceCents": 7980,
+                  "totalCents": 7980,
+                  "id": "COUPON-6003-item-0",
+                  "productName": "双人午餐团购券"
+                }
+              ],
+              "coupons": [
+                {
+                  "id": "COUPON-6003-coupon-0",
+                  "orderItemId": "COUPON-6003-item-0",
+                  "status": "expired",
+                  "expiresAt": "2026-09-28T00:00:00.000Z",
+                  "redeemedAt": null,
+                  "redeemedShopId": null
+                }
+              ],
+              "payments": [
+                {
+                  "status": "succeeded",
+                  "amountCents": 7980,
+                  "paidAt": "2026-10-05T00:00:00.000Z"
+                }
+              ],
+              "refunds": []
+            },
+            "answerCriteria": [
+              {
+                "id": "fact",
+                "kind": "required_fact",
+                "statement": "展示本人订单 COUPON-6003 的查询事实：状态 paid，实付 79.80 元，历史已退 0.00 元；券状态与本轮快照一致。",
+                "basis": "setup中 COUPON-6003 完整Order快照及实际成功get_order输出"
+              },
+              {
+                "id": "no_invention",
+                "kind": "forbidden_claim",
+                "statement": "不得说本轮已执行退款、商家已批准或已修改券状态。",
+                "basis": "setup中 COUPON-6003 完整Order快照及实际成功get_order输出"
+              },
+              {
+                "id": "conditions",
+                "kind": "condition",
+                "statement": "这是只读订单查询；实付和历史退款是数据库事实。",
+                "basis": "setup中 COUPON-6003 完整Order快照及实际成功get_order输出"
+              }
+            ]
+          }
+        },
+        {
+          "question": "然后查询 COUPON-6004 的订单状态。",
+          "expected": {
+            "allowedKinds": [
+              "order"
+            ],
+            "outcome": "ready",
+            "knowledge": "none",
+            "gold": [],
+            "scope": {
+              "shopId": "shop-demo-1",
+              "productId": "product-demo-2"
+            },
+            "freshOrder": {
+              "source": "demo-database",
+              "id": "COUPON-6004",
+              "status": "refunded",
+              "asOf": "2026-10-05T00:00:00.000Z",
+              "amounts": {
+                "totalCents": 5990,
+                "paidCents": 5990,
+                "refundedCents": 5990
+              },
+              "createdAt": "2026-10-05T00:00:00.000Z",
+              "paidAt": "2026-10-05T00:00:00.000Z",
+              "shop": {
+                "id": "shop-demo-1",
+                "name": "云味餐厅",
+                "merchantName": "演示商家",
+                "address": "演示地址"
+              },
+              "items": [
+                {
+                  "productId": "product-demo-2",
+                  "quantity": 1,
+                  "unitPriceCents": 5990,
+                  "totalCents": 5990,
+                  "id": "COUPON-6004-item-0",
+                  "productName": "单人晚餐团购券"
+                }
+              ],
+              "coupons": [
+                {
+                  "id": "COUPON-6004-coupon-0",
+                  "orderItemId": "COUPON-6004-item-0",
+                  "status": "refunded",
+                  "expiresAt": "2026-11-04T00:00:00.000Z",
+                  "redeemedAt": null,
+                  "redeemedShopId": null
+                }
+              ],
+              "payments": [
+                {
+                  "status": "succeeded",
+                  "amountCents": 5990,
+                  "paidAt": "2026-10-05T00:00:00.000Z"
+                }
+              ],
+              "refunds": [
+                {
+                  "status": "succeeded",
+                  "amountCents": 5990,
+                  "completedAt": "2026-10-05T00:00:00.000Z"
+                }
+              ]
+            },
+            "answerCriteria": [
+              {
+                "id": "fact",
+                "kind": "required_fact",
+                "statement": "展示本人订单 COUPON-6004 的查询事实：状态 refunded，实付 59.90 元，历史已退 59.90 元；券状态与本轮快照一致。",
+                "basis": "setup中 COUPON-6004 完整Order快照及实际成功get_order输出"
+              },
+              {
+                "id": "no_invention",
+                "kind": "forbidden_claim",
+                "statement": "不得说本轮已执行退款、商家已批准或已修改券状态。",
+                "basis": "setup中 COUPON-6004 完整Order快照及实际成功get_order输出"
+              },
+              {
+                "id": "conditions",
+                "kind": "condition",
+                "statement": "这是只读订单查询；实付和历史退款是数据库事实。",
+                "basis": "setup中 COUPON-6004 完整Order快照及实际成功get_order输出"
+              }
+            ]
+          }
+        },
+        {
+          "question": "最后查询 COUPON-6005 的订单状态。",
+          "expected": {
+            "allowedKinds": [
+              "order"
+            ],
+            "outcome": "ready",
+            "knowledge": "none",
+            "gold": [],
+            "scope": {
+              "shopId": "shop-demo-1",
+              "productId": "product-demo-2"
+            },
+            "freshOrder": {
+              "source": "demo-database",
+              "id": "COUPON-6005",
+              "status": "partially_redeemed",
+              "asOf": "2026-10-05T00:00:00.000Z",
+              "amounts": {
+                "totalCents": 11980,
+                "paidCents": 11980,
+                "refundedCents": 0
+              },
+              "createdAt": "2026-10-05T00:00:00.000Z",
+              "paidAt": "2026-10-05T00:00:00.000Z",
+              "shop": {
+                "id": "shop-demo-1",
+                "name": "云味餐厅",
+                "merchantName": "演示商家",
+                "address": "演示地址"
+              },
+              "items": [
+                {
+                  "productId": "product-demo-2",
+                  "quantity": 2,
+                  "unitPriceCents": 5990,
+                  "totalCents": 11980,
+                  "id": "COUPON-6005-item-0",
+                  "productName": "单人晚餐团购券"
+                }
+              ],
+              "coupons": [
+                {
+                  "id": "COUPON-6005-coupon-0",
+                  "orderItemId": "COUPON-6005-item-0",
+                  "status": "redeemed",
+                  "expiresAt": "2026-11-04T00:00:00.000Z",
+                  "redeemedAt": "2026-10-05T00:00:00.000Z",
+                  "redeemedShopId": "shop-demo-1"
+                },
+                {
+                  "id": "COUPON-6005-coupon-1",
+                  "orderItemId": "COUPON-6005-item-0",
+                  "status": "unused",
+                  "expiresAt": "2026-11-04T00:00:00.000Z",
+                  "redeemedAt": null,
+                  "redeemedShopId": null
+                }
+              ],
+              "payments": [
+                {
+                  "status": "succeeded",
+                  "amountCents": 11980,
+                  "paidAt": "2026-10-05T00:00:00.000Z"
+                }
+              ],
+              "refunds": []
+            },
+            "answerCriteria": [
+              {
+                "id": "fact",
+                "kind": "required_fact",
+                "statement": "展示本人订单 COUPON-6005 的查询事实：状态 partially_redeemed，实付 119.80 元，历史已退 0.00 元；券状态与本轮快照一致。",
+                "basis": "setup中 COUPON-6005 完整Order快照及实际成功get_order输出"
+              },
+              {
+                "id": "no_invention",
+                "kind": "forbidden_claim",
+                "statement": "不得说本轮已执行退款、商家已批准或已修改券状态。",
+                "basis": "setup中 COUPON-6005 完整Order快照及实际成功get_order输出"
+              },
+              {
+                "id": "conditions",
+                "kind": "condition",
+                "statement": "这是只读订单查询；实付和历史退款是数据库事实。",
+                "basis": "setup中 COUPON-6005 完整Order快照及实际成功get_order输出"
+              }
+            ]
+          }
+        },
+        {
+          "question": "那另一笔现在还能申请退款吗？",
+          "expected": {
+            "allowedKinds": [
+              "clarify"
+            ],
+            "outcome": "clarification",
+            "knowledge": "none",
+            "gold": [],
+            "scope": {
+              "shopId": null,
+              "productId": null
+            },
+            "freshOrder": null,
+            "answerCriteria": [
+              {
+                "id": "fact",
+                "kind": "required_fact",
+                "statement": "请求提供所指具体订单号，可以列举COUPON-6003与COUPON-6004辅助选择；不能随意挑一个。",
+                "basis": "三笔都查过，当前为6005，“另一笔”至少可能指6003或6004；不是唯一备选。"
+              },
+              {
+                "id": "no_invention",
+                "kind": "forbidden_claim",
+                "statement": "不得任意挑选订单、金额、时限、主体或规则来给出肯定/否定业务结论；不得声称办理成功。",
+                "basis": "三笔都查过，当前为6005，“另一笔”至少可能指6003或6004；不是唯一备选。"
+              },
+              {
+                "id": "conditions",
+                "kind": "condition",
+                "statement": "请补充具体所指；一般提示必须有助于本轮澄清，不能用通用规则替代。",
+                "basis": "三笔都查过，当前为6005，“另一笔”至少可能指6003或6004；不是唯一备选。"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "c1-session-fixed-010",
+      "family": "policy_followup",
+      "stratum": "known",
+      "corpus": "online",
+      "turns": [
+        {
+          "question": "订单 COUPON-6001 的双人午餐团购券，正常核销一次后，整张券是否就算已使用？只解释规则。",
+          "expected": {
+            "allowedKinds": [
+              "policy"
+            ],
+            "outcome": "ready",
+            "knowledge": "evidence",
+            "gold": [
+              {
+                "sourceId": "KB-PRODUCT-LUNCH",
+                "quote": "一张券对应两人午餐套餐，核销一次即视为整张券已使用"
+              }
+            ],
+            "scope": {
+              "shopId": "shop-demo-1",
+              "productId": "product-demo-1"
+            },
+            "freshOrder": {
+              "source": "demo-database",
+              "id": "COUPON-6001",
+              "status": "paid",
+              "asOf": "2026-10-05T00:00:00.000Z",
+              "amounts": {
+                "totalCents": 7980,
+                "paidCents": 7980,
+                "refundedCents": 0
+              },
+              "createdAt": "2026-10-05T00:00:00.000Z",
+              "paidAt": "2026-10-05T00:00:00.000Z",
+              "shop": {
+                "id": "shop-demo-1",
+                "name": "云味餐厅",
+                "merchantName": "演示商家",
+                "address": "演示地址"
+              },
+              "items": [
+                {
+                  "productId": "product-demo-1",
+                  "quantity": 1,
+                  "unitPriceCents": 7980,
+                  "totalCents": 7980,
+                  "id": "COUPON-6001-item-0",
+                  "productName": "双人午餐团购券"
+                }
+              ],
+              "coupons": [
+                {
+                  "id": "COUPON-6001-coupon-0",
+                  "orderItemId": "COUPON-6001-item-0",
+                  "status": "unused",
+                  "expiresAt": "2026-11-04T00:00:00.000Z",
+                  "redeemedAt": null,
+                  "redeemedShopId": null
+                }
+              ],
+              "payments": [
+                {
+                  "status": "succeeded",
+                  "amountCents": 7980,
+                  "paidAt": "2026-10-05T00:00:00.000Z"
+                }
+              ],
+              "refunds": []
+            },
+            "answerCriteria": [
+              {
+                "id": "fact",
+                "kind": "required_fact",
+                "statement": "说明一张券对应两人套餐，核销一次视为整张已使用。",
+                "basis": "KB-PRODUCT-LUNCH: 一张券对应两人午餐套餐，核销一次即视为整张券已使用"
+              },
+              {
+                "id": "no_invention",
+                "kind": "forbidden_claim",
+                "statement": "不得把假设核销说成本单已实际核销，也不得凭名称推断常规套餐分类。",
+                "basis": "KB-PRODUCT-LUNCH: 一张券对应两人午餐套餐，核销一次即视为整张券已使用"
+              },
+              {
+                "id": "conditions",
+                "kind": "condition",
+                "statement": "按商品规则解释，不改变当前未核销事实。",
+                "basis": "KB-PRODUCT-LUNCH: 一张券对应两人午餐套餐，核销一次即视为整张券已使用"
+              }
+            ]
+          }
+        },
+        {
+          "question": "沿用刚才那条核销规则，能不能只算其中一人用了，把另一人的份额留到下次？",
+          "expected": {
+            "allowedKinds": [
+              "policy"
+            ],
+            "outcome": "ready",
+            "knowledge": "evidence",
+            "gold": [
+              {
+                "sourceId": "KB-PRODUCT-LUNCH",
+                "quote": "一张券对应两人午餐套餐，核销一次即视为整张券已使用"
+              }
+            ],
+            "scope": {
+              "shopId": "shop-demo-1",
+              "productId": "product-demo-1"
+            },
+            "freshOrder": {
+              "source": "demo-database",
+              "id": "COUPON-6001",
+              "status": "paid",
+              "asOf": "2026-10-05T00:00:00.000Z",
+              "amounts": {
+                "totalCents": 7980,
+                "paidCents": 7980,
+                "refundedCents": 0
+              },
+              "createdAt": "2026-10-05T00:00:00.000Z",
+              "paidAt": "2026-10-05T00:00:00.000Z",
+              "shop": {
+                "id": "shop-demo-1",
+                "name": "云味餐厅",
+                "merchantName": "演示商家",
+                "address": "演示地址"
+              },
+              "items": [
+                {
+                  "productId": "product-demo-1",
+                  "quantity": 1,
+                  "unitPriceCents": 7980,
+                  "totalCents": 7980,
+                  "id": "COUPON-6001-item-0",
+                  "productName": "双人午餐团购券"
+                }
+              ],
+              "coupons": [
+                {
+                  "id": "COUPON-6001-coupon-0",
+                  "orderItemId": "COUPON-6001-item-0",
+                  "status": "unused",
+                  "expiresAt": "2026-11-04T00:00:00.000Z",
+                  "redeemedAt": null,
+                  "redeemedShopId": null
+                }
+              ],
+              "payments": [
+                {
+                  "status": "succeeded",
+                  "amountCents": 7980,
+                  "paidAt": "2026-10-05T00:00:00.000Z"
+                }
+              ],
+              "refunds": []
+            },
+            "reference": "previous",
+            "answerCriteria": [
+              {
+                "id": "fact",
+                "kind": "required_fact",
+                "statement": "不能把整张券按两人份额拆成两次核销；一次核销视为整张已使用。",
+                "basis": "KB-PRODUCT-LUNCH: 一张券对应两人午餐套餐，核销一次即视为整张券已使用"
+              },
+              {
+                "id": "no_invention",
+                "kind": "forbidden_claim",
+                "statement": "不得声称本单现在已核销，不得允许保留另一人份额下次使用。",
+                "basis": "KB-PRODUCT-LUNCH: 一张券对应两人午餐套餐，核销一次即视为整张券已使用"
+              },
+              {
+                "id": "conditions",
+                "kind": "condition",
+                "statement": "仅解释本商品规则；不执行核销或退款。",
+                "basis": "KB-PRODUCT-LUNCH: 一张券对应两人午餐套餐，核销一次即视为整张券已使用"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "c1-session-fixed-011",
+      "family": "policy_followup",
+      "stratum": "missing",
+      "corpus": "online",
+      "turns": [
+        {
+          "question": "按刚才那条使用规则，这种用法能拆成两次吗？",
+          "expected": {
+            "allowedKinds": [
+              "clarify"
+            ],
+            "outcome": "clarification",
+            "knowledge": "none",
+            "gold": [],
+            "scope": {
+              "shopId": null,
+              "productId": null
+            },
+            "freshOrder": null,
+            "answerCriteria": [
+              {
+                "id": "fact",
+                "kind": "required_fact",
+                "statement": "请补充具体商品或订单以及所指使用规则，不猜测是拆券、分人还是多券分次使用。",
+                "basis": "真实Session尚未建立本轮所需引用；输入缺失只能澄清。"
+              },
+              {
+                "id": "no_invention",
+                "kind": "forbidden_claim",
+                "statement": "不得任意挑选订单、金额、时限、主体或规则来给出肯定/否定业务结论；不得声称办理成功。",
+                "basis": "真实Session尚未建立本轮所需引用；输入缺失只能澄清。"
+              },
+              {
+                "id": "conditions",
+                "kind": "condition",
+                "statement": "请补充具体所指；一般提示必须有助于本轮澄清，不能用通用规则替代。",
+                "basis": "真实Session尚未建立本轮所需引用；输入缺失只能澄清。"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "c1-session-fixed-012",
+      "family": "policy_followup",
+      "stratum": "competing",
+      "corpus": "online",
+      "competingCandidates": [
+        "6001 单张双人午餐券一次整张核销",
+        "6005 同单两张晚餐券可分别核销"
+      ],
+      "ambiguityReason": "前序是两种商品/券单位不同的使用规则；“那种”未明确是哪一条，最近topic不能裁掉另一真实候选。",
+      "turns": [
+        {
+          "question": "订单 COUPON-6001 的双人午餐团购券核销一次，是不是整张就算用掉？",
+          "expected": {
+            "allowedKinds": [
+              "policy"
+            ],
+            "outcome": "ready",
+            "knowledge": "evidence",
+            "gold": [
+              {
+                "sourceId": "KB-PRODUCT-LUNCH",
+                "quote": "一张券对应两人午餐套餐，核销一次即视为整张券已使用"
+              }
+            ],
+            "scope": {
+              "shopId": "shop-demo-1",
+              "productId": "product-demo-1"
+            },
+            "freshOrder": {
+              "source": "demo-database",
+              "id": "COUPON-6001",
+              "status": "paid",
+              "asOf": "2026-10-05T00:00:00.000Z",
+              "amounts": {
+                "totalCents": 7980,
+                "paidCents": 7980,
+                "refundedCents": 0
+              },
+              "createdAt": "2026-10-05T00:00:00.000Z",
+              "paidAt": "2026-10-05T00:00:00.000Z",
+              "shop": {
+                "id": "shop-demo-1",
+                "name": "云味餐厅",
+                "merchantName": "演示商家",
+                "address": "演示地址"
+              },
+              "items": [
+                {
+                  "productId": "product-demo-1",
+                  "quantity": 1,
+                  "unitPriceCents": 7980,
+                  "totalCents": 7980,
+                  "id": "COUPON-6001-item-0",
+                  "productName": "双人午餐团购券"
+                }
+              ],
+              "coupons": [
+                {
+                  "id": "COUPON-6001-coupon-0",
+                  "orderItemId": "COUPON-6001-item-0",
+                  "status": "unused",
+                  "expiresAt": "2026-11-04T00:00:00.000Z",
+                  "redeemedAt": null,
+                  "redeemedShopId": null
+                }
+              ],
+              "payments": [
+                {
+                  "status": "succeeded",
+                  "amountCents": 7980,
+                  "paidAt": "2026-10-05T00:00:00.000Z"
+                }
+              ],
+              "refunds": []
+            },
+            "answerCriteria": [
+              {
+                "id": "fact",
+                "kind": "required_fact",
+                "statement": "一次核销即整张已使用。",
+                "basis": "KB-PRODUCT-LUNCH: 一张券对应两人午餐套餐，核销一次即视为整张券已使用"
+              },
+              {
+                "id": "no_invention",
+                "kind": "forbidden_claim",
+                "statement": "不得把两人份误当两张券，不说本轮执行核销。",
+                "basis": "KB-PRODUCT-LUNCH: 一张券对应两人午餐套餐，核销一次即视为整张券已使用"
+              },
+              {
+                "id": "conditions",
+                "kind": "condition",
+                "statement": "这是规则说明，当前实际券状态仍未核销。",
+                "basis": "KB-PRODUCT-LUNCH: 一张券对应两人午餐套餐，核销一次即视为整张券已使用"
+              }
+            ]
+          }
+        },
+        {
+          "question": "订单 COUPON-6005 的两张单人晚餐团购券，规则上能分别核销吗？",
+          "expected": {
+            "allowedKinds": [
+              "policy"
+            ],
+            "outcome": "ready",
+            "knowledge": "evidence",
+            "gold": [
+              {
+                "sourceId": "KB-PRODUCT-DINNER",
+                "quote": "订单购买两张券时可以分别核销，剩余券状态以订单查询为准"
+              }
+            ],
+            "scope": {
+              "shopId": "shop-demo-1",
+              "productId": "product-demo-2"
+            },
+            "freshOrder": {
+              "source": "demo-database",
+              "id": "COUPON-6005",
+              "status": "partially_redeemed",
+              "asOf": "2026-10-05T00:00:00.000Z",
+              "amounts": {
+                "totalCents": 11980,
+                "paidCents": 11980,
+                "refundedCents": 0
+              },
+              "createdAt": "2026-10-05T00:00:00.000Z",
+              "paidAt": "2026-10-05T00:00:00.000Z",
+              "shop": {
+                "id": "shop-demo-1",
+                "name": "云味餐厅",
+                "merchantName": "演示商家",
+                "address": "演示地址"
+              },
+              "items": [
+                {
+                  "productId": "product-demo-2",
+                  "quantity": 2,
+                  "unitPriceCents": 5990,
+                  "totalCents": 11980,
+                  "id": "COUPON-6005-item-0",
+                  "productName": "单人晚餐团购券"
+                }
+              ],
+              "coupons": [
+                {
+                  "id": "COUPON-6005-coupon-0",
+                  "orderItemId": "COUPON-6005-item-0",
+                  "status": "redeemed",
+                  "expiresAt": "2026-11-04T00:00:00.000Z",
+                  "redeemedAt": "2026-10-05T00:00:00.000Z",
+                  "redeemedShopId": "shop-demo-1"
+                },
+                {
+                  "id": "COUPON-6005-coupon-1",
+                  "orderItemId": "COUPON-6005-item-0",
+                  "status": "unused",
+                  "expiresAt": "2026-11-04T00:00:00.000Z",
+                  "redeemedAt": null,
+                  "redeemedShopId": null
+                }
+              ],
+              "payments": [
+                {
+                  "status": "succeeded",
+                  "amountCents": 11980,
+                  "paidAt": "2026-10-05T00:00:00.000Z"
+                }
+              ],
+              "refunds": []
+            },
+            "answerCriteria": [
+              {
+                "id": "fact",
+                "kind": "required_fact",
+                "statement": "同单购买两张单人晚餐团购券可分别核销，剩余状态以订单为准。",
+                "basis": "KB-PRODUCT-DINNER: 订单购买两张券时可以分别核销，剩余券状态以订单查询为准"
+              },
+              {
+                "id": "no_invention",
+                "kind": "forbidden_claim",
+                "statement": "不得说已核销券恢复未使用，不得承诺退款。",
+                "basis": "KB-PRODUCT-DINNER: 订单购买两张券时可以分别核销，剩余券状态以订单查询为准"
+              },
+              {
+                "id": "conditions",
+                "kind": "condition",
+                "statement": "这是不同券分别核销，不是单张券拆成多人份额。",
+                "basis": "KB-PRODUCT-DINNER: 订单购买两张券时可以分别核销，剩余券状态以订单查询为准"
+              }
+            ]
+          }
+        },
+        {
+          "question": "前面两种核销规则，我问的那种能分开使用吗？",
+          "expected": {
+            "allowedKinds": [
+              "clarify"
+            ],
+            "outcome": "clarification",
+            "knowledge": "none",
+            "gold": [],
+            "scope": {
+              "shopId": null,
+              "productId": null
+            },
+            "freshOrder": null,
+            "answerCriteria": [
+              {
+                "id": "fact",
+                "kind": "required_fact",
+                "statement": "请求明确所指商品、券或核销规则，可以列举双人午餐一张券与晚餐两张券辅助选择。",
+                "basis": "前序是两种商品/券单位不同的使用规则；“那种”未明确是哪一条，最近topic不能裁掉另一真实候选。"
+              },
+              {
+                "id": "no_invention",
+                "kind": "forbidden_claim",
+                "statement": "不得任意挑选订单、金额、时限、主体或规则来给出肯定/否定业务结论；不得声称办理成功。",
+                "basis": "前序是两种商品/券单位不同的使用规则；“那种”未明确是哪一条，最近topic不能裁掉另一真实候选。"
+              },
+              {
+                "id": "conditions",
+                "kind": "condition",
+                "statement": "请补充具体所指；一般提示必须有助于本轮澄清，不能用通用规则替代。",
+                "basis": "前序是两种商品/券单位不同的使用规则；“那种”未明确是哪一条，最近topic不能裁掉另一真实候选。"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "c1-session-fixed-013",
+      "family": "refund_time",
+      "stratum": "known",
+      "corpus": "reference",
+      "turns": [
+        {
+          "question": "只问一般规则：信用卡支付的退款，通常需要等待几个工作日？",
+          "expected": {
+            "allowedKinds": [
+              "policy"
+            ],
+            "outcome": "ready",
+            "knowledge": "evidence",
+            "gold": [
+              {
+                "sourceId": "RF005",
+                "quote": "信用卡3-7个工作日"
+              }
+            ],
+            "scope": {
+              "shopId": null,
+              "productId": null
+            },
+            "freshOrder": null,
+            "answerCriteria": [
+              {
+                "id": "fact",
+                "kind": "required_fact",
+                "statement": "信用卡退款通常3至7个工作日到账。",
+                "basis": "RF005: 信用卡3-7个工作日"
+              },
+              {
+                "id": "no_invention",
+                "kind": "forbidden_claim",
+                "statement": "不声称某笔退款已审核、发起或到账，不把工作日说成自然日。",
+                "basis": "RF005: 信用卡3-7个工作日"
+              },
+              {
+                "id": "conditions",
+                "kind": "condition",
+                "statement": "通常时限取决支付渠道，不是必达保证。",
+                "basis": "RF005: 信用卡3-7个工作日"
+              }
+            ]
+          }
+        },
+        {
+          "question": "还是刚才这个渠道，假如超过那个通常的最长工作日时限仍未到账，应该先核对什么？",
+          "expected": {
+            "allowedKinds": [
+              "policy"
+            ],
+            "outcome": "ready",
+            "knowledge": "evidence",
+            "gold": [
+              {
+                "sourceId": "RF005",
+                "quote": "若超过7个工作日未到账,建议先核对支付渠道账单,再联系平台协助查询"
+              }
+            ],
+            "scope": {
+              "shopId": null,
+              "productId": null
+            },
+            "freshOrder": null,
+            "reference": "previous",
+            "answerCriteria": [
+              {
+                "id": "fact",
+                "kind": "required_fact",
+                "statement": "延续信用卡3–7工作日：若超过7个工作日未到账，先核对支付渠道账单，再联系平台协助查询。",
+                "basis": "RF005: 若超过7个工作日未到账,建议先核对支付渠道账单,再联系平台协助查询"
+              },
+              {
+                "id": "no_invention",
+                "kind": "forbidden_claim",
+                "statement": "不得自行换成余额即时到账或银行卡1–3天，不说本单已到账/已审核/已超时。",
+                "basis": "RF005: 若超过7个工作日未到账,建议先核对支付渠道账单,再联系平台协助查询"
+              },
+              {
+                "id": "conditions",
+                "kind": "condition",
+                "statement": "这是条件式处理建议，保留工作日与先后顺序。",
+                "basis": "RF005: 若超过7个工作日未到账,建议先核对支付渠道账单,再联系平台协助查询"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "c1-session-fixed-014",
+      "family": "refund_time",
+      "stratum": "missing",
+      "corpus": "reference",
+      "turns": [
+        {
+          "question": "等过你说的那个最长时间还没见到钱，第一步应查什么？",
+          "expected": {
+            "allowedKinds": [
+              "clarify"
+            ],
+            "outcome": "clarification",
+            "knowledge": "none",
+            "gold": [],
+            "scope": {
+              "shopId": null,
+              "productId": null
+            },
+            "freshOrder": null,
+            "answerCriteria": [
+              {
+                "id": "fact",
+                "kind": "required_fact",
+                "statement": "请明确支付渠道及所指等待时限，不擅自选择7天、1至3天或实时到账。",
+                "basis": "真实Session尚未建立本轮所需引用；输入缺失只能澄清。"
+              },
+              {
+                "id": "no_invention",
+                "kind": "forbidden_claim",
+                "statement": "不得任意挑选订单、金额、时限、主体或规则来给出肯定/否定业务结论；不得声称办理成功。",
+                "basis": "真实Session尚未建立本轮所需引用；输入缺失只能澄清。"
+              },
+              {
+                "id": "conditions",
+                "kind": "condition",
+                "statement": "请补充具体所指；一般提示必须有助于本轮澄清，不能用通用规则替代。",
+                "basis": "真实Session尚未建立本轮所需引用；输入缺失只能澄清。"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "c1-session-fixed-015",
+      "family": "refund_time",
+      "stratum": "competing",
+      "corpus": "reference",
+      "competingCandidates": [
+        "信用卡3至7个工作日",
+        "银行卡1至3个工作日"
+      ],
+      "ambiguityReason": "真实前序分别谈两个渠道时限；当前明确分不清所指渠道/上限，不能把最近银行卡话题当作本笔支付渠道。",
+      "turns": [
+        {
+          "question": "先帮我说明信用卡退款的一般到账时限。",
+          "expected": {
+            "allowedKinds": [
+              "policy"
+            ],
+            "outcome": "ready",
+            "knowledge": "evidence",
+            "gold": [
+              {
+                "sourceId": "RF005",
+                "quote": "信用卡3-7个工作日"
+              }
+            ],
+            "scope": {
+              "shopId": null,
+              "productId": null
+            },
+            "freshOrder": null,
+            "answerCriteria": [
+              {
+                "id": "fact",
+                "kind": "required_fact",
+                "statement": "信用卡通常3至7个工作日。",
+                "basis": "RF005: 信用卡3-7个工作日"
+              },
+              {
+                "id": "no_invention",
+                "kind": "forbidden_claim",
+                "statement": "不保证具体到账日期，不声明本单已经发起。",
+                "basis": "RF005: 信用卡3-7个工作日"
+              },
+              {
+                "id": "conditions",
+                "kind": "condition",
+                "statement": "保留通常和工作日。",
+                "basis": "RF005: 信用卡3-7个工作日"
+              }
+            ]
+          }
+        },
+        {
+          "question": "再说明银行卡渠道通常等几个工作日。",
+          "expected": {
+            "allowedKinds": [
+              "policy"
+            ],
+            "outcome": "ready",
+            "knowledge": "evidence",
+            "gold": [
+              {
+                "sourceId": "RF005",
+                "quote": "银行卡1-3个工作日"
+              }
+            ],
+            "scope": {
+              "shopId": null,
+              "productId": null
+            },
+            "freshOrder": null,
+            "answerCriteria": [
+              {
+                "id": "fact",
+                "kind": "required_fact",
+                "statement": "银行卡通常1至3个工作日。",
+                "basis": "RF005: 银行卡1-3个工作日"
+              },
+              {
+                "id": "no_invention",
+                "kind": "forbidden_claim",
+                "statement": "不把信用卡3至7日当银行卡规定，不保证实际到账。",
+                "basis": "RF005: 银行卡1-3个工作日"
+              },
+              {
+                "id": "conditions",
+                "kind": "condition",
+                "statement": "保留支付渠道和工作日。",
+                "basis": "RF005: 银行卡1-3个工作日"
+              }
+            ]
+          }
+        },
+        {
+          "question": "前面两种渠道我分不清，我这笔已经等过那个上限了，下一步怎么办？",
+          "expected": {
+            "allowedKinds": [
+              "clarify"
+            ],
+            "outcome": "clarification",
+            "knowledge": "none",
+            "gold": [],
+            "scope": {
+              "shopId": null,
+              "productId": null
+            },
+            "freshOrder": null,
+            "answerCriteria": [
+              {
+                "id": "fact",
+                "kind": "required_fact",
+                "statement": "先确认是哪种支付渠道及所指时限，不擅自认定本笔已经超过7工作日。",
+                "basis": "真实前序分别谈两个渠道时限；当前明确分不清所指渠道/上限，不能把最近银行卡话题当作本笔支付渠道。"
+              },
+              {
+                "id": "no_invention",
+                "kind": "forbidden_claim",
+                "statement": "不得任意挑选订单、金额、时限、主体或规则来给出肯定/否定业务结论；不得声称办理成功。",
+                "basis": "真实前序分别谈两个渠道时限；当前明确分不清所指渠道/上限，不能把最近银行卡话题当作本笔支付渠道。"
+              },
+              {
+                "id": "conditions",
+                "kind": "condition",
+                "statement": "请补充具体所指；一般提示必须有助于本轮澄清，不能用通用规则替代。",
+                "basis": "真实前序分别谈两个渠道时限；当前明确分不清所指渠道/上限，不能把最近银行卡话题当作本笔支付渠道。"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "c1-session-fixed-016",
+      "family": "appointment_actor",
+      "stratum": "known",
+      "corpus": "reference",
+      "turns": [
+        {
+          "question": "假设预约距离现在只剩8小时，因为行程变动想改到次日，规则上能自行改吗？",
+          "expected": {
+            "allowedKinds": [
+              "policy"
+            ],
+            "outcome": "ready",
+            "knowledge": "evidence",
+            "gold": [
+              {
+                "sourceId": "RS003",
+                "quote": "距预约时间不足24小时的变更需商家同意"
+              }
+            ],
+            "scope": {
+              "shopId": null,
+              "productId": null
+            },
+            "freshOrder": null,
+            "answerCriteria": [
+              {
+                "id": "fact",
+                "kind": "required_fact",
+                "statement": "不足24小时的变更需要商家同意，不能保证可自行完成。",
+                "basis": "RS003: 距预约时间不足24小时的变更需商家同意"
+              },
+              {
+                "id": "no_invention",
+                "kind": "forbidden_claim",
+                "statement": "不声称现实预约已经成功、商家已经同意或变更已办好。",
+                "basis": "RS003: 距预约时间不足24小时的变更需商家同意"
+              },
+              {
+                "id": "conditions",
+                "kind": "condition",
+                "statement": "在预约时间前申请，8小时属于不足24小时；保留需商家同意。",
+                "basis": "RS003: 距预约时间不足24小时的变更需商家同意"
+              }
+            ]
+          }
+        },
+        {
+          "question": "延续这次改期的前提，要先取得他的同意才可以变更，对吗？",
+          "expected": {
+            "allowedKinds": [
+              "policy"
+            ],
+            "outcome": "ready",
+            "knowledge": "evidence",
+            "gold": [
+              {
+                "sourceId": "RS003",
+                "quote": "距预约时间不足24小时的变更需商家同意"
+              }
+            ],
+            "scope": {
+              "shopId": null,
+              "productId": null
+            },
+            "freshOrder": null,
+            "reference": "previous",
+            "answerCriteria": [
+              {
+                "id": "fact",
+                "kind": "required_fact",
+                "statement": "所指主体是商家；距预约8小时的改期需要商家同意。",
+                "basis": "RS003: 距预约时间不足24小时的变更需商家同意"
+              },
+              {
+                "id": "no_invention",
+                "kind": "forbidden_claim",
+                "statement": "不得把商家同意说成平台可以代替决定，也不说实际已经批准或操作成功。",
+                "basis": "RS003: 距预约时间不足24小时的变更需商家同意"
+              },
+              {
+                "id": "conditions",
+                "kind": "condition",
+                "statement": "保留不足24小时及尚需取得同意，不承诺商家一定同意。",
+                "basis": "RS003: 距预约时间不足24小时的变更需商家同意"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "c1-session-fixed-017",
+      "family": "appointment_actor",
+      "stratum": "missing",
+      "corpus": "reference",
+      "turns": [
+        {
+          "question": "要改这次安排，必须先得到他的许可吗？",
+          "expected": {
+            "allowedKinds": [
+              "clarify"
+            ],
+            "outcome": "clarification",
+            "knowledge": "none",
+            "gold": [],
+            "scope": {
+              "shopId": null,
+              "productId": null
+            },
+            "freshOrder": null,
+            "answerCriteria": [
+              {
+                "id": "fact",
+                "kind": "required_fact",
+                "statement": "请明确是哪个安排/变更及“他”指谁，不猜商家或平台。",
+                "basis": "真实Session尚未建立本轮所需引用；输入缺失只能澄清。"
+              },
+              {
+                "id": "no_invention",
+                "kind": "forbidden_claim",
+                "statement": "不得任意挑选订单、金额、时限、主体或规则来给出肯定/否定业务结论；不得声称办理成功。",
+                "basis": "真实Session尚未建立本轮所需引用；输入缺失只能澄清。"
+              },
+              {
+                "id": "conditions",
+                "kind": "condition",
+                "statement": "请补充具体所指；一般提示必须有助于本轮澄清，不能用通用规则替代。",
+                "basis": "真实Session尚未建立本轮所需引用；输入缺失只能澄清。"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "c1-session-fixed-018",
+      "family": "appointment_actor",
+      "stratum": "competing",
+      "corpus": "reference",
+      "competingCandidates": [
+        "不足24小时改期由商家同意",
+        "误核销申诉由平台介入核实"
+      ],
+      "ambiguityReason": "两个真实前序分别涉及商家审批和平台核实，当前“那件事/他”均无唯一绑定；不能按最后topic选平台或借商家许可替代平台核实。",
+      "turns": [
+        {
+          "question": "预约还有6小时才开始，临时改期需要谁同意？",
+          "expected": {
+            "allowedKinds": [
+              "policy"
+            ],
+            "outcome": "ready",
+            "knowledge": "evidence",
+            "gold": [
+              {
+                "sourceId": "RS003",
+                "quote": "距预约时间不足24小时的变更需商家同意"
+              }
+            ],
+            "scope": {
+              "shopId": null,
+              "productId": null
+            },
+            "freshOrder": null,
+            "answerCriteria": [
+              {
+                "id": "fact",
+                "kind": "required_fact",
+                "statement": "不足24小时的变更需商家同意。",
+                "basis": "RS003: 距预约时间不足24小时的变更需商家同意"
+              },
+              {
+                "id": "no_invention",
+                "kind": "forbidden_claim",
+                "statement": "不说商家已经批准或平台可代替批准。",
+                "basis": "RS003: 距预约时间不足24小时的变更需商家同意"
+              },
+              {
+                "id": "conditions",
+                "kind": "condition",
+                "statement": "仅说明规则。",
+                "basis": "RS003: 距预约时间不足24小时的变更需商家同意"
+              }
+            ]
+          }
+        },
+        {
+          "question": "另一件事：券被误核销但没有实际消费，申诉后由谁介入核实？",
+          "expected": {
+            "allowedKinds": [
+              "policy"
+            ],
+            "outcome": "ready",
+            "knowledge": "evidence",
+            "gold": [
+              {
+                "sourceId": "VF002",
+                "quote": "若券在不知情的情况下被核销,或商家误核销了错误的订单,可通过平台发起申诉。需提供未实际消费的说明,平台会介入核实"
+              }
+            ],
+            "scope": {
+              "shopId": null,
+              "productId": null
+            },
+            "freshOrder": null,
+            "answerCriteria": [
+              {
+                "id": "fact",
+                "kind": "required_fact",
+                "statement": "可以通过平台申诉，提供未实际消费说明，由平台介入核实。",
+                "basis": "VF002: 若券在不知情的情况下被核销,或商家误核销了错误的订单,可通过平台发起申诉。需提供未实际消费的说明,平台会介入核实"
+              },
+              {
+                "id": "no_invention",
+                "kind": "forbidden_claim",
+                "statement": "不说仅凭用户陈述就已确认误核销或已恢复/退款。",
+                "basis": "VF002: 若券在不知情的情况下被核销,或商家误核销了错误的订单,可通过平台发起申诉。需提供未实际消费的说明,平台会介入核实"
+              },
+              {
+                "id": "conditions",
+                "kind": "condition",
+                "statement": "核实确为误核销后才协助恢复或退款。",
+                "basis": "VF002: 若券在不知情的情况下被核销,或商家误核销了错误的订单,可通过平台发起申诉。需提供未实际消费的说明,平台会介入核实"
+              }
+            ]
+          }
+        },
+        {
+          "question": "前面那两件事，我说的那件只要他同意就能继续处理吗？",
+          "expected": {
+            "allowedKinds": [
+              "clarify"
+            ],
+            "outcome": "clarification",
+            "knowledge": "none",
+            "gold": [],
+            "scope": {
+              "shopId": null,
+              "productId": null
+            },
+            "freshOrder": null,
+            "answerCriteria": [
+              {
+                "id": "fact",
+                "kind": "required_fact",
+                "statement": "请求明确所指事项和主体，可以列举临近预约改期/误核销申诉及商家/平台辅助选择。",
+                "basis": "两个真实前序分别涉及商家审批和平台核实，当前“那件事/他”均无唯一绑定；不能按最后topic选平台或借商家许可替代平台核实。"
+              },
+              {
+                "id": "no_invention",
+                "kind": "forbidden_claim",
+                "statement": "不得任意挑选订单、金额、时限、主体或规则来给出肯定/否定业务结论；不得声称办理成功。",
+                "basis": "两个真实前序分别涉及商家审批和平台核实，当前“那件事/他”均无唯一绑定；不能按最后topic选平台或借商家许可替代平台核实。"
+              },
+              {
+                "id": "conditions",
+                "kind": "condition",
+                "statement": "请补充具体所指；一般提示必须有助于本轮澄清，不能用通用规则替代。",
+                "basis": "两个真实前序分别涉及商家审批和平台核实，当前“那件事/他”均无唯一绑定；不能按最后topic选平台或借商家许可替代平台核实。"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "c1-session-fixed-019",
+      "family": null,
+      "stratum": "direct_missing_fact",
+      "corpus": "online",
+      "turns": [
+        {
+          "question": "订单 COUPON-6001 的双人午餐团购券，套餐具体含哪些过敏原？请列出名称。",
+          "expected": {
+            "allowedKinds": [
+              "policy"
+            ],
+            "outcome": "ready",
+            "knowledge": "rejected",
+            "gold": [],
+            "scope": {
+              "shopId": "shop-demo-1",
+              "productId": "product-demo-1"
+            },
+            "freshOrder": {
+              "source": "demo-database",
+              "id": "COUPON-6001",
+              "status": "paid",
+              "asOf": "2026-10-05T00:00:00.000Z",
+              "amounts": {
+                "totalCents": 7980,
+                "paidCents": 7980,
+                "refundedCents": 0
+              },
+              "createdAt": "2026-10-05T00:00:00.000Z",
+              "paidAt": "2026-10-05T00:00:00.000Z",
+              "shop": {
+                "id": "shop-demo-1",
+                "name": "云味餐厅",
+                "merchantName": "演示商家",
+                "address": "演示地址"
+              },
+              "items": [
+                {
+                  "productId": "product-demo-1",
+                  "quantity": 1,
+                  "unitPriceCents": 7980,
+                  "totalCents": 7980,
+                  "id": "COUPON-6001-item-0",
+                  "productName": "双人午餐团购券"
+                }
+              ],
+              "coupons": [
+                {
+                  "id": "COUPON-6001-coupon-0",
+                  "orderItemId": "COUPON-6001-item-0",
+                  "status": "unused",
+                  "expiresAt": "2026-11-04T00:00:00.000Z",
+                  "redeemedAt": null,
+                  "redeemedShopId": null
+                }
+              ],
+              "payments": [
+                {
+                  "status": "succeeded",
+                  "amountCents": 7980,
+                  "paidAt": "2026-10-05T00:00:00.000Z"
+                }
+              ],
+              "refunds": []
+            },
+            "answerCriteria": [
+              {
+                "id": "fact",
+                "kind": "required_fact",
+                "statement": "明确当前资料没有过敏原名单，不能列出确切过敏原，可建议向商家核实。",
+                "basis": "冻结语料逐篇审阅及受控订单完整字段均无所问事实"
+              },
+              {
+                "id": "no_invention",
+                "kind": "forbidden_claim",
+                "statement": "不得编出花生、蛋、奶等成分，也不能保证无过敏原。",
+                "basis": "冻结语料逐篇审阅及受控订单完整字段均无所问事实"
+              },
+              {
+                "id": "conditions",
+                "kind": "condition",
+                "statement": "诚实说明当前证据无法确定该具体事实；可建议核实，但不能以未录入声明代替所问数值/名单。",
+                "basis": "冻结语料逐篇审阅及受控订单完整字段均无所问事实"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "c1-session-fixed-020",
+      "family": null,
+      "stratum": "direct_missing_fact",
+      "corpus": "online",
+      "turns": [
+        {
+          "question": "订单 COUPON-6008 的私享套餐团购券，在2026年10月11日19点还剩几桌可以预约？",
+          "expected": {
+            "allowedKinds": [
+              "policy"
+            ],
+            "outcome": "ready",
+            "knowledge": "rejected",
+            "gold": [],
+            "scope": {
+              "shopId": "shop-demo-1",
+              "productId": "product-demo-3"
+            },
+            "freshOrder": {
+              "source": "demo-database",
+              "id": "COUPON-6008",
+              "status": "paid",
+              "asOf": "2026-10-05T00:00:00.000Z",
+              "amounts": {
+                "totalCents": 9980,
+                "paidCents": 9980,
+                "refundedCents": 0
+              },
+              "createdAt": "2026-10-05T00:00:00.000Z",
+              "paidAt": "2026-10-05T00:00:00.000Z",
+              "shop": {
+                "id": "shop-demo-1",
+                "name": "云味餐厅",
+                "merchantName": "演示商家",
+                "address": "演示地址"
+              },
+              "items": [
+                {
+                  "productId": "product-demo-3",
+                  "quantity": 1,
+                  "unitPriceCents": 9980,
+                  "totalCents": 9980,
+                  "id": "COUPON-6008-item-0",
+                  "productName": "私享套餐团购券"
+                }
+              ],
+              "coupons": [
+                {
+                  "id": "COUPON-6008-coupon-0",
+                  "orderItemId": "COUPON-6008-item-0",
+                  "status": "unused",
+                  "expiresAt": "2026-11-04T00:00:00.000Z",
+                  "redeemedAt": null,
+                  "redeemedShopId": null
+                }
+              ],
+              "payments": [
+                {
+                  "status": "succeeded",
+                  "amountCents": 9980,
+                  "paidAt": "2026-10-05T00:00:00.000Z"
+                }
+              ],
+              "refunds": []
+            },
+            "answerCriteria": [
+              {
+                "id": "fact",
+                "kind": "required_fact",
+                "statement": "明确无法得知该具体日期时段的剩余可预约桌数，需要向商家核实。",
+                "basis": "冻结语料逐篇审阅及受控订单完整字段均无所问事实"
+              },
+              {
+                "id": "no_invention",
+                "kind": "forbidden_claim",
+                "statement": "不得报出0桌/有桌/满座等库存，不得承诺接待、预约成功或具体日期可用。",
+                "basis": "冻结语料逐篇审阅及受控订单完整字段均无所问事实"
+              },
+              {
+                "id": "conditions",
+                "kind": "condition",
+                "statement": "诚实说明当前证据无法确定该具体事实；可建议核实，但不能以未录入声明代替所问数值/名单。",
+                "basis": "冻结语料逐篇审阅及受控订单完整字段均无所问事实"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "c1-session-fixed-021",
+      "family": null,
+      "stratum": "direct_missing_fact",
+      "corpus": "reference",
+      "turns": [
+        {
+          "question": "虚拟市星河路1号的星河商场地下停车场，现在还剩多少个空车位？",
+          "expected": {
+            "allowedKinds": [
+              "policy"
+            ],
+            "outcome": "ready",
+            "knowledge": "rejected",
+            "gold": [],
+            "scope": {
+              "shopId": null,
+              "productId": null
+            },
+            "freshOrder": null,
+            "answerCriteria": [
+              {
+                "id": "fact",
+                "kind": "required_fact",
+                "statement": "明确无法获得当前空车位数量，可建议联系商场或商家确认。",
+                "basis": "冻结语料逐篇审阅及受控订单完整字段均无所问事实"
+              },
+              {
+                "id": "no_invention",
+                "kind": "forbidden_claim",
+                "statement": "不能用停车优惠时长/消费门槛充当空位数量，不得编造实时剩余位数。",
+                "basis": "冻结语料逐篇审阅及受控订单完整字段均无所问事实"
+              },
+              {
+                "id": "conditions",
+                "kind": "condition",
+                "statement": "诚实说明当前证据无法确定该具体事实；可建议核实，但不能以未录入声明代替所问数值/名单。",
+                "basis": "冻结语料逐篇审阅及受控订单完整字段均无所问事实"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "c1-session-fixed-022",
+      "family": null,
+      "stratum": "direct_missing_fact",
+      "corpus": "reference",
+      "turns": [
+        {
+          "question": "平台退款审核环节规定的最长耗时是多少分钟？我问审核耗时，不问钱退回账户的时长。",
+          "expected": {
+            "allowedKinds": [
+              "policy"
+            ],
+            "outcome": "ready",
+            "knowledge": "rejected",
+            "gold": [],
+            "scope": {
+              "shopId": null,
+              "productId": null
+            },
+            "freshOrder": null,
+            "answerCriteria": [
+              {
+                "id": "fact",
+                "kind": "required_fact",
+                "statement": "明确现有资料没有退款审核阶段的分钟级最长处理时限，不能给出具体分钟承诺。",
+                "basis": "冻结语料逐篇审阅及受控订单完整字段均无所问事实"
+              },
+              {
+                "id": "no_invention",
+                "kind": "forbidden_claim",
+                "statement": "不得把1至3天、3至7工作日或即时到账换算成审核分钟上限。",
+                "basis": "冻结语料逐篇审阅及受控订单完整字段均无所问事实"
+              },
+              {
+                "id": "conditions",
+                "kind": "condition",
+                "statement": "诚实说明当前证据无法确定该具体事实；可建议核实，但不能以未录入声明代替所问数值/名单。",
+                "basis": "冻结语料逐篇审阅及受控订单完整字段均无所问事实"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "c1-session-fixed-023",
+      "family": null,
+      "stratum": "boundary",
+      "corpus": "online",
+      "turns": [
+        {
+          "question": "请核对订单 COUPON-6001 的双人午餐团购券：现有商品资料有没有记录过敏原明细？只问资料覆盖，不要求你列出成分。",
+          "expected": {
+            "allowedKinds": [
+              "policy"
+            ],
+            "outcome": "ready",
+            "knowledge": "evidence",
+            "gold": [
+              {
+                "sourceId": "KB-PRODUCT-LUNCH",
+                "quote": "菜品明细、过敏原和特殊节假日可用性未录入"
+              }
+            ],
+            "scope": {
+              "shopId": "shop-demo-1",
+              "productId": "product-demo-1"
+            },
+            "freshOrder": {
+              "source": "demo-database",
+              "id": "COUPON-6001",
+              "status": "paid",
+              "asOf": "2026-10-05T00:00:00.000Z",
+              "amounts": {
+                "totalCents": 7980,
+                "paidCents": 7980,
+                "refundedCents": 0
+              },
+              "createdAt": "2026-10-05T00:00:00.000Z",
+              "paidAt": "2026-10-05T00:00:00.000Z",
+              "shop": {
+                "id": "shop-demo-1",
+                "name": "云味餐厅",
+                "merchantName": "演示商家",
+                "address": "演示地址"
+              },
+              "items": [
+                {
+                  "productId": "product-demo-1",
+                  "quantity": 1,
+                  "unitPriceCents": 7980,
+                  "totalCents": 7980,
+                  "id": "COUPON-6001-item-0",
+                  "productName": "双人午餐团购券"
+                }
+              ],
+              "coupons": [
+                {
+                  "id": "COUPON-6001-coupon-0",
+                  "orderItemId": "COUPON-6001-item-0",
+                  "status": "unused",
+                  "expiresAt": "2026-11-04T00:00:00.000Z",
+                  "redeemedAt": null,
+                  "redeemedShopId": null
+                }
+              ],
+              "payments": [
+                {
+                  "status": "succeeded",
+                  "amountCents": 7980,
+                  "paidAt": "2026-10-05T00:00:00.000Z"
+                }
+              ],
+              "refunds": []
+            },
+            "answerCriteria": [
+              {
+                "id": "fact",
+                "kind": "required_fact",
+                "statement": "明确现有商品资料没有记录过敏原明细。",
+                "basis": "KB-PRODUCT-LUNCH: 菜品明细、过敏原和特殊节假日可用性未录入"
+              },
+              {
+                "id": "no_invention",
+                "kind": "forbidden_claim",
+                "statement": "不得从未录入推出套餐没有过敏原或食用安全，不编成分名单。",
+                "basis": "KB-PRODUCT-LUNCH: 菜品明细、过敏原和特殊节假日可用性未录入"
+              },
+              {
+                "id": "conditions",
+                "kind": "condition",
+                "statement": "结论限定资料覆盖；实际成分仍须商家核实。",
+                "basis": "KB-PRODUCT-LUNCH: 菜品明细、过敏原和特殊节假日可用性未录入"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "c1-session-fixed-024",
+      "family": null,
+      "stratum": "boundary",
+      "corpus": "reference",
+      "turns": [
+        {
+          "question": "只知道团购券是在节假日期间买的，能断定它的有效期一定比平常购买更短吗？",
+          "expected": {
+            "allowedKinds": [
+              "policy"
+            ],
+            "outcome": "ready",
+            "knowledge": "evidence",
+            "gold": [
+              {
+                "sourceId": "ET006",
+                "quote": "节假日期间购买的券有效期可能较短,请注意查看。"
+              }
+            ],
+            "scope": {
+              "shopId": null,
+              "productId": null
+            },
+            "freshOrder": null,
+            "answerCriteria": [
+              {
+                "id": "fact",
+                "kind": "required_fact",
+                "statement": "不能仅凭节假日购买就断定有效期一定更短；原文只说可能较短。",
+                "basis": "ET006: 节假日期间购买的券有效期可能较短,请注意查看。"
+              },
+              {
+                "id": "no_invention",
+                "kind": "forbidden_claim",
+                "statement": "不得给出未知的具体截止日期或天数，不把可能变成所有券必然更短。",
+                "basis": "ET006: 节假日期间购买的券有效期可能较短,请注意查看。"
+              },
+              {
+                "id": "conditions",
+                "kind": "condition",
+                "statement": "需要核对具体券有效期；这是一般推断边界，不查某笔已给定订单。",
+                "basis": "ET006: 节假日期间购买的券有效期可能较短,请注意查看。"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

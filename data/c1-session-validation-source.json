@@ -1,0 +1,4672 @@
+{
+  "version": 1,
+  "status": "reviewed-and-frozen-before-first-execution",
+  "suiteId": "c1-session-v2.2-fixed-validation-1",
+  "validationPolicy": "fixed-validation-not-blind",
+  "provenance": "New fixed dialogues authored after exposed C1 original/development/v2/v3 and Session development. Shared workspace, not blind. No execution of these new questions during authoring. Main agent must independently review all labels and then freeze a separate manifest before a single actual run.",
+  "candidate": {
+    "architecture": "controller",
+    "dependencySnapshot": {
+      "version": 1,
+      "rootDeclarations": {
+        "@earendil-works/pi-ai": "1.0.0",
+        "@earendil-works/pi-agent-core": null,
+        "@earendil-works/pi-coding-agent": "1.0.0",
+        "mysql2": "3.24.5"
+      },
+      "packages": [
+        {
+          "path": "node_modules/@earendil-works/pi-ai",
+          "name": "@earendil-works/pi-ai",
+          "installedVersion": "1.0.0",
+          "lockedVersion": "1.0.0",
+          "lockIntegrity": "sha512-3/W1vdDaVtpeMd23ElvJC12HLA5yS/BGqqcXF+0SK082dN7cbgNcCwguTBRBC258Ke8SzSvUW1B75iAf8w8IxA==",
+          "dependencyDeclarations": {}
+        },
+        {
+          "path": "node_modules/@earendil-works/pi-coding-agent",
+          "name": "@earendil-works/pi-coding-agent",
+          "installedVersion": "1.0.0",
+          "lockedVersion": "1.0.0",
+          "lockIntegrity": "sha512-/FtbxoSQU/mEv1QnichJjRjqteqaIaMWxmhB4G367+MwZfX7/DI5B9YAg5lqbN7nztFskBEtUSZ+FlmMBECtMw==",
+          "dependencyDeclarations": {
+            "@earendil-works/pi-ai": "^1.0.0",
+            "@earendil-works/pi-agent-core": "^1.0.0"
+          }
+        },
+        {
+          "path": "node_modules/@earendil-works/pi-coding-agent/node_modules/@earendil-works/pi-agent-core",
+          "name": "@earendil-works/pi-agent-core",
+          "installedVersion": "1.0.0",
+          "lockedVersion": "1.0.0",
+          "lockIntegrity": null,
+          "dependencyDeclarations": {
+            "@earendil-works/pi-ai": "^1.0.0"
+          }
+        },
+        {
+          "path": "node_modules/@earendil-works/pi-coding-agent/node_modules/@earendil-works/pi-ai",
+          "name": "@earendil-works/pi-ai",
+          "installedVersion": "1.0.0",
+          "lockedVersion": "1.0.0",
+          "lockIntegrity": null,
+          "dependencyDeclarations": {}
+        },
+        {
+          "path": "node_modules/mysql2",
+          "name": "mysql2",
+          "installedVersion": "3.24.5",
+          "lockedVersion": "3.24.5",
+          "lockIntegrity": "sha512-X6Ujsr2QSkkLpkQGjxzpKRAPn9nu4axpR63ntBzquFVEvPOArgbUQ1sJjFKI7hnaYtiVZxa17Z7q18KSubW0IQ==",
+          "dependencyDeclarations": {}
+        }
+      ]
+    },
+    "parameters": {
+      "timeoutMs": 60000,
+      "repairBudget": 1,
+      "merchantEvents": "host",
+      "knowledgeMode": "m4-support",
+      "knowledgeSupport": "typed",
+      "knowledgeSupportModel": "deepseek-v4-pro",
+      "knowledgeApplicability": "declared",
+      "knowledgeThreshold": 0.5,
+      "knowledgeTimeoutMs": 60000
+    },
+    "model": {
+      "provider": "deepseek",
+      "id": "deepseek-flash",
+      "api": "openai-completions",
+      "baseUrl": "https://api.deepseek.com",
+      "maxTokens": 2048,
+      "cost": {
+        "input": 0.3,
+        "output": 1.2,
+        "cacheRead": 0.006,
+        "cacheWrite": 0
+      }
+    },
+    "support": {
+      "provider": "deepseek",
+      "model": "deepseek-v4-pro",
+      "api": "openai-completions",
+      "endpoint": "https://api.deepseek.com",
+      "timeoutMs": 60000,
+      "temperature": 0,
+      "maxTokens": 2048,
+      "maxRetries": 0,
+      "promptVersion": "fact-support-typed-v5",
+      "promptHash": "6f90373dc229648806bfa93957041bc7bb8ba7f50c76e61fe316827561b2453b",
+      "serialization": "json-query-id-title-tags-body-v1",
+      "serializationHash": "1d16c5e3ef4647c120fe6ddce72417c9ec618ee41dc77faa447ec214e5749c4a",
+      "pricing": {
+        "currency": "USD",
+        "estimated": true,
+        "source": "Pi model catalog",
+        "rates": {
+          "input": 1.32,
+          "output": 3.96,
+          "cacheRead": 0.044,
+          "cacheWrite": 0
+        }
+      },
+      "profile": "typed",
+      "validationVersion": "typed-candidate-isolation-v1"
+    },
+    "rerank": {
+      "endpoints": {
+        "origin": "https://ws-tiy939iiusj2254o.cn-beijing.maas.aliyuncs.com",
+        "embedding": "https://ws-tiy939iiusj2254o.cn-beijing.maas.aliyuncs.com/compatible-mode/v1/embeddings",
+        "rerank": "https://ws-tiy939iiusj2254o.cn-beijing.maas.aliyuncs.com/compatible-api/v1/reranks"
+      },
+      "timeoutMs": 60000,
+      "retries": 0,
+      "embeddingModel": "text-embedding-v4",
+      "dimensions": 1024,
+      "rerankModel": "qwen3-rerank",
+      "rerankInstruction": "Given a web search query, retrieve relevant passages that answer the query."
+    },
+    "pricing": {
+      "estimated": true,
+      "asOf": "2026-10-06",
+      "source": "Pi catalog and Bailian published estimate",
+      "rerankCnyPerMillionTokens": 0.5
+    },
+    "limits": {
+      "requests": {
+        "agent": 120,
+        "rerank": 60,
+        "support": 60
+      },
+      "deadlineMs": 2700000,
+      "turnTimeoutMs": 60000,
+      "estimatedUsd": 1,
+      "estimatedCny": 0.15
+    },
+    "sessionAutomaticRetries": 2,
+    "providerRetries": 0
+  },
+  "counts": {
+    "cases": 24,
+    "turns": 45,
+    "strata": {
+      "known": 6,
+      "missing": 6,
+      "competing": 6,
+      "direct_missing_fact": 4,
+      "boundary": 2
+    }
+  },
+  "plannedCurrentKnowledgeTargets": 7,
+  "plannedAllKnowledgeTurns": 20,
+  "fixturePolicy": {
+    "source": "Existing frozen support-v2 templates via fixtureOrder; rebind synthetic IDs from COUPON-1xxx to COUPON-6xxx without policy changes.",
+    "actor": "Each dialogue has a distinct trusted synthetic QQ actor/group; order ownership is explicit in setup and enforced at get_order.",
+    "reference": "Reference corpus isolated from online corpus/store; global reference questions never import reference policy into MySQL.",
+    "stateChange": "Case001 turn2 applies an external completed refund to the controlled store only. Exact before/after Order is predeclared; no Session focus/topic/reference is injected.",
+    "asOf": "2026-10-05T00:00:00.000Z baseline; external refund advances to 01:00 same day. Evaluation uses frozen asOf rather than wall clock to avoid corpus drift.",
+    "actions": "Expected kinds are scorer-only; all runtime actions/references come from the real production Session. No mocked LLM decisions.",
+    "scope": "Online 8 active original docs + original inactive scope sentinel; reference 35 original docs + inactive sentinel. Inactive and out-of-scope sources cannot be accepted."
+  },
+  "limitations": [
+    "Only controlled in-memory orders, not MySQL/QQ/real merchant/payment execution.",
+    "24 dialogues are small fixed validation, not blinded or statistical proof.",
+    "Prior 7/8 language diagnostic and 10/10 Session results remain as originally measured; they do not establish SKU-to-regular-meal category mapping.",
+    "This suite does not verify all product alias/category mappings. Its product questions use canonical names and explicit original facts; no assertion that product-demo-1 belongs to regular meal category.",
+    "Paid-unit comparison is pure DB with zero knowledge; it does not retroactively pass historical a1-val-056 retrieval gold or prove refund limits/approval.",
+    "Unreviewed final replies cannot pass. Codex reviews actual supportReply with bound hashes and criteria for human review; this is not human acceptance or a second online judge."
+  ],
+  "adjudication": {
+    "reviewer": "codex",
+    "forHumanReview": true,
+    "humanAcceptance": false,
+    "reviewedAgainst": "Complete visible original corpus, literal quotes, full controlled order fields and predeclared transitions. Equivalent fully supporting docs included; related-only docs excluded with reasons.",
+    "manifest": "Separate raw-byte SHA-256 manifest binds the reviewed dataset, setup, source provenance and candidate before the first real execution."
+  },
+  "sourceFiles": {
+    "data/acceptance-online.json": {
+      "sha256": "5f97b7f4e77cd1695a38ef9b0c42e53f52f40f7ae869a39fcdcdae5ae8971b72",
+      "bytes": 5787
+    },
+    "data/acceptance-source.json": {
+      "sha256": "a142141b94aea8b5a3ac9812d6abc2bb9171b2e437e47c69d615a9c688bd042c",
+      "bytes": 21225
+    },
+    "data/support-v2-validation.json": {
+      "sha256": "7860c21fb98efd4fcbb8158e9dcc9629aad113dc688d280027c14790e6b84969",
+      "bytes": 129822
+    },
+    "data/c1-context-validation-v3.json": {
+      "sha256": "31e2bc995367ab5e56bc37f5a48c704bd7259a5d40217b07e4dca4fe7dd5623e",
+      "bytes": 48380
+    },
+    "data/c1-context-validation-v3-source.json": {
+      "sha256": "d91100a5de2fa701cd5243112d74282f5d8b197ca06027bc3d0ce73deecd8689",
+      "bytes": 2832
+    },
+    "db/02-seed.sql": {
+      "sha256": "82c7143840ac30d166207dcf92c227b3368b98af899412a4f669f04bfb976560",
+      "bytes": 9719
+    },
+    "data/reference/kefu-harness/source.json": {
+      "sha256": "42c6791ca2edfabcb98d9c49c2cd063c81e7705c29e94a6c1858357000c1d5cf",
+      "bytes": 1223
+    },
+    "data/reference/kefu-harness/data/knowledge/docs.jsonl": {
+      "sha256": "d3cd80ba76fdc82e57c1eefdc66a20987f09bc9b3dd0fbd1287c709146217fae",
+      "bytes": 14267
+    },
+    "docs/c1-session-validation-draft.md": {
+      "sha256": "2674187e4b7a727064382e7a54c474222cb5cc2467a593787a9b9a30fac14550",
+      "bytes": 16641
+    }
+  },
+  "candidateFiles": {
+    "data/c1-session-validation.json": {
+      "sha256": "42186a94c413ee245ebd2a0c33254c8e75ba9c360cc866f26c85ac4db1bd6c8b",
+      "bytes": 120954
+    },
+    "data/c1-session-validation-setup.json": {
+      "sha256": "5d1e716b9d3bf292e99f73a2f8fd8b7fe113be13cb3546076698c6f5a71c8769",
+      "bytes": 78110
+    }
+  },
+  "caseReviews": [
+    {
+      "caseId": "c1-session-fixed-001",
+      "reviewer": "codex",
+      "forHumanReview": true,
+      "humanAcceptance": false,
+      "reviewStage": "before-first-execution",
+      "turns": [
+        {
+          "turn": 1,
+          "prerequisites": [
+            "本人已有订单 COUPON-6001；受控 store 按可信 actor 鉴权。"
+          ],
+          "requestedFact": "展示本人订单 COUPON-6001 的查询事实：状态 paid，实付 79.80 元，历史已退 0.00 元；券状态与本轮快照一致。",
+          "scopeReason": "可信入口 actor 与 owner 一致；本轮 get_order 重新授权并确定 shop/product，不从文字扩大范围。",
+          "completeGold": [],
+          "consideredVisibleSourceIds": [
+            "KB-PRODUCT-LUNCH",
+            "KB-REFUND-EXPIRED",
+            "KB-REFUND-PARTIAL",
+            "KB-REFUND-PAYMENT",
+            "KB-REFUND-REDEEMED",
+            "KB-REFUND-UNUSED",
+            "KB-SHOP-DEMO-1"
+          ],
+          "relatedButInsufficient": [],
+          "remainingVisibleNotGold": [
+            {
+              "sourceId": "KB-PRODUCT-LUNCH",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-REFUND-EXPIRED",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-REFUND-PARTIAL",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-REFUND-PAYMENT",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-REFUND-REDEEMED",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-REFUND-UNUSED",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-SHOP-DEMO-1",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            }
+          ],
+          "note": "逐篇审阅可见语料；gold 是能独立回答本轮事实的完整来源集合，按题意保留条件；未看该新题的任何模型结果。"
+        },
+        {
+          "turn": 2,
+          "prerequisites": [
+            "第一轮真实查询建立订单focus。",
+            "第二轮之前受控store应用已预声明的外部退款成功事件，订单/coupon/history/refundedCents/asOf同步变化；Session内部引用不改。"
+          ],
+          "requestedFact": "说明当前订单已退款，历史已退79.80元，不能对同笔资金再次退款。",
+          "scopeReason": "可信入口 actor 与 owner 一致；本轮 get_order 重新授权并确定 shop/product，不从文字扩大范围。",
+          "completeGold": [
+            {
+              "sourceId": "KB-REFUND-PAYMENT",
+              "quote": "已完成退款的订单需以支付和退款历史为准，不得重复退款"
+            }
+          ],
+          "consideredVisibleSourceIds": [
+            "KB-PRODUCT-LUNCH",
+            "KB-REFUND-EXPIRED",
+            "KB-REFUND-PARTIAL",
+            "KB-REFUND-PAYMENT",
+            "KB-REFUND-REDEEMED",
+            "KB-REFUND-UNUSED",
+            "KB-SHOP-DEMO-1"
+          ],
+          "relatedButInsufficient": [
+            {
+              "sourceId": "KB-REFUND-PARTIAL",
+              "quote": "同一订单有多张券时必须逐券核对。",
+              "reason": "当前 已退款券 为单券订单，多券原文的适用数量不成立；不能接收其局部退款句。"
+            },
+            {
+              "sourceId": "KB-REFUND-UNUSED",
+              "quote": "已支付、未核销且尚未过期的团购券可以申请退款。",
+              "reason": "当前 已退款券 不满足完整未核销且未过期且未退款条件，不能接受为当前资格证据。"
+            }
+          ],
+          "remainingVisibleNotGold": [
+            {
+              "sourceId": "KB-PRODUCT-LUNCH",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "KB-REFUND-EXPIRED",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "KB-REFUND-REDEEMED",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "KB-SHOP-DEMO-1",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            }
+          ],
+          "note": "逐篇审阅可见语料；gold 是能独立回答本轮事实的完整来源集合，按题意保留条件；未看该新题的任何模型结果。"
+        }
+      ]
+    },
+    {
+      "caseId": "c1-session-fixed-002",
+      "reviewer": "codex",
+      "forHumanReview": true,
+      "humanAcceptance": false,
+      "reviewStage": "before-first-execution",
+      "turns": [
+        {
+          "turn": 1,
+          "prerequisites": [
+            "开始全新Session，缺少相应已完成前序，不注入focus/topic/amountRef。"
+          ],
+          "requestedFact": "询问要查询的订单号或明确哪张券，不猜测订单或券状态。",
+          "scopeReason": "该轮不以订单建立范围；需要澄清的未解指代不进行检索；完整参考政策题仅用隔离的全局 reference 语料。",
+          "completeGold": [],
+          "consideredVisibleSourceIds": [
+            "KB-REFUND-EXPIRED",
+            "KB-REFUND-PARTIAL",
+            "KB-REFUND-PAYMENT",
+            "KB-REFUND-REDEEMED",
+            "KB-REFUND-UNUSED"
+          ],
+          "relatedButInsufficient": [],
+          "remainingVisibleNotGold": [
+            {
+              "sourceId": "KB-REFUND-EXPIRED",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-REFUND-PARTIAL",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-REFUND-PAYMENT",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-REFUND-REDEEMED",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-REFUND-UNUSED",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            }
+          ],
+          "note": "逐篇审阅可见语料；gold 是能独立回答本轮事实的完整来源集合，按题意保留条件；未看该新题的任何模型结果。"
+        }
+      ]
+    },
+    {
+      "caseId": "c1-session-fixed-003",
+      "reviewer": "codex",
+      "forHumanReview": true,
+      "humanAcceptance": false,
+      "reviewStage": "before-first-execution",
+      "turns": [
+        {
+          "turn": 1,
+          "prerequisites": [
+            "本人已有订单 COUPON-6001；受控 store 按可信 actor 鉴权。"
+          ],
+          "requestedFact": "展示本人订单 COUPON-6001 的查询事实：状态 paid，实付 79.80 元，历史已退 0.00 元；券状态与本轮快照一致。",
+          "scopeReason": "可信入口 actor 与 owner 一致；本轮 get_order 重新授权并确定 shop/product，不从文字扩大范围。",
+          "completeGold": [],
+          "consideredVisibleSourceIds": [
+            "KB-PRODUCT-LUNCH",
+            "KB-REFUND-EXPIRED",
+            "KB-REFUND-PARTIAL",
+            "KB-REFUND-PAYMENT",
+            "KB-REFUND-REDEEMED",
+            "KB-REFUND-UNUSED",
+            "KB-SHOP-DEMO-1"
+          ],
+          "relatedButInsufficient": [],
+          "remainingVisibleNotGold": [
+            {
+              "sourceId": "KB-PRODUCT-LUNCH",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-REFUND-EXPIRED",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-REFUND-PARTIAL",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-REFUND-PAYMENT",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-REFUND-REDEEMED",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-REFUND-UNUSED",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-SHOP-DEMO-1",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            }
+          ],
+          "note": "逐篇审阅可见语料；gold 是能独立回答本轮事实的完整来源集合，按题意保留条件；未看该新题的任何模型结果。"
+        },
+        {
+          "turn": 2,
+          "prerequisites": [
+            "本人已有订单 COUPON-6004；受控 store 按可信 actor 鉴权。"
+          ],
+          "requestedFact": "展示本人订单 COUPON-6004 的查询事实：状态 refunded，实付 59.90 元，历史已退 59.90 元；券状态与本轮快照一致。",
+          "scopeReason": "可信入口 actor 与 owner 一致；本轮 get_order 重新授权并确定 shop/product，不从文字扩大范围。",
+          "completeGold": [],
+          "consideredVisibleSourceIds": [
+            "KB-PRODUCT-DINNER",
+            "KB-REFUND-EXPIRED",
+            "KB-REFUND-PARTIAL",
+            "KB-REFUND-PAYMENT",
+            "KB-REFUND-REDEEMED",
+            "KB-REFUND-UNUSED",
+            "KB-SHOP-DEMO-1"
+          ],
+          "relatedButInsufficient": [],
+          "remainingVisibleNotGold": [
+            {
+              "sourceId": "KB-PRODUCT-DINNER",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-REFUND-EXPIRED",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-REFUND-PARTIAL",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-REFUND-PAYMENT",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-REFUND-REDEEMED",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-REFUND-UNUSED",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-SHOP-DEMO-1",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            }
+          ],
+          "note": "逐篇审阅可见语料；gold 是能独立回答本轮事实的完整来源集合，按题意保留条件；未看该新题的任何模型结果。"
+        },
+        {
+          "turn": 3,
+          "prerequisites": [
+            "COUPON-6001 未用券",
+            "COUPON-6004 已退款券"
+          ],
+          "requestedFact": "请求明确是哪笔订单，再查对应状态；可以列出COUPON-6001与COUPON-6004辅助选择。",
+          "scopeReason": "该轮不以订单建立范围；需要澄清的未解指代不进行检索；完整参考政策题仅用隔离的全局 reference 语料。",
+          "completeGold": [],
+          "consideredVisibleSourceIds": [
+            "KB-REFUND-EXPIRED",
+            "KB-REFUND-PARTIAL",
+            "KB-REFUND-PAYMENT",
+            "KB-REFUND-REDEEMED",
+            "KB-REFUND-UNUSED"
+          ],
+          "relatedButInsufficient": [],
+          "remainingVisibleNotGold": [
+            {
+              "sourceId": "KB-REFUND-EXPIRED",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-REFUND-PARTIAL",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-REFUND-PAYMENT",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-REFUND-REDEEMED",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-REFUND-UNUSED",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            }
+          ],
+          "note": "逐篇审阅可见语料；gold 是能独立回答本轮事实的完整来源集合，按题意保留条件；未看该新题的任何模型结果。"
+        }
+      ]
+    },
+    {
+      "caseId": "c1-session-fixed-004",
+      "reviewer": "codex",
+      "forHumanReview": true,
+      "humanAcceptance": false,
+      "reviewStage": "before-first-execution",
+      "turns": [
+        {
+          "turn": 1,
+          "prerequisites": [
+            "本人已有订单 COUPON-6005；受控 store 按可信 actor 鉴权。"
+          ],
+          "requestedFact": "展示本人订单 COUPON-6005 的查询事实：状态 partially_redeemed，实付 119.80 元，历史已退 0.00 元；券状态与本轮快照一致。",
+          "scopeReason": "可信入口 actor 与 owner 一致；本轮 get_order 重新授权并确定 shop/product，不从文字扩大范围。",
+          "completeGold": [],
+          "consideredVisibleSourceIds": [
+            "KB-PRODUCT-DINNER",
+            "KB-REFUND-EXPIRED",
+            "KB-REFUND-PARTIAL",
+            "KB-REFUND-PAYMENT",
+            "KB-REFUND-REDEEMED",
+            "KB-REFUND-UNUSED",
+            "KB-SHOP-DEMO-1"
+          ],
+          "relatedButInsufficient": [],
+          "remainingVisibleNotGold": [
+            {
+              "sourceId": "KB-PRODUCT-DINNER",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-REFUND-EXPIRED",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-REFUND-PARTIAL",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-REFUND-PAYMENT",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-REFUND-REDEEMED",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-REFUND-UNUSED",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-SHOP-DEMO-1",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            }
+          ],
+          "note": "逐篇审阅可见语料；gold 是能独立回答本轮事实的完整来源集合，按题意保留条件；未看该新题的任何模型结果。"
+        },
+        {
+          "turn": 2,
+          "prerequisites": [
+            "真实order前序建立amountReference，运行时requestId来自实际宿主显示。",
+            "订单两券，一张redeemed一张unused；实付11980=行合计，支付成功11980，没有优惠分摊缺口、无退款历史。"
+          ],
+          "requestedFact": "明确剩余唯一未核销券的每券实付59.90元，与此前真实展示59.90元相同。",
+          "scopeReason": "可信入口 actor 与 owner 一致；本轮 get_order 重新授权并确定 shop/product，不从文字扩大范围。",
+          "completeGold": [],
+          "consideredVisibleSourceIds": [
+            "KB-PRODUCT-DINNER",
+            "KB-REFUND-EXPIRED",
+            "KB-REFUND-PARTIAL",
+            "KB-REFUND-PAYMENT",
+            "KB-REFUND-REDEEMED",
+            "KB-REFUND-UNUSED",
+            "KB-SHOP-DEMO-1"
+          ],
+          "relatedButInsufficient": [],
+          "remainingVisibleNotGold": [
+            {
+              "sourceId": "KB-PRODUCT-DINNER",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-REFUND-EXPIRED",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-REFUND-PARTIAL",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-REFUND-PAYMENT",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-REFUND-REDEEMED",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-REFUND-UNUSED",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-SHOP-DEMO-1",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            }
+          ],
+          "note": "逐篇审阅可见语料；gold 是能独立回答本轮事实的完整来源集合，按题意保留条件；未看该新题的任何模型结果。"
+        }
+      ]
+    },
+    {
+      "caseId": "c1-session-fixed-005",
+      "reviewer": "codex",
+      "forHumanReview": true,
+      "humanAcceptance": false,
+      "reviewStage": "before-first-execution",
+      "turns": [
+        {
+          "turn": 1,
+          "prerequisites": [
+            "开始全新Session，缺少相应已完成前序，不注入focus/topic/amountRef。"
+          ],
+          "requestedFact": "说明当前没有可引用的之前金额展示，先补充或重新查询，不凭订单号补造历史金额引用。",
+          "scopeReason": "该轮不以订单建立范围；需要澄清的未解指代不进行检索；完整参考政策题仅用隔离的全局 reference 语料。",
+          "completeGold": [],
+          "consideredVisibleSourceIds": [
+            "KB-REFUND-EXPIRED",
+            "KB-REFUND-PARTIAL",
+            "KB-REFUND-PAYMENT",
+            "KB-REFUND-REDEEMED",
+            "KB-REFUND-UNUSED"
+          ],
+          "relatedButInsufficient": [],
+          "remainingVisibleNotGold": [
+            {
+              "sourceId": "KB-REFUND-EXPIRED",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-REFUND-PARTIAL",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-REFUND-PAYMENT",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-REFUND-REDEEMED",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-REFUND-UNUSED",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            }
+          ],
+          "note": "逐篇审阅可见语料；gold 是能独立回答本轮事实的完整来源集合，按题意保留条件；未看该新题的任何模型结果。"
+        }
+      ]
+    },
+    {
+      "caseId": "c1-session-fixed-006",
+      "reviewer": "codex",
+      "forHumanReview": true,
+      "humanAcceptance": false,
+      "reviewStage": "before-first-execution",
+      "turns": [
+        {
+          "turn": 1,
+          "prerequisites": [
+            "本人已有订单 COUPON-6001；受控 store 按可信 actor 鉴权。"
+          ],
+          "requestedFact": "展示本人订单 COUPON-6001 的查询事实：状态 paid，实付 79.80 元，历史已退 0.00 元；券状态与本轮快照一致。",
+          "scopeReason": "可信入口 actor 与 owner 一致；本轮 get_order 重新授权并确定 shop/product，不从文字扩大范围。",
+          "completeGold": [],
+          "consideredVisibleSourceIds": [
+            "KB-PRODUCT-LUNCH",
+            "KB-REFUND-EXPIRED",
+            "KB-REFUND-PARTIAL",
+            "KB-REFUND-PAYMENT",
+            "KB-REFUND-REDEEMED",
+            "KB-REFUND-UNUSED",
+            "KB-SHOP-DEMO-1"
+          ],
+          "relatedButInsufficient": [],
+          "remainingVisibleNotGold": [
+            {
+              "sourceId": "KB-PRODUCT-LUNCH",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-REFUND-EXPIRED",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-REFUND-PARTIAL",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-REFUND-PAYMENT",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-REFUND-REDEEMED",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-REFUND-UNUSED",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-SHOP-DEMO-1",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            }
+          ],
+          "note": "逐篇审阅可见语料；gold 是能独立回答本轮事实的完整来源集合，按题意保留条件；未看该新题的任何模型结果。"
+        },
+        {
+          "turn": 2,
+          "prerequisites": [
+            "本人已有订单 COUPON-6005；受控 store 按可信 actor 鉴权。"
+          ],
+          "requestedFact": "展示本人订单 COUPON-6005 的查询事实：状态 partially_redeemed，实付 119.80 元，历史已退 0.00 元；券状态与本轮快照一致。",
+          "scopeReason": "可信入口 actor 与 owner 一致；本轮 get_order 重新授权并确定 shop/product，不从文字扩大范围。",
+          "completeGold": [],
+          "consideredVisibleSourceIds": [
+            "KB-PRODUCT-DINNER",
+            "KB-REFUND-EXPIRED",
+            "KB-REFUND-PARTIAL",
+            "KB-REFUND-PAYMENT",
+            "KB-REFUND-REDEEMED",
+            "KB-REFUND-UNUSED",
+            "KB-SHOP-DEMO-1"
+          ],
+          "relatedButInsufficient": [],
+          "remainingVisibleNotGold": [
+            {
+              "sourceId": "KB-PRODUCT-DINNER",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-REFUND-EXPIRED",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-REFUND-PARTIAL",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-REFUND-PAYMENT",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-REFUND-REDEEMED",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-REFUND-UNUSED",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-SHOP-DEMO-1",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            }
+          ],
+          "note": "逐篇审阅可见语料；gold 是能独立回答本轮事实的完整来源集合，按题意保留条件；未看该新题的任何模型结果。"
+        },
+        {
+          "turn": 3,
+          "prerequisites": [
+            "COUPON-6001 每券实付79.80元",
+            "COUPON-6005 每券实付59.90元"
+          ],
+          "requestedFact": "请求明确作为比较基准的是哪个前序金额；可以列举79.80元和59.90元帮助确认，不擅自采用最近展示的一个。",
+          "scopeReason": "可信入口 actor 与 owner 一致；本轮 get_order 重新授权并确定 shop/product，不从文字扩大范围。",
+          "completeGold": [],
+          "consideredVisibleSourceIds": [
+            "KB-PRODUCT-DINNER",
+            "KB-REFUND-EXPIRED",
+            "KB-REFUND-PARTIAL",
+            "KB-REFUND-PAYMENT",
+            "KB-REFUND-REDEEMED",
+            "KB-REFUND-UNUSED",
+            "KB-SHOP-DEMO-1"
+          ],
+          "relatedButInsufficient": [],
+          "remainingVisibleNotGold": [
+            {
+              "sourceId": "KB-PRODUCT-DINNER",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-REFUND-EXPIRED",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-REFUND-PARTIAL",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-REFUND-PAYMENT",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-REFUND-REDEEMED",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-REFUND-UNUSED",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-SHOP-DEMO-1",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            }
+          ],
+          "note": "逐篇审阅可见语料；gold 是能独立回答本轮事实的完整来源集合，按题意保留条件；未看该新题的任何模型结果。"
+        }
+      ]
+    },
+    {
+      "caseId": "c1-session-fixed-007",
+      "reviewer": "codex",
+      "forHumanReview": true,
+      "humanAcceptance": false,
+      "reviewStage": "before-first-execution",
+      "turns": [
+        {
+          "turn": 1,
+          "prerequisites": [
+            "本人已有订单 COUPON-6003；受控 store 按可信 actor 鉴权。"
+          ],
+          "requestedFact": "展示本人订单 COUPON-6003 的查询事实：状态 paid，实付 79.80 元，历史已退 0.00 元；券状态与本轮快照一致。",
+          "scopeReason": "可信入口 actor 与 owner 一致；本轮 get_order 重新授权并确定 shop/product，不从文字扩大范围。",
+          "completeGold": [],
+          "consideredVisibleSourceIds": [
+            "KB-PRODUCT-LUNCH",
+            "KB-REFUND-EXPIRED",
+            "KB-REFUND-PARTIAL",
+            "KB-REFUND-PAYMENT",
+            "KB-REFUND-REDEEMED",
+            "KB-REFUND-UNUSED",
+            "KB-SHOP-DEMO-1"
+          ],
+          "relatedButInsufficient": [],
+          "remainingVisibleNotGold": [
+            {
+              "sourceId": "KB-PRODUCT-LUNCH",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-REFUND-EXPIRED",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-REFUND-PARTIAL",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-REFUND-PAYMENT",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-REFUND-REDEEMED",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-REFUND-UNUSED",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-SHOP-DEMO-1",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            }
+          ],
+          "note": "逐篇审阅可见语料；gold 是能独立回答本轮事实的完整来源集合，按题意保留条件；未看该新题的任何模型结果。"
+        },
+        {
+          "turn": 2,
+          "prerequisites": [
+            "本人已有订单 COUPON-6001；受控 store 按可信 actor 鉴权。"
+          ],
+          "requestedFact": "展示本人订单 COUPON-6001 的查询事实：状态 paid，实付 79.80 元，历史已退 0.00 元；券状态与本轮快照一致。",
+          "scopeReason": "可信入口 actor 与 owner 一致；本轮 get_order 重新授权并确定 shop/product，不从文字扩大范围。",
+          "completeGold": [],
+          "consideredVisibleSourceIds": [
+            "KB-PRODUCT-LUNCH",
+            "KB-REFUND-EXPIRED",
+            "KB-REFUND-PARTIAL",
+            "KB-REFUND-PAYMENT",
+            "KB-REFUND-REDEEMED",
+            "KB-REFUND-UNUSED",
+            "KB-SHOP-DEMO-1"
+          ],
+          "relatedButInsufficient": [],
+          "remainingVisibleNotGold": [
+            {
+              "sourceId": "KB-PRODUCT-LUNCH",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-REFUND-EXPIRED",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-REFUND-PARTIAL",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-REFUND-PAYMENT",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-REFUND-REDEEMED",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-REFUND-UNUSED",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-SHOP-DEMO-1",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            }
+          ],
+          "note": "逐篇审阅可见语料；gold 是能独立回答本轮事实的完整来源集合，按题意保留条件；未看该新题的任何模型结果。"
+        },
+        {
+          "turn": 3,
+          "prerequisites": [
+            "前两轮真实order查询形成恰好两笔授权选择；当前focus是6001，唯一alternative是6003。",
+            "6003 expiresAt早于asOf且coupon.status=expired，单券。"
+          ],
+          "requestedFact": "切回COUPON-6003，说明它已过期但未核销，退款可能性及金额需要商家确认。",
+          "scopeReason": "可信入口 actor 与 owner 一致；本轮 get_order 重新授权并确定 shop/product，不从文字扩大范围。",
+          "completeGold": [
+            {
+              "sourceId": "KB-REFUND-EXPIRED",
+              "quote": "已过期但未核销的券需要商家确认能否退款、延期以及金额。知识库未提供过期自动退款或自动延期政策"
+            }
+          ],
+          "consideredVisibleSourceIds": [
+            "KB-PRODUCT-LUNCH",
+            "KB-REFUND-EXPIRED",
+            "KB-REFUND-PARTIAL",
+            "KB-REFUND-PAYMENT",
+            "KB-REFUND-REDEEMED",
+            "KB-REFUND-UNUSED",
+            "KB-SHOP-DEMO-1"
+          ],
+          "relatedButInsufficient": [
+            {
+              "sourceId": "KB-REFUND-PARTIAL",
+              "quote": "同一订单有多张券时必须逐券核对。",
+              "reason": "当前 过期券 为单券订单，多券原文的适用数量不成立；不能接收其局部退款句。"
+            },
+            {
+              "sourceId": "KB-REFUND-UNUSED",
+              "quote": "已支付、未核销且尚未过期的团购券可以申请退款。",
+              "reason": "当前 过期券 不满足完整未核销且未过期且未退款条件，不能接受为当前资格证据。"
+            }
+          ],
+          "remainingVisibleNotGold": [
+            {
+              "sourceId": "KB-PRODUCT-LUNCH",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "KB-REFUND-PAYMENT",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "KB-REFUND-REDEEMED",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "KB-SHOP-DEMO-1",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            }
+          ],
+          "note": "逐篇审阅可见语料；gold 是能独立回答本轮事实的完整来源集合，按题意保留条件；未看该新题的任何模型结果。"
+        }
+      ]
+    },
+    {
+      "caseId": "c1-session-fixed-008",
+      "reviewer": "codex",
+      "forHumanReview": true,
+      "humanAcceptance": false,
+      "reviewStage": "before-first-execution",
+      "turns": [
+        {
+          "turn": 1,
+          "prerequisites": [
+            "本人已有订单 COUPON-6001；受控 store 按可信 actor 鉴权。"
+          ],
+          "requestedFact": "展示本人订单 COUPON-6001 的查询事实：状态 paid，实付 79.80 元，历史已退 0.00 元；券状态与本轮快照一致。",
+          "scopeReason": "可信入口 actor 与 owner 一致；本轮 get_order 重新授权并确定 shop/product，不从文字扩大范围。",
+          "completeGold": [],
+          "consideredVisibleSourceIds": [
+            "KB-PRODUCT-LUNCH",
+            "KB-REFUND-EXPIRED",
+            "KB-REFUND-PARTIAL",
+            "KB-REFUND-PAYMENT",
+            "KB-REFUND-REDEEMED",
+            "KB-REFUND-UNUSED",
+            "KB-SHOP-DEMO-1"
+          ],
+          "relatedButInsufficient": [],
+          "remainingVisibleNotGold": [
+            {
+              "sourceId": "KB-PRODUCT-LUNCH",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-REFUND-EXPIRED",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-REFUND-PARTIAL",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-REFUND-PAYMENT",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-REFUND-REDEEMED",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-REFUND-UNUSED",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-SHOP-DEMO-1",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            }
+          ],
+          "note": "逐篇审阅可见语料；gold 是能独立回答本轮事实的完整来源集合，按题意保留条件；未看该新题的任何模型结果。"
+        },
+        {
+          "turn": 2,
+          "prerequisites": [
+            "真实查询只形成COUPON-6001一笔选择，alternative不存在。"
+          ],
+          "requestedFact": "请给出另一笔订单号；目前只有一笔经过查询，不能虚构备选订单。",
+          "scopeReason": "该轮不以订单建立范围；需要澄清的未解指代不进行检索；完整参考政策题仅用隔离的全局 reference 语料。",
+          "completeGold": [],
+          "consideredVisibleSourceIds": [
+            "KB-REFUND-EXPIRED",
+            "KB-REFUND-PARTIAL",
+            "KB-REFUND-PAYMENT",
+            "KB-REFUND-REDEEMED",
+            "KB-REFUND-UNUSED"
+          ],
+          "relatedButInsufficient": [],
+          "remainingVisibleNotGold": [
+            {
+              "sourceId": "KB-REFUND-EXPIRED",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-REFUND-PARTIAL",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-REFUND-PAYMENT",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-REFUND-REDEEMED",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-REFUND-UNUSED",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            }
+          ],
+          "note": "逐篇审阅可见语料；gold 是能独立回答本轮事实的完整来源集合，按题意保留条件；未看该新题的任何模型结果。"
+        }
+      ]
+    },
+    {
+      "caseId": "c1-session-fixed-009",
+      "reviewer": "codex",
+      "forHumanReview": true,
+      "humanAcceptance": false,
+      "reviewStage": "before-first-execution",
+      "turns": [
+        {
+          "turn": 1,
+          "prerequisites": [
+            "本人已有订单 COUPON-6003；受控 store 按可信 actor 鉴权。"
+          ],
+          "requestedFact": "展示本人订单 COUPON-6003 的查询事实：状态 paid，实付 79.80 元，历史已退 0.00 元；券状态与本轮快照一致。",
+          "scopeReason": "可信入口 actor 与 owner 一致；本轮 get_order 重新授权并确定 shop/product，不从文字扩大范围。",
+          "completeGold": [],
+          "consideredVisibleSourceIds": [
+            "KB-PRODUCT-LUNCH",
+            "KB-REFUND-EXPIRED",
+            "KB-REFUND-PARTIAL",
+            "KB-REFUND-PAYMENT",
+            "KB-REFUND-REDEEMED",
+            "KB-REFUND-UNUSED",
+            "KB-SHOP-DEMO-1"
+          ],
+          "relatedButInsufficient": [],
+          "remainingVisibleNotGold": [
+            {
+              "sourceId": "KB-PRODUCT-LUNCH",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-REFUND-EXPIRED",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-REFUND-PARTIAL",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-REFUND-PAYMENT",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-REFUND-REDEEMED",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-REFUND-UNUSED",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-SHOP-DEMO-1",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            }
+          ],
+          "note": "逐篇审阅可见语料；gold 是能独立回答本轮事实的完整来源集合，按题意保留条件；未看该新题的任何模型结果。"
+        },
+        {
+          "turn": 2,
+          "prerequisites": [
+            "本人已有订单 COUPON-6004；受控 store 按可信 actor 鉴权。"
+          ],
+          "requestedFact": "展示本人订单 COUPON-6004 的查询事实：状态 refunded，实付 59.90 元，历史已退 59.90 元；券状态与本轮快照一致。",
+          "scopeReason": "可信入口 actor 与 owner 一致；本轮 get_order 重新授权并确定 shop/product，不从文字扩大范围。",
+          "completeGold": [],
+          "consideredVisibleSourceIds": [
+            "KB-PRODUCT-DINNER",
+            "KB-REFUND-EXPIRED",
+            "KB-REFUND-PARTIAL",
+            "KB-REFUND-PAYMENT",
+            "KB-REFUND-REDEEMED",
+            "KB-REFUND-UNUSED",
+            "KB-SHOP-DEMO-1"
+          ],
+          "relatedButInsufficient": [],
+          "remainingVisibleNotGold": [
+            {
+              "sourceId": "KB-PRODUCT-DINNER",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-REFUND-EXPIRED",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-REFUND-PARTIAL",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-REFUND-PAYMENT",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-REFUND-REDEEMED",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-REFUND-UNUSED",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-SHOP-DEMO-1",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            }
+          ],
+          "note": "逐篇审阅可见语料；gold 是能独立回答本轮事实的完整来源集合，按题意保留条件；未看该新题的任何模型结果。"
+        },
+        {
+          "turn": 3,
+          "prerequisites": [
+            "本人已有订单 COUPON-6005；受控 store 按可信 actor 鉴权。"
+          ],
+          "requestedFact": "展示本人订单 COUPON-6005 的查询事实：状态 partially_redeemed，实付 119.80 元，历史已退 0.00 元；券状态与本轮快照一致。",
+          "scopeReason": "可信入口 actor 与 owner 一致；本轮 get_order 重新授权并确定 shop/product，不从文字扩大范围。",
+          "completeGold": [],
+          "consideredVisibleSourceIds": [
+            "KB-PRODUCT-DINNER",
+            "KB-REFUND-EXPIRED",
+            "KB-REFUND-PARTIAL",
+            "KB-REFUND-PAYMENT",
+            "KB-REFUND-REDEEMED",
+            "KB-REFUND-UNUSED",
+            "KB-SHOP-DEMO-1"
+          ],
+          "relatedButInsufficient": [],
+          "remainingVisibleNotGold": [
+            {
+              "sourceId": "KB-PRODUCT-DINNER",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-REFUND-EXPIRED",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-REFUND-PARTIAL",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-REFUND-PAYMENT",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-REFUND-REDEEMED",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-REFUND-UNUSED",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-SHOP-DEMO-1",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            }
+          ],
+          "note": "逐篇审阅可见语料；gold 是能独立回答本轮事实的完整来源集合，按题意保留条件；未看该新题的任何模型结果。"
+        },
+        {
+          "turn": 4,
+          "prerequisites": [
+            "COUPON-6003",
+            "COUPON-6004"
+          ],
+          "requestedFact": "请求提供所指具体订单号，可以列举COUPON-6003与COUPON-6004辅助选择；不能随意挑一个。",
+          "scopeReason": "该轮不以订单建立范围；需要澄清的未解指代不进行检索；完整参考政策题仅用隔离的全局 reference 语料。",
+          "completeGold": [],
+          "consideredVisibleSourceIds": [
+            "KB-REFUND-EXPIRED",
+            "KB-REFUND-PARTIAL",
+            "KB-REFUND-PAYMENT",
+            "KB-REFUND-REDEEMED",
+            "KB-REFUND-UNUSED"
+          ],
+          "relatedButInsufficient": [],
+          "remainingVisibleNotGold": [
+            {
+              "sourceId": "KB-REFUND-EXPIRED",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-REFUND-PARTIAL",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-REFUND-PAYMENT",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-REFUND-REDEEMED",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-REFUND-UNUSED",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            }
+          ],
+          "note": "逐篇审阅可见语料；gold 是能独立回答本轮事实的完整来源集合，按题意保留条件；未看该新题的任何模型结果。"
+        }
+      ]
+    },
+    {
+      "caseId": "c1-session-fixed-010",
+      "reviewer": "codex",
+      "forHumanReview": true,
+      "humanAcceptance": false,
+      "reviewStage": "before-first-execution",
+      "turns": [
+        {
+          "turn": 1,
+          "prerequisites": [
+            "canonical商品名与fresh product-demo-1一致；这是明确假设正常核销的规则问题，不要求券已被核销。"
+          ],
+          "requestedFact": "说明一张券对应两人套餐，核销一次视为整张已使用。",
+          "scopeReason": "可信入口 actor 与 owner 一致；本轮 get_order 重新授权并确定 shop/product，不从文字扩大范围。",
+          "completeGold": [
+            {
+              "sourceId": "KB-PRODUCT-LUNCH",
+              "quote": "一张券对应两人午餐套餐，核销一次即视为整张券已使用"
+            }
+          ],
+          "consideredVisibleSourceIds": [
+            "KB-PRODUCT-LUNCH",
+            "KB-REFUND-EXPIRED",
+            "KB-REFUND-PARTIAL",
+            "KB-REFUND-PAYMENT",
+            "KB-REFUND-REDEEMED",
+            "KB-REFUND-UNUSED",
+            "KB-SHOP-DEMO-1"
+          ],
+          "relatedButInsufficient": [
+            {
+              "sourceId": "KB-REFUND-REDEEMED",
+              "quote": "已经核销的团购券不适用未核销自动退款规则",
+              "reason": "该篇是核销后售后，不独立给出双人商品整张一次核销的单位。"
+            }
+          ],
+          "remainingVisibleNotGold": [
+            {
+              "sourceId": "KB-REFUND-EXPIRED",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "KB-REFUND-PARTIAL",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "KB-REFUND-PAYMENT",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "KB-REFUND-UNUSED",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "KB-SHOP-DEMO-1",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            }
+          ],
+          "note": "逐篇审阅可见语料；gold 是能独立回答本轮事实的完整来源集合，按题意保留条件；未看该新题的任何模型结果。"
+        },
+        {
+          "turn": 2,
+          "prerequisites": [
+            "上一轮实际可答且成功取证后才建立topic；当前以真实requestId续问同一商品，重新get_order授权。"
+          ],
+          "requestedFact": "不能把整张券按两人份额拆成两次核销；一次核销视为整张已使用。",
+          "scopeReason": "可信入口 actor 与 owner 一致；本轮 get_order 重新授权并确定 shop/product，不从文字扩大范围。",
+          "completeGold": [
+            {
+              "sourceId": "KB-PRODUCT-LUNCH",
+              "quote": "一张券对应两人午餐套餐，核销一次即视为整张券已使用"
+            }
+          ],
+          "consideredVisibleSourceIds": [
+            "KB-PRODUCT-LUNCH",
+            "KB-REFUND-EXPIRED",
+            "KB-REFUND-PARTIAL",
+            "KB-REFUND-PAYMENT",
+            "KB-REFUND-REDEEMED",
+            "KB-REFUND-UNUSED",
+            "KB-SHOP-DEMO-1"
+          ],
+          "relatedButInsufficient": [
+            {
+              "sourceId": "KB-REFUND-PARTIAL",
+              "quote": "同一订单有多张券时必须逐券核对。",
+              "reason": "多张券不等于一张双人券的两人份额，本单只有一张券，不能用多券部分处理支持拆分。"
+            }
+          ],
+          "remainingVisibleNotGold": [
+            {
+              "sourceId": "KB-REFUND-EXPIRED",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "KB-REFUND-PAYMENT",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "KB-REFUND-REDEEMED",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "KB-REFUND-UNUSED",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "KB-SHOP-DEMO-1",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            }
+          ],
+          "note": "逐篇审阅可见语料；gold 是能独立回答本轮事实的完整来源集合，按题意保留条件；未看该新题的任何模型结果。"
+        }
+      ]
+    },
+    {
+      "caseId": "c1-session-fixed-011",
+      "reviewer": "codex",
+      "forHumanReview": true,
+      "humanAcceptance": false,
+      "reviewStage": "before-first-execution",
+      "turns": [
+        {
+          "turn": 1,
+          "prerequisites": [
+            "开始全新Session，缺少相应已完成前序，不注入focus/topic/amountRef。"
+          ],
+          "requestedFact": "请补充具体商品或订单以及所指使用规则，不猜测是拆券、分人还是多券分次使用。",
+          "scopeReason": "该轮不以订单建立范围；需要澄清的未解指代不进行检索；完整参考政策题仅用隔离的全局 reference 语料。",
+          "completeGold": [],
+          "consideredVisibleSourceIds": [
+            "KB-REFUND-EXPIRED",
+            "KB-REFUND-PARTIAL",
+            "KB-REFUND-PAYMENT",
+            "KB-REFUND-REDEEMED",
+            "KB-REFUND-UNUSED"
+          ],
+          "relatedButInsufficient": [],
+          "remainingVisibleNotGold": [
+            {
+              "sourceId": "KB-REFUND-EXPIRED",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-REFUND-PARTIAL",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-REFUND-PAYMENT",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-REFUND-REDEEMED",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-REFUND-UNUSED",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            }
+          ],
+          "note": "逐篇审阅可见语料；gold 是能独立回答本轮事实的完整来源集合，按题意保留条件；未看该新题的任何模型结果。"
+        }
+      ]
+    },
+    {
+      "caseId": "c1-session-fixed-012",
+      "reviewer": "codex",
+      "forHumanReview": true,
+      "humanAcceptance": false,
+      "reviewStage": "before-first-execution",
+      "turns": [
+        {
+          "turn": 1,
+          "prerequisites": [
+            "fresh商品为双人午餐团购券。"
+          ],
+          "requestedFact": "一次核销即整张已使用。",
+          "scopeReason": "可信入口 actor 与 owner 一致；本轮 get_order 重新授权并确定 shop/product，不从文字扩大范围。",
+          "completeGold": [
+            {
+              "sourceId": "KB-PRODUCT-LUNCH",
+              "quote": "一张券对应两人午餐套餐，核销一次即视为整张券已使用"
+            }
+          ],
+          "consideredVisibleSourceIds": [
+            "KB-PRODUCT-LUNCH",
+            "KB-REFUND-EXPIRED",
+            "KB-REFUND-PARTIAL",
+            "KB-REFUND-PAYMENT",
+            "KB-REFUND-REDEEMED",
+            "KB-REFUND-UNUSED",
+            "KB-SHOP-DEMO-1"
+          ],
+          "relatedButInsufficient": [],
+          "remainingVisibleNotGold": [
+            {
+              "sourceId": "KB-REFUND-EXPIRED",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "KB-REFUND-PARTIAL",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "KB-REFUND-PAYMENT",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "KB-REFUND-REDEEMED",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "KB-REFUND-UNUSED",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "KB-SHOP-DEMO-1",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            }
+          ],
+          "note": "逐篇审阅可见语料；gold 是能独立回答本轮事实的完整来源集合，按题意保留条件；未看该新题的任何模型结果。"
+        },
+        {
+          "turn": 2,
+          "prerequisites": [
+            "fresh单人晚餐商品、quantity2、两个coupon支持“两张”前提。"
+          ],
+          "requestedFact": "同单购买两张单人晚餐团购券可分别核销，剩余状态以订单为准。",
+          "scopeReason": "可信入口 actor 与 owner 一致；本轮 get_order 重新授权并确定 shop/product，不从文字扩大范围。",
+          "completeGold": [
+            {
+              "sourceId": "KB-PRODUCT-DINNER",
+              "quote": "订单购买两张券时可以分别核销，剩余券状态以订单查询为准"
+            }
+          ],
+          "consideredVisibleSourceIds": [
+            "KB-PRODUCT-DINNER",
+            "KB-REFUND-EXPIRED",
+            "KB-REFUND-PARTIAL",
+            "KB-REFUND-PAYMENT",
+            "KB-REFUND-REDEEMED",
+            "KB-REFUND-UNUSED",
+            "KB-SHOP-DEMO-1"
+          ],
+          "relatedButInsufficient": [
+            {
+              "sourceId": "KB-REFUND-PARTIAL",
+              "quote": "同一订单有多张券时必须逐券核对。",
+              "reason": "该篇讨论部分退款与金额，未规定使用时能否分别核销；商品说明才直接回答。"
+            }
+          ],
+          "remainingVisibleNotGold": [
+            {
+              "sourceId": "KB-REFUND-EXPIRED",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "KB-REFUND-PAYMENT",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "KB-REFUND-REDEEMED",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "KB-REFUND-UNUSED",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "KB-SHOP-DEMO-1",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            }
+          ],
+          "note": "逐篇审阅可见语料；gold 是能独立回答本轮事实的完整来源集合，按题意保留条件；未看该新题的任何模型结果。"
+        },
+        {
+          "turn": 3,
+          "prerequisites": [
+            "6001 单张双人午餐券一次整张核销",
+            "6005 同单两张晚餐券可分别核销"
+          ],
+          "requestedFact": "请求明确所指商品、券或核销规则，可以列举双人午餐一张券与晚餐两张券辅助选择。",
+          "scopeReason": "该轮不以订单建立范围；需要澄清的未解指代不进行检索；完整参考政策题仅用隔离的全局 reference 语料。",
+          "completeGold": [],
+          "consideredVisibleSourceIds": [
+            "KB-REFUND-EXPIRED",
+            "KB-REFUND-PARTIAL",
+            "KB-REFUND-PAYMENT",
+            "KB-REFUND-REDEEMED",
+            "KB-REFUND-UNUSED"
+          ],
+          "relatedButInsufficient": [],
+          "remainingVisibleNotGold": [
+            {
+              "sourceId": "KB-REFUND-EXPIRED",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-REFUND-PARTIAL",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-REFUND-PAYMENT",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-REFUND-REDEEMED",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "KB-REFUND-UNUSED",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            }
+          ],
+          "note": "逐篇审阅可见语料；gold 是能独立回答本轮事实的完整来源集合，按题意保留条件；未看该新题的任何模型结果。"
+        }
+      ]
+    },
+    {
+      "caseId": "c1-session-fixed-013",
+      "reviewer": "codex",
+      "forHumanReview": true,
+      "humanAcceptance": false,
+      "reviewStage": "before-first-execution",
+      "turns": [
+        {
+          "turn": 1,
+          "prerequisites": [
+            "隔离reference全局政策；问题明确信用卡渠道，无实例查询。"
+          ],
+          "requestedFact": "信用卡退款通常3至7个工作日到账。",
+          "scopeReason": "该轮不以订单建立范围；需要澄清的未解指代不进行检索；完整参考政策题仅用隔离的全局 reference 语料。",
+          "completeGold": [
+            {
+              "sourceId": "RF005",
+              "quote": "信用卡3-7个工作日"
+            }
+          ],
+          "consideredVisibleSourceIds": [
+            "CY001",
+            "CY002",
+            "CY003",
+            "ET001",
+            "ET002",
+            "ET003",
+            "ET004",
+            "ET005",
+            "ET006",
+            "ET007",
+            "ET008",
+            "JL001",
+            "JL002",
+            "LR001",
+            "LR002",
+            "MC001",
+            "MC002",
+            "PY001",
+            "PY002",
+            "RF001",
+            "RF002",
+            "RF003",
+            "RF004",
+            "RF005",
+            "RS001",
+            "RS002",
+            "RS003",
+            "VF001",
+            "VF002",
+            "VF003",
+            "VF004",
+            "XY001",
+            "XY002"
+          ],
+          "relatedButInsufficient": [
+            {
+              "sourceId": "RF001",
+              "quote": "一般1-3个工作日到账,具体到账时间以支付渠道为准",
+              "reason": "一般团购退回时限未具体给出信用卡渠道3–7日，不能覆盖已明确的渠道条件。"
+            }
+          ],
+          "remainingVisibleNotGold": [
+            {
+              "sourceId": "CY001",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "CY002",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "CY003",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "ET001",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "ET002",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "ET003",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "ET004",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "ET005",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "ET006",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "ET007",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "ET008",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "JL001",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "JL002",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "LR001",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "LR002",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "MC001",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "MC002",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "PY001",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "PY002",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "RF002",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "RF003",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "RF004",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "RS001",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "RS002",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "RS003",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "VF001",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "VF002",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "VF003",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "VF004",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "XY001",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "XY002",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            }
+          ],
+          "note": "逐篇审阅可见语料；gold 是能独立回答本轮事实的完整来源集合，按题意保留条件；未看该新题的任何模型结果。"
+        },
+        {
+          "turn": 2,
+          "prerequisites": [
+            "上一轮必须真实成功产生信用卡单一topic，当前引用对应requestId。"
+          ],
+          "requestedFact": "延续信用卡3–7工作日：若超过7个工作日未到账，先核对支付渠道账单，再联系平台协助查询。",
+          "scopeReason": "该轮不以订单建立范围；需要澄清的未解指代不进行检索；完整参考政策题仅用隔离的全局 reference 语料。",
+          "completeGold": [
+            {
+              "sourceId": "RF005",
+              "quote": "若超过7个工作日未到账,建议先核对支付渠道账单,再联系平台协助查询"
+            }
+          ],
+          "consideredVisibleSourceIds": [
+            "CY001",
+            "CY002",
+            "CY003",
+            "ET001",
+            "ET002",
+            "ET003",
+            "ET004",
+            "ET005",
+            "ET006",
+            "ET007",
+            "ET008",
+            "JL001",
+            "JL002",
+            "LR001",
+            "LR002",
+            "MC001",
+            "MC002",
+            "PY001",
+            "PY002",
+            "RF001",
+            "RF002",
+            "RF003",
+            "RF004",
+            "RF005",
+            "RS001",
+            "RS002",
+            "RS003",
+            "VF001",
+            "VF002",
+            "VF003",
+            "VF004",
+            "XY001",
+            "XY002"
+          ],
+          "relatedButInsufficient": [
+            {
+              "sourceId": "PY002",
+              "quote": "若出现重复支付或多扣款,多扣部分会自动退回原支付账户,通常1-3个工作日到账。",
+              "reason": "当前是假设信用卡普通退款超过最长时限，不是重复支付或多扣款自动退回。"
+            },
+            {
+              "sourceId": "RF001",
+              "quote": "一般1-3个工作日到账,具体到账时间以支付渠道为准",
+              "reason": "没有超过7工作日后先查账单的步骤，不独立回答当前动作顺序。"
+            }
+          ],
+          "remainingVisibleNotGold": [
+            {
+              "sourceId": "CY001",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "CY002",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "CY003",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "ET001",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "ET002",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "ET003",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "ET004",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "ET005",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "ET006",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "ET007",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "ET008",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "JL001",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "JL002",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "LR001",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "LR002",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "MC001",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "MC002",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "PY001",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "RF002",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "RF003",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "RF004",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "RS001",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "RS002",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "RS003",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "VF001",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "VF002",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "VF003",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "VF004",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "XY001",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "XY002",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            }
+          ],
+          "note": "逐篇审阅可见语料；gold 是能独立回答本轮事实的完整来源集合，按题意保留条件；未看该新题的任何模型结果。"
+        }
+      ]
+    },
+    {
+      "caseId": "c1-session-fixed-014",
+      "reviewer": "codex",
+      "forHumanReview": true,
+      "humanAcceptance": false,
+      "reviewStage": "before-first-execution",
+      "turns": [
+        {
+          "turn": 1,
+          "prerequisites": [
+            "开始全新Session，缺少相应已完成前序，不注入focus/topic/amountRef。"
+          ],
+          "requestedFact": "请明确支付渠道及所指等待时限，不擅自选择7天、1至3天或实时到账。",
+          "scopeReason": "该轮不以订单建立范围；需要澄清的未解指代不进行检索；完整参考政策题仅用隔离的全局 reference 语料。",
+          "completeGold": [],
+          "consideredVisibleSourceIds": [
+            "CY001",
+            "CY002",
+            "CY003",
+            "ET001",
+            "ET002",
+            "ET003",
+            "ET004",
+            "ET005",
+            "ET006",
+            "ET007",
+            "ET008",
+            "JL001",
+            "JL002",
+            "LR001",
+            "LR002",
+            "MC001",
+            "MC002",
+            "PY001",
+            "PY002",
+            "RF001",
+            "RF002",
+            "RF003",
+            "RF004",
+            "RF005",
+            "RS001",
+            "RS002",
+            "RS003",
+            "VF001",
+            "VF002",
+            "VF003",
+            "VF004",
+            "XY001",
+            "XY002"
+          ],
+          "relatedButInsufficient": [],
+          "remainingVisibleNotGold": [
+            {
+              "sourceId": "CY001",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "CY002",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "CY003",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "ET001",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "ET002",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "ET003",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "ET004",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "ET005",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "ET006",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "ET007",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "ET008",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "JL001",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "JL002",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "LR001",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "LR002",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "MC001",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "MC002",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "PY001",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "PY002",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "RF001",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "RF002",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "RF003",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "RF004",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "RF005",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "RS001",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "RS002",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "RS003",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "VF001",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "VF002",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "VF003",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "VF004",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "XY001",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "XY002",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            }
+          ],
+          "note": "逐篇审阅可见语料；gold 是能独立回答本轮事实的完整来源集合，按题意保留条件；未看该新题的任何模型结果。"
+        }
+      ]
+    },
+    {
+      "caseId": "c1-session-fixed-015",
+      "reviewer": "codex",
+      "forHumanReview": true,
+      "humanAcceptance": false,
+      "reviewStage": "before-first-execution",
+      "turns": [
+        {
+          "turn": 1,
+          "prerequisites": [
+            "reference一般渠道规则。"
+          ],
+          "requestedFact": "信用卡通常3至7个工作日。",
+          "scopeReason": "该轮不以订单建立范围；需要澄清的未解指代不进行检索；完整参考政策题仅用隔离的全局 reference 语料。",
+          "completeGold": [
+            {
+              "sourceId": "RF005",
+              "quote": "信用卡3-7个工作日"
+            }
+          ],
+          "consideredVisibleSourceIds": [
+            "CY001",
+            "CY002",
+            "CY003",
+            "ET001",
+            "ET002",
+            "ET003",
+            "ET004",
+            "ET005",
+            "ET006",
+            "ET007",
+            "ET008",
+            "JL001",
+            "JL002",
+            "LR001",
+            "LR002",
+            "MC001",
+            "MC002",
+            "PY001",
+            "PY002",
+            "RF001",
+            "RF002",
+            "RF003",
+            "RF004",
+            "RF005",
+            "RS001",
+            "RS002",
+            "RS003",
+            "VF001",
+            "VF002",
+            "VF003",
+            "VF004",
+            "XY001",
+            "XY002"
+          ],
+          "relatedButInsufficient": [],
+          "remainingVisibleNotGold": [
+            {
+              "sourceId": "CY001",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "CY002",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "CY003",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "ET001",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "ET002",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "ET003",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "ET004",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "ET005",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "ET006",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "ET007",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "ET008",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "JL001",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "JL002",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "LR001",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "LR002",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "MC001",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "MC002",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "PY001",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "PY002",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "RF001",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "RF002",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "RF003",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "RF004",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "RS001",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "RS002",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "RS003",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "VF001",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "VF002",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "VF003",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "VF004",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "XY001",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "XY002",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            }
+          ],
+          "note": "逐篇审阅可见语料；gold 是能独立回答本轮事实的完整来源集合，按题意保留条件；未看该新题的任何模型结果。"
+        },
+        {
+          "turn": 2,
+          "prerequisites": [
+            "本轮完整单一银行卡规则，不依靠上一轮scope。"
+          ],
+          "requestedFact": "银行卡通常1至3个工作日。",
+          "scopeReason": "该轮不以订单建立范围；需要澄清的未解指代不进行检索；完整参考政策题仅用隔离的全局 reference 语料。",
+          "completeGold": [
+            {
+              "sourceId": "RF005",
+              "quote": "银行卡1-3个工作日"
+            }
+          ],
+          "consideredVisibleSourceIds": [
+            "CY001",
+            "CY002",
+            "CY003",
+            "ET001",
+            "ET002",
+            "ET003",
+            "ET004",
+            "ET005",
+            "ET006",
+            "ET007",
+            "ET008",
+            "JL001",
+            "JL002",
+            "LR001",
+            "LR002",
+            "MC001",
+            "MC002",
+            "PY001",
+            "PY002",
+            "RF001",
+            "RF002",
+            "RF003",
+            "RF004",
+            "RF005",
+            "RS001",
+            "RS002",
+            "RS003",
+            "VF001",
+            "VF002",
+            "VF003",
+            "VF004",
+            "XY001",
+            "XY002"
+          ],
+          "relatedButInsufficient": [
+            {
+              "sourceId": "RF001",
+              "quote": "一般1-3个工作日到账,具体到账时间以支付渠道为准",
+              "reason": "一般时限未确认银行卡专属渠道，数字相同不足以独立支持本轮渠道事实。"
+            },
+            {
+              "sourceId": "PY002",
+              "quote": "多扣部分会自动退回原支付账户,通常1-3个工作日到账",
+              "reason": "此为多扣款自动退回；当前未声明重复支付，不能套用。"
+            }
+          ],
+          "remainingVisibleNotGold": [
+            {
+              "sourceId": "CY001",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "CY002",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "CY003",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "ET001",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "ET002",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "ET003",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "ET004",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "ET005",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "ET006",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "ET007",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "ET008",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "JL001",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "JL002",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "LR001",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "LR002",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "MC001",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "MC002",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "PY001",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "RF002",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "RF003",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "RF004",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "RS001",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "RS002",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "RS003",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "VF001",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "VF002",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "VF003",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "VF004",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "XY001",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "XY002",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            }
+          ],
+          "note": "逐篇审阅可见语料；gold 是能独立回答本轮事实的完整来源集合，按题意保留条件；未看该新题的任何模型结果。"
+        },
+        {
+          "turn": 3,
+          "prerequisites": [
+            "信用卡3至7个工作日",
+            "银行卡1至3个工作日"
+          ],
+          "requestedFact": "先确认是哪种支付渠道及所指时限，不擅自认定本笔已经超过7工作日。",
+          "scopeReason": "该轮不以订单建立范围；需要澄清的未解指代不进行检索；完整参考政策题仅用隔离的全局 reference 语料。",
+          "completeGold": [],
+          "consideredVisibleSourceIds": [
+            "CY001",
+            "CY002",
+            "CY003",
+            "ET001",
+            "ET002",
+            "ET003",
+            "ET004",
+            "ET005",
+            "ET006",
+            "ET007",
+            "ET008",
+            "JL001",
+            "JL002",
+            "LR001",
+            "LR002",
+            "MC001",
+            "MC002",
+            "PY001",
+            "PY002",
+            "RF001",
+            "RF002",
+            "RF003",
+            "RF004",
+            "RF005",
+            "RS001",
+            "RS002",
+            "RS003",
+            "VF001",
+            "VF002",
+            "VF003",
+            "VF004",
+            "XY001",
+            "XY002"
+          ],
+          "relatedButInsufficient": [],
+          "remainingVisibleNotGold": [
+            {
+              "sourceId": "CY001",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "CY002",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "CY003",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "ET001",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "ET002",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "ET003",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "ET004",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "ET005",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "ET006",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "ET007",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "ET008",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "JL001",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "JL002",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "LR001",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "LR002",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "MC001",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "MC002",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "PY001",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "PY002",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "RF001",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "RF002",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "RF003",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "RF004",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "RF005",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "RS001",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "RS002",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "RS003",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "VF001",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "VF002",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "VF003",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "VF004",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "XY001",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "XY002",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            }
+          ],
+          "note": "逐篇审阅可见语料；gold 是能独立回答本轮事实的完整来源集合，按题意保留条件；未看该新题的任何模型结果。"
+        }
+      ]
+    },
+    {
+      "caseId": "c1-session-fixed-016",
+      "reviewer": "codex",
+      "forHumanReview": true,
+      "humanAcceptance": false,
+      "reviewStage": "before-first-execution",
+      "turns": [
+        {
+          "turn": 1,
+          "prerequisites": [
+            "纯假设规则，明确改期与8小时；不需要预填真实预约或批准。"
+          ],
+          "requestedFact": "不足24小时的变更需要商家同意，不能保证可自行完成。",
+          "scopeReason": "该轮不以订单建立范围；需要澄清的未解指代不进行检索；完整参考政策题仅用隔离的全局 reference 语料。",
+          "completeGold": [
+            {
+              "sourceId": "RS003",
+              "quote": "距预约时间不足24小时的变更需商家同意"
+            }
+          ],
+          "consideredVisibleSourceIds": [
+            "CY001",
+            "CY002",
+            "CY003",
+            "ET001",
+            "ET002",
+            "ET003",
+            "ET004",
+            "ET005",
+            "ET006",
+            "ET007",
+            "ET008",
+            "JL001",
+            "JL002",
+            "LR001",
+            "LR002",
+            "MC001",
+            "MC002",
+            "PY001",
+            "PY002",
+            "RF001",
+            "RF002",
+            "RF003",
+            "RF004",
+            "RF005",
+            "RS001",
+            "RS002",
+            "RS003",
+            "VF001",
+            "VF002",
+            "VF003",
+            "VF004",
+            "XY001",
+            "XY002"
+          ],
+          "relatedButInsufficient": [
+            {
+              "sourceId": "RF003",
+              "quote": "建议优先选择改期而非退款,改期通常不受此限制,且需在预约时间前操作",
+              "reason": "该篇临近取消退款限制和建议改期不说明8小时改期批准主体；不能覆盖RS003明确不足24小时的条件。"
+            }
+          ],
+          "remainingVisibleNotGold": [
+            {
+              "sourceId": "CY001",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "CY002",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "CY003",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "ET001",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "ET002",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "ET003",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "ET004",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "ET005",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "ET006",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "ET007",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "ET008",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "JL001",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "JL002",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "LR001",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "LR002",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "MC001",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "MC002",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "PY001",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "PY002",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "RF001",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "RF002",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "RF004",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "RF005",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "RS001",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "RS002",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "VF001",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "VF002",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "VF003",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "VF004",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "XY001",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "XY002",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            }
+          ],
+          "note": "逐篇审阅可见语料；gold 是能独立回答本轮事实的完整来源集合，按题意保留条件；未看该新题的任何模型结果。"
+        },
+        {
+          "turn": 2,
+          "prerequisites": [
+            "上一轮实际成功取证形成8小时改期topic，当前真实requestId绑定该话题。"
+          ],
+          "requestedFact": "所指主体是商家；距预约8小时的改期需要商家同意。",
+          "scopeReason": "该轮不以订单建立范围；需要澄清的未解指代不进行检索；完整参考政策题仅用隔离的全局 reference 语料。",
+          "completeGold": [
+            {
+              "sourceId": "RS003",
+              "quote": "距预约时间不足24小时的变更需商家同意"
+            }
+          ],
+          "consideredVisibleSourceIds": [
+            "CY001",
+            "CY002",
+            "CY003",
+            "ET001",
+            "ET002",
+            "ET003",
+            "ET004",
+            "ET005",
+            "ET006",
+            "ET007",
+            "ET008",
+            "JL001",
+            "JL002",
+            "LR001",
+            "LR002",
+            "MC001",
+            "MC002",
+            "PY001",
+            "PY002",
+            "RF001",
+            "RF002",
+            "RF003",
+            "RF004",
+            "RF005",
+            "RS001",
+            "RS002",
+            "RS003",
+            "VF001",
+            "VF002",
+            "VF003",
+            "VF004",
+            "XY001",
+            "XY002"
+          ],
+          "relatedButInsufficient": [
+            {
+              "sourceId": "RF002",
+              "quote": "如确有特殊情况需要退款,须经商家同意后方可办理",
+              "reason": "核销后退款的商家同意与当前临近预约改期不同，不能只因主体相同接收。"
+            },
+            {
+              "sourceId": "RF003",
+              "quote": "改期通常不受此限制,且需在预约时间前操作",
+              "reason": "没有不足24小时变更须商家同意的明确依据。"
+            }
+          ],
+          "remainingVisibleNotGold": [
+            {
+              "sourceId": "CY001",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "CY002",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "CY003",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "ET001",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "ET002",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "ET003",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "ET004",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "ET005",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "ET006",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "ET007",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "ET008",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "JL001",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "JL002",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "LR001",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "LR002",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "MC001",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "MC002",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "PY001",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "PY002",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "RF001",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "RF004",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "RF005",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "RS001",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "RS002",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "VF001",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "VF002",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "VF003",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "VF004",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "XY001",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "XY002",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            }
+          ],
+          "note": "逐篇审阅可见语料；gold 是能独立回答本轮事实的完整来源集合，按题意保留条件；未看该新题的任何模型结果。"
+        }
+      ]
+    },
+    {
+      "caseId": "c1-session-fixed-017",
+      "reviewer": "codex",
+      "forHumanReview": true,
+      "humanAcceptance": false,
+      "reviewStage": "before-first-execution",
+      "turns": [
+        {
+          "turn": 1,
+          "prerequisites": [
+            "开始全新Session，缺少相应已完成前序，不注入focus/topic/amountRef。"
+          ],
+          "requestedFact": "请明确是哪个安排/变更及“他”指谁，不猜商家或平台。",
+          "scopeReason": "该轮不以订单建立范围；需要澄清的未解指代不进行检索；完整参考政策题仅用隔离的全局 reference 语料。",
+          "completeGold": [],
+          "consideredVisibleSourceIds": [
+            "CY001",
+            "CY002",
+            "CY003",
+            "ET001",
+            "ET002",
+            "ET003",
+            "ET004",
+            "ET005",
+            "ET006",
+            "ET007",
+            "ET008",
+            "JL001",
+            "JL002",
+            "LR001",
+            "LR002",
+            "MC001",
+            "MC002",
+            "PY001",
+            "PY002",
+            "RF001",
+            "RF002",
+            "RF003",
+            "RF004",
+            "RF005",
+            "RS001",
+            "RS002",
+            "RS003",
+            "VF001",
+            "VF002",
+            "VF003",
+            "VF004",
+            "XY001",
+            "XY002"
+          ],
+          "relatedButInsufficient": [],
+          "remainingVisibleNotGold": [
+            {
+              "sourceId": "CY001",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "CY002",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "CY003",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "ET001",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "ET002",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "ET003",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "ET004",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "ET005",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "ET006",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "ET007",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "ET008",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "JL001",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "JL002",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "LR001",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "LR002",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "MC001",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "MC002",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "PY001",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "PY002",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "RF001",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "RF002",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "RF003",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "RF004",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "RF005",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "RS001",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "RS002",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "RS003",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "VF001",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "VF002",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "VF003",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "VF004",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "XY001",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "XY002",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            }
+          ],
+          "note": "逐篇审阅可见语料；gold 是能独立回答本轮事实的完整来源集合，按题意保留条件；未看该新题的任何模型结果。"
+        }
+      ]
+    },
+    {
+      "caseId": "c1-session-fixed-018",
+      "reviewer": "codex",
+      "forHumanReview": true,
+      "humanAcceptance": false,
+      "reviewStage": "before-first-execution",
+      "turns": [
+        {
+          "turn": 1,
+          "prerequisites": [
+            "明确6小时改期的一般政策。"
+          ],
+          "requestedFact": "不足24小时的变更需商家同意。",
+          "scopeReason": "该轮不以订单建立范围；需要澄清的未解指代不进行检索；完整参考政策题仅用隔离的全局 reference 语料。",
+          "completeGold": [
+            {
+              "sourceId": "RS003",
+              "quote": "距预约时间不足24小时的变更需商家同意"
+            }
+          ],
+          "consideredVisibleSourceIds": [
+            "CY001",
+            "CY002",
+            "CY003",
+            "ET001",
+            "ET002",
+            "ET003",
+            "ET004",
+            "ET005",
+            "ET006",
+            "ET007",
+            "ET008",
+            "JL001",
+            "JL002",
+            "LR001",
+            "LR002",
+            "MC001",
+            "MC002",
+            "PY001",
+            "PY002",
+            "RF001",
+            "RF002",
+            "RF003",
+            "RF004",
+            "RF005",
+            "RS001",
+            "RS002",
+            "RS003",
+            "VF001",
+            "VF002",
+            "VF003",
+            "VF004",
+            "XY001",
+            "XY002"
+          ],
+          "relatedButInsufficient": [],
+          "remainingVisibleNotGold": [
+            {
+              "sourceId": "CY001",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "CY002",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "CY003",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "ET001",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "ET002",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "ET003",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "ET004",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "ET005",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "ET006",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "ET007",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "ET008",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "JL001",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "JL002",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "LR001",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "LR002",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "MC001",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "MC002",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "PY001",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "PY002",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "RF001",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "RF002",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "RF003",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "RF004",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "RF005",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "RS001",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "RS002",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "VF001",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "VF002",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "VF003",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "VF004",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "XY001",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "XY002",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            }
+          ],
+          "note": "逐篇审阅可见语料；gold 是能独立回答本轮事实的完整来源集合，按题意保留条件；未看该新题的任何模型结果。"
+        },
+        {
+          "turn": 2,
+          "prerequisites": [
+            "完整独立的误核销申诉假设，不是前一改期话题。"
+          ],
+          "requestedFact": "可以通过平台申诉，提供未实际消费说明，由平台介入核实。",
+          "scopeReason": "该轮不以订单建立范围；需要澄清的未解指代不进行检索；完整参考政策题仅用隔离的全局 reference 语料。",
+          "completeGold": [
+            {
+              "sourceId": "VF002",
+              "quote": "若券在不知情的情况下被核销,或商家误核销了错误的订单,可通过平台发起申诉。需提供未实际消费的说明,平台会介入核实"
+            }
+          ],
+          "consideredVisibleSourceIds": [
+            "CY001",
+            "CY002",
+            "CY003",
+            "ET001",
+            "ET002",
+            "ET003",
+            "ET004",
+            "ET005",
+            "ET006",
+            "ET007",
+            "ET008",
+            "JL001",
+            "JL002",
+            "LR001",
+            "LR002",
+            "MC001",
+            "MC002",
+            "PY001",
+            "PY002",
+            "RF001",
+            "RF002",
+            "RF003",
+            "RF004",
+            "RF005",
+            "RS001",
+            "RS002",
+            "RS003",
+            "VF001",
+            "VF002",
+            "VF003",
+            "VF004",
+            "XY001",
+            "XY002"
+          ],
+          "relatedButInsufficient": [
+            {
+              "sourceId": "RF002",
+              "quote": "平台会协助联系商家协商,商家同意与否由商家自主决定",
+              "reason": "此为普通核销后特殊退款协商，不是误核销申诉核实流程。"
+            },
+            {
+              "sourceId": "ET004",
+              "quote": "协商不成可通过平台发起投诉",
+              "reason": "服务质量投诉不等于误核销申诉，未独立给出本题特定核实流程。"
+            }
+          ],
+          "remainingVisibleNotGold": [
+            {
+              "sourceId": "CY001",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "CY002",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "CY003",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "ET001",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "ET002",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "ET003",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "ET005",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "ET006",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "ET007",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "ET008",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "JL001",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "JL002",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "LR001",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "LR002",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "MC001",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "MC002",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "PY001",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "PY002",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "RF001",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "RF003",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "RF004",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "RF005",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "RS001",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "RS002",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "RS003",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "VF001",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "VF003",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "VF004",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "XY001",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "XY002",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            }
+          ],
+          "note": "逐篇审阅可见语料；gold 是能独立回答本轮事实的完整来源集合，按题意保留条件；未看该新题的任何模型结果。"
+        },
+        {
+          "turn": 3,
+          "prerequisites": [
+            "不足24小时改期由商家同意",
+            "误核销申诉由平台介入核实"
+          ],
+          "requestedFact": "请求明确所指事项和主体，可以列举临近预约改期/误核销申诉及商家/平台辅助选择。",
+          "scopeReason": "该轮不以订单建立范围；需要澄清的未解指代不进行检索；完整参考政策题仅用隔离的全局 reference 语料。",
+          "completeGold": [],
+          "consideredVisibleSourceIds": [
+            "CY001",
+            "CY002",
+            "CY003",
+            "ET001",
+            "ET002",
+            "ET003",
+            "ET004",
+            "ET005",
+            "ET006",
+            "ET007",
+            "ET008",
+            "JL001",
+            "JL002",
+            "LR001",
+            "LR002",
+            "MC001",
+            "MC002",
+            "PY001",
+            "PY002",
+            "RF001",
+            "RF002",
+            "RF003",
+            "RF004",
+            "RF005",
+            "RS001",
+            "RS002",
+            "RS003",
+            "VF001",
+            "VF002",
+            "VF003",
+            "VF004",
+            "XY001",
+            "XY002"
+          ],
+          "relatedButInsufficient": [],
+          "remainingVisibleNotGold": [
+            {
+              "sourceId": "CY001",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "CY002",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "CY003",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "ET001",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "ET002",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "ET003",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "ET004",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "ET005",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "ET006",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "ET007",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "ET008",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "JL001",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "JL002",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "LR001",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "LR002",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "MC001",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "MC002",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "PY001",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "PY002",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "RF001",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "RF002",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "RF003",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "RF004",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "RF005",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "RS001",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "RS002",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "RS003",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "VF001",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "VF002",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "VF003",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "VF004",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "XY001",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            },
+            {
+              "sourceId": "XY002",
+              "reason": "本轮只查数据库或澄清未解析指代，不允许知识检索；任何规则都不能代替缺失对象/真实引用。"
+            }
+          ],
+          "note": "逐篇审阅可见语料；gold 是能独立回答本轮事实的完整来源集合，按题意保留条件；未看该新题的任何模型结果。"
+        }
+      ]
+    },
+    {
+      "caseId": "c1-session-fixed-019",
+      "reviewer": "codex",
+      "forHumanReview": true,
+      "humanAcceptance": false,
+      "reviewStage": "before-first-execution",
+      "turns": [
+        {
+          "turn": 1,
+          "prerequisites": [
+            "canonical商品由fresh订单确认；DB只含商品名、数量、支付和券状态，没有菜品/成分字段。"
+          ],
+          "requestedFact": "明确当前资料没有过敏原名单，不能列出确切过敏原，可建议向商家核实。",
+          "scopeReason": "可信入口 actor 与 owner 一致；本轮 get_order 重新授权并确定 shop/product，不从文字扩大范围。",
+          "completeGold": [],
+          "consideredVisibleSourceIds": [
+            "KB-PRODUCT-LUNCH",
+            "KB-REFUND-EXPIRED",
+            "KB-REFUND-PARTIAL",
+            "KB-REFUND-PAYMENT",
+            "KB-REFUND-REDEEMED",
+            "KB-REFUND-UNUSED",
+            "KB-SHOP-DEMO-1"
+          ],
+          "relatedButInsufficient": [
+            {
+              "sourceId": "KB-PRODUCT-LUNCH",
+              "quote": "菜品明细、过敏原和特殊节假日可用性未录入",
+              "reason": "仅说明名单缺失，不能支持具体过敏原名称；本题没有问资料是否记载。"
+            }
+          ],
+          "remainingVisibleNotGold": [
+            {
+              "sourceId": "KB-REFUND-EXPIRED",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "KB-REFUND-PARTIAL",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "KB-REFUND-PAYMENT",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "KB-REFUND-REDEEMED",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "KB-REFUND-UNUSED",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "KB-SHOP-DEMO-1",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            }
+          ],
+          "note": "逐篇审阅可见语料；gold 是能独立回答本轮事实的完整来源集合，按题意保留条件；未看该新题的任何模型结果。"
+        }
+      ]
+    },
+    {
+      "caseId": "c1-session-fixed-020",
+      "reviewer": "codex",
+      "forHumanReview": true,
+      "humanAcceptance": false,
+      "reviewStage": "before-first-execution",
+      "turns": [
+        {
+          "turn": 1,
+          "prerequisites": [
+            "fresh订单只确认私享商品身份，不提供实时库存或预约账本；具体时间是用户目标，不是商家事实。"
+          ],
+          "requestedFact": "明确无法得知该具体日期时段的剩余可预约桌数，需要向商家核实。",
+          "scopeReason": "可信入口 actor 与 owner 一致；本轮 get_order 重新授权并确定 shop/product，不从文字扩大范围。",
+          "completeGold": [],
+          "consideredVisibleSourceIds": [
+            "KB-REFUND-EXPIRED",
+            "KB-REFUND-PARTIAL",
+            "KB-REFUND-PAYMENT",
+            "KB-REFUND-REDEEMED",
+            "KB-REFUND-UNUSED",
+            "KB-SHOP-DEMO-1"
+          ],
+          "relatedButInsufficient": [
+            {
+              "sourceId": "KB-SHOP-DEMO-1",
+              "quote": "助手目前不能预约、外呼、查询实时库存或安排接待",
+              "reason": "服务能力限制不是实时剩余桌数。"
+            },
+            {
+              "sourceId": "KB-SHOP-DEMO-1",
+              "quote": "法定节假日、特殊活动和私享套餐使用限制没有录入",
+              "reason": "未录入声明不是实际日期可用性或可预约库存，不能因日期是周日套用常规套餐规则。"
+            }
+          ],
+          "remainingVisibleNotGold": [
+            {
+              "sourceId": "KB-REFUND-EXPIRED",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "KB-REFUND-PARTIAL",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "KB-REFUND-PAYMENT",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "KB-REFUND-REDEEMED",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "KB-REFUND-UNUSED",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            }
+          ],
+          "note": "逐篇审阅可见语料；gold 是能独立回答本轮事实的完整来源集合，按题意保留条件；未看该新题的任何模型结果。"
+        }
+      ]
+    },
+    {
+      "caseId": "c1-session-fixed-021",
+      "reviewer": "codex",
+      "forHumanReview": true,
+      "humanAcceptance": false,
+      "reviewStage": "before-first-execution",
+      "turns": [
+        {
+          "turn": 1,
+          "prerequisites": [
+            "隔离reference没有实时车位数据；SH002为shop_1001范围文档，当前全局scope不可见。",
+            "用户已提供唯一合成地点名称及地址，所问停车场主体明确；这是目标定位，不是库存事实，也不据用户文本绑定shop_1001或扩大global scope。"
+          ],
+          "requestedFact": "明确无法获得当前空车位数量，可建议联系商场或商家确认。",
+          "scopeReason": "该轮不以订单建立范围；需要澄清的未解指代不进行检索；完整参考政策题仅用隔离的全局 reference 语料。",
+          "completeGold": [],
+          "consideredVisibleSourceIds": [
+            "CY001",
+            "CY002",
+            "CY003",
+            "ET001",
+            "ET002",
+            "ET003",
+            "ET004",
+            "ET005",
+            "ET006",
+            "ET007",
+            "ET008",
+            "JL001",
+            "JL002",
+            "LR001",
+            "LR002",
+            "MC001",
+            "MC002",
+            "PY001",
+            "PY002",
+            "RF001",
+            "RF002",
+            "RF003",
+            "RF004",
+            "RF005",
+            "RS001",
+            "RS002",
+            "RS003",
+            "VF001",
+            "VF002",
+            "VF003",
+            "VF004",
+            "XY001",
+            "XY002"
+          ],
+          "relatedButInsufficient": [
+            {
+              "sourceId": "ET002",
+              "quote": "平台无法查询实时车位",
+              "reason": "此句只说明能力边界，不含当前车位数量；询问具体数量不得按boundary_answer接收。"
+            },
+            {
+              "sourceId": "MC001",
+              "quote": "平台客服无法查询商家的实时经营状态",
+              "reason": "泛化实时问题建议不提供停车场空位数。"
+            }
+          ],
+          "remainingVisibleNotGold": [
+            {
+              "sourceId": "CY001",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "CY002",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "CY003",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "ET001",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "ET003",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "ET004",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "ET005",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "ET006",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "ET007",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "ET008",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "JL001",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "JL002",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "LR001",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "LR002",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "MC002",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "PY001",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "PY002",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "RF001",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "RF002",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "RF003",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "RF004",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "RF005",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "RS001",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "RS002",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "RS003",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "VF001",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "VF002",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "VF003",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "VF004",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "XY001",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "XY002",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            }
+          ],
+          "note": "执行前独立审阅发现原题未指明停车场，可能合法先问地点。仅补充合成名称/地址以消除引用歧义；具体空位数仍未提供，corpus/scope/gold及候选实现未改，没有看任何本题运行结果。"
+        }
+      ]
+    },
+    {
+      "caseId": "c1-session-fixed-022",
+      "reviewer": "codex",
+      "forHumanReview": true,
+      "humanAcceptance": false,
+      "reviewStage": "before-first-execution",
+      "turns": [
+        {
+          "turn": 1,
+          "prerequisites": [
+            "完整一般规则问题，无订单或前文依赖；reference只有渠道到账时限，没有审核SLA。"
+          ],
+          "requestedFact": "明确现有资料没有退款审核阶段的分钟级最长处理时限，不能给出具体分钟承诺。",
+          "scopeReason": "该轮不以订单建立范围；需要澄清的未解指代不进行检索；完整参考政策题仅用隔离的全局 reference 语料。",
+          "completeGold": [],
+          "consideredVisibleSourceIds": [
+            "CY001",
+            "CY002",
+            "CY003",
+            "ET001",
+            "ET002",
+            "ET003",
+            "ET004",
+            "ET005",
+            "ET006",
+            "ET007",
+            "ET008",
+            "JL001",
+            "JL002",
+            "LR001",
+            "LR002",
+            "MC001",
+            "MC002",
+            "PY001",
+            "PY002",
+            "RF001",
+            "RF002",
+            "RF003",
+            "RF004",
+            "RF005",
+            "RS001",
+            "RS002",
+            "RS003",
+            "VF001",
+            "VF002",
+            "VF003",
+            "VF004",
+            "XY001",
+            "XY002"
+          ],
+          "relatedButInsufficient": [
+            {
+              "sourceId": "RF005",
+              "quote": "退款审核通过后即发起退回,资金到账时间取决于支付渠道",
+              "reason": "起点是审核通过后，不说明审核本身多久。"
+            },
+            {
+              "sourceId": "RF001",
+              "quote": "一般1-3个工作日到账",
+              "reason": "到账时限不是审核SLA。"
+            },
+            {
+              "sourceId": "PY002",
+              "quote": "通常1-3个工作日到账",
+              "reason": "重复付款退回时限同样不是退款审核耗时。"
+            }
+          ],
+          "remainingVisibleNotGold": [
+            {
+              "sourceId": "CY001",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "CY002",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "CY003",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "ET001",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "ET002",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "ET003",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "ET004",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "ET005",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "ET006",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "ET007",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "ET008",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "JL001",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "JL002",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "LR001",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "LR002",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "MC001",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "MC002",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "PY001",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "RF002",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "RF003",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "RF004",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "RS001",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "RS002",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "RS003",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "VF001",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "VF002",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "VF003",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "VF004",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "XY001",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "XY002",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            }
+          ],
+          "note": "逐篇审阅可见语料；gold 是能独立回答本轮事实的完整来源集合，按题意保留条件；未看该新题的任何模型结果。"
+        }
+      ]
+    },
+    {
+      "caseId": "c1-session-fixed-023",
+      "reviewer": "codex",
+      "forHumanReview": true,
+      "humanAcceptance": false,
+      "reviewStage": "before-first-execution",
+      "turns": [
+        {
+          "turn": 1,
+          "prerequisites": [
+            "fresh商品确认product-demo-1；当前明确问资料覆盖，未录入声明是所问事实本身。"
+          ],
+          "requestedFact": "明确现有商品资料没有记录过敏原明细。",
+          "scopeReason": "可信入口 actor 与 owner 一致；本轮 get_order 重新授权并确定 shop/product，不从文字扩大范围。",
+          "completeGold": [
+            {
+              "sourceId": "KB-PRODUCT-LUNCH",
+              "quote": "菜品明细、过敏原和特殊节假日可用性未录入"
+            }
+          ],
+          "consideredVisibleSourceIds": [
+            "KB-PRODUCT-LUNCH",
+            "KB-REFUND-EXPIRED",
+            "KB-REFUND-PARTIAL",
+            "KB-REFUND-PAYMENT",
+            "KB-REFUND-REDEEMED",
+            "KB-REFUND-UNUSED",
+            "KB-SHOP-DEMO-1"
+          ],
+          "relatedButInsufficient": [],
+          "remainingVisibleNotGold": [
+            {
+              "sourceId": "KB-REFUND-EXPIRED",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "KB-REFUND-PARTIAL",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "KB-REFUND-PAYMENT",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "KB-REFUND-REDEEMED",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "KB-REFUND-UNUSED",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "KB-SHOP-DEMO-1",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            }
+          ],
+          "note": "逐篇审阅可见语料；gold 是能独立回答本轮事实的完整来源集合，按题意保留条件；未看该新题的任何模型结果。"
+        }
+      ]
+    },
+    {
+      "caseId": "c1-session-fixed-024",
+      "reviewer": "codex",
+      "forHumanReview": true,
+      "humanAcceptance": false,
+      "reviewStage": "before-first-execution",
+      "turns": [
+        {
+          "turn": 1,
+          "prerequisites": [
+            "完整政策推断问题；ET006使用可能这一模态，并非对全部节假日购券作必然承诺。"
+          ],
+          "requestedFact": "不能仅凭节假日购买就断定有效期一定更短；原文只说可能较短。",
+          "scopeReason": "该轮不以订单建立范围；需要澄清的未解指代不进行检索；完整参考政策题仅用隔离的全局 reference 语料。",
+          "completeGold": [
+            {
+              "sourceId": "ET006",
+              "quote": "节假日期间购买的券有效期可能较短,请注意查看。"
+            }
+          ],
+          "consideredVisibleSourceIds": [
+            "CY001",
+            "CY002",
+            "CY003",
+            "ET001",
+            "ET002",
+            "ET003",
+            "ET004",
+            "ET005",
+            "ET006",
+            "ET007",
+            "ET008",
+            "JL001",
+            "JL002",
+            "LR001",
+            "LR002",
+            "MC001",
+            "MC002",
+            "PY001",
+            "PY002",
+            "RF001",
+            "RF002",
+            "RF003",
+            "RF004",
+            "RF005",
+            "RS001",
+            "RS002",
+            "RS003",
+            "VF001",
+            "VF002",
+            "VF003",
+            "VF004",
+            "XY001",
+            "XY002"
+          ],
+          "relatedButInsufficient": [
+            {
+              "sourceId": "RF001",
+              "quote": "若券已过有效期但未核销,同样支持过期退。",
+              "reason": "过期退款资格不说明节假日购买是否必然缩短有效期。"
+            },
+            {
+              "sourceId": "RS002",
+              "quote": "法定节假日营业时间可能调整",
+              "reason": "营业时段不是券的有效期，不能混作所问事实。"
+            },
+            {
+              "sourceId": "XY001",
+              "quote": "节假日可能不可用或需补差价",
+              "reason": "节假日是否可使用与购券有效期长短是不同属性。"
+            }
+          ],
+          "remainingVisibleNotGold": [
+            {
+              "sourceId": "CY001",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "CY002",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "CY003",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "ET001",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "ET002",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "ET003",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "ET004",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "ET005",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "ET007",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "ET008",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "JL001",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "JL002",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "LR001",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "LR002",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "MC001",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "MC002",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "PY001",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "PY002",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "RF002",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "RF003",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "RF004",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "RF005",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "RS001",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "RS003",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "VF001",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "VF002",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "VF003",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "VF004",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            },
+            {
+              "sourceId": "XY002",
+              "reason": "原文属于其他业务事实/政策，不能独立回答本轮所问事实；不能因主题邻近补充为充分证据。"
+            }
+          ],
+          "note": "逐篇审阅可见语料；gold 是能独立回答本轮事实的完整来源集合，按题意保留条件；未看该新题的任何模型结果。"
+        }
+      ]
+    }
+  ],
+  "independentReview": {
+    "completedAt": "2026-10-05T21:01:04.801Z",
+    "reviewers": [
+      "codex-primary",
+      "codex-independent-reviewer"
+    ],
+    "forHumanReview": true,
+    "humanAcceptance": false,
+    "scope": "All 24 dialogues / 45 turns, visible source completeness, literal gold, insufficient related sources, true missing/competing references, actor/ownership, store state change and answer criteria.",
+    "changesBeforeExecution": [
+      {
+        "caseId": "c1-session-fixed-021",
+        "change": "Named a unique synthetic car park and address so missing subject is not confused with missing real-time inventory. No gold, scope or stratum change."
+      }
+    ],
+    "limitations": [
+      "This shared-workspace fixed validation is not blind.",
+      "All fixture owners are authorized synthetic actors; no new real multi-account or comprehensive authorization stress test.",
+      "No SKU-to-rule-category mapping claim."
+    ]
+  }
+}
