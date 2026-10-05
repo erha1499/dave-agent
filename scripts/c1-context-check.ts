@@ -6,10 +6,11 @@ import type { AssistantMessage } from "@earendil-works/pi-ai";
 import { merchantSourceKey } from "../src/after-sales.ts";
 import { createBailianClient } from "../src/bailian.ts";
 import { OrderAccessError, type CouponStore, type QQIdentity } from "../src/coupon-store.ts";
-import { createEvidenceSupportClient, evidenceSupportPromptVersion, evidenceSupportTypedPromptVersion, type EvidenceSupportProfile } from "../src/evidence-support.ts";
+import { createEvidenceSupportClient, evidenceSupportPromptVersion, evidenceSupportTypedPromptVersion, resolveEvidenceSupportModel, type EvidenceSupportModel, type EvidenceSupportProfile } from "../src/evidence-support.ts";
 import { createKnowledgeService, type KnowledgeService, type KnowledgeTrace } from "../src/knowledge-service.ts";
 import { rankBm25, scopeDocuments, type RetrievalDocument } from "../src/retrieval-ranking.ts";
-import { SupportController, resolveSupportPolicyQuestion, type SupportResult, type TrustedPolicyTopic } from "../src/support-controller.ts";
+import { SupportController, type SupportResult, type TrustedPolicyTopic } from "../src/support-controller.ts";
+import { parseContextSupportAction, type ContextSupportAction } from "../src/support-context-action.ts";
 import { rememberOrderChoice, type TrustedAmountReference, type TrustedOrderChoices } from "../src/support-context.ts";
 import { loadAcceptanceDataset } from "./acceptance-data.ts";
 
@@ -131,7 +132,38 @@ export async function loadC1ContextDataset(split: C1Split = "original") {
   return { dataset, manifest, corpora, templates };
 }
 
-function fixtureOrder(key: string, data: Awaited<ReturnType<typeof loadC1ContextDataset>>): Order {
+type ActionAdapter = { kind: "policy" | "refund_eligibility" | "paid_amount_compare" | "clarify";
+  orderRef: "focus" | "alternative" | null; questionContext: "standalone" | "previous" | null;
+  contract: "knowledge" | "paid_facts_only" | "unsupported_refund_limit"; productMention?: string };
+async function loadActionAdapter() {
+  const path = "data/c1-context-action-adapter.json", manifest = await json(path.replace(".json", "-source.json"));
+  const bytes = await readFile(new URL(path, root));
+  assert.deepEqual(manifest.dataset, { path, sha256: hash(bytes), bytes: bytes.length });
+  const data = JSON.parse(bytes.toString()) as { version: number; protocol: string; originalDatasets: Record<string, string>; cases: Record<string, ActionAdapter> };
+  assert.equal(data.version, 1); assert.equal(data.protocol, "v2.2"); assert.equal(Object.keys(data.cases).length, 31);
+  assert.deepEqual(data.originalDatasets, manifest.originalDatasets);
+  for (const [path, digest] of Object.entries(data.originalDatasets)) {
+    const bytes = await readFile(new URL(path, root)); assert.equal(hash(bytes), digest);
+    for (const row of (JSON.parse(bytes.toString()) as Dataset).cases) {
+      const action = data.cases[row.id]; assert.ok(action, `${row.id} supplied action`);
+      if (action.productMention) assert.ok(row.originalQuery.includes(action.productMention));
+      assert.ok(["knowledge", "paid_facts_only", "unsupported_refund_limit"].includes(action.contract));
+      assert.equal(action.kind === "paid_amount_compare", action.contract === "paid_facts_only");
+    }
+  }
+  return { data, manifest };
+}
+
+function assertFreshOrder(result: SupportResult | undefined, expectedId: string): Order {
+  assert.ok(result, "Controller result required");
+  const order = result.evidence.order; assert.ok(order, "Current evidence.order required"); assert.equal(order.id, expectedId);
+  const call = result.evidence.actualCalls.find(call => call.name === "get_order" && !call.isError && call.input.orderId === expectedId
+    && call.parentSpanId === result.evidence.requestId);
+  assert.ok(call, "Current successful authorized get_order required"); assert.deepEqual(call.output, order, "Evidence must be actual fresh get_order output");
+  return order;
+}
+
+export function fixtureOrder(key: string, data: Awaited<ReturnType<typeof loadC1ContextDataset>>): Order {
   const fixture = data.dataset.orderFixtures[key]!, template = data.templates[fixture.template]!;
   const at = new Date("2026-10-05T00:00:00.000Z");
   const names: Record<string, string> = { "product-demo-1": "双人午餐团购券", "product-demo-2": "单人晚餐团购券", "product-demo-3": "私享套餐团购券" };
@@ -148,7 +180,7 @@ function fixtureOrder(key: string, data: Awaited<ReturnType<typeof loadC1Context
 
 // Deliberately semantic-free substitutes. Rank one lexical candidate and accept its actual text;
 // only --live can score gold retrieval/support. No case IDs, labels or gold enter either transport.
-async function mockClients(profile: EvidenceSupportProfile) {
+async function mockClients(profile: EvidenceSupportProfile, supportModel: EvidenceSupportModel) {
   const rerank = createBailianClient({ retries: 0, timeoutMs: 1000,
     env: { DASHSCOPE_API_KEY: "offline-never-sent", DASHSCOPE_BASE_URL: "https://dashscope.aliyuncs.com" },
     fetch: async (_url, options) => {
@@ -158,9 +190,10 @@ async function mockClients(profile: EvidenceSupportProfile) {
       const indices = [...order, ...documents.map((_, index) => index).filter(index => !order.includes(index))];
       return new Response(JSON.stringify({ results: indices.map((index, position) => ({ index, relevance_score: position === 0 ? .9 : .1 })), usage: { total_tokens: 1 } }));
     } });
-  const model = { provider: "deepseek", id: "offline-contract-substitute", api: "openai-completions", baseUrl: "https://api.deepseek.com", maxTokens: 4096,
+  const selected = resolveEvidenceSupportModel(supportModel);
+  const model = { provider: selected.provider, id: selected.model, api: "openai-completions", baseUrl: "https://api.deepseek.com", maxTokens: 4096,
     cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 } };
-  const support = await createEvidenceSupportClient({ profile, timeoutMs: 1000, runtime: { model,
+  const support = await createEvidenceSupportClient({ profile, modelSelection: supportModel, timeoutMs: 1000, runtime: { model,
     complete: async (context): Promise<AssistantMessage> => {
       const payload = JSON.parse(String(context.messages[0]!.content));
       return { role: "assistant", api: "openai-completions", provider: model.provider, model: model.id, stopReason: "stop", timestamp: 0,
@@ -174,26 +207,31 @@ async function mockClients(profile: EvidenceSupportProfile) {
 type Row = { caseId: string; variantId: string; partition: "query_only" | "contextual"; corpus: string; evaluationStratum?: Case["evaluationStratum"]; contextContract?: Case["contextContract"];
   expected: Expected; status: "passed" | "failed" | "unimplemented" | "error";
   errors: string[]; originalQuery: string; effectiveQuery?: string; observedResolution?: string; acceptedIds?: string[];
-  warmups: SupportResult[]; contextSources?: { focusRequestId?: string; amountReferenceRequestId?: string; amountReferenceSource?: "order_display" | "policy_display"; policyTopicRequestId?: string; orderChoicesRequestIds?: string[] }; factChecks?: Record<string, string | number | boolean>; controller?: SupportResult; traces: KnowledgeTrace[]; semanticScored: boolean; contextContractPassed?: boolean };
+  warmups: SupportResult[]; contextSources?: { focusRequestId?: string; amountReferenceRequestId?: string; amountReferenceSource?: "order_display" | "policy_display"; policyTopicRequestId?: string; orderChoicesRequestIds?: string[] }; factChecks?: Record<string, string | number | boolean>; controller?: SupportResult; traces: KnowledgeTrace[]; semanticScored: boolean; contextContractPassed?: boolean; actionContract?: ActionAdapter["contract"];
+  legacyDiagnostics?: { version: "frozen-lexical-oracle-v1"; missingEffectivePhrases: string[]; topLevelVerifiedOrderId?: string; originalRetrievalContract: string };
+  fixturePreparation?: { declaredTopics: number; attemptedTopics: number; establishedTopics: number; currentTopicSelected: boolean };
+  suppliedAction?: ContextSupportAction; referenceProbe?: { kind: "missing_or_ambiguous" | "nonexistent"; passed: boolean; result?: SupportResult } };
 
-export async function runC1ContextCheck(live = false, split: C1Split = "original", threshold = .71, knowledgeSupport: EvidenceSupportProfile = "binary") {
+export async function runC1ContextCheck(live = false, split: C1Split = "original", threshold = .71, knowledgeSupport: EvidenceSupportProfile = "binary", knowledgeSupportModel: EvidenceSupportModel = "configured") {
   assert.ok(Number.isFinite(threshold) && threshold >= 0 && threshold <= 1, "threshold must be 0..1");
   assert.ok(knowledgeSupport === "binary" || knowledgeSupport === "typed", "knowledgeSupport must be binary or typed");
-  const data = await loadC1ContextDataset(split), clients = live ? undefined : await mockClients(knowledgeSupport), runId = randomUUID();
+  resolveEvidenceSupportModel(knowledgeSupportModel);
+  const data = await loadC1ContextDataset(split), adapter = await loadActionAdapter(), clients = live ? undefined : await mockClients(knowledgeSupport, knowledgeSupportModel), runId = randomUUID();
   const rows: Row[] = [];
-  const codeFiles = ["scripts/c1-context-check.ts", "src/support-controller.ts", "src/support-context.ts", "src/knowledge-service.ts", "src/evidence-support.ts", "src/evidence-acceptance.ts", "src/retrieval-ranking.ts", "src/bailian.ts"];
+  const codeFiles = ["scripts/c1-context-check.ts", "src/support-controller.ts", "src/support-context.ts", "src/support-context-action.ts", "src/knowledge-service.ts", "src/evidence-support.ts", "src/evidence-acceptance.ts", "src/retrieval-ranking.ts", "src/bailian.ts"];
   const codeHashes = async () => Object.fromEntries(await Promise.all(codeFiles.map(async file => [file, hash(await readFile(new URL(file, root)))])));
   const codeBefore = await codeHashes();
   for (const test of data.dataset.cases) {
+    const supplied = adapter.data.cases[test.id]!;
     const queryOnly: Variant = { id: "query_only", input: { identity: data.dataset.actor, groupOpenid: data.dataset.groupOpenid, focusOrder: null, topics: [] },
       expected: { ...test.queryOnlyExpected, evidence: [], effectiveQueryMustInclude: [] } };
     for (const variant of [queryOnly, ...test.variants]) {
       const row: Row = { caseId: test.id, variantId: variant.id, partition: variant.id === "query_only" ? "query_only" : "contextual", corpus: test.corpus, evaluationStratum: test.evaluationStratum, contextContract: test.contextContract,
-        expected: variant.expected, status: "failed", errors: [], originalQuery: test.originalQuery, warmups: [], traces: [], semanticScored: live };
+        expected: variant.expected, actionContract: supplied.contract, status: "failed", errors: [], originalQuery: test.originalQuery, warmups: [], traces: [], semanticScored: live };
       rows.push(row);
       const input = variant.input, sourceKey = merchantSourceKey(input.identity, input.groupOpenid);
       const rawService = createKnowledgeService({ readKnowledgeDocuments: async () => structuredClone(data.corpora[test.corpus]) },
-        { mode: "m4-support", supportProfile: knowledgeSupport, threshold, timeoutMs: live ? 60_000 : 1000, clients });
+        { mode: "m4-support", supportProfile: knowledgeSupport, supportModel: knowledgeSupportModel, threshold, timeoutMs: live ? 60_000 : 1000, clients });
       const knowledge: KnowledgeService = { search: async request => { const result = await rawService.search(request); row.traces.push(result.trace); return result; } };
       const store = {
         getOrder: async (identity: QQIdentity, id: string) => {
@@ -209,13 +247,14 @@ export async function runC1ContextCheck(live = false, split: C1Split = "original
         userText: query, focusOrderId: focus, policyTopic });
       try {
         // Establish focus by an actual authorized order read, independently of policy retrieval.
+        const authorized = new Map<string, string>();
         let focus: string | undefined, orderChoices: TrustedOrderChoices | undefined, amountReference: TrustedAmountReference | undefined;
         if (test.corpus === "online" && input.focusOrder) {
           const choices = [...(input.alternatives ?? []).filter(key => key !== input.focusOrder), input.focusOrder];
           for (const [index, key] of choices.entries()) {
             const id = data.dataset.orderFixtures[key]!.orderId;
-            const selected = await controller.createTurn(context(`查询订单 ${id}`, `focus-${index}`)).execute({ kind: "order", orderRef: { kind: "explicit", orderId: id } });
-            row.warmups.push(selected); assert.equal(selected.verifiedOrderId, id); focus = selected.verifiedOrderId;
+            const selected = await controller.createTurn(context(`查询订单 ${id}`, `focus-${index}`)).execute({ protocol: "v2.2", kind: "order", orderRef: { kind: "explicit", orderId: id } });
+            row.warmups.push(selected); assertFreshOrder(selected, id); authorized.set(key, id); focus = id;
             row.contextSources = { ...row.contextSources, focusRequestId: selected.evidence.requestId };
             if (input.amountReference && key === input.amountReference.order && selected.verifiedAmountReference) {
               amountReference = selected.verifiedAmountReference;
@@ -225,56 +264,88 @@ export async function runC1ContextCheck(live = false, split: C1Split = "original
             if (input.alternatives) orderChoices = rememberOrderChoice(orderChoices, { sourceKey, groupOpenid: input.groupOpenid }, id, selected.evidence.requestId);
           }
         }
-        // Multiple topics deliberately provide no single trustedPolicyTopic, matching bounded host state.
-        let topic: TrustedPolicyTopic | undefined;
-        const needsTopic = resolveSupportPolicyQuestion({ originalQuery: test.originalQuery, sourceKey, groupOpenid: input.groupOpenid, orderId: focus ?? null }).needsClarification;
-        if (input.topics.length === 1 && (needsTopic || input.amountReference || input.alternatives)) {
-          const prior = input.topics[0]!, fixture = prior.order ? data.dataset.orderFixtures[prior.order] : undefined;
-          const warmup = await controller.createTurn(context(prior.priorQuery, "prior")).execute({ kind: prior.kind === "refund_eligibility" || prior.kind === "remaining_coupon_refund" ? "refund_eligibility" : "policy", question: prior.priorQuery,
-            ...(fixture ? { orderRef: { kind: "explicit", orderId: fixture.orderId } } : {}) });
-          row.warmups.push(warmup); topic = warmup.verifiedPolicyTopic;
-          row.contextSources = { ...row.contextSources, policyTopicRequestId: topic?.requestId,
-            orderChoicesRequestIds: orderChoices?.orders.map(choice => choice.requestId) };
-          if (input.amountReference) {
-            if (!amountReference && warmup.verifiedAmountReference) {
-              amountReference = warmup.verifiedAmountReference;
-              row.contextSources.amountReferenceRequestId = warmup.evidence.requestId;
-              row.contextSources.amountReferenceSource = "policy_display";
-            }
-            if (!amountReference) throw new Error("Prior turn did not display a trusted unit paid amount");
-            assert.equal(amountReference.productId, input.amountReference.productId);
+        // Replay declared prerequisites before the tested action. The SUT never decides which fixture history exists.
+        const preparedTopics: TrustedPolicyTopic[] = [];
+        row.fixturePreparation = { declaredTopics: input.topics.length, attemptedTopics: 0, establishedTopics: 0, currentTopicSelected: false };
+        for (const [index, prior] of input.topics.entries()) {
+          const fixture = prior.order ? data.dataset.orderFixtures[prior.order] : undefined;
+          const explicit = fixture && [...prior.priorQuery.matchAll(/COUPON-\d{4}(?!\d)/g)].some(match => match[0] === fixture.orderId);
+          let priorFocus = prior.order ? authorized.get(prior.order) : undefined;
+          if (fixture && !explicit && !priorFocus) {
+            const selected = await controller.createTurn(context(`查询订单 ${fixture.orderId}`, `prior-focus-${index}`)).execute({ protocol: "v2.2", kind: "order", orderRef: { kind: "explicit", orderId: fixture.orderId } });
+            row.warmups.push(selected); assertFreshOrder(selected, fixture.orderId); priorFocus = fixture.orderId; authorized.set(prior.order!, priorFocus);
           }
-          if (needsTopic && !topic && !input.amountReference && !input.alternatives) throw new Error("Prior turn did not produce a unique verified policy topic");
-          if (live && prior.sourceEvidence && !topic?.sources.some(source => source.sourceId === prior.sourceEvidence!.docId)) throw new Error("Prior topic lacks frozen source evidence");
+          const priorAction = parseContextSupportAction({ protocol: "v2.2", kind: prior.kind === "refund_eligibility" || prior.kind === "remaining_coupon_refund" ? "refund_eligibility" : "policy",
+            question: prior.priorQuery, questionContext: { kind: "standalone" },
+            ...(fixture ? { orderRef: explicit ? { kind: "explicit", orderId: fixture.orderId } : { kind: "focus" } } : {}) });
+          row.fixturePreparation.attemptedTopics++;
+          const warmup = await controller.createTurn(context(prior.priorQuery, `prior-${index}`, priorFocus)).execute(priorAction);
+          row.warmups.push(warmup);
+          if (fixture) assertFreshOrder(warmup, fixture.orderId);
+          if (!warmup.verifiedPolicyTopic) throw new Error("Declared successful prior did not produce a verified policy topic");
+          if (live && prior.sourceEvidence && !warmup.verifiedPolicyTopic.sources.some(source => source.sourceId === prior.sourceEvidence!.docId)) throw new Error("Prior topic lacks frozen source evidence");
+          preparedTopics.push(warmup.verifiedPolicyTopic); row.fixturePreparation.establishedTopics++;
+          if (input.amountReference && !amountReference && warmup.verifiedAmountReference) {
+            amountReference = warmup.verifiedAmountReference;
+            row.contextSources = { ...row.contextSources, amountReferenceRequestId: warmup.evidence.requestId, amountReferenceSource: "policy_display" };
+          }
         }
-        if (test.corpus === "online") {
-          const action = { kind: /退/.test(test.originalQuery) ? "refund_eligibility" : "policy", question: test.originalQuery,
-            ...(focus || /退/.test(test.originalQuery) ? { orderRef: { kind: "focus" } } : {}) };
-          const result = await controller.createTurn({ ...context(test.originalQuery, "current", focus, topic), orderChoices, amountReference }).execute(action);
-          row.controller = result; row.effectiveQuery = result.evidence.knowledge[0]?.context.effectiveQuery;
-          row.acceptedIds = result.evidence.rules.map(rule => rule.sourceId);
-          row.observedResolution = result.outcome === "clarification" ? "clarify" : row.acceptedIds.length ? "resolved" : "resolved_no_evidence";
-        } else {
-          const resolved = resolveSupportPolicyQuestion({ originalQuery: test.originalQuery, sourceKey, groupOpenid: input.groupOpenid, orderId: null, policyTopic: topic });
-          row.effectiveQuery = resolved.query;
-          if (resolved.needsClarification) { row.observedResolution = "clarify"; row.acceptedIds = []; }
-          else {
-            const result = await knowledge.search({ query: resolved.query, originalQuery: test.originalQuery, scope: { shopId: null, productId: null } });
-            row.acceptedIds = result.documents.map(doc => doc.sourceId); row.observedResolution = row.acceptedIds.length ? "resolved" : "resolved_no_evidence";
+        const topic = preparedTopics.length === 1 ? preparedTopics[0] : undefined;
+        row.fixturePreparation.currentTopicSelected = Boolean(topic);
+        row.contextSources = { ...row.contextSources, policyTopicRequestId: topic?.requestId, orderChoicesRequestIds: orderChoices?.orders.map(choice => choice.requestId) };
+        if (input.amountReference && amountReference) assert.equal(amountReference.productId, input.amountReference.productId);
+        const missingReferenceId = `${runId}:${rows.length}:nonexistent-reference`;
+        const action = parseContextSupportAction(supplied.kind === "clarify"
+          ? { protocol: "v2.2", kind: "clarify", field: "intent", reason: "ambiguous" }
+          : supplied.kind === "paid_amount_compare"
+          ? { protocol: "v2.2", kind: "paid_amount_compare", orderRef: { kind: "focus" }, amountRef: { requestId: amountReference?.requestId ?? missingReferenceId } }
+          : { protocol: "v2.2", kind: supplied.kind, question: test.originalQuery,
+            questionContext: supplied.questionContext === "previous" ? { kind: "previous", requestId: topic?.requestId ?? missingReferenceId } : { kind: "standalone" },
+            ...(supplied.orderRef ? { orderRef: { kind: supplied.orderRef } } : {}), ...(supplied.productMention ? { productMention: supplied.productMention } : {}) });
+        row.suppliedAction = action;
+        const currentContext = { ...context(test.originalQuery, "current", focus, topic), orderChoices, amountReference };
+        // Explicit invalid-ID probes prove host rejection, rather than handing every negative row a clarify action.
+        if ((action.kind === "policy" || action.kind === "refund_eligibility") && action.questionContext.kind === "previous" || action.kind === "paid_amount_compare") {
+          const hasReference = action.kind === "paid_amount_compare" ? Boolean(amountReference) : Boolean(topic);
+          row.referenceProbe = { kind: hasReference ? "nonexistent" : "missing_or_ambiguous", passed: false };
+          if (hasReference) {
+            const probe = action.kind === "paid_amount_compare" ? { ...action, amountRef: { requestId: missingReferenceId } }
+              : { ...action, questionContext: { kind: "previous" as const, requestId: missingReferenceId } };
+            const rejected = await controller.createTurn({ ...currentContext, requestId: `${currentContext.requestId}:probe` }).execute(probe);
+            row.referenceProbe.result = rejected; assert.equal(rejected.outcome, "clarification");
+            assert.equal(rejected.evidence.knowledge.length, 0); assert.equal(rejected.evidence.rules.length, 0);
+            assert.ok(rejected.evidence.actualCalls.every(call => call.name === "get_order"), "Invalid reference cannot request knowledge or side effects");
+            row.referenceProbe.passed = true;
           }
+        }
+        const result = await controller.createTurn(currentContext).execute(action);
+        row.controller = result; row.effectiveQuery = result.evidence.knowledge[0]?.context.effectiveQuery;
+        row.acceptedIds = result.evidence.rules.map(rule => rule.sourceId);
+        row.observedResolution = result.outcome === "clarification" ? "clarify" : result.evidence.amountComparison ? "resolved_facts" : row.acceptedIds.length ? "resolved" : "resolved_no_evidence";
+        row.legacyDiagnostics = { version: "frozen-lexical-oracle-v1", missingEffectivePhrases: variant.expected.effectiveQueryMustInclude.filter(phrase => !row.effectiveQuery?.includes(phrase)),
+          topLevelVerifiedOrderId: result.verifiedOrderId,
+          originalRetrievalContract: supplied.contract === "paid_facts_only" && variant.expected.relevant.length ? "original PARTIAL gold remains unmet: business contract now requires zero knowledge calls"
+            : supplied.contract === "unsupported_refund_limit" && variant.expected.resolution !== "clarify" ? "original resolved amount-limit contract remains unsupported" : live ? "scored against unchanged gold" : "not semantically scored offline" };
+        if (row.referenceProbe?.kind === "missing_or_ambiguous") {
+          assert.equal(result.outcome, "clarification"); assert.equal(result.evidence.knowledge.length, 0); row.referenceProbe.passed = true;
         }
         if (row.traces.some(trace => trace.status === "unavailable")) throw new Error("Knowledge service unavailable; see sanitized traces");
-        if (variant.expected.resolution === "clarify") {
+        if (variant.expected.resolution === "clarify" || supplied.contract === "unsupported_refund_limit") {
           assert.equal(row.observedResolution, "clarify"); assert.equal(row.controller?.evidence.knowledge.length ?? 0, 0);
         } else {
           assert.notEqual(row.observedResolution, "clarify");
-          if (test.contextContract === "core" && test.corpus === "online" && input.focusOrder) {
-            assert.equal(row.controller?.verifiedOrderId, variant.expected.facts?.resolvedOrderId ?? data.dataset.orderFixtures[input.focusOrder]!.orderId, "Core focus must be freshly authorized");
+          if (test.corpus === "online" && input.focusOrder) {
+            const expectedOrder = String(variant.expected.facts?.resolvedOrderId ?? data.dataset.orderFixtures[input.focusOrder]!.orderId);
+            const fresh = assertFreshOrder(row.controller, expectedOrder);
+            for (const item of row.controller!.evidence.knowledge) {
+              assert.equal(item.context.scopeSource, "fresh_order"); assert.equal(item.context.facts?.orderId, fresh.id);
+              assert.equal(item.trace.scope.shopId, fresh.shop.id); assert.ok(fresh.items.some(product => product.productId === item.trace.scope.productId));
+            }
           }
           if (variant.expected.facts) {
             row.factChecks = {};
             for (const [field, expected] of Object.entries(variant.expected.facts)) {
-              const actual = field === "resolvedOrderId" ? row.controller?.verifiedOrderId
+              const actual: unknown = field === "resolvedOrderId" ? row.controller?.evidence.order?.id
                 : row.controller?.evidence.amountComparison?.[field as keyof NonNullable<SupportResult["evidence"]["amountComparison"]>];
               assert.equal(actual, expected, field); row.factChecks[field] = actual as string | number | boolean;
             }
@@ -283,9 +354,16 @@ export async function runC1ContextCheck(live = false, split: C1Split = "original
               row.factChecks.refundApproved = false;
             }
           }
-          for (const phrase of variant.expected.effectiveQueryMustInclude) assert.ok(row.effectiveQuery?.includes(phrase), `effective query lacks ${phrase}`);
+          for (const item of row.controller!.evidence.knowledge) {
+            assert.equal(item.context.originalQuery, test.originalQuery); assert.equal(item.trace.query, item.context.effectiveQuery);
+            if (supplied.questionContext === "previous") assert.equal(item.context.policyTopic?.requestId, topic?.requestId, "Declared prior must actually bind to current knowledge");
+          }
+          if (supplied.contract === "paid_facts_only") {
+            assert.equal(row.observedResolution, "resolved_facts"); assert.equal(row.controller!.evidence.knowledge.length, 0);
+            assert.equal(row.controller!.evidence.rules.length, 0); assert.equal(row.controller!.evidence.amountComparison?.referenceRequestId, amountReference?.requestId);
+          }
           row.contextContractPassed = true; // Resolution and trusted facts are independent of policy recall.
-          if (live) { assert.equal(row.observedResolution, variant.expected.resolution); assert.deepEqual([...(row.acceptedIds ?? [])].sort(), [...variant.expected.relevant].sort()); }
+          if (live && supplied.contract === "knowledge") { assert.equal(row.observedResolution, variant.expected.resolution); assert.deepEqual([...(row.acceptedIds ?? [])].sort(), [...variant.expected.relevant].sort()); }
         }
         row.status = "passed";
       } catch (error) { row.status = error instanceof assert.AssertionError ? "failed" : "error"; row.errors.push(error instanceof assert.AssertionError ? error.message : error instanceof Error ? error.message : "Unknown failure"); }
@@ -328,19 +406,27 @@ export async function runC1ContextCheck(live = false, split: C1Split = "original
     knownPassedByFamily: Object.fromEntries(data.dataset.cases.map(test => [test.id, rows.some(row => row.caseId === test.id && row.variantId === "known" && row.status === "passed")]))
   } : null;
   const codeAfter = await codeHashes(), codeStable = JSON.stringify(codeBefore) === JSON.stringify(codeAfter);
-  const admission = metrics ? { status: codeStable && metrics.incomplete === 0 && metrics.acceptedRecallAt5 >= .8
+  const admission = metrics ? { legacyDiagnosticStatus: codeStable && metrics.incomplete === 0 && metrics.acceptedRecallAt5 >= .8
     && metrics.falseAccepts === 0 && metrics.scopeViolations === 0 && (metrics.falseRejectRate === null || metrics.falseRejectRate <= .1)
     && metrics.boundaryPassed === metrics.boundaryPlanned && (!coreContextContracts || coreContextContracts.passed === coreContextContracts.planned) ? "metrics_met" : "not_met",
+    status: "not_applicable_to_original_validation",
     limits: { acceptedRecallAt5Minimum: .8, falseRejectRateMaximum: .1, falseAcceptsMaximum: 0, scopeViolationsMaximum: 0, incompleteMaximum: 0, clarificationBoundaryRequired: "all", coreTrustedReferenceContractsRequired: split === "validation-v3" ? "all (policy recall scored separately)" : "not separately declared in earlier datasets" },
     allKnownContextContractsPassed: Object.values(metrics.knownPassedByFamily).every(Boolean),
     note: "Passing retrieval metrics alone does not prove every contextual capability or final answer quality; inspect known contracts and all failures." } : null;
-  const artifact = { version: 2, codeStable, configuration: { threshold, knowledgeSupport, supportPrompt: knowledgeSupport === "typed" ? evidenceSupportTypedPromptVersion : evidenceSupportPromptVersion, observedSupportPrompts: [...new Set(traces.flatMap(trace => trace.settings?.support ? [trace.settings.support.promptVersion] : []))], timeoutMs: live ? 60_000 : 1000, retries: 0 }, runnerVersion: "c1-context-runner-v3", split, runId, executedAt: new Date().toISOString(), mode: live ? "live-retrieval-support" : "offline-engineering",
-    scope: "Production controller/resolver and knowledge service; controlled order snapshots, supplied actions, no real model action selection, MySQL or QQ.",
-    validationPolicy: data.dataset.validationPolicy, source: data.manifest, semanticScored: live,
+  const artifact = { version: 2, codeStable, configuration: { threshold, knowledgeSupport, knowledgeSupportModel, observedSupportSettings: [...new Map(traces.flatMap(trace => trace.settings?.support ? [[JSON.stringify(trace.settings.support), trace.settings.support] as const] : [])).values()], supportPrompt: knowledgeSupport === "typed" ? evidenceSupportTypedPromptVersion : evidenceSupportPromptVersion, observedSupportPrompts: [...new Set(traces.flatMap(trace => trace.settings?.support ? [trace.settings.support.promptVersion] : []))], timeoutMs: live ? 60_000 : 1000, retries: 0 }, runnerVersion: "c1-context-runner-v3.2-adapter", scoringVersion: "c1-supplied-action-scoring-v2", split, runId, executedAt: new Date().toISOString(), mode: live ? "live-supplied-action-development" : "offline-adapter-engineering",
+    scope: "v2.2 Controller host-contract development with frozen supplied actions and controlled order snapshots; no natural-language action selection, MySQL or QQ.",
+    validationPolicy: "exposed-development-adapter-not-new-validation", originalValidationPolicy: data.dataset.validationPolicy, source: data.manifest, actionAdapter: adapter.manifest, semanticScored: live,
+    fixtureActionsAreOracle: true, naturalLanguageUnderstandingEvaluated: false, originalAdmissionNotApplicable: "v2.2 supplied actions and paid-amount zero-knowledge contract differ from original runs; frozen data/gold/report retained",
     modelActionSelectionEvaluated: false, finalAnswerQualityEvaluated: false,
     mockPolicy: live ? null : "Semantic-free one-candidate lexical rerank and accept-text substitute. Passed measures resolution/wiring only, never retrieval factual quality.",
     codeHashes: { before: codeBefore, after: codeAfter },
-    summary: { metrics, admission, caseGroups: data.dataset.cases.length, originalCases: new Set(data.dataset.cases.map(row => row.originalId ?? row.id)).size, queryOnly: summarize(rows.filter(row => row.partition === "query_only")),
+    summary: { metrics, admission, originalContractChanges: { paidAmountFactsOnly: rows.filter(row => row.actionContract === "paid_facts_only").length, unsupportedRefundLimit: rows.filter(row => row.actionContract === "unsupported_refund_limit").length },
+      amountFactsContract: { planned: rows.filter(row => row.actionContract === "paid_facts_only" && row.expected.resolution === "resolved").length,
+        passed: rows.filter(row => row.actionContract === "paid_facts_only" && row.expected.resolution === "resolved" && row.status === "passed").length,
+        originalGoldContract: "Original knowledge gold is unchanged and not passed by the new zero-knowledge amount action" },
+      originalPositiveContractsNotPassedByAdapter: rows.filter(row => row.actionContract !== "knowledge" && row.expected.resolution === "resolved").map(row => ({ caseId: row.caseId, variantId: row.variantId, reason: row.actionContract })),
+      referenceProbes: { planned: rows.filter(row => row.referenceProbe).length, passed: rows.filter(row => row.referenceProbe?.passed).length },
+      lexicalDiagnosticFailures: rows.filter(row => row.legacyDiagnostics?.missingEffectivePhrases.length).length, caseGroups: data.dataset.cases.length, originalCases: new Set(data.dataset.cases.map(row => row.originalId ?? row.id)).size, queryOnly: summarize(rows.filter(row => row.partition === "query_only")),
       contextual: summarize(rows.filter(row => row.partition === "contextual")),
       contextualByStratum: split === "validation-v3" ? Object.fromEntries((["direct_fact", "boundary_question", "direct_missing_fact"] as const).map(stratum => [stratum, summarize(contextual.filter(row => row.evaluationStratum === stratum && row.variantId === "known"))])) : null,
       contextualByExpectation: Object.fromEntries((["resolved", "resolved_no_evidence", "clarify"] as const).map(resolution => [resolution,
@@ -357,12 +443,15 @@ export async function runC1ContextCheck(live = false, split: C1Split = "original
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  assert.ok(process.argv.slice(2).every(arg => arg === "--live" || arg === "--schema-only" || /^--split=(original|development|validation-v2|validation-v3)$/.test(arg) || /^--knowledge-support=(binary|typed)$/.test(arg) || /^--threshold=(?:0(?:\.\d+)?|1(?:\.0+)?)$/.test(arg)), "Use --live, --schema-only, --split=original|development|validation-v2|validation-v3, --threshold=0..1, --knowledge-support=binary|typed only");
+  assert.ok(process.argv.slice(2).every(arg => arg === "--live" || arg === "--schema-only" || /^--split=(original|development|validation-v2|validation-v3)$/.test(arg) || /^--knowledge-support=(binary|typed)$/.test(arg) || /^--knowledge-support-model=(configured|deepseek-v4-pro)$/.test(arg) || /^--threshold=(?:0(?:\.\d+)?|1(?:\.0+)?)$/.test(arg)), "Use --live, --schema-only, --split=original|development|validation-v2|validation-v3, --threshold=0..1, --knowledge-support=binary|typed, --knowledge-support-model=configured|deepseek-v4-pro only");
   const split = (process.argv.find(arg => arg.startsWith("--split="))?.slice(8) ?? "original") as C1Split;
   const threshold = Number(process.argv.find(arg => arg.startsWith("--threshold="))?.slice(12) ?? ".71");
   assert.ok(process.argv.filter(arg => arg.startsWith("--threshold=")).length <= 1, "Only one threshold is allowed");
   const knowledgeSupport = (process.argv.find(arg => arg.startsWith("--knowledge-support="))?.slice(20) ?? "binary") as EvidenceSupportProfile;
   assert.ok(process.argv.filter(arg => arg.startsWith("--knowledge-support=")).length <= 1, "Only one knowledge support profile is allowed");
-  if (process.argv.includes("--schema-only")) { const data = await loadC1ContextDataset(split); console.log(JSON.stringify({ split, sha256: data.manifest.dataset.sha256, counts: data.manifest.counts })); }
-  else { const result = await runC1ContextCheck(process.argv.includes("--live"), split, threshold, knowledgeSupport); if (!result.codeStable || result.summary.queryOnly.errors || result.summary.contextual.errors || result.summary.queryOnly.failed || result.summary.contextual.failed) process.exitCode = 1; }
+  const knowledgeSupportModel = (process.argv.find(arg => arg.startsWith("--knowledge-support-model="))?.slice(26) ?? "configured") as EvidenceSupportModel;
+  assert.ok(process.argv.filter(arg => arg.startsWith("--knowledge-support-model=")).length <= 1, "Only one knowledge support model is allowed");
+  resolveEvidenceSupportModel(knowledgeSupportModel);
+  if (process.argv.includes("--schema-only")) { const data = await loadC1ContextDataset(split), adapter = await loadActionAdapter(); console.log(JSON.stringify({ split, sha256: data.manifest.dataset.sha256, counts: data.manifest.counts, adapterSha256: adapter.manifest.dataset.sha256 })); }
+  else { const result = await runC1ContextCheck(process.argv.includes("--live"), split, threshold, knowledgeSupport, knowledgeSupportModel); if (!result.codeStable || result.summary.queryOnly.errors || result.summary.contextual.errors || result.summary.queryOnly.failed || result.summary.contextual.failed) process.exitCode = 1; }
 }

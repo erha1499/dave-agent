@@ -9,7 +9,8 @@ import { QQAgent } from "../src/qq-agent.ts";
 import { confirmRefundReply } from "../src/refund-entry.ts";
 import type { RefundOperation, RefundStore } from "../src/refunds.ts";
 import type { RenderedReply } from "../src/reply.ts";
-import { createSupportSession } from "../src/support-session.ts";
+import { createSupportSession, getSupportResult } from "../src/support-session.ts";
+import { contextSupportActionParameters } from "../src/support-context-action.ts";
 
 // Real Pi + QQAgent + notification dispatcher. Persistence and sends are deterministic spies, not a DB/QQ integration claim.
 const runtime = await createModelRuntime(), faux = fauxProvider();
@@ -37,12 +38,13 @@ function message(id: string, content = "你好", timestamp = new Date().toISOStr
 function observe(context: TranscriptContext, contains?: string) {
   try {
     assert.deepEqual(getCurrentTools(context.messages).map(tool => tool.name), ["support_action"]);
+    assert.deepEqual(JSON.parse(JSON.stringify(getCurrentTools(context.messages)[0]!.parameters)), JSON.parse(JSON.stringify(contextSupportActionParameters)));
     if (contains) assert.ok(JSON.stringify(context.messages).includes(contains));
   } catch (error) { modelErrors.push(error); }
 }
 const hello = (context: TranscriptContext) => {
   observe(context);
-  return fauxAssistantMessage(fauxToolCall("support_action", { action: { kind: "non_business", reason: "greeting" } }), { stopReason: "toolUse" });
+  return fauxAssistantMessage(fauxToolCall("support_action", { action: { protocol: "v2.2", kind: "non_business", reason: "greeting" } }), { stopReason: "toolUse" });
 };
 const finish = (context: TranscriptContext) => { observe(context); return fauxAssistantMessage("工程验证回复"); };
 const refundStore = {
@@ -138,6 +140,7 @@ try {
   card(1, "event");
   assert.ok(sessions[0]!.messages.some(item => item.role === "custom" && item.customType === "merchant-result"));
   assert.deepEqual(sessions[0]!.getActiveToolNames(), ["support_action"]);
+  assert.deepEqual(getSupportResult(sessions[0]!)?.action, { protocol: "v2.2", kind: "non_business", reason: "greeting" });
   console.log("[support-notification] user/event serialization, zero model event and busy-before-claim PASS");
 } finally { release.resolve(); await qq.close(); }
 
@@ -150,7 +153,7 @@ try {
   assert.equal(attempts.at(-1)?.reply.kind, "refund_status");
   faux.setResponses([context => {
     observe(context, operationId);
-    return fauxAssistantMessage(fauxToolCall("support_action", { action: { kind: "clarify", field: "intent", reason: "missing" } }), { stopReason: "toolUse" });
+    return fauxAssistantMessage(fauxToolCall("support_action", { action: { protocol: "v2.2", kind: "clarify", field: "intent", reason: "missing" } }), { stopReason: "toolUse" });
   }, finish]);
   await qq.handle(message("ordinary-consent", "同意"));
   assert.equal(confirms, 1, "a receipt and ordinary consent cannot execute confirmation again");
@@ -198,7 +201,7 @@ try {
   assert.equal(faux.state.callCount, before); assert.equal(focusWrites.length, writes); assert.equal(persistedFocus, "COUPON-2002");
   faux.setResponses([context => {
     observe(context, task.taskId);
-    return fauxAssistantMessage(fauxToolCall("support_action", { action: { kind: "order", orderRef: { kind: "focus" } } }), { stopReason: "toolUse" });
+    return fauxAssistantMessage(fauxToolCall("support_action", { action: { protocol: "v2.2", kind: "order", orderRef: { kind: "focus" } } }), { stopReason: "toolUse" });
   }, finish]);
   await qq.handle(message("focus-after-event", "查一下这张的订单情况"));
   assert.match(attempts.at(-1)!.reply.text, /COUPON-2002/);

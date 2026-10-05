@@ -114,6 +114,8 @@ C1 的 `business-service/search_faq` 保留 `output: documents[]`，附加 `know
 
 `trace.status` 的 `accepted`、`rejected`、`unavailable` 分别表示接收到证据、未接收到证据、服务未完成；拒收本身不能证明案例通过。`stages` 可选，旧记录缺少时显示未采集。`sources` 记录本次实际接受文档的 sourceId 和规范文档 SHA-256，不能以历史话题中的同 ID 版本替代；拒收或不可用时为空。`supportVerification` 仅在真实判别完成时保存输入/请求绑定及 supported/quote/reason，失败或未调用不补造；若随后原文变化，该旧输入判别仍可审计，但最终 sources 为空且状态不可用。工作台按逐次查询展示来源与原文、实际 scope 和 original/effective query；金额事实与退款授权仍分别检查。
 
+`trace.supportModel` 是配置选择（configured / deepseek-v4-pro），`trace.settings.support.provider/model` 才是判别客户端实际配置；没有真实请求时不得用所选项补造模型调用。`trace.supportFailure` 可包含失败枚举 `code` 与 `outputHash`，不包含原始模型文本。类别/引文的成功记录仍在 `supportVerification.value` 数组中。v2.2 `paid_amount_compare` 只读取授权订单和金额引用，正常没有知识 trace，不应显示为检索失败。
+
 知识提供商请求只在相应子 span 填 `usage`，其父 `search_faq` 不重复填，且不加入 Agent 的 `steps`。人民币 `price_estimate` 按适用区域与版本价目估算，美元 `sdk_estimate` 按 Pi 模型目录估算；超时未回传的用量保留 null。旧 `analysis.usage` 继续只代表 Agent 模型步骤，业务总成本比较应使用带知识调用的归因明细，按币种分别报告。
 
 轮次类型优先依据可信入口 span 的 `trigger`：`event` 是商家事件，`confirmation` 是用户精确确认经宿主执行，`user` 是普通用户请求。v2 的事件和确认回执应标为宿主；其他轮不因含 host 服务 span 就改标宿主。这里标的是最终回执生成方：atomic 商家事件仍可能调用模型，但发送的是宿主固定状态卡，模型步骤仍保留展示。旧轮无 spans 时保留原展示。spans 为空表示显式没有归因记录，不等于模型调用必为零；零模型需依据该轮实际 `steps`。无效归因记录应保留原始文本与诊断，不能让页面崩溃或显示为正常执行。

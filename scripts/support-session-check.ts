@@ -8,14 +8,15 @@ import { merchantSourceKey, type AfterSalesStore, type MerchantTask } from "../s
 import type { CouponStore, QQIdentity } from "../src/coupon-store.ts";
 import type { RefundOperation, RefundStore } from "../src/refunds.ts";
 import { markRefundReplyPresented } from "../src/refund-entry.ts";
-import { createSupportSession, getSupportResult, isSupportSession, prepareSupportPrompt, readSupportArchitecture, supportReply,
+import { cancelSupportTurn, createSupportSession, getSupportResult, isSupportSession, prepareSupportPrompt, readSupportArchitecture, supportReply,
   type SupportFocus } from "../src/support-session.ts";
 import type { SupportAction } from "../src/support-action.ts";
+import { contextSupportActionParameters, type ContextOrderRef, type ContextSupportAction } from "../src/support-context-action.ts";
 import type { SupportCall } from "../src/support-controller.ts";
 import { readKnowledgeParameters, resolveSupportParameters, resolveSupportRunParameters, type SupportExperimentParameters } from "../src/support-parameters.ts";
 import { runSupportV2Live } from "./support-v2-live.ts";
 
-const knowledgeDefaults = { knowledgeMode: "lexical", knowledgeSupport: "binary", knowledgeThreshold: .71, knowledgeTimeoutMs: 15_000 };
+const knowledgeDefaults = { knowledgeMode: "lexical", knowledgeSupport: "binary", knowledgeSupportModel: "configured", knowledgeThreshold: .71, knowledgeTimeoutMs: 15_000 };
 assert.deepEqual(resolveSupportParameters(), { timeoutMs: 60_000, repairBudget: 1, merchantEvents: "architecture", ...knowledgeDefaults });
 assert.deepEqual(resolveSupportParameters({ timeoutMs: 10_000, repairBudget: 0, merchantEvents: "host" }),
   { timeoutMs: 10_000, repairBudget: 0, merchantEvents: "host", ...knowledgeDefaults });
@@ -27,7 +28,7 @@ assert.deepEqual(resolveSupportRunParameters("atomic", { merchantEvents: "host",
   { timeoutMs: 60_000, repairBudget: null, merchantEvents: "host", ...knowledgeDefaults });
 assert.deepEqual(readKnowledgeParameters({}), knowledgeDefaults);
 assert.deepEqual(readKnowledgeParameters({ KNOWLEDGE_MODE: "m4-support", KNOWLEDGE_THRESHOLD: "0.8", KNOWLEDGE_TIMEOUT_MS: "12000" }),
-  { knowledgeMode: "m4-support", knowledgeSupport: "binary", knowledgeThreshold: .8, knowledgeTimeoutMs: 12_000 });
+  { knowledgeMode: "m4-support", knowledgeSupport: "binary", knowledgeSupportModel: "configured", knowledgeThreshold: .8, knowledgeTimeoutMs: 12_000 });
 assert.equal(readKnowledgeParameters({ KNOWLEDGE_MODE: "m4-support", KNOWLEDGE_SUPPORT: "typed" }).knowledgeSupport, "typed");
 for (const env of [{ KNOWLEDGE_MODE: "typo" }, { KNOWLEDGE_THRESHOLD: "NaN" }, { KNOWLEDGE_THRESHOLD: "1.01" },
   { KNOWLEDGE_THRESHOLD: "0x1" }, { KNOWLEDGE_TIMEOUT_MS: "0" }, { KNOWLEDGE_TIMEOUT_MS: "1.1" }, { KNOWLEDGE_TIMEOUT_MS: "60001" },
@@ -121,24 +122,41 @@ const focusStore: SupportFocus = {
   async write(value) { focusWrites.push(value); if (failFocus) throw new Error("focus offline"); focus = value; },
 };
 const explicit = (id = orderId) => ({ kind: "explicit" as const, orderId: id });
+type HostReference = { kind?: string; protocol?: string; orderId?: string | null;
+  policyTopic?: { requestId: string; originalQuery: string } | null;
+  itemPaidUnit?: { requestId: string; orderId: string; paidCents: number } | null; alternativeOrderId?: string | null };
+const hostReference = (context: TranscriptContext) => context.messages.flatMap(message => typeof message.content === "string" ? [message.content]
+  : message.content.filter(part => part.type === "text").map(part => part.text))
+  .map(text => { try { return JSON.parse(text) as HostReference; } catch { return {}; } })
+  .filter(value => value.kind === "host_order_reference").at(-1) ?? {};
+const currentAction = (action: SupportAction | ContextSupportAction): ContextSupportAction => "protocol" in action ? action
+  : { ...action, protocol: "v2.2", ...(action.kind === "policy" || action.kind === "refund_eligibility"
+    ? { questionContext: { kind: "standalone" as const } } : {}) } as ContextSupportAction;
+const previous = (question: string, kind: "policy" | "refund_eligibility" = "policy", orderRef: ContextOrderRef = { kind: "focus" }) =>
+  (host: HostReference): ContextSupportAction => ({ protocol: "v2.2", kind, question, orderRef,
+    questionContext: { kind: "previous", requestId: host.policyTopic?.requestId ?? "unavailable-topic" } });
+const comparePaid = (host: HostReference): ContextSupportAction => ({ protocol: "v2.2", kind: "paid_amount_compare",
+  orderRef: { kind: "focus" }, amountRef: { requestId: host.itemPaidUnit?.requestId ?? "unavailable-amount" } });
 function observe(context: TranscriptContext, expectedFocus?: string | null) {
   // Pi converts callback assertions into model errors; save them for independent assertions after each turn.
   try {
     assert.equal(getCurrentSystemPrompt(context.messages), expectedPrompt);
-    assert.deepEqual(getCurrentTools(context.messages).map(tool => tool.name), ["support_action"]);
+    const tools = getCurrentTools(context.messages);
+    assert.deepEqual(tools.map(tool => tool.name), ["support_action"]);
+    assert.deepEqual(JSON.parse(JSON.stringify(tools[0]!.parameters)), JSON.parse(JSON.stringify(contextSupportActionParameters)),
+      "the real session exposes only the strict v2.2 tool schema");
     if (expectedFocus !== undefined) {
-      const reference = context.messages.flatMap(message => typeof message.content === "string" ? [message.content]
-        : message.content.filter(part => part.type === "text").map(part => part.text))
-        .map(text => { try { return JSON.parse(text) as { kind?: string; orderId?: string | null }; } catch { return {}; } })
-        .filter(value => value.kind === "host_order_reference").at(-1);
+      const reference = hostReference(context);
       assert.equal(reference?.orderId, expectedFocus, "before_agent_start must inject the current host reference");
     }
   } catch (error) { modelErrors.push(error); }
 }
-const choose = (action: SupportAction, expectedFocus?: string | null): FauxResponseStep => (context, _options, _state, model) => {
+// Default adaptation is only for legacy fixed faux scripts. Reference tests below
+// explicitly choose new semantic slots using IDs from the actual current host message.
+const choose = (action: SupportAction | ContextSupportAction | ((host: HostReference) => ContextSupportAction), expectedFocus?: string | null): FauxResponseStep => (context, _options, _state, model) => {
   observe(context, expectedFocus);
   try { assert.equal(model.maxTokens, 2048); } catch (error) { modelErrors.push(error); }
-  return fauxAssistantMessage(fauxToolCall("support_action", { action }), { stopReason: "toolUse" });
+  return fauxAssistantMessage(fauxToolCall("support_action", { action: typeof action === "function" ? action(hostReference(context)) : currentAction(action) }), { stopReason: "toolUse" });
 };
 const finish: FauxResponseStep = context => { observe(context); return fauxAssistantMessage("工程验证：按当前证据答复。"); };
 let session = await createSupportSession(identity, store, runtime, faux.getModel(), { store: merchant, sourceKey, refunds }, { groupOpenid: group, focus: focusStore });
@@ -190,7 +208,7 @@ try {
   console.log("[support-session] current-text reference error repairs to focus once; repeated invalid references exhaust budget before services PASS");
 
   const beforePrepare = prepares;
-  const duplicate = { kind: "refund_prepare" as const, orderRef: explicit() };
+  const duplicate = currentAction({ kind: "refund_prepare" as const, orderRef: explicit() });
   const duplicateResults = await run(`请给 ${orderId} 生成退款方案`, [context => {
     observe(context);
     return fauxAssistantMessage([fauxToolCall("support_action", { action: duplicate }), fauxToolCall("support_action", { action: duplicate })], { stopReason: "toolUse" });
@@ -298,9 +316,21 @@ try {
   const repaired = await run(`查询 ${orderId}`, [malformed, choose({ kind: "order", orderRef: explicit() }), finish]);
   assert.deepEqual(repaired.map(result => result.isError), [true, false], "one correction is permitted");
   assert.equal(getSupportResult(session)?.action.kind, "order");
+  const legacyAction = () => fauxAssistantMessage(fauxToolCall("support_action", { action: { kind: "order", orderRef: explicit() } }), { stopReason: "toolUse" });
+  const beforeProtocolRepair = calls.length;
+  const protocolRepair = await run(`查询 ${orderId}`, [legacyAction, choose({ kind: "order", orderRef: explicit() }), finish]);
+  assert.deepEqual(protocolRepair.map(result => result.isError), [true, false]);
+  assert.deepEqual(calls.slice(beforeProtocolRepair), [`order:${orderId}`]);
+  assert.equal((getSupportResult(session)!.action as ContextSupportAction).protocol, "v2.2");
+  const beforeOldProtocol = calls.length, beforeOldModel = faux.state.callCount;
+  const exhaustedProtocol = await run(`查询 ${orderId}`, [legacyAction, legacyAction, choose({ kind: "order", orderRef: explicit() }), finish], 2);
+  assert.ok(exhaustedProtocol.every(result => result.isError)); assert.equal(calls.length, beforeOldProtocol);
+  assert.equal(faux.state.callCount, beforeOldModel + 2); assert.equal(getSupportResult(session), undefined);
+  faux.setResponses([]);
+  console.log("[support-session] missing protocol is rejected by the current tool and consumes bounded repairs without legacy fallback PASS");
   const beforeReasonRepair = prepares, beforeReasonCalls = calls.length;
   const reasonRepair = await run(`请给 ${orderId} 生成退款方案。`, [
-    fauxAssistantMessage(fauxToolCall("support_action", { action: { kind: "refund_prepare", orderRef: explicit(), reason: "行程变化" } }), { stopReason: "toolUse" }),
+    fauxAssistantMessage(fauxToolCall("support_action", { action: { protocol: "v2.2", kind: "refund_prepare", orderRef: explicit(), reason: "行程变化" } }), { stopReason: "toolUse" }),
     choose({ kind: "refund_prepare", orderRef: explicit() }), finish,
   ]);
   assert.deepEqual(reasonRepair.map(result => result.isError), [true, false], "obsolete reason must be rejected, not silently stripped");
@@ -362,34 +392,34 @@ try {
   const calendarQuestion = `${orderId} 的套餐平日可用吗？`;
   await run(calendarQuestion, [choose({ kind: "policy", orderRef: explicit(), question: "模型简化的问题" }), finish]);
   assert.equal(getSupportResult(session)!.verifiedPolicyTopic!.originalQuery, calendarQuestion);
-  await run("周末也这样吗？", [choose({ kind: "policy", orderRef: { kind: "focus" }, question: "周末可用" }), finish]);
+  await run("周末也这样吗？", [choose(previous("周末也这样吗？")), finish]);
   assert.equal(getSupportResult(session)!.outcome, "ready");
   assert.ok(knowledgeInputs.at(-1)!.includes(calendarQuestion.replaceAll(orderId, "该订单")));
   const knowledgeStep = trace.findLast(step => step.name === "search_faq")!;
   assert.equal(knowledgeStep.knowledge!.trace.mode, "m4-support"); assert.equal(knowledgeStep.knowledge!.trace.usage.supportTokens, 40);
   const beforeAmbiguous = knowledgeInputs.length;
-  await run("换成另一张呢？", [choose({ kind: "policy", orderRef: { kind: "focus" }, question: "退款" }, null), finish]);
-  assert.equal(getSupportResult(session)!.outcome, "clarification"); assert.equal(focus, undefined);
-  await run("那这个还能退吗？", [choose({ kind: "refund_eligibility", orderRef: { kind: "focus" }, question: "退款" }, null), finish]);
+  await run("换成另一张呢？", [choose({ kind: "clarify", field: "order", reason: "ambiguous" }, orderId), finish]);
+  assert.equal(getSupportResult(session)!.outcome, "clarification"); assert.equal(focus, orderId, "semantic clarification does not imply the host forgot an authorized order");
+  await run("那刚才的使用规则还能适用吗？", [choose(previous("那刚才的使用规则还能适用吗？"), orderId), finish]);
   assert.equal(getSupportResult(session)!.outcome, "clarification"); assert.equal(knowledgeInputs.length, beforeAmbiguous);
   await run(calendarQuestion, [choose({ kind: "policy", orderRef: explicit(), question: "可用日期" }), finish]);
   session.dispose();
   session = await createSupportSession(identity, store, runtime, faux.getModel(), { store: merchant, sourceKey, refunds },
     { groupOpenid: group, focus: focusStore, knowledge });
-  await run("周末也这样吗？", [choose({ kind: "policy", orderRef: { kind: "focus" }, question: "周末可用" }, orderId), finish]);
+  await run("周末也这样吗？", [choose(previous("周末也这样吗？"), orderId), finish]);
   assert.equal(getSupportResult(session)!.outcome, "clarification", "a restored order focus does not restore a policy topic across sessions");
   await run(calendarQuestion, [choose({ kind: "policy", orderRef: explicit(), question: "可用日期" }), finish]);
   knowledgeUnavailable = true;
-  await run("周末也这样吗？", [choose({ kind: "policy", orderRef: { kind: "focus" }, question: "周末可用" }), finish]);
+  await run("周末也这样吗？", [choose(previous("周末也这样吗？")), finish]);
   assert.equal(getSupportResult(session)!.needsAnswer, false); assert.equal(getSupportResult(session)!.verifiedPolicyTopic, undefined);
   knowledgeUnavailable = false;
   const beforeNoTopic = knowledgeInputs.length;
-  await run("周末也这样吗？", [choose({ kind: "policy", orderRef: { kind: "focus" }, question: "周末可用" }), finish]);
+  await run("周末也这样吗？", [choose(previous("周末也这样吗？")), finish]);
   assert.equal(getSupportResult(session)!.outcome, "clarification"); assert.equal(knowledgeInputs.length, beforeNoTopic);
   await run(calendarQuestion, [choose({ kind: "policy", orderRef: explicit(), question: "可用日期" }), finish]);
   await run("接下来呢？", [fauxAssistantMessage("本轮没有产生业务动作。")]);
   const beforeOmission = knowledgeInputs.length;
-  await run("周末也这样吗？", [choose({ kind: "policy", orderRef: { kind: "focus" }, question: "周末可用" }), finish]);
+  await run("周末也这样吗？", [choose(previous("周末也这样吗？")), finish]);
   assert.equal(getSupportResult(session)!.outcome, "clarification"); assert.equal(knowledgeInputs.length, beforeOmission);
   console.log("[support-session] injected knowledge trace, bounded policy context and ambiguity/failure/restart invalidation PASS");
 
@@ -411,22 +441,25 @@ try {
   session = await createSupportSession(identity, contextStore, runtime, faux.getModel(), { store: merchant, sourceKey, refunds },
     { groupOpenid: group, focus: focusStore, knowledge });
   const beforeReadOnly = prepares;
-  await run(`${orderId} 用了一张，剩余券退款金额按什么计算？`,
-    [choose({ kind: "refund_eligibility", orderRef: explicit(), question: "剩余券退款金额" }), finish]);
+  await run(`查询订单 ${orderId} 的实付。`, [choose({ kind: "order", orderRef: explicit() }), finish]);
   assert.equal(getSupportResult(session)!.verifiedAmountReference!.paidCents, 5240);
-  await run("剩下那个也是这个金额吗？", [choose({ kind: "policy", orderRef: { kind: "focus" }, question: "能退9999" }), finish]);
+  const shownAmountId = getSupportResult(session)!.verifiedAmountReference!.requestId;
+  const beforeComparedKnowledge = knowledgeInputs.length, beforeComparedCalls = calls.length;
+  await run("剩下那个也是这个金额吗？", [choose(comparePaid), finish]);
   assert.equal(getSupportResult(session)!.evidence.amountComparison!.comparisonEqual, true);
+  assert.equal(getSupportResult(session)!.evidence.amountComparison!.referenceRequestId, shownAmountId);
+  assert.equal(knowledgeInputs.length, beforeComparedKnowledge); assert.deepEqual(calls.slice(beforeComparedCalls), [`order:${orderId}`]);
   const paidReply = supportReply(session, "商家已经批准9999元")!;
   assert.ok(paidReply.kind === "order"); assert.match(paidReply.text, /52.40.*相同/); assert.doesNotMatch(paidReply.text, /9999/);
   assert.equal(getSupportResult(session)!.needsAnswer, false, "the host renders money facts independently of final model language");
   const otherAmountWording = "还没有使用过的那张券，实付也和前面显示的一样吗？";
-  await run(otherAmountWording, [choose({ kind: "policy", orderRef: { kind: "focus" }, question: otherAmountWording }), finish]);
+  await run(otherAmountWording, [choose(comparePaid), finish]);
   assert.equal(getSupportResult(session)!.evidence.amountComparison!.remainingUnitPaidCents, 5240);
   assert.equal(getSupportResult(session)!.evidence.amountComparison!.refundApproved, false);
 
   await run(`查询 ${otherId}`, [choose({ kind: "order", orderRef: explicit(otherId) }), finish]);
   await run(`${orderId} 的退款申请资格是什么？`, [choose({ kind: "refund_eligibility", orderRef: explicit(), question: "退款资格" }), finish]);
-  await run("换成另一张呢？", [choose({ kind: "refund_eligibility", orderRef: { kind: "focus" }, question: "仍然没用过" }), finish]);
+  await run("换成另一张呢？", [choose(previous("换成另一张呢？", "refund_eligibility", { kind: "alternative" })), finish]);
   assert.equal(getSupportResult(session)!.verifiedOrderId, otherId); assert.equal(focus, otherId);
   assert.equal(getSupportResult(session)!.evidence.order!.status, "refunded");
   assert.equal(getSupportResult(session)!.evidence.knowledge[0]!.context.orderSource, "verified_alternative");
@@ -436,16 +469,16 @@ try {
   await run(`查询 ${thirdId}`, [choose({ kind: "order", orderRef: explicit(thirdId) }), finish]);
   await run(`${orderId} 的退款申请资格是什么？`, [choose({ kind: "refund_eligibility", orderRef: explicit(), question: "退款资格" }), finish]);
   const beforeMany = calls.length;
-  await run("换成另一张呢？", [choose({ kind: "refund_eligibility", orderRef: { kind: "focus" }, question: "退款资格" }, null), finish]);
+  await run("换成另一张呢？", [choose(previous("换成另一张呢？", "refund_eligibility", { kind: "alternative" }), orderId), finish]);
   assert.equal(getSupportResult(session)!.outcome, "clarification"); assert.equal(calls.length, beforeMany);
   await run(`查询 ${orderId}`, [choose({ kind: "order", orderRef: explicit() }), finish]);
   session.dispose();
   session = await createSupportSession(identity, contextStore, runtime, faux.getModel(), { store: merchant, sourceKey, refunds },
     { groupOpenid: group, focus: focusStore, knowledge });
   const beforeLostReference = calls.length;
-  await run("剩下那个也是这个金额吗？", [choose({ kind: "policy", orderRef: { kind: "focus" }, question: "金额" }, null), finish]);
+  await run("剩下那个也是这个金额吗？", [choose(comparePaid, orderId), finish]);
   assert.equal(getSupportResult(session)!.outcome, "clarification"); assert.equal(calls.length, beforeLostReference);
-  await run(otherAmountWording, [choose({ kind: "policy", orderRef: { kind: "focus" }, question: otherAmountWording }), finish]);
+  await run(otherAmountWording, [choose(comparePaid), finish]);
   assert.equal(getSupportResult(session)!.outcome, "clarification"); assert.equal(calls.length, beforeLostReference,
     "alternative amount wording cannot retrieve generic rules when its trusted reference was lost");
   console.log("[support-session] actual-turn paid references and alternative orders, fixed money reply and missing/multiple/restart guards PASS");
@@ -511,3 +544,82 @@ try {
 } finally {
   session.dispose();
 }
+
+{
+  // Actual Pi tool callback with deterministic business delays; no remote model.
+  const seenCalls: SupportCall[] = [], writes: Array<string | undefined> = [];
+  let mode: "normal" | "cancel-read" | "cancel-write" | "late-failure" = "normal", persisted: string | undefined;
+  let rejectOld: ((error: Error) => void) | undefined;
+  let raceSession: Awaited<ReturnType<typeof createSupportSession>>;
+  const raceStore = { getOrder: async (_identity: QQIdentity, id: string) => {
+    if (mode === "cancel-read") { cancelSupportTurn(raceSession); void raceSession.abort(); }
+    if (mode === "late-failure" && id === orderId) return new Promise<ReturnType<typeof makeOrder>>((_resolve, reject) => { rejectOld = reject; });
+    return makeOrder(id);
+  }, searchKnowledge: async () => [] } as unknown as CouponStore;
+  raceSession = await createSupportSession(identity, raceStore, runtime, faux.getModel(), undefined, {
+    groupOpenid: group, focus: { read: async () => persisted, write: async id => {
+      if (id && mode === "cancel-write") { cancelSupportTurn(raceSession); void raceSession.abort(); }
+      // This commit already started; cancellation cannot claim to undo it.
+      writes.push(id); persisted = id;
+    } },
+  });
+  const raceModelErrors: unknown[] = [];
+  raceSession.subscribe(event => {
+    if (event.type === "message_end" && event.message.role === "assistant" && event.message.stopReason === "error") raceModelErrors.push(event.message.errorMessage);
+  });
+  const select = (id: string): FauxResponseStep => () => fauxAssistantMessage(fauxToolCall("support_action", {
+    action: { protocol: "v2.2", kind: "order", orderRef: { kind: "explicit", orderId: id } },
+  }), { stopReason: "toolUse" });
+  const prompt = async (requestId: string, text: string, responses: FauxResponseStep[]) => {
+    prepareSupportPrompt(raceSession, { requestId, groupOpenid: group, messageId: requestId, onCall: call => seenCalls.push(call) });
+    const before = raceModelErrors.length;
+    faux.setResponses(responses); await raceSession.prompt(text, { expandPromptTemplates: false });
+    const errors = raceModelErrors.slice(before);
+    if (mode === "cancel-read" || mode === "cancel-write") assert.ok(errors.every(error => error === "This operation was aborted"));
+    else assert.deepEqual(errors, []);
+  };
+  try {
+    mode = "cancel-read";
+    await prompt("cancel-read", `查询 ${orderId}`, [select(orderId)]);
+    assert.equal(getSupportResult(raceSession), undefined); assert.equal(supportReply(raceSession)?.kind, "notice");
+    assert.ok(!writes.includes(orderId), "canceled read must never start a focus write");
+    assert.equal(seenCalls.at(-1)!.name, "get_order"); assert.equal(seenCalls.at(-1)!.isError, false);
+    mode = "normal";
+    await prompt("after-cancel", `查询 ${otherId}`, [context => {
+      const host = hostReference(context); assert.equal(host?.orderId, null); assert.equal(host?.itemPaidUnit, null);
+      assert.equal(host?.policyTopic, null); assert.equal(host?.alternativeOrderId, null);
+      return fauxAssistantMessage(fauxToolCall("support_action", { action: { protocol: "v2.2", kind: "order", orderRef: { kind: "explicit", orderId: otherId } } }), { stopReason: "toolUse" });
+    }, () => fauxAssistantMessage("查询完成。")]);
+    assert.equal(getSupportResult(raceSession)?.verifiedOrderId, otherId);
+    const completed = getSupportResult(raceSession);
+    cancelSupportTurn(raceSession);
+    assert.equal(getSupportResult(raceSession), completed, "cancellation preserves a host receipt published before cancellation");
+
+    mode = "cancel-write";
+    await prompt("cancel-write", `查询 ${orderId}`, [select(orderId)]);
+    assert.equal(persisted, orderId, "a write started before cancellation may already have committed");
+    assert.equal(getSupportResult(raceSession), undefined); assert.equal(supportReply(raceSession)?.kind, "notice");
+    mode = "normal";
+    await prompt("after-write-cancel", "你好", [context => {
+      const host = hostReference(context); assert.equal(host?.itemPaidUnit, null); assert.equal(host?.policyTopic, null);
+      return fauxAssistantMessage(fauxToolCall("support_action", { action: { protocol: "v2.2", kind: "non_business", reason: "greeting" } }), { stopReason: "toolUse" });
+    }, () => fauxAssistantMessage("你好。")]);
+
+    // Keep an old actual tool invocation pending while a new Pi turn succeeds.
+    await prompt("old-pending", `查询 ${orderId}`, [() => fauxAssistantMessage("待处理。")]);
+    mode = "late-failure";
+    const tool = raceSession.agent.state.tools.find(tool => tool.name === "support_action")!;
+    const old = tool.execute("old-tool", { action: { protocol: "v2.2", kind: "order", orderRef: { kind: "explicit", orderId } } }, new AbortController().signal).catch(error => error);
+    assert.ok(rejectOld);
+    await prompt("new-success", `查询 ${otherId}`, [select(otherId), () => fauxAssistantMessage("完成。")]);
+    const latest = getSupportResult(raceSession)!; assert.equal(latest.verifiedAmountReference?.requestId, "new-success");
+    rejectOld(new Error("old read failed after the next turn")); await old;
+    assert.equal(getSupportResult(raceSession), latest, "old failure must not replace the new result");
+    mode = "normal";
+    await prompt("check-new-reference", "你好", [context => {
+      assert.equal(hostReference(context)?.itemPaidUnit?.requestId, "new-success", "old failure must not clear the new amount reference");
+      return fauxAssistantMessage(fauxToolCall("support_action", { action: { protocol: "v2.2", kind: "non_business", reason: "greeting" } }), { stopReason: "toolUse" });
+    }, () => fauxAssistantMessage("你好。")]);
+  } finally { raceSession.dispose(); }
+}
+console.log("[support-session] canceled reads/writes suppress cards and new references; late old failure preserves the new turn PASS");

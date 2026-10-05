@@ -4,17 +4,18 @@ export type SupportExperimentParameters = {
   merchantEvents: "architecture" | "host" | "model";
   knowledgeMode: "lexical" | "m4-support";
   knowledgeSupport: "binary" | "typed";
+  knowledgeSupportModel: "configured" | "deepseek-v4-pro";
   knowledgeThreshold: number;
   knowledgeTimeoutMs: number;
 };
 
 export function resolveSupportParameters(input: Partial<SupportExperimentParameters> = {}): SupportExperimentParameters {
   if (!input || typeof input !== "object" || Array.isArray(input)
-    || Object.keys(input).some(key => !["timeoutMs", "repairBudget", "merchantEvents", "knowledgeMode", "knowledgeSupport", "knowledgeThreshold", "knowledgeTimeoutMs"].includes(key))) {
-    throw new Error("业务实验参数仅支持 timeoutMs、repairBudget、merchantEvents、knowledgeMode、knowledgeSupport、knowledgeThreshold、knowledgeTimeoutMs。");
+    || Object.keys(input).some(key => !["timeoutMs", "repairBudget", "merchantEvents", "knowledgeMode", "knowledgeSupport", "knowledgeSupportModel", "knowledgeThreshold", "knowledgeTimeoutMs"].includes(key))) {
+    throw new Error("业务实验参数仅支持 timeoutMs、repairBudget、merchantEvents、knowledgeMode、knowledgeSupport、knowledgeSupportModel、knowledgeThreshold、knowledgeTimeoutMs。");
   }
   const parameters = { timeoutMs: 60_000, repairBudget: 1, merchantEvents: "architecture" as const,
-    knowledgeMode: "lexical" as const, knowledgeSupport: "binary" as const, knowledgeThreshold: .71, knowledgeTimeoutMs: 15_000, ...input };
+    knowledgeMode: "lexical" as const, knowledgeSupport: "binary" as const, knowledgeSupportModel: "configured" as const, knowledgeThreshold: .71, knowledgeTimeoutMs: 15_000, ...input };
   if (!Number.isInteger(parameters.timeoutMs) || parameters.timeoutMs < 10_000 || parameters.timeoutMs > 120_000) {
     throw new Error("timeoutMs 必须为 10000..120000 的整数。");
   }
@@ -27,6 +28,8 @@ export function resolveSupportParameters(input: Partial<SupportExperimentParamet
   if (!["lexical", "m4-support"].includes(parameters.knowledgeMode)) throw new Error("knowledgeMode 仅支持 lexical 或 m4-support。");
   if (!["binary", "typed"].includes(parameters.knowledgeSupport)) throw new Error("knowledgeSupport 仅支持 binary 或 typed。");
   if (parameters.knowledgeMode === "lexical" && parameters.knowledgeSupport !== "binary") throw new Error("knowledgeSupport typed 仅适用于 m4-support。");
+  if (!["configured", "deepseek-v4-pro"].includes(parameters.knowledgeSupportModel)) throw new Error("knowledgeSupportModel 仅支持 configured 或 deepseek-v4-pro。");
+  if (parameters.knowledgeMode === "lexical" && parameters.knowledgeSupportModel !== "configured") throw new Error("knowledgeSupportModel deepseek-v4-pro 仅适用于 m4-support。");
   if (!Number.isFinite(parameters.knowledgeThreshold) || parameters.knowledgeThreshold < 0 || parameters.knowledgeThreshold > 1) {
     throw new Error("knowledgeThreshold 必须为 0..1 的数值。");
   }
@@ -48,14 +51,15 @@ export function resolveSupportRunParameters(architecture: "atomic" | "controller
     repairBudget: architecture === "controller" ? parameters.repairBudget : null };
 }
 
-export function readKnowledgeParameters(env: NodeJS.ProcessEnv = process.env): Pick<SupportExperimentParameters, "knowledgeMode" | "knowledgeSupport" | "knowledgeThreshold" | "knowledgeTimeoutMs"> {
+export function readKnowledgeParameters(env: NodeJS.ProcessEnv = process.env): Pick<SupportExperimentParameters, "knowledgeMode" | "knowledgeSupport" | "knowledgeSupportModel" | "knowledgeThreshold" | "knowledgeTimeoutMs"> {
   const threshold = env.KNOWLEDGE_THRESHOLD?.trim(), timeout = env.KNOWLEDGE_TIMEOUT_MS?.trim();
   if (threshold && !/^(?:\d+(?:\.\d+)?|\.\d+)$/.test(threshold)) throw new Error("KNOWLEDGE_THRESHOLD 应为 0..1 的数值。");
   if (timeout && !/^\d+$/.test(timeout)) throw new Error("KNOWLEDGE_TIMEOUT_MS 应为 1000..60000 的整数。");
-  const { knowledgeMode, knowledgeSupport, knowledgeThreshold, knowledgeTimeoutMs } = resolveSupportParameters({
+  const { knowledgeMode, knowledgeSupport, knowledgeSupportModel, knowledgeThreshold, knowledgeTimeoutMs } = resolveSupportParameters({
     knowledgeMode: (env.KNOWLEDGE_MODE?.trim() || "lexical") as SupportExperimentParameters["knowledgeMode"],
     knowledgeSupport: (env.KNOWLEDGE_SUPPORT?.trim() || "binary") as SupportExperimentParameters["knowledgeSupport"],
+    knowledgeSupportModel: (env.KNOWLEDGE_SUPPORT_MODEL?.trim() || "configured") as SupportExperimentParameters["knowledgeSupportModel"],
     knowledgeThreshold: threshold ? Number(threshold) : .71, knowledgeTimeoutMs: timeout ? Number(timeout) : 15_000,
   });
-  return { knowledgeMode, knowledgeSupport, knowledgeThreshold, knowledgeTimeoutMs };
+  return { knowledgeMode, knowledgeSupport, knowledgeSupportModel, knowledgeThreshold, knowledgeTimeoutMs };
 }

@@ -1,0 +1,187 @@
+{
+  "version": 2,
+  "suiteId": "c1-support-development-pairs-v2",
+  "stage": "development-not-validation",
+  "provenance": "公开开发回归：原6问逐字保留，新增2组知识是否记载与具体业务事实成对问题，依据已曝光的文档覆盖误拒设计。不是盲测或新固定验证；未读取或创建v4。",
+  "measurement": "Direct support classification only; same actual document within each pair. No rerank, context resolver, order read, model action selection or final-answer evaluation. One real typed support request per query, ten planned rows including errors. Original six retain exact category/support scoring. New coverage positives accept only boundary_answer or direct_fact as declared before execution; all instance negatives reject as limitation_only.",
+  "cases": [
+    {
+      "id": "c1-pair-001",
+      "pair": "rule-condition",
+      "corpus": "online",
+      "sourceId": "KB-REFUND-EXPIRED",
+      "query": "已过期但未核销的团购券，申请退款之前需要谁确认？",
+      "scope": {
+        "shopId": null,
+        "productId": null
+      },
+      "expected": {
+        "category": "direct_fact",
+        "supported": true,
+        "evidenceQuote": "已过期但未核销的券需要商家确认能否退款、延期以及金额",
+        "reason": "询问政策本身规定的确认主体；原文已给出商家确认这个前提，不要求实例审批结果。"
+      }
+    },
+    {
+      "id": "c1-pair-002",
+      "pair": "rule-condition",
+      "corpus": "online",
+      "sourceId": "KB-REFUND-EXPIRED",
+      "query": "我这笔已过期但未核销的团购券，商家现在已经批准退款了吗？",
+      "scope": {
+        "shopId": null,
+        "productId": null
+      },
+      "expected": {
+        "category": "limitation_only",
+        "supported": false,
+        "evidenceQuote": "已过期但未核销的券需要商家确认能否退款、延期以及金额",
+        "reason": "询问本单是否已经批准；政策前提没有提供实例商家结果。"
+      }
+    },
+    {
+      "id": "c1-pair-003",
+      "pair": "refund-route",
+      "corpus": "reference",
+      "sourceId": "RF001",
+      "query": "未核销且在有效期内的团购券退款，款项按规则退到哪个账户？",
+      "scope": {
+        "shopId": null,
+        "productId": null
+      },
+      "expected": {
+        "category": "direct_fact",
+        "supported": true,
+        "evidenceQuote": "退款将原路退回至原支付账户",
+        "reason": "询问政策规定的退款资金路径，不询问某笔到账事件。"
+      }
+    },
+    {
+      "id": "c1-pair-004",
+      "pair": "refund-route",
+      "corpus": "reference",
+      "sourceId": "RF001",
+      "query": "我这笔未核销团购券的退款，现在已经到账到我的原支付账户了吗？",
+      "scope": {
+        "shopId": null,
+        "productId": null
+      },
+      "expected": {
+        "category": "limitation_only",
+        "supported": false,
+        "evidenceQuote": "退款将原路退回至原支付账户,一般1-3个工作日到账,具体到账时间以支付渠道为准",
+        "reason": "询问本单是否已到账；通用路径和一般时效不证明实际事件已经发生。"
+      }
+    },
+    {
+      "id": "c1-pair-005",
+      "pair": "expiry-source",
+      "corpus": "online",
+      "sourceId": "KB-PRODUCT-LUNCH",
+      "query": "仅凭双人午餐团购券这个名称，就能推断出这张券的具体截止日期吗？",
+      "scope": {
+        "shopId": "shop-demo-1",
+        "productId": "product-demo-1"
+      },
+      "expected": {
+        "category": "boundary_answer",
+        "supported": true,
+        "evidenceQuote": "每张券具体截止时间以订单返回的 expiresAt 为准",
+        "reason": "明确问从名称推断日期是否有依据；原文指定订单 expiresAt 是具体截止时间的依据。"
+      }
+    },
+    {
+      "id": "c1-pair-006",
+      "pair": "expiry-source",
+      "corpus": "online",
+      "sourceId": "KB-PRODUCT-LUNCH",
+      "query": "我这张双人午餐团购券的具体到期日是2026年几月几日？",
+      "scope": {
+        "shopId": "shop-demo-1",
+        "productId": "product-demo-1"
+      },
+      "expected": {
+        "category": "limitation_only",
+        "supported": false,
+        "evidenceQuote": "每张券具体截止时间以订单返回的 expiresAt 为准",
+        "reason": "直接索要本单实际日期；原文只有查询位置，没有 expiresAt 实例值。"
+      }
+    },
+    {
+      "id": "c1-pair-007",
+      "pair": "allergen-document-coverage",
+      "corpus": "online",
+      "sourceId": "KB-PRODUCT-LUNCH",
+      "query": "知识库有没有列出双人午餐套餐的过敏原信息？",
+      "scope": {
+        "shopId": "shop-demo-1",
+        "productId": "product-demo-1"
+      },
+      "expected": {
+        "category": "boundary_answer",
+        "acceptableCategories": [
+          "boundary_answer",
+          "direct_fact"
+        ],
+        "supported": true,
+        "evidenceQuote": "菜品明细、过敏原和特殊节假日可用性未录入。",
+        "reason": "询问文档是否记载；明确未录入足以回答文档覆盖为否，不推断实际过敏原。"
+      }
+    },
+    {
+      "id": "c1-pair-008",
+      "pair": "allergen-document-coverage",
+      "corpus": "online",
+      "sourceId": "KB-PRODUCT-LUNCH",
+      "query": "双人午餐套餐具体含有哪些过敏原？请列出来。",
+      "scope": {
+        "shopId": "shop-demo-1",
+        "productId": "product-demo-1"
+      },
+      "expected": {
+        "category": "limitation_only",
+        "supported": false,
+        "evidenceQuote": "菜品明细、过敏原和特殊节假日可用性未录入。",
+        "reason": "索要具体业务属性；未录入不能提供实际过敏原清单。"
+      }
+    },
+    {
+      "id": "c1-pair-009",
+      "pair": "use-rules-document-coverage",
+      "corpus": "online",
+      "sourceId": "KB-SHOP-DEMO-1",
+      "query": "知识库是否已经写清这家店私享套餐的使用限制？",
+      "scope": {
+        "shopId": "shop-demo-1",
+        "productId": null
+      },
+      "expected": {
+        "category": "boundary_answer",
+        "acceptableCategories": [
+          "boundary_answer",
+          "direct_fact"
+        ],
+        "supported": true,
+        "evidenceQuote": "法定节假日、特殊活动和私享套餐使用限制没有录入",
+        "reason": "只问文档覆盖范围；原文直接说明没有录入，可以回答未记载。"
+      }
+    },
+    {
+      "id": "c1-pair-010",
+      "pair": "use-rules-document-coverage",
+      "corpus": "online",
+      "sourceId": "KB-SHOP-DEMO-1",
+      "query": "这家店的私享套餐，普通周六可以到店使用吗？",
+      "scope": {
+        "shopId": "shop-demo-1",
+        "productId": null
+      },
+      "expected": {
+        "category": "limitation_only",
+        "supported": false,
+        "evidenceQuote": "法定节假日、特殊活动和私享套餐使用限制没有录入",
+        "reason": "询问实际使用资格；常规套餐的周末规则和私享限制未录入都不能提供本类可用性事实。"
+      }
+    }
+  ]
+}

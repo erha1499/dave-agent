@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "createdDate": "2026-10-06",
+  "stage": "development-exposed-dialogues",
+  "dataset": {
+    "path": "data/c1-session-development.json",
+    "sha256": "5e07eafb9261bd3a486e476916f771932f6b402a3e3696c89f87e3767f222925",
+    "bytes": 5500
+  },
+  "counts": {
+    "cases": 10,
+    "turns": 20
+  },
+  "baseFiles": {
+    "data/acceptance-validation.json": "0ead08f6c37cf43be8d84b47557692e3ac2cc264fe37994f2f030cddf7d50592",
+    "data/acceptance-online.json": "5f97b7f4e77cd1695a38ef9b0c42e53f52f40f7ae869a39fcdcdae5ae8971b72",
+    "data/reference/kefu-harness/source.json": "42c6791ca2edfabcb98d9c49c2cd063c81e7705c29e94a6c1858357000c1d5cf",
+    "data/reference/kefu-harness/data/knowledge/docs.jsonl": "d3cd80ba76fdc82e57c1eefdc66a20987f09bc9b3dd0fbd1287c709146217fae",
+    "data/support-v2-validation.json": "7860c21fb98efd4fcbb8158e9dcc9629aad113dc688d280027c14790e6b84969",
+    "db/02-seed.sql": "82c7143840ac30d166207dcf92c227b3368b98af899412a4f669f04bfb976560",
+    "data/c1-context-validation.json": "cc6a457731d8abc2d147e569cb766796a3064b65beb1016861aa1d24589a2271",
+    "data/c1-context-validation-source.json": "807e7028cefba939ba8e977aecf6734f13450c905a8fc162af85259886de2d5f",
+    "data/c1-context-development.json": "e25a9198ae9aa5b1461e8cb4454415f4d8bbe08f6586e4bcf4d9d893fedd9913",
+    "data/c1-context-development-source.json": "08966a17f9ba9dc98bb41185fd420bd476b8f32e317c1d0311b1b1bd66ece1f4",
+    "data/c1-context-validation-v2.json": "9a1516165b5ef1d27cef844858802978c86553dc68b254d8af8807e205683166",
+    "data/c1-context-validation-v2-source.json": "d7bbbfe8769341c478c8ed7c8e69db9ae47f927ecd47739b5ce9589079e14f95",
+    "data/c1-context-validation-v3.json": "31e2bc995367ab5e56bc37f5a48c704bd7259a5d40217b07e4dca4fe7dd5623e",
+    "data/c1-context-validation-v3-source.json": "d91100a5de2fa701cd5243112d74282f5d8b197ca06027bc3d0ce73deecd8689"
+  },
+  "scope": {
+    "actualModelActions": true,
+    "suppliedActions": false,
+    "blindValidation": false,
+    "persistentDatabase": false,
+    "qqSending": false,
+    "fixtureAnchor": "2026-10-05T00:00:00.000Z"
+  },
+  "review": "Dialogues cover already exposed C1 abilities. Checker expectations are never supplied to the model. Each case has an isolated in-memory order store and one corpus. Prior turns must produce real host references; no fixture-injected topics or model actions. Paid amount comparison is a fresh DB fact with zero knowledge calls, not an approved refund or limit. SDK automatic retries remain observable inside the shared HTTP cap."
+}

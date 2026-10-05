@@ -1,0 +1,212 @@
+{
+  "version": 1,
+  "protocol": "v2.2",
+  "role": "supplied-action-development-adapter-not-language-evaluation",
+  "originalDatasets": {
+    "data/c1-context-validation.json": "cc6a457731d8abc2d147e569cb766796a3064b65beb1016861aa1d24589a2271",
+    "data/c1-context-development.json": "e25a9198ae9aa5b1461e8cb4454415f4d8bbe08f6586e4bcf4d9d893fedd9913",
+    "data/c1-context-validation-v2.json": "9a1516165b5ef1d27cef844858802978c86553dc68b254d8af8807e205683166",
+    "data/c1-context-validation-v3.json": "31e2bc995367ab5e56bc37f5a48c704bd7259a5d40217b07e4dca4fe7dd5623e"
+  },
+  "policy": {
+    "prior": "Execute every declared prior independent of the tested resolver. No current explicit ID means an actual previously read focus is required. Multiple successful topics remain ambiguous; never select one silently.",
+    "actions": "These actions are explicit test oracles. The model did not select intent, reference, product mention or clarification. Missing/stale previous and amount IDs are adversarial host probes.",
+    "paid": "Business contract changed: paid_amount_compare performs fresh DB amount comparison with zero knowledge calls/rules. Original PARTIAL gold stays unchanged and original retrieval contract remains not met, not relabeled passed.",
+    "unsupported": "dev-002 asks a refund application limit. Supplied clarify documents the unsupported capability; it never grants a refund limit and does not pass the original resolved-facts expectation.",
+    "scoring": "Fresh authorization requires matching successful get_order call and evidence.order. Frozen effectiveQueryMustInclude is retained as a lexical diagnostic only, not semantic correctness. Original artifacts and report are immutable."
+  },
+  "cases": {
+    "a1-val-055": {
+      "kind": "refund_eligibility",
+      "orderRef": "focus",
+      "questionContext": "standalone",
+      "contract": "knowledge"
+    },
+    "a1-val-056": {
+      "kind": "paid_amount_compare",
+      "orderRef": "focus",
+      "questionContext": null,
+      "contract": "paid_facts_only"
+    },
+    "a1-val-057": {
+      "kind": "refund_eligibility",
+      "orderRef": "alternative",
+      "questionContext": "previous",
+      "contract": "knowledge"
+    },
+    "a1-val-058": {
+      "kind": "policy",
+      "orderRef": "focus",
+      "questionContext": "previous",
+      "contract": "knowledge"
+    },
+    "a1-val-059": {
+      "kind": "policy",
+      "orderRef": null,
+      "questionContext": "previous",
+      "contract": "knowledge"
+    },
+    "a1-val-060": {
+      "kind": "policy",
+      "orderRef": null,
+      "questionContext": "previous",
+      "contract": "knowledge"
+    },
+    "c1-dev-001": {
+      "kind": "refund_eligibility",
+      "orderRef": "focus",
+      "questionContext": "standalone",
+      "contract": "knowledge"
+    },
+    "c1-dev-002": {
+      "kind": "clarify",
+      "orderRef": "focus",
+      "questionContext": null,
+      "contract": "unsupported_refund_limit"
+    },
+    "c1-dev-003": {
+      "kind": "refund_eligibility",
+      "orderRef": "alternative",
+      "questionContext": "previous",
+      "contract": "knowledge"
+    },
+    "c1-dev-004": {
+      "kind": "policy",
+      "orderRef": "focus",
+      "questionContext": "standalone",
+      "contract": "knowledge",
+      "productMention": "私享"
+    },
+    "c1-dev-005": {
+      "kind": "policy",
+      "orderRef": "focus",
+      "questionContext": "previous",
+      "contract": "knowledge"
+    },
+    "c1-dev-006": {
+      "kind": "policy",
+      "orderRef": null,
+      "questionContext": "previous",
+      "contract": "knowledge"
+    },
+    "c1-dev-007": {
+      "kind": "policy",
+      "orderRef": null,
+      "questionContext": "previous",
+      "contract": "knowledge"
+    },
+    "c1-fresh-001": {
+      "kind": "refund_eligibility",
+      "orderRef": "focus",
+      "questionContext": "standalone",
+      "contract": "knowledge"
+    },
+    "c1-fresh-002": {
+      "kind": "paid_amount_compare",
+      "orderRef": "focus",
+      "questionContext": null,
+      "contract": "paid_facts_only"
+    },
+    "c1-fresh-003": {
+      "kind": "refund_eligibility",
+      "orderRef": "alternative",
+      "questionContext": "previous",
+      "contract": "knowledge"
+    },
+    "c1-fresh-004": {
+      "kind": "policy",
+      "orderRef": "focus",
+      "questionContext": "standalone",
+      "contract": "knowledge",
+      "productMention": "私享"
+    },
+    "c1-fresh-005": {
+      "kind": "policy",
+      "orderRef": null,
+      "questionContext": "previous",
+      "contract": "knowledge"
+    },
+    "c1-fresh-006": {
+      "kind": "policy",
+      "orderRef": null,
+      "questionContext": "previous",
+      "contract": "knowledge"
+    },
+    "c1-fresh-v3-001": {
+      "kind": "refund_eligibility",
+      "orderRef": "focus",
+      "questionContext": "standalone",
+      "contract": "knowledge"
+    },
+    "c1-fresh-v3-002": {
+      "kind": "paid_amount_compare",
+      "orderRef": "focus",
+      "questionContext": null,
+      "contract": "paid_facts_only"
+    },
+    "c1-fresh-v3-003": {
+      "kind": "refund_eligibility",
+      "orderRef": "alternative",
+      "questionContext": "previous",
+      "contract": "knowledge"
+    },
+    "c1-fresh-v3-004": {
+      "kind": "policy",
+      "orderRef": "focus",
+      "questionContext": "previous",
+      "contract": "knowledge"
+    },
+    "c1-fresh-v3-005": {
+      "kind": "policy",
+      "orderRef": null,
+      "questionContext": "previous",
+      "contract": "knowledge"
+    },
+    "c1-fresh-v3-006": {
+      "kind": "policy",
+      "orderRef": null,
+      "questionContext": "previous",
+      "contract": "knowledge"
+    },
+    "c1-fresh-v3-007": {
+      "kind": "policy",
+      "orderRef": "focus",
+      "questionContext": "standalone",
+      "contract": "knowledge",
+      "productMention": "私享"
+    },
+    "c1-fresh-v3-008": {
+      "kind": "policy",
+      "orderRef": "focus",
+      "questionContext": "standalone",
+      "contract": "knowledge",
+      "productMention": "午餐"
+    },
+    "c1-fresh-v3-009": {
+      "kind": "policy",
+      "orderRef": "focus",
+      "questionContext": "standalone",
+      "contract": "knowledge",
+      "productMention": "私享"
+    },
+    "c1-fresh-v3-010": {
+      "kind": "policy",
+      "orderRef": "focus",
+      "questionContext": "standalone",
+      "contract": "knowledge",
+      "productMention": "双人午餐"
+    },
+    "c1-fresh-v3-011": {
+      "kind": "policy",
+      "orderRef": null,
+      "questionContext": "previous",
+      "contract": "knowledge"
+    },
+    "c1-fresh-v3-012": {
+      "kind": "policy",
+      "orderRef": null,
+      "questionContext": "previous",
+      "contract": "knowledge"
+    }
+  }
+}

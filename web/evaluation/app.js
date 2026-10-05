@@ -32,6 +32,8 @@ const v2CaseNames = {
 const displayCaseName = (id, fallback) => v2CaseNames[id] || fallback || id;
 const actorNames = { agent: "Agent", host: "宿主" };
 const triggerNames = { user: "普通用户", event: "商家事件", confirmation: "用户确认" };
+// v2.2 只读实付比较是纯 DB 事实计算：只补中文标签，无知识检索也不算缺数据或检索失败。
+const actionNames = { paid_amount_compare: "只读实付比较" };
 const ANSWER_NOTE = "回答效果：本轮不评测";
 const number = value => value === null || value === undefined ? "未采集" : new Intl.NumberFormat("zh-CN").format(value);
 const duration = value => value === null || value === undefined ? "未采集" : `${(value / 1000).toFixed(2)} s`;
@@ -553,6 +555,10 @@ function knowledgeNode(span) {
   const promptVersion = trace.settings?.support?.promptVersion;
   const profileLabel = rawProfile === "typed" ? "typed 分类判别"
     : rawProfile === "binary" || promptVersion === "fact-support-v1" ? "binary 二元判断" : "未知";
+  // 实际执行模型以 settings.support.provider/model 为准（trace.supportModel 只是配置选择）；缺记录不猜。
+  const supportProvider = trace.settings?.support?.provider;
+  const supportModelName = trace.settings?.support?.model;
+  const modelSegment = supportProvider || supportModelName ? ` · ${[supportProvider, supportModelName].filter(Boolean).join("/")}` : "";
   const usage = trace.usage && typeof trace.usage === "object" ? trace.usage : {};
   const stages = Array.isArray(trace.stages) ? trace.stages.filter(stage => stage && typeof stage === "object") : [];
   return node("div", { class: "knowledge-call" },
@@ -580,7 +586,7 @@ function knowledgeNode(span) {
         ? node("ul", { class: "check-list" }, ...rejected.map(item => node("li", {},
           text("span", `${item.id ?? "—"} · ${knowledgeRejectReasons[item.reason] || item.reason || "未记录"}`))))
         : null,
-      rawProfile || promptVersion ? text("p", `判别配置：${profileLabel}${promptVersion ? ` · prompt ${promptVersion}` : ""}`, "knowledge-line") : null,
+      rawProfile || promptVersion ? text("p", `判别配置：${profileLabel}${modelSegment}${promptVersion ? ` · prompt ${promptVersion}` : ""}`, "knowledge-line") : null,
       verificationInvalid ? text("p", "判别明细记录异常，无法解析。", "knowledge-line") : null,
       verdicts.length
         ? node("details", { class: "trace" },
@@ -609,7 +615,7 @@ function spanNode(span) {
   return node("details", { class: "step span" },
     node("summary", { class: "step-top" },
       text("span", actorNames[span.actor] || span.actor, "step-index"),
-      text("span", `${span.component} · ${span.name}`, "step-name"),
+      text("span", `${span.component} · ${actionNames[span.name] ? `${span.name}（${actionNames[span.name]}）` : span.name}`, "step-name"),
       outcome,
       text("span", duration(span.durationMs), "step-timing")),
     span.input !== undefined ? node("div", {}, text("p", "输入", "step-label"), json(span.input)) : null,

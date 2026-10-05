@@ -33,3 +33,7 @@ await import("./retrieval-v2-check.ts");
 const { checkSupportLiveDataset } = await import("./support-v2-live.ts");
 await checkSupportLiveDataset();
 console.log("v2 live 题集干检查通过；未开启 --live，不连接数据库或调用付费模型。");
+const { checkC1SessionRunner } = await import("./c1-session-live.ts");
+await checkC1SessionRunner();
+const { loadC1SupportDevelopment } = await import("./c1-support-check.ts");
+await loadC1SupportDevelopment("expanded");

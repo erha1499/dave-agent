@@ -733,7 +733,7 @@ for (const outcome of ["success", "detail-failure", "analysis-failure"]) {
       sourceHashes: { before: "b1", after: "b1" }, durationMs: 1240, calls: [],
       usage: { rerankTokens: 1200, supportTokens: 800, estimatedCny: 0.0006, estimatedUsd: 0.00008, incompleteCalls: 0 },
       pricing: { estimated: true },
-      settings: { support: { promptVersion: "fact-support-typed-v2", profile: "typed" }, serialization: "json-title-tags-body-v1" },
+      settings: { support: { promptVersion: "fact-support-typed-v2", profile: "typed", provider: "deepseek", model: "deepseek-v4-pro" }, serialization: "json-title-tags-body-v1" },
       // 结构取自真实 run 990dac49 首个 case 的知识 trace（脱敏）：对象容器 {value, requestHash, inputHash, attempts}。
       supportVerification: {
         requestHash: "2e0a54caa785947f", inputHash: "9f1c2d",
@@ -788,7 +788,7 @@ for (const outcome of ["success", "detail-failure", "analysis-failure"]) {
         rejected: [], diagnostics: { topScore: 0.88, scoreGap: null, candidates: [] } },
       sources: [{ sourceId: "KB-NEW-RULE", version: "c".repeat(64) }],
       sourceHashes: { before: "b1", after: "b1" }, durationMs: 900, calls: [],
-      settings: { support: { promptVersion: "fact-support-v2-typed", profile: "typed" } },
+      settings: { support: { promptVersion: "fact-support-v2-typed", profile: "typed", provider: "deepseek", model: "deepseek-flash" } },
       usage: { rerankTokens: 900, supportTokens: 600, estimatedCny: 0.0004, estimatedUsd: 0.00006, incompleteCalls: 0 },
       stages: [{ name: "read", observedAt: T, durationMs: 3 }],
     },
@@ -839,6 +839,8 @@ for (const outcome of ["success", "detail-failure", "analysis-failure"]) {
               usage: { provider: "pi", model: "k-test", kind: "llm", inputTokens: 700, outputTokens: 100, totalTokens: 800, cost: { currency: "USD", amount: 0.00008, source: "sdk_estimate" } } },
             { id: "p3", parentSpanId: "k-span-1", actor: "host", trigger: "user", component: "knowledge-support", name: "support", observedAt: T, durationMs: 100, outcome: "error",
               usage: { provider: "pi", model: "k-test", kind: "llm", inputTokens: null, outputTokens: null, totalTokens: null, cost: null } },
+            { id: "p4", parentSpanId: "t1", actor: "host", trigger: "user", component: "business-service", name: "paid_amount_compare", observedAt: T, durationMs: 3, outcome: "ok",
+              input: { orderRef: "current", amountRef: { requestId: "r9" } }, output: { paidCents: 7980, compareToCents: 7980, equal: true } },
           ] }),
         turn({ index: 2, question: "退款规则", reply: "稍候", steps: [{ index: 1, type: "model", name: "k-test", durationMs: 500, usage: null }],
           spans: [
@@ -880,8 +882,9 @@ for (const outcome of ["success", "detail-failure", "analysis-failure"]) {
   assert.match(html, /引用：需联系商家核实/, "实际 quote 可见");
   assert.match(html, /KB-PENDING · 二元判断 · 未知/, "未完成不记为不支持");
   assert.match(html, /KB-OLD-DOC · 二元判断 · 支持/, "binary 旧记录不反推类别");
-  assert.match(html, /判别配置：typed 分类判别 · prompt fact-support-typed-v2/, "trace 显示实际 prompt 版本");
-  assert.match(html, /prompt fact-support-v2-typed/, "旧 typed 版本保留显示");
+  assert.match(html, /判别配置：typed 分类判别 · deepseek\/deepseek-v4-pro · prompt fact-support-typed-v2/, "实际 provider/model 与 prompt 版本");
+  assert.match(html, /deepseek\/deepseek-flash/, "另一调用实际模型分列");
+  assert.match(html, /paid_amount_compare（只读实付比较）/, "v2.2 只读实付比较中文标签");
   assert.match(html, /判别配置：binary 二元判断 · prompt fact-support-v1/, "fact-support-v1 识别为 binary");
   assert.match(html, /宿主仅接受事实或规则与明确安全边界问题的回答/, "接受口径说明");
   assert.match(html, /判别明细记录异常，无法解析/, "顶层数组等非合同容器明确诊断，不默默兼容");

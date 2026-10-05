@@ -3,7 +3,8 @@ import type { AssistantMessage } from "@earendil-works/pi-ai";
 import { acceptEvidence, resolveEvidenceAcceptance } from "../src/evidence-acceptance.ts";
 import { applyEvidenceSupport, createEvidenceSupportClient, EvidenceSupportError, evidenceSupportInputHash, validateEvidenceSupport,
   validateEvidenceSupportVerification, verifyEvidenceSupport, evidenceSupportPrompt, evidenceSupportTypedPromptVersion,
-  evidenceSupportTypedV1Prompt, evidenceSupportTypedV1PromptHash, evidenceSupportTypedV1PromptVersion, type EvidenceSupportDecision } from "../src/evidence-support.ts";
+  evidenceSupportTypedV1Prompt, evidenceSupportTypedV1PromptHash, evidenceSupportTypedV1PromptVersion,
+  evidenceSupportTypedV2Prompt, evidenceSupportTypedV2PromptHash, evidenceSupportTypedV2PromptVersion, resolveEvidenceSupportModel, type EvidenceSupportDecision } from "../src/evidence-support.ts";
 import { contentHash } from "../src/bailian.ts";
 
 const documents = [
@@ -55,6 +56,9 @@ assert.equal(client.settings.profile, undefined);
 assert.equal(evidenceSupportTypedV1PromptVersion, "fact-support-v2-typed");
 assert.equal(contentHash(evidenceSupportTypedV1Prompt), evidenceSupportTypedV1PromptHash);
 assert.equal(evidenceSupportTypedV1PromptHash, "4223604540af3298649bb546fb14354e1bb779cf2d23626bd368448f6fd9c9dd");
+assert.equal(evidenceSupportTypedV2PromptVersion, "fact-support-typed-v2");
+assert.equal(contentHash(evidenceSupportTypedV2Prompt), evidenceSupportTypedV2PromptHash);
+assert.equal(evidenceSupportTypedV2PromptHash, "cd375d082eb2b5fb9b780377cad922df5d3b79dffe7568df823a06c1b3b344a3");
 const explicitBinary = await createEvidenceSupportClient({ profile: "binary", timeoutMs: 1000, runtime: { model, complete: async () => message({ decisions }) } });
 assert.deepEqual(explicitBinary.settings, client.settings, "explicit binary retains the default v1 settings shape");
 assert.equal(calls, 1); assert.equal(checked.attempts.length, 1); assert.equal(checked.attempts[0]!.outcome, "ok");
@@ -105,12 +109,12 @@ const unreported = await createEvidenceSupportClient({ runtime: { model, complet
 assert.equal((await verifyEvidenceSupport({ query, scope, candidates, client: unreported })).attempts[0]!.costUsd, null);
 const failed = await createEvidenceSupportClient({ runtime: { model, complete: async () => { throw new Error("secret-key-should-not-escape"); } } });
 await assert.rejects(verifyEvidenceSupport({ query, scope, candidates, client: failed }), error => error instanceof EvidenceSupportError
-  && error.attempts[0]!.outcome === "provider_error" && !error.message.includes("secret"));
+  && error.attempts[0]!.outcome === "provider_error" && error.code === "provider_error" && error.outputHash === null && !error.message.includes("secret"));
 let timeoutCalls = 0;
 const timeout = await createEvidenceSupportClient({ timeoutMs: 1000, runtime: { model, complete: async (_context, options) => {
   timeoutCalls++; return new Promise((_resolve, reject) => options.signal.addEventListener("abort", () => reject(new Error("abort"))));
 } } });
-await assert.rejects(verifyEvidenceSupport({ query, scope, candidates, client: timeout }), error => error instanceof EvidenceSupportError && error.attempts[0]!.outcome === "timeout");
+await assert.rejects(verifyEvidenceSupport({ query, scope, candidates, client: timeout }), error => error instanceof EvidenceSupportError && error.attempts[0]!.outcome === "timeout" && error.code === "timeout" && error.outputHash === null);
 assert.equal(timeoutCalls, 1);
 await assert.rejects(verifyEvidenceSupport({ query, scope: { shopId: "other" }, candidates, client }), /不可见/); assert.equal(calls, 1);
 const empty = await verifyEvidenceSupport({ query, scope, candidates: [], client }); assert.equal(empty.attempts.length, 0); assert.equal(calls, 1);
@@ -127,7 +131,7 @@ const typed = await createEvidenceSupportClient({ profile: "typed", timeoutMs: 1
   return message({ decisions: typedRows });
 } } });
 assert.equal(typed.settings.profile, "typed"); assert.equal(typed.settings.promptVersion, evidenceSupportTypedPromptVersion);
-assert.equal(typed.settings.promptVersion, "fact-support-typed-v2"); assert.notEqual(typed.settings.promptHash, evidenceSupportTypedV1PromptHash);
+assert.equal(typed.settings.promptVersion, "fact-support-typed-v3"); assert.notEqual(typed.settings.promptHash, evidenceSupportTypedV2PromptHash);
 const typedChecked = await verifyEvidenceSupport({ query, scope, candidates, client: typed });
 assert.equal(typedCalls, 1); assert.notEqual(typedChecked.requestHash, checked.requestHash);
 assert.deepEqual(typedChecked.value.map(row => [row.category, row.supported]), [["limitation_only", false], ["unrelated", false]]);
@@ -161,3 +165,57 @@ for (const invalidRows of [[], [
 }
 await assert.rejects(createEvidenceSupportClient({ profile: "unknown" as "typed", runtime: { model, complete: async () => message({ decisions }) } }));
 console.log("Evidence support checks passed: pending is not accepted, one tool-free JSON request, exact complete decisions, input-bound cache, safe failure/timeout, usage, and post-call source scope recheck; no external calls.");
+
+// Model selection changes only support; foreign-provider credentials are rejected before runtime creation.
+assert.deepEqual(resolveEvidenceSupportModel("configured", {}), { provider: "deepseek", model: "deepseek-flash" });
+const configuredEnv = { MODEL_PROVIDER: "deepseek", MODEL_ID: "deepseek-flash", MODEL_API_KEY: "fake-never-sent" };
+assert.deepEqual(resolveEvidenceSupportModel("deepseek-v4-pro", configuredEnv), { provider: "deepseek", model: "deepseek-v4-pro" });
+assert.equal(configuredEnv.MODEL_ID, "deepseek-flash");
+assert.throws(() => resolveEvidenceSupportModel("deepseek-v4-pro", { MODEL_PROVIDER: "openai" }), /MODEL_PROVIDER/);
+await assert.rejects(createEvidenceSupportClient({ modelSelection: "deepseek-v4-pro", env: { MODEL_PROVIDER: "openai", MODEL_API_KEY: "fake-wrong-provider" } }), /MODEL_PROVIDER/);
+await assert.rejects(createEvidenceSupportClient({ modelSelection: "deepseek-v4-pro", env: {}, runtime: { model, complete: async () => { throw Error("must not run"); } } }), /模型不一致/);
+const selectedDefault = await createEvidenceSupportClient({ modelSelection: "configured", timeoutMs: 1000, env: { MODEL_PROVIDER: "deepseek", MODEL_ID: model.id }, runtime: { model, complete: async () => message({ decisions }) } });
+assert.deepEqual(selectedDefault.settings, client.settings, "configured selection preserves the A1 settings and prompt bytes");
+
+// Failure diagnostics are bounded and do not relax any existing acceptance rule.
+const validTyped = [{ id: "A", category: "direct_fact", quote: documents[0]!.body, reason: "已有事实" },
+  { id: "B", category: "unrelated", quote: null, reason: "无关" }];
+const diagnosticCases: Array<{ code: string; profile?: "binary" | "typed"; raw?: string; value?: unknown; stopReason?: AssistantMessage["stopReason"]; nonText?: boolean }> = [
+  { code: "invalid_json", raw: "{broken-json" },
+  { code: "invalid_shape", value: { decisions, extra: "must-not-leak" } },
+  { code: "invalid_id", value: { decisions: [decisions[0]] } },
+  { code: "invalid_id", value: { decisions: [decisions[0], decisions[0]] } },
+  { code: "invalid_id", value: { decisions: [{ ...decisions[0], id: "foreign" }, decisions[1]] } },
+  { code: "invalid_quote", value: { decisions: [{ ...decisions[0], supported: true, quote: "made-up-text" }, decisions[1]] } },
+  { code: "invalid_reason", value: { decisions: [{ ...decisions[0], reason: "x".repeat(121) }, decisions[1]] } },
+  { code: "invalid_reason", value: { decisions: [{ ...decisions[0], reason: " " }, decisions[1]] } },
+  { code: "invalid_supported", value: { decisions: [{ ...decisions[0], supported: "yes" }, decisions[1]] } },
+  { code: "invalid_category", profile: "typed", value: { decisions: [{ ...validTyped[0], category: "unknown" }, validTyped[1]] } },
+  { code: "invalid_shape", profile: "typed", value: { decisions: [{ ...validTyped[0], supported: true }, validTyped[1]] } },
+  { code: "invalid_quote", profile: "typed", value: { decisions: [{ ...validTyped[0], quote: "not-in-source" }, validTyped[1]] } },
+  { code: "response_limit", raw: "x".repeat(20_001) },
+  { code: "unfinished_response", value: { decisions }, stopReason: "length" },
+  { code: "unexpected_content", value: { decisions }, nonText: true },
+];
+for (const test of diagnosticCases) {
+  let requests = 0, observed = 0;
+  const raw = test.raw ?? JSON.stringify(test.value);
+  const diagnostic = await createEvidenceSupportClient({ profile: test.profile, observeResponseForTest: response => {
+    observed++; assert.equal(response.text, raw.slice(0, 20_000)); assert.equal(response.outputHash, contentHash(raw));
+    assert.equal(response.truncated, raw.length > 20_000);
+    assert.deepEqual(Object.keys(response).sort(), ["outputHash", "stopReason", "text", "truncated"]);
+  }, runtime: { model, complete: async () => {
+    requests++; const response = message(test.value); response.content = [{ type: "text", text: raw }];
+    if (test.nonText) response.content.push({ type: "thinking", thinking: "hidden-test-reasoning" });
+    response.stopReason = test.stopReason ?? "stop"; return response;
+  } } });
+  await assert.rejects(diagnostic.verify(query, candidates), error => {
+    assert.ok(error instanceof EvidenceSupportError); assert.equal(error.code, test.code); assert.equal(error.outputHash, contentHash(raw));
+    assert.equal(error.attempts.length, 1); assert.ok(!JSON.stringify(error).includes(raw), "failure has no raw response"); return true;
+  });
+  assert.equal(requests, 1); assert.equal(observed, 1);
+}
+let observerRequests = 0;
+const throwingObserver = await createEvidenceSupportClient({ observeResponseForTest: () => { throw Error("observer-only-failure"); },
+  runtime: { model, complete: async () => { observerRequests++; return message({ decisions }); } } });
+assert.deepEqual((await throwingObserver.verify(query, candidates)).value, decisions); assert.equal(observerRequests, 1);

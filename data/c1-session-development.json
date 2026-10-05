@@ -1,0 +1,78 @@
+{
+  "version": 1,
+  "suiteId": "c1-session-development-v2.2",
+  "stage": "development-exposed-dialogues",
+  "provenance": "All ten dialogues exercise already exposed C1 abilities. This is a development run with a real model choosing actions, not a new or blind validation. Expectations are checker-only and never enter model context.",
+  "cases": [
+    {
+      "id": "session-refunded-followup", "corpus": "online",
+      "turns": [
+        { "question": "查询订单 COUPON-1004 的当前状态。", "expect": { "kind": "order", "orderId": "COUPON-1004", "orderRef": "explicit", "knowledge": "none" } },
+        { "question": "这张已经退款成功的券，还可以重新申请一次退款吗？", "expect": { "kind": "refund_eligibility", "orderId": "COUPON-1004", "orderRef": "focus", "questionContext": "standalone", "knowledge": "evidence", "relevant": ["KB-REFUND-PAYMENT"] } }
+      ]
+    },
+    {
+      "id": "session-paid-comparison", "corpus": "online",
+      "turns": [
+        { "question": "查询订单 COUPON-1005 的实付情况。", "expect": { "kind": "order", "orderId": "COUPON-1005", "orderRef": "explicit", "knowledge": "none", "displayedPaidCents": 5990 } },
+        { "question": "余下那份的实付价，和之前展示的每券金额相等吗？", "expect": { "kind": "paid_amount_compare", "orderId": "COUPON-1005", "orderRef": "focus", "knowledge": "none", "comparisonPaidCents": 5990 } }
+      ]
+    },
+    {
+      "id": "session-alternative-order", "corpus": "online",
+      "turns": [
+        { "question": "查询订单 COUPON-1001 的当前状态。", "expect": { "kind": "order", "orderId": "COUPON-1001", "orderRef": "explicit", "knowledge": "none" } },
+        { "question": "再查询订单 COUPON-1004 的当前状态。", "expect": { "kind": "order", "orderId": "COUPON-1004", "orderRef": "explicit", "knowledge": "none" } },
+        { "question": "换查另一笔订单，它现在符合哪些退款申请条件？", "expect": { "kind": "refund_eligibility", "orderId": "COUPON-1001", "orderRef": "alternative", "questionContext": "standalone", "knowledge": "evidence", "relevant": ["KB-REFUND-UNUSED"], "forbiddenQueryPhrases": ["已经退款成功", "已退款重复退款", "COUPON-1004"] } }
+      ]
+    },
+    {
+      "id": "session-weekend-topic", "corpus": "online",
+      "turns": [
+        { "question": "订单 COUPON-1001 对应的常规午餐套餐，普通周末能用吗？", "expect": { "kind": "policy", "orderId": "COUPON-1001", "orderRef": "explicit", "questionContext": "standalone", "knowledge": "evidence", "relevant": ["KB-SHOP-DEMO-1"], "produceTopic": true } },
+        { "question": "这张券星期天也按刚才的规则使用吗？", "expect": { "kind": "policy", "orderId": "COUPON-1001", "orderRef": "focus", "questionContext": "previous", "knowledge": "evidence", "relevant": ["KB-SHOP-DEMO-1"] } }
+      ]
+    },
+    {
+      "id": "session-credit-card-topic", "corpus": "reference",
+      "turns": [
+        { "question": "信用卡退款通常需要3至7个工作日到账吗？", "expect": { "kind": "policy", "orderId": null, "questionContext": "standalone", "knowledge": "evidence", "relevant": ["RF005"], "produceTopic": true } },
+        { "question": "超过这个时间还没到账，应该先做什么？", "expect": { "kind": "policy", "orderId": null, "questionContext": "previous", "knowledge": "evidence", "relevant": ["RF005"] } }
+      ]
+    },
+    {
+      "id": "session-appointment-topic", "corpus": "reference",
+      "turns": [
+        { "question": "距离预约还有10小时，改期需要商家同意吗？", "expect": { "kind": "policy", "orderId": null, "questionContext": "standalone", "knowledge": "evidence", "relevant": ["RS003"], "produceTopic": true } },
+        { "question": "这个变更如果没有他的同意，能直接办吗？", "expect": { "kind": "policy", "orderId": null, "questionContext": "previous", "knowledge": "evidence", "relevant": ["RS003"] } }
+      ]
+    },
+    {
+      "id": "session-missing-topic", "corpus": "reference",
+      "turns": [
+        { "question": "超过这个时间还没到账，应该先做什么？", "expect": { "kind": "clarify", "orderId": null, "knowledge": "none" } }
+      ]
+    },
+    {
+      "id": "session-missing-amount", "corpus": "online",
+      "turns": [
+        { "question": "余下那份的实付价，和之前展示的每券金额相等吗？", "expect": { "kind": "clarify", "orderId": null, "knowledge": "none" } }
+      ]
+    },
+    {
+      "id": "session-ambiguous-alternative", "corpus": "online",
+      "turns": [
+        { "question": "查询订单 COUPON-1001。", "expect": { "kind": "order", "orderId": "COUPON-1001", "orderRef": "explicit", "knowledge": "none" } },
+        { "question": "查询订单 COUPON-1004。", "expect": { "kind": "order", "orderId": "COUPON-1004", "orderRef": "explicit", "knowledge": "none" } },
+        { "question": "查询订单 COUPON-1005。", "expect": { "kind": "order", "orderId": "COUPON-1005", "orderRef": "explicit", "knowledge": "none" } },
+        { "question": "换查另一笔订单，它是否可以申请退款？", "expect": { "kind": "clarify", "orderId": null, "knowledge": "none" } }
+      ]
+    },
+    {
+      "id": "session-missing-decision-maker", "corpus": "reference",
+      "turns": [
+        { "question": "这个变更如果没有他的同意，能直接办吗？", "expect": { "kind": "clarify", "orderId": null, "knowledge": "none" } }
+      ]
+    }
+  ]
+}

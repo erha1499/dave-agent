@@ -34,6 +34,7 @@
 | --- | --- | --- |
 | `knowledgeMode` | `lexical` / `m4-support`，默认 `lexical` | Controller 查询知识时采用词项排名或重排加支持性判别；atomic + m4-support 在启动前拒绝。 |
 | `knowledgeSupport` | `binary` / `typed`，默认 `binary` | binary 保持 A1 的二元判断；typed 区分事实/规则、明确边界问题、仅信息缺失和无关证据。typed 仅适用于 Controller + m4-support，非法组合启动前拒绝。实际 Prompt 版本写入 trace，类别不代表已获业务授权。 |
+| `knowledgeSupportModel` | `configured` / `deepseek-v4-pro`，默认 `configured` | 仅 Controller + m4-support 可固定支持判别模型；configured 跟随业务模型配置，固定 Pro 要求 DeepSeek provider。业务 Agent 的模型不因此改变；实际执行模型以 `trace.settings.support` 为准。 |
 | `knowledgeThreshold` | 0–1，默认 0.71 | 仅 m4-support 的相关性预筛；分数不是概率。变更后属于新实验配置。 |
 | `knowledgeTimeoutMs` | 1000–60000，默认 15000 毫秒 | Controller 单次知识查询的总等待上限，含读取、重排、支持判别与来源复检；零自动重试。 |
 
@@ -46,9 +47,9 @@ node --env-file-if-exists=.env scripts/experiment.ts --preset support-knowledge-
 
 `support-knowledge-profile-ab` 在相同 Controller / m4-support / 0.71 下只对照 binary 与 typed，适合分离判别方案本身的收益。可以通过工作台调整阈值并下载完整 JSON；不应一边改阈值、一边改判别方案后把全部收益归给单一组件。预设是对照入口，不表示其中的值已经是最终推荐。已曝光开发题上的选择与新固定验证分别见 [C1 上下文结果](./c1-context-results.md)，端到端业务证据见 [C1 业务结果](./c1-business-results.md)。
 
-CLI / QQ 分别读取 `KNOWLEDGE_MODE`、`KNOWLEDGE_SUPPORT`、`KNOWLEDGE_THRESHOLD`、`KNOWLEDGE_TIMEOUT_MS`；未配置仍为 lexical / binary。环境变量只在进程启动时读取，实验表单不会修改运行中的 QQ。
+`support-knowledge-model-ab` 固定 Controller / m4-support / typed / 0.5，仅比较 configured 与 Pro。只有环境中的 configured 实际为 Flash 时，才构成 Flash/Pro 对照；界面允许预览、修改、下载和运行，非法组合可在原控件修复而不暗改参数。该预设不代表当前候选已准入。开发对照与费用见 [支持模型结果](./c1-support-model-results.md)。
 
-CLI/QQ 正式入口分别读取 `KNOWLEDGE_MODE`、`KNOWLEDGE_THRESHOLD`、`KNOWLEDGE_TIMEOUT_MS`，Controller 通过 `SUPPORT_ARCHITECTURE=controller` 显式选择。实验表单只控制本次评测，不修改环境文件或正在运行的 QQ。确认、身份与金额边界不受上述开关影响。
+CLI / QQ 读取 `KNOWLEDGE_MODE`、`KNOWLEDGE_SUPPORT`、`KNOWLEDGE_SUPPORT_MODEL`、`KNOWLEDGE_THRESHOLD`、`KNOWLEDGE_TIMEOUT_MS`；未配置仍为 lexical / binary / configured。Controller 通过 `SUPPORT_ARCHITECTURE=controller` 显式选择。环境变量只在进程启动时读取；实验表单只控制本次评测，不修改环境文件或运行中的 QQ。确认、身份与金额边界不受上述开关影响。
 
 ### A1 配置 version 2
 

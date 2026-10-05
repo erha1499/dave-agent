@@ -76,7 +76,8 @@ const counts = (planned: number, passed: number, failed: number, skipped: number
   ({ planned, passed, failed, skipped, missing, passRate: planned ? passed / planned : null });
 const supportParams = (over: Record<string, unknown> = {}): any => ({
   timeoutMs: 60000, repairBudget: 1, merchantEvents: "architecture",
-  knowledgeMode: "lexical", knowledgeThreshold: 0.71, knowledgeTimeoutMs: 15000, knowledgeSupport: "binary", ...over,
+  knowledgeMode: "lexical", knowledgeSupport: "binary", knowledgeSupportModel: "configured",
+  knowledgeThreshold: 0.71, knowledgeTimeoutMs: 15000, ...over,
 });
 const retrievalParams = (over: Record<string, unknown> = {}): any => ({
   candidateTopK: 20, bm25K1: 1.2, bm25B: 0.75, rrfK: 60, rrfWindow: 20, cache: "reuse",
@@ -95,6 +96,9 @@ const catalog = (): any => ({
     { id: "support-knowledge-profile-ab", name: "Controller 事实支持判别 A/B", config: { version: 1, kind: "support", label: "Controller 事实支持判别 A/B", repeat: 1, allowRemote: false, variants: [
       { id: "A", architecture: "controller", parameters: supportParams({ knowledgeMode: "m4-support", knowledgeSupport: "binary" }) },
       { id: "B", architecture: "controller", parameters: supportParams({ knowledgeMode: "m4-support", knowledgeSupport: "typed" }) }] } },
+    { id: "support-knowledge-model-ab", name: "事实支持模型 A/B", config: { version: 1, kind: "support", label: "事实支持模型 A/B", repeat: 1, allowRemote: false, variants: [
+      { id: "A", architecture: "controller", parameters: supportParams({ knowledgeMode: "m4-support", knowledgeSupport: "typed", knowledgeSupportModel: "configured", knowledgeThreshold: 0.5 }) },
+      { id: "B", architecture: "controller", parameters: supportParams({ knowledgeMode: "m4-support", knowledgeSupport: "typed", knowledgeSupportModel: "deepseek-v4-pro", knowledgeThreshold: 0.5 }) }] } },
     { id: "retrieval-local", name: "本地检索 M0 / M1", config: { version: 1, kind: "retrieval", label: "本地检索 M0 / M1", repeat: 1, allowRemote: false, variants: [
       { id: "A", modes: ["M0", "M1"], parameters: retrievalParams() } ] } },
     { id: "retrieval-rerank", name: "词项 / 全候选重排", config: { version: 1, kind: "retrieval", label: "词项 / 全候选重排", repeat: 1, allowRemote: false, variants: [
@@ -116,7 +120,9 @@ const catalog = (): any => ({
         { value: "lexical", label: "本地词项" }, { value: "m4-support", label: "全候选重排 + 事实支持" }], note: "m4-support 仅 Controller；额外调用百炼和支持性模型" },
       { key: "knowledgeThreshold", label: "知识接收阈值", type: "number", min: 0, max: 1, step: 0.01, note: "仅 m4-support；默认冻结值 0.71，分数不是概率" },
       { key: "knowledgeSupport", label: "事实支持判别", type: "select", options: [
-        { value: "binary", label: "二元判断" }, { value: "typed", label: "分类判别（事实/边界/限制/无关）" }], note: "仅 Controller + m4-support 生效" },
+        { value: "binary", label: "二元基线 v1" }, { value: "typed", label: "分类候选 v3" }], note: "typed 仅用于 m4-support" },
+      { key: "knowledgeSupportModel", label: "支持判别模型", type: "select", options: [
+        { value: "configured", label: "跟随已配置模型" }, { value: "deepseek-v4-pro", label: "DeepSeek V4 Pro" }], note: "仅 Controller + m4-support；Pro 只切换支持判别" },
       { key: "knowledgeTimeoutMs", label: "单次知识查询超时（ms）", type: "number", min: 1000, max: 60000, step: 1000, note: "包含读取、重排、支持判别和来源复检；无自动重试" },
     ],
     retrieval: [
@@ -984,4 +990,99 @@ const openExperiments = async (booted: Awaited<ReturnType<typeof boot>>, jobs: u
   assert.equal(byField("knowledgeSupport", "A").value, "binary", "旧配置缺省显示二元判断");
   assert.equal(byField("knowledgeSupport", "A").disabled, true, "词项旧配置判别类型不适用但配置保留");
   console.log("PASS 实验调试：knowledgeSupport 适用性联动、组合保留配置、提交体新参数、旧缺省 binary 兼容。");
+}
+
+// knowledgeSupportModel 固定 Pro：仅 Controller + m4-support 合法，非法组合禁提交不暗改、可改回 configured，旧缺省 configured。
+{
+  const booted = await boot();
+  const { element, find, flush, pendingCount } = booted;
+  await openExperiments(booted);
+  const root = element("experiments");
+  const byField = (field: string, variant: string) => findAllAttr(root, "data-field", field).find(item => item.attrs.get("data-variant") === variant)!;
+  const preset = findAttr(root, "data-field", "preset")!;
+  preset.value = "support-knowledge-model-ab";
+  preset.fire("change");
+  await flush();
+  assert.equal(byField("knowledgeSupportModel", "A").value, "configured");
+  assert.equal(byField("knowledgeSupportModel", "B").value, "deepseek-v4-pro");
+  assert.equal(byField("knowledgeSupportModel", "A").disabled, false, "Controller + m4-support 判别模型生效");
+  assert.equal(byField("knowledgeThreshold", "A").value, "0.5", "预设阈值回填");
+  assert.match(content(root), /knowledgeSupportModel configured → deepseek-v4-pro/, "差异含判别模型");
+  // A 先把判别类型归 binary 以隔离 Pro 规则，再改 Pro（合法）→ 切 lexical（非法）：原因可见、禁提交、控件仍可改回、参数不暗改。
+  const profileA0 = byField("knowledgeSupport", "A");
+  profileA0.value = "binary";
+  profileA0.fire("change");
+  await flush();
+  const modelA = byField("knowledgeSupportModel", "A");
+  modelA.value = "deepseek-v4-pro";
+  modelA.fire("change");
+  await flush();
+  const modeA = byField("knowledgeMode", "A");
+  modeA.value = "lexical";
+  modeA.fire("change");
+  await flush();
+  assert.match(content(root), /固定 Pro 判别模型需 Controller \+ m4-support 知识检索；请改回 configured 或调整组合/, "非法组合明确原因");
+  assert.equal(findClass(root, "primary-button")!.disabled, true, "lexical+Pro 禁提交");
+  assert.equal(byField("knowledgeSupportModel", "A").disabled, false, "非法值保留可操作以修正");
+  assert.equal(byField("knowledgeSupportModel", "A").value, "deepseek-v4-pro", "不暗改参数");
+  const modelFix = byField("knowledgeSupportModel", "A");
+  modelFix.value = "configured";
+  modelFix.fire("change");
+  await flush();
+  assert.ok(!content(root).includes("固定 Pro 判别模型需"), "改回 configured 后错误消失");
+  assert.equal(byField("knowledgeSupportModel", "A").disabled, true, "合法 lexical+configured 显示不适用");
+  // 再置 Pro：atomic + Pro 同样命中同一非法规则。
+  const modelA2 = byField("knowledgeSupportModel", "A");
+  modelA2.value = "deepseek-v4-pro";
+  modelA2.fire("change");
+  await flush();
+  const archA = byField("architecture", "A");
+  archA.value = "atomic";
+  archA.fire("change");
+  await flush();
+  assert.match(content(root), /固定 Pro 判别模型需/, "atomic+Pro 同样禁提交");
+  assert.equal(byField("knowledgeSupportModel", "A").value, "deepseek-v4-pro", "atomic 下参数仍保留");
+  assert.equal(byField("knowledgeSupportModel", "A").disabled, false, "非法值仍可操作");
+  const archA2 = byField("architecture", "A");
+  archA2.value = "controller";
+  archA2.fire("change");
+  await flush();
+  const modeA3 = byField("knowledgeMode", "A");
+  modeA3.value = "m4-support";
+  modeA3.fire("change");
+  await flush();
+  assert.ok(!content(root).includes("固定 Pro 判别模型需"), "回到合法组合错误消失");
+  // 提交体带判别模型参数。
+  const allow = findAttr(root, "data-field", "allow-remote")!;
+  allow.checked = true;
+  allow.fire("change");
+  await flush();
+  findClass(root, "primary-button")!.fire("click");
+  await flush(1);
+  const post = find(request => request.path === "/api/experiments" && request.options?.method === "POST", "model POST");
+  const body = JSON.parse(post.options?.body || "{}");
+  assert.equal(body.variants[0].parameters.knowledgeSupportModel, "deepseek-v4-pro", "提交体含 Pro 选择");
+  assert.equal(body.variants[1].parameters.knowledgeSupportModel, "deepseek-v4-pro");
+  respond(post, job("job-m1", { status: "completed", config: body }));
+  await flush();
+  assert.equal(pendingCount(), 0);
+  // 旧缺省 configured：无 knowledgeSupportModel 的历史配置显示缺省且词项不适用。
+  const legacyJob = job("job-old-m", {
+    config: { version: 1, kind: "support", label: "旧模型配置", repeat: 1, allowRemote: false,
+      variants: [{ id: "A", architecture: "controller", parameters: { timeoutMs: 60000, repairBudget: 1, merchantEvents: "architecture" } }] },
+    results: [{ variantId: "A", repetition: 1, kind: "support", status: "completed", runId: "run-old-m", summary: supportSummary(3) }],
+  });
+  findAttr(root, "data-action", "refresh-jobs")!.fire("click");
+  await flush(1);
+  respond(find(request => request.path === "/api/experiments", "refresh legacy model"), { jobs: [legacyJob] });
+  await flush();
+  walk(root).find(item => item.className.split(" ").includes("exp-job"))!.fire("click");
+  await flush(1);
+  respond(find(request => request.path === "/api/experiments/job-old-m", "legacy model detail"), legacyJob);
+  await flush();
+  findAttr(root, "data-action", "load-config")!.fire("click");
+  await flush();
+  assert.equal(byField("knowledgeSupportModel", "A").value, "configured", "旧配置缺省 configured，不倒填实际模型");
+  assert.equal(byField("knowledgeSupportModel", "A").disabled, true, "词项旧配置判别模型不适用");
+  console.log("PASS 实验调试：knowledgeSupportModel 非法组合禁提交可修复、提交体参数、旧缺省 configured 兼容。");
 }

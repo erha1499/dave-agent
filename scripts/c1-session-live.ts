@@ -1,0 +1,310 @@
+import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { pathToFileURL } from "node:url";
+import { createConfiguredModelRuntime } from "../src/agent.ts";
+import { contentHash, createBailianClient } from "../src/bailian.ts";
+import { createEvidenceSupportClient } from "../src/evidence-support.ts";
+import { OrderAccessError, type CouponStore } from "../src/coupon-store.ts";
+import { captureEvaluationTurn } from "../src/eval-capture.ts";
+import { createKnowledgeService, type KnowledgeTrace } from "../src/knowledge-service.ts";
+import { scopeDocuments } from "../src/retrieval-ranking.ts";
+import { cancelSupportTurn, createSupportSession, getSupportResult, prepareSupportPrompt, supportReply } from "../src/support-session.ts";
+import type { SupportCall, SupportResult } from "../src/support-controller.ts";
+import type { EvalStep } from "../src/evaluation.ts";
+import { fixtureOrder, loadC1ContextDataset } from "./c1-context-check.ts";
+
+type Expect = { kind: "order" | "policy" | "refund_eligibility" | "paid_amount_compare" | "clarify";
+  orderId: string | null; orderRef?: "explicit" | "focus" | "alternative"; questionContext?: "standalone" | "previous";
+  knowledge: "none" | "evidence"; relevant?: string[]; produceTopic?: boolean; displayedPaidCents?: number;
+  comparisonPaidCents?: number; forbiddenQueryPhrases?: string[] };
+type Turn = { question: string; expect: Expect };
+type Dataset = { version: 1; suiteId: string; stage: string; provenance: string;
+  cases: Array<{ id: string; corpus: "online" | "reference"; turns: Turn[] }> };
+type HostReference = { kind?: string; orderId?: string | null; policyTopic?: { requestId: string } | null;
+  itemPaidUnit?: { requestId: string; paidCents: number } | null; alternativeOrderId?: string | null };
+type Check = { layer: "action" | "reference" | "business" | "knowledge" | "execution"; name: string; passed: boolean };
+type NetworkRequest = { operation: "agent" | "support" | "rerank"; caseId: string; turn: number; startedAt: string;
+  httpStatus: number | null; error: "request_failed" | null };
+type Row = { caseId: string; turn: number; phase: "preparatory" | "final"; question: string; expected: Expect;
+  status: "passed" | "failed" | "skipped"; reason?: string; durationMs: number | null; checks: Check[];
+  hostReference?: HostReference; result?: SupportResult; reply?: unknown; steps: EvalStep[]; calls: SupportCall[];
+  requests: NetworkRequest[]; sdkRetryEvents: Array<{ type: "auto_retry_start" | "auto_retry_end"; attempt: number }>;
+  rawRecall: number | null; acceptedRecall: number | null; firstActionCorrect: boolean | null };
+const root = new URL("../", import.meta.url);
+const datasetPath = "data/c1-session-development.json", sourcePath = "data/c1-session-development-source.json";
+const codeFiles = ["scripts/c1-session-live.ts", "scripts/c1-context-check.ts", "src/support-session.ts", "src/support-controller.ts",
+  "src/support-context-action.ts", "src/support-action.ts", "src/support-context.ts", "src/agent.ts", "src/eval-capture.ts",
+  "src/knowledge-service.ts", "src/bailian.ts", "src/evidence-support.ts", "src/evidence-acceptance.ts", "src/retrieval-ranking.ts",
+  "prompts/customer-service-v2.md", "skills/shop-support-v2/SKILL.md", "package-lock.json"];
+const hashes = async (files: string[]) => Object.fromEntries(await Promise.all(files.map(async file => [file, contentHash(await readFile(new URL(file, root)))])));
+const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+function exactKeys(value: object, allowed: string[]) { assert.ok(Object.keys(value).every(key => allowed.includes(key))); }
+
+export async function loadC1SessionDevelopment() {
+  const bytes = await readFile(new URL(datasetPath, root));
+  const data = JSON.parse(bytes.toString()) as Dataset;
+  const source = JSON.parse(await readFile(new URL(sourcePath, root), "utf8"));
+  assert.equal(data.version, 1); assert.equal(data.stage, "development-exposed-dialogues");
+  assert.equal(source.version, 1); assert.equal(source.stage, data.stage); assert.equal(source.dataset.path, datasetPath);
+  assert.equal(source.dataset.sha256, contentHash(bytes)); assert.equal(source.dataset.bytes, bytes.length);
+  assert.equal(data.cases.length, 10); assert.equal(data.cases.reduce((n, item) => n + item.turns.length, 0), 20);
+  assert.deepEqual(source.counts, { cases: 10, turns: 20 });
+  assert.equal(new Set(data.cases.map(item => item.id)).size, 10);
+  const context = await loadC1ContextDataset("validation-v3");
+  for (const [path, digest] of Object.entries(source.baseFiles)) assert.equal((await hashes([path]))[path], digest, path);
+  exactKeys(data, ["version", "suiteId", "stage", "provenance", "cases"]);
+  for (const item of data.cases) {
+    exactKeys(item, ["id", "corpus", "turns"]); assert.ok(["online", "reference"].includes(item.corpus));
+    assert.ok(item.turns.length >= 1 && item.turns.length <= 4);
+    for (const turn of item.turns) {
+      exactKeys(turn, ["question", "expect"]); assert.ok(turn.question.trim() && turn.question.length <= 500);
+      const e = turn.expect; exactKeys(e, ["kind", "orderId", "orderRef", "questionContext", "knowledge", "relevant", "produceTopic", "displayedPaidCents", "comparisonPaidCents", "forbiddenQueryPhrases"]);
+      assert.ok(["order", "policy", "refund_eligibility", "paid_amount_compare", "clarify"].includes(e.kind));
+      assert.ok(e.orderId === null || Object.values(context.dataset.orderFixtures).some(order => order.orderId === e.orderId));
+      assert.ok([undefined, "explicit", "focus", "alternative"].includes(e.orderRef));
+      assert.ok([undefined, "standalone", "previous"].includes(e.questionContext));
+      assert.ok(["none", "evidence"].includes(e.knowledge));
+      assert.equal(Boolean(e.questionContext), e.kind === "policy" || e.kind === "refund_eligibility");
+      if (e.kind === "clarify") { assert.equal(e.orderId, null); assert.equal(e.knowledge, "none"); }
+      if (e.kind === "paid_amount_compare") { assert.ok(Number.isSafeInteger(e.comparisonPaidCents)); assert.equal(e.knowledge, "none"); }
+      if (e.knowledge === "evidence") {
+        assert.ok(e.relevant?.length); assert.equal(new Set(e.relevant).size, e.relevant!.length);
+        for (const id of e.relevant!) assert.ok(context.corpora[item.corpus].some(doc => doc.id === id));
+      } else assert.equal(e.relevant, undefined);
+    }
+  }
+  return { data, source, context };
+}
+
+// All three provider paths use this guard at the actual HTTP boundary. Retries
+// also consume the same fixed request budget; no credential/header/body is logged.
+function requestGuard(limit: number, fetcher: typeof fetch = fetch) {
+  const requests: NetworkRequest[] = [];
+  let active: { caseId: string; turn: number; signal: AbortSignal } | undefined;
+  let exhausted = false;
+  return { requests, get exhausted() { return exhausted; }, setActive(value: typeof active) { active = value; },
+    fetchFor(operation: NetworkRequest["operation"]): typeof fetch { return async (url, init) => {
+      if (!active) throw new Error("No active measured turn");
+      const signals = [active.signal, init?.signal, url instanceof Request ? url.signal : undefined].filter((signal): signal is AbortSignal => Boolean(signal));
+      const signal = AbortSignal.any(signals); signal.throwIfAborted();
+      if (requests.length >= limit) { exhausted = true; throw new Error("Global request budget exhausted before sending"); }
+      const request: NetworkRequest = { operation, caseId: active.caseId, turn: active.turn, startedAt: new Date().toISOString(), httpStatus: null, error: null };
+      requests.push(request);
+      try { const response = await fetcher(url, { ...init, signal }); request.httpStatus = response.status; return response; }
+      catch { request.error = "request_failed"; throw new Error("Measured provider request failed"); }
+    }; } };
+}
+function lastHost(messages: readonly unknown[]): HostReference {
+  return messages.flatMap(value => {
+    if (!value || typeof value !== "object" || !("content" in value) || typeof value.content !== "string") return [];
+    try { const data = JSON.parse(value.content) as HostReference; return data.kind === "host_order_reference" ? [data] : []; } catch { return []; }
+  }).at(-1) ?? {};
+}
+function actionCorrect(action: unknown, e: Expect, host: HostReference) {
+  if (!action || typeof action !== "object") return false;
+  const value = action as { protocol?: string; kind?: string; orderRef?: { kind: string; orderId?: string };
+    questionContext?: { kind: string; requestId?: string }; amountRef?: { requestId?: string } };
+  return value.protocol === "v2.2" && value.kind === e.kind
+    && (e.orderRef === undefined ? value.orderRef === undefined : value.orderRef?.kind === e.orderRef)
+    && (e.orderRef !== "explicit" || value.orderRef?.orderId === e.orderId)
+    && (e.questionContext === undefined ? value.questionContext === undefined : value.questionContext?.kind === e.questionContext)
+    && (e.questionContext !== "previous" || Boolean(host.policyTopic?.requestId) && value.questionContext?.requestId === host.policyTopic!.requestId)
+    && (e.kind !== "paid_amount_compare" || Boolean(host.itemPaidUnit?.requestId) && value.amountRef?.requestId === host.itemPaidUnit!.requestId);
+}
+function evaluate(row: Row, executed: boolean) {
+  const e = row.expected, result = row.result, host = row.hostReference ?? {};
+  const check = (layer: Check["layer"], name: string, passed: boolean) => row.checks.push({ layer, name, passed });
+  check("execution", "turn completed within deadline without provider failure", executed);
+  check("action", "executed action and semantic reference match expectation", actionCorrect(result?.action, e, host));
+  check("business", "no side-effecting service calls", row.calls.every(call => ["get_order", "search_faq"].includes(call.name)));
+  check("business", "expected terminal outcome", result?.outcome === (e.kind === "clarify" ? "clarification" : "ready"));
+  check("reference", "fresh authorization or no-order path", e.orderId === null ? !row.calls.some(call => call.name === "get_order")
+    : result?.evidence.order?.id === e.orderId && row.calls.some(call => call.name === "get_order" && !call.isError && call.input.orderId === e.orderId));
+  if (e.kind === "clarify") check("reference", "clarification does not access business services", row.calls.length === 0);
+  if (e.questionContext === "previous") check("reference", "knowledge uses actual visible prior topic", Boolean(host.policyTopic?.requestId)
+    && result?.evidence.knowledge[0]?.context.policyTopic?.requestId === host.policyTopic!.requestId);
+  if (e.orderRef === "alternative") check("reference", "only the actual host alternative is selected", host.alternativeOrderId === e.orderId
+    && result?.verifiedOrderId === e.orderId);
+  if (e.produceTopic) check("reference", "successful source-backed topic produced", result?.verifiedPolicyTopic?.requestId === result?.evidence.requestId
+    && Boolean(result?.verifiedPolicyTopic?.sources.length));
+  if (e.displayedPaidCents !== undefined) check("business", "host displayed paid amount produced", result?.verifiedAmountReference?.paidCents === e.displayedPaidCents);
+  if (e.comparisonPaidCents !== undefined) {
+    const amount = result?.evidence.amountComparison;
+    check("business", "unique remaining coupon paid comparison is factual and not approval", amount?.remainingCouponCount === 1
+      && amount.remainingUnitPaidCents === e.comparisonPaidCents && amount.referencePaidCents === e.comparisonPaidCents
+      && amount.comparisonEqual === true && amount.refundApproved === false && result?.needsAnswer === false
+      && amount.referenceRequestId === host.itemPaidUnit?.requestId);
+  }
+  const traces = row.calls.flatMap(call => call.knowledge ? [call.knowledge.trace] : []);
+  if (e.knowledge === "none") check("knowledge", "no knowledge or knowledge-provider requests", traces.length === 0
+    && !row.calls.some(call => call.name === "search_faq") && row.requests.every(request => request.operation === "agent"));
+  else {
+    check("knowledge", "one actual two-stage knowledge query", traces.length === 1 && traces[0]!.mode === "m4-support"
+      && traces[0]!.supportProfile === "typed" && traces[0]!.supportModel === "deepseek-v4-pro" && traces[0]!.threshold === .5 && traces[0]!.status !== "unavailable");
+    const accepted = result?.evidence.rules.map(rule => rule.sourceId) ?? [], relevant = e.relevant!;
+    check("knowledge", "accepted evidence equals frozen expected sources", same([...accepted].sort(), [...relevant].sort()));
+    check("knowledge", "original current question remains auditable", traces[0]?.originalQuery === row.question);
+    for (const phrase of e.forbiddenQueryPhrases ?? []) check("reference", `no historical assumption in query: ${phrase}`,
+      Boolean(traces[0]) && !traces[0]!.query.includes(phrase));
+    row.rawRecall = traces[0]?.calls.some(call => call.operation === "rerank" && call.status === "ok")
+      ? relevant.filter(id => traces[0]!.rawRanking.slice(0, 5).some(doc => doc.id === id)).length / relevant.length : null;
+    row.acceptedRecall = traces[0] && traces[0].status !== "unavailable"
+      ? relevant.filter(id => accepted.includes(id)).length / relevant.length : null;
+  }
+  const first = row.steps.find(step => step.type === "tool" && step.name === "support_action")?.input as { action?: unknown } | undefined;
+  row.firstActionCorrect = actionCorrect(first?.action, e, host);
+  row.status = row.checks.every(check => check.passed) ? "passed" : "failed";
+}
+
+export async function checkC1SessionRunner() {
+  const { data } = await loadC1SessionDevelopment();
+  const guard = requestGuard(1, async () => new Response("{}"));
+  guard.setActive({ caseId: "guard", turn: 1, signal: new AbortController().signal });
+  await guard.fetchFor("agent")("https://example.invalid");
+  await assert.rejects(guard.fetchFor("support")("https://example.invalid"), /budget exhausted/);
+  assert.equal(guard.requests.length, 1); assert.equal(guard.exhausted, true);
+  const stopped = requestGuard(70, async () => { throw new Error("must not send"); });
+  stopped.setActive({ caseId: "guard", turn: 1, signal: AbortSignal.abort() });
+  await assert.rejects(stopped.fetchFor("rerank")("https://example.invalid")); assert.equal(stopped.requests.length, 0);
+  stopped.setActive({ caseId: "guard", turn: 1, signal: new AbortController().signal });
+  await assert.rejects(stopped.fetchFor("support")("https://example.invalid", { signal: AbortSignal.abort() })); assert.equal(stopped.requests.length, 0);
+  assert.equal(actionCorrect({ protocol: "v2.2", kind: "policy", questionContext: { kind: "previous", requestId: "invented" } },
+    { kind: "policy", orderId: null, knowledge: "evidence", questionContext: "previous" }, { policyTopic: { requestId: "actual" } }), false);
+  for (const item of data.cases) for (const [index, turn] of item.turns.entries()) {
+    const row: Row = { caseId: item.id, turn: index + 1, phase: "final", question: turn.question, expected: turn.expect,
+      status: "failed", durationMs: null, checks: [], steps: [], calls: [], requests: [], sdkRetryEvents: [], rawRecall: null, acceptedRecall: null, firstActionCorrect: null };
+    evaluate(row, false); assert.equal(row.status, "failed", "missing execution cannot pass any planned turn");
+  }
+  console.log("C1 Session runner engineering checks passed: 10 cases / 20 turns, frozen data, hard HTTP budget, cancellation and missing-execution rejection. No live model.");
+}
+
+export async function runC1SessionDevelopment() {
+  const { data, source, context } = await loadC1SessionDevelopment();
+  const snapshotFiles = [...new Set([...codeFiles, datasetPath, sourcePath, ...Object.keys(source.baseFiles)])];
+  const runId = randomUUID(), startedAt = new Date().toISOString(), codeBefore = await hashes(snapshotFiles);
+  const directory = new URL(".runtime/c1-session/", root); await mkdir(directory, { recursive: true });
+  const path = new URL(`live-development-${runId}.json`, directory);
+  const guard = requestGuard(70), rows: Row[] = [], cleanup: Array<{ caseId: string; sessionDisposed: boolean; remainingOrders: number }> = [];
+  const { modelRuntime, model } = await createConfiguredModelRuntime();
+  assert.equal(model.provider, "deepseek"); assert.equal(model.api, "openai-completions");
+  const supportModel = modelRuntime.getModel("deepseek", "deepseek-v4-pro"); assert.ok(supportModel);
+  const originalStream = modelRuntime.streamSimple.bind(modelRuntime);
+  modelRuntime.streamSimple = (selected, transcript, options) => originalStream(selected, transcript, { ...options, fetch: guard.fetchFor("agent") });
+  const rerank = createBailianClient({ retries: 0, timeoutMs: 60_000, fetch: guard.fetchFor("rerank") });
+  const support = await createEvidenceSupportClient({ profile: "typed", modelSelection: "deepseek-v4-pro", timeoutMs: 60_000, runtime: { model: supportModel,
+    complete: (transcript, options) => modelRuntime.complete(supportModel, transcript, { ...options, fetch: guard.fetchFor("support") }) } });
+  const artifact = { version: 1, runId, startedAt, finishedAt: null as string | null, stage: data.stage,
+    modelActionSelectionEvaluated: true, finalAnswerQualityEvaluated: false, source,
+    scope: "Real Pi Session / DeepSeek action selection and real Bailian rerank / typed support; isolated in-memory synthetic orders and corpus per case; no SQL or QQ.",
+    settings: { maxHttpRequests: 70, turnTimeoutMs: 60_000, knowledgeTimeoutMs: 60_000, supportProfile: "typed", supportModel: "deepseek-v4-pro", threshold: .5,
+      sdkSessionAutomaticRetries: 2, sdkProviderRetries: 0, knowledgeRetries: 0, businessRetries: 0, repairBudget: 1,
+      model: { provider: model.provider, id: model.id, api: model.api, maxTokens: Math.min(model.maxTokens, 2048), thinking: "off", cost: model.cost },
+      support: support.settings, rerank: rerank.settings },
+    corpusHashes: { online: contentHash(context.corpora.online), reference: contentHash(context.corpora.reference) },
+    codeHashes: { before: codeBefore, after: {} as Record<string, string> }, codeStable: false,
+    rows, requests: guard.requests, cleanup, summary: {} as Record<string, unknown> };
+  const save = async () => writeFile(path, `${JSON.stringify(artifact, null, 2)}\n`);
+  await save();
+  try {
+    for (const item of data.cases) {
+      const orders = new Map(Object.keys(context.dataset.orderFixtures).map(key => [context.dataset.orderFixtures[key]!.orderId, fixtureOrder(key, context)]));
+      const store = { getOrder: async (identity: Parameters<CouponStore["getOrder"]>[0], id: string) => {
+        const owner = Object.values(context.dataset.orderFixtures).find(order => order.orderId === id)?.owner;
+        if (identity.appId !== context.dataset.actor.appId || identity.senderId !== owner || !orders.has(id)) throw new OrderAccessError("Controlled fixture ownership denied");
+        return structuredClone(orders.get(id)!);
+      }, searchKnowledge: async () => { throw new Error("The measured knowledge service must be used"); } } as unknown as CouponStore;
+      const knowledge = createKnowledgeService({ readKnowledgeDocuments: async () => structuredClone(context.corpora[item.corpus]) },
+        { mode: "m4-support", supportProfile: "typed", supportModel: "deepseek-v4-pro", threshold: .5, timeoutMs: 60_000, clients: { rerank, support } });
+      const session = await createSupportSession(context.dataset.actor, store, modelRuntime, model, undefined,
+        { groupOpenid: `${runId}:${item.id}`, knowledge, repairBudget: 1 });
+      let dependencyFailed = false;
+      try {
+        for (const [index, turn] of item.turns.entries()) {
+          const row: Row = { caseId: item.id, turn: index + 1, phase: index === item.turns.length - 1 ? "final" : "preparatory",
+            question: turn.question, expected: turn.expect, status: "skipped", durationMs: null, checks: [], steps: [], calls: [], requests: [], sdkRetryEvents: [],
+            rawRecall: null, acceptedRecall: null, firstActionCorrect: null };
+          rows.push(row);
+          if (dependencyFailed || guard.exhausted || guard.requests.length >= 70) { row.reason = dependencyFailed ? "Required prior turn failed; denominator retained" : "Global request budget reached"; continue; }
+          const controller = new AbortController(), capture = captureEvaluationTurn(`${model.provider}/${model.id}`);
+          guard.setActive({ caseId: item.id, turn: index + 1, signal: controller.signal });
+          prepareSupportPrompt(session, { requestId: `${runId}:${item.id}:${index + 1}`, groupOpenid: `${runId}:${item.id}`,
+            messageId: `${runId}:${item.id}:${index + 1}`, onCall: call => row.calls.push(structuredClone(call)) });
+          const messagesBefore = session.messages.length, unsubscribe = session.subscribe(event => {
+            capture.receive(event);
+            if (event.type === "auto_retry_start" || event.type === "auto_retry_end") row.sdkRetryEvents.push({ type: event.type, attempt: event.attempt });
+          }), requestStart = guard.requests.length;
+          let timedOut = false, failed = false;
+          const timer = setTimeout(() => { timedOut = true; controller.abort(); cancelSupportTurn(session); void session.abort().catch(() => {}); }, 60_000);
+          try { await session.prompt(turn.question, { expandPromptTemplates: false }); }
+          catch { failed = true; }
+          finally { clearTimeout(timer); unsubscribe(); controller.abort(); }
+          const measured = capture.finish(); row.durationMs = measured.durationMs; row.steps = measured.steps;
+          row.requests = structuredClone(guard.requests.slice(requestStart)); row.hostReference = lastHost(session.messages.slice(messagesBefore));
+          const result = getSupportResult(session); if (result) row.result = structuredClone(result);
+          const finalMessage = session.messages.findLast(message => message.role === "assistant");
+          const finalText = finalMessage?.role === "assistant" ? finalMessage.content.filter(part => part.type === "text").map(part => part.text).join("") : "";
+          row.reply = supportReply(session, finalText);
+          const traces = row.calls.flatMap(call => call.knowledge ? [call.knowledge.trace] : []);
+          evaluate(row, !failed && !timedOut && !measured.failed && !row.steps.some(step => step.type === "model" && step.isError)
+            && traces.every(trace => trace.status !== "unavailable"));
+          const scopeValid = traces.every(trace => {
+            const visible = new Set(scopeDocuments(context.corpora[item.corpus], trace.scope).map(doc => doc.id));
+            return trace.acceptance?.accepted.every(doc => visible.has(doc.id)) ?? true;
+          });
+          row.checks.push({ layer: "knowledge", name: "accepted sources remain inside trusted scope", passed: scopeValid });
+          if (!scopeValid) row.status = "failed";
+          // Continue only when the actual prior action established its expected
+          // host facts and evidence. Never synthesize the missing reference.
+          dependencyFailed = row.status !== "passed";
+          console.log(`[c1-session] ${item.id}/${index + 1} ${row.status}; HTTP=${guard.requests.length}/70`);
+          guard.setActive(undefined); await save();
+        }
+      } finally { cancelSupportTurn(session); await session.abort().catch(() => {}); session.dispose(); orders.clear();
+        cleanup.push({ caseId: item.id, sessionDisposed: true, remainingOrders: orders.size }); guard.setActive(undefined); }
+    }
+  } finally {
+    artifact.finishedAt = new Date().toISOString(); artifact.codeHashes.after = await hashes(snapshotFiles);
+    artifact.codeStable = same(artifact.codeHashes.before, artifact.codeHashes.after);
+    const modelSteps = rows.flatMap(row => row.steps.filter(step => step.type === "model"));
+    const traces: KnowledgeTrace[] = rows.flatMap(row => row.calls.flatMap(call => call.knowledge ? [call.knowledge.trace] : []));
+    const agentRequests = guard.requests.filter(request => request.operation === "agent").length;
+    const agentReported = modelSteps.filter(step => step.usage !== null && step.usage !== undefined);
+    const providerCoverage = Object.fromEntries((["rerank", "support"] as const).map(operation => [operation, {
+      actualHttpRequests: guard.requests.filter(request => request.operation === operation).length,
+      traceCalls: traces.reduce((n, trace) => n + trace.calls.filter(call => call.operation === operation).length, 0),
+    }]));
+    const knowledgeSum = (field: "rerankTokens" | "supportTokens" | "estimatedCny" | "estimatedUsd") => {
+      const coverage = providerCoverage[field === "rerankTokens" || field === "estimatedCny" ? "rerank" : "support"]!;
+      return coverage.actualHttpRequests !== coverage.traceCalls || traces.some(trace => trace.usage[field] === null)
+        ? null : traces.reduce((n, trace) => n + trace.usage[field]!, 0);
+    };
+    const layer = (name: Check["layer"]) => ({ checkedTurns: rows.filter(row => row.checks.some(check => check.layer === name)).length,
+      passedTurns: rows.filter(row => row.checks.some(check => check.layer === name) && row.checks.filter(check => check.layer === name).every(check => check.passed)).length });
+    artifact.summary = { plannedCases: data.cases.length, plannedTurns: data.cases.reduce((n, item) => n + item.turns.length, 0),
+      passedCases: data.cases.filter(item => rows.filter(row => row.caseId === item.id).length === item.turns.length
+        && rows.filter(row => row.caseId === item.id).every(row => row.status === "passed")).length,
+      passedTurns: rows.filter(row => row.status === "passed").length, failedTurns: rows.filter(row => row.status === "failed").length,
+      skippedTurns: rows.filter(row => row.status === "skipped").length, missingTurns: 20 - rows.length,
+      finalTurns: rows.filter(row => row.phase === "final").map(row => ({ caseId: row.caseId, status: row.status })),
+      layers: Object.fromEntries((["action", "reference", "business", "knowledge", "execution"] as const).map(name => [name, layer(name)])),
+      firstActionCorrect: rows.filter(row => row.firstActionCorrect === true).length,
+      httpRequests: guard.requests.length, agentHttpRequests: agentRequests, modelResponses: modelSteps.length, agentUsageReported: agentReported.length,
+      agentTotalTokens: agentReported.length === agentRequests ? agentReported.reduce((n, step) => n + step.usage!.totalTokens, 0) : null,
+      agentEstimatedUsd: agentReported.length === agentRequests && agentReported.every(step => step.usage!.estimatedCostUsd !== null)
+        ? agentReported.reduce((n, step) => n + step.usage!.estimatedCostUsd!, 0) : null,
+      sdkRetryStarts: rows.reduce((n, row) => n + row.sdkRetryEvents.filter(event => event.type === "auto_retry_start").length, 0),
+      knowledge: { providerCoverage, rerankTokens: knowledgeSum("rerankTokens"), supportTokens: knowledgeSum("supportTokens"),
+        estimatedCny: knowledgeSum("estimatedCny"), estimatedUsd: knowledgeSum("estimatedUsd"), incompleteCalls: traces.reduce((n, trace) => n + trace.usage.incompleteCalls, 0) },
+      budgetExhausted: guard.exhausted || guard.requests.length >= 70, cleanupsCompleted: cleanup.length,
+      conclusion: "Development evidence only. Action selection, host facts, knowledge support and final natural-language quality are separate; final answer quality is not scored." };
+    await save();
+    console.log(JSON.stringify({ artifact: path.pathname, codeStable: artifact.codeStable, ...artifact.summary }));
+  }
+  return path.pathname;
+}
+
+if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
+  if (process.argv.includes("--live")) await runC1SessionDevelopment();
+  else await checkC1SessionRunner();
+}

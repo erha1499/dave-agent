@@ -49,7 +49,7 @@ async function main() {
   if (!["TEST_USER1", "TEST_USER2"].includes(senderId)) throw new Error("CLI_DEMO_USER 仅支持 TEST_USER1 或 TEST_USER2 合成身份。");
   const store = new CouponStore(createPool(readDatabaseConfig()));
   const knowledge = architecture === "controller" ? createKnowledgeService(store, { mode: parameters.knowledgeMode,
-    supportProfile: parameters.knowledgeSupport, threshold: parameters.knowledgeThreshold, timeoutMs: parameters.knowledgeTimeoutMs }) : undefined;
+    supportProfile: parameters.knowledgeSupport, supportModel: parameters.knowledgeSupportModel, threshold: parameters.knowledgeThreshold, timeoutMs: parameters.knowledgeTimeoutMs }) : undefined;
   const afterSales = process.env.AFTER_SALES_DB_PASSWORD
     ? new AfterSalesStore(createPool(readAfterSalesDatabaseConfig())) : undefined;
   const refunds = process.env.REFUND_DB_PASSWORD ? new RefundStore(createPool(readRefundDatabaseConfig())) : undefined;

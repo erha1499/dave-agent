@@ -4,6 +4,7 @@ import { connect } from "node:net";
 import { readFile } from "node:fs/promises";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import { readKnowledgeParameters, resolveSupportRunParameters } from "../src/support-parameters.ts";
 import { experimentCatalog, resolveExperimentConfig, remoteRequired, requireExperimentExecution, ExperimentInputError } from "../src/experiment-config.ts";
 import { parseExperimentArgs } from "./experiment.ts";
 import { createEvaluationServer } from "../src/eval-server.ts";
@@ -27,13 +28,26 @@ assert.ok(knowledgeAB.variants.every(variant => variant.parameters.knowledgeThre
 assert.deepEqual(resolveExperimentConfig(JSON.parse(await readFile("configs/experiments/support-knowledge-ab.json", "utf8"))), knowledgeAB);
 assert.throws(() => requireExperimentExecution(knowledgeAB));
 assert.throws(() => resolveExperimentConfig({ ...support, variants: [{ id: "A", architecture: "atomic", parameters: { knowledgeMode: "m4-support" } }] }));
-for (const key of ["knowledgeMode", "knowledgeSupport", "knowledgeThreshold", "knowledgeTimeoutMs"]) assert.ok(catalog.fields.support.some(field => field.key === key));
+for (const key of ["knowledgeMode", "knowledgeSupport", "knowledgeSupportModel", "knowledgeThreshold", "knowledgeTimeoutMs"]) assert.ok(catalog.fields.support.some(field => field.key === key));
 const profileAB = catalog.presets.find(preset => preset.id === "support-knowledge-profile-ab")!.config;
 assert.equal(profileAB.kind, "support");
 if (profileAB.kind !== "support") throw new Error("profile preset kind");
 assert.deepEqual(profileAB.variants.map(variant => [variant.parameters.knowledgeMode, variant.parameters.knowledgeSupport]), [["m4-support", "binary"], ["m4-support", "typed"]]);
 assert.deepEqual(resolveExperimentConfig(JSON.parse(await readFile("configs/experiments/support-knowledge-profile-ab.json", "utf8"))), profileAB);
 assert.throws(() => resolveExperimentConfig({ ...support, variants: [{ id: "A", architecture: "controller", parameters: { knowledgeSupport: "typed" } }] }));
+const modelAB = catalog.presets.find(preset => preset.id === "support-knowledge-model-ab")!.config;
+if (modelAB.kind !== "support") throw new Error("model preset kind");
+assert.deepEqual(modelAB.variants.map(v => [v.architecture, v.parameters.knowledgeMode, v.parameters.knowledgeSupport, v.parameters.knowledgeSupportModel, v.parameters.knowledgeThreshold]),
+  [["controller", "m4-support", "typed", "configured", .5], ["controller", "m4-support", "typed", "deepseek-v4-pro", .5]]);
+assert.deepEqual(resolveExperimentConfig(JSON.parse(await readFile("configs/experiments/support-knowledge-model-ab.json", "utf8"))), modelAB);
+assert.equal(readKnowledgeParameters({}).knowledgeSupportModel, "configured");
+assert.equal(readKnowledgeParameters({ KNOWLEDGE_MODE: "m4-support", KNOWLEDGE_SUPPORT_MODEL: "deepseek-v4-pro" }).knowledgeSupportModel, "deepseek-v4-pro");
+assert.throws(() => readKnowledgeParameters({ KNOWLEDGE_SUPPORT_MODEL: "deepseek-v4-pro" }), /仅适用于/);
+assert.throws(() => readKnowledgeParameters({ KNOWLEDGE_MODE: "m4-support", KNOWLEDGE_SUPPORT_MODEL: "typo" }), /knowledgeSupportModel/);
+assert.throws(() => resolveSupportRunParameters("atomic", { knowledgeMode: "m4-support", knowledgeSupportModel: "deepseek-v4-pro" }), /atomic/);
+for (const parameters of [{ knowledgeSupportModel: "deepseek-v4-pro" }, { knowledgeMode: "m4-support", knowledgeSupportModel: "typo" }]) {
+  assert.throws(() => resolveExperimentConfig({ ...support, variants: [{ id: "A", architecture: "controller", parameters }] }));
+}
 for (const entry of ["src/cli.ts", "src/qq.ts"]) {
   await assert.rejects(promisify(execFile)(process.execPath, [entry], {
     env: { SUPPORT_ARCHITECTURE: "atomic", KNOWLEDGE_MODE: "m4-support" }, timeout: 5000,

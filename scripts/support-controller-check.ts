@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { MerchantBusinessError, merchantSourceKey, type MerchantTask } from "../src/after-sales.ts";
 import { OrderAccessError } from "../src/coupon-store.ts";
 import { parseSupportAction, SupportProtocolError } from "../src/support-action.ts";
+import { parseContextSupportAction, type ContextSupportAction } from "../src/support-context-action.ts";
 import { SupportController, SupportServiceError, type SupportCall, type SupportServices, type SupportTurnContext } from "../src/support-controller.ts";
 import { RefundBusinessError, type RefundOperation } from "../src/refunds.ts";
 import type { KnowledgeSearchInput, KnowledgeTrace } from "../src/knowledge-service.ts";
@@ -229,6 +230,26 @@ console.log("[support-controller] scoped evidence and empty-rule short circuit P
   assert.equal(test.preparations, 0);
 }
 console.log("[support-controller] failed-call dedup and cancellation before next service PASS");
+
+{
+  const test = setup(), abort = new AbortController();
+  test.services.store.getOrder = async () => { abort.abort(); return structuredClone(order); };
+  await assert.rejects(test.controller.createTurn(test.context(undefined, { signal: abort.signal }))
+    .execute({ protocol: "v2.2", kind: "order", orderRef: explicit }), { name: "AbortError" });
+  assert.equal(test.trace.length, 1); assert.equal(test.trace[0]!.isError, false);
+  assert.deepEqual(test.trace[0]!.output, order, "completed read audit survives cancellation even though no result is published");
+
+  const prepared = setup(), stopped = new AbortController(), prepare = prepared.services.refunds!.prepare;
+  prepared.services.refunds!.prepare = async (...args) => { const value = await prepare(...args); stopped.abort(); return value; };
+  const turn = prepared.controller.createTurn(prepared.context(undefined, { signal: stopped.signal }));
+  const action = { protocol: "v2.2" as const, kind: "refund_prepare" as const, orderRef: explicit };
+  await assert.rejects(turn.execute(action), { name: "AbortError" });
+  await assert.rejects(turn.execute(action), { name: "AbortError" });
+  assert.equal(prepared.preparations, 1, "cancellation must not retry a completed prepare");
+  assert.equal(prepared.trace.at(-1)!.name, "prepare_refund"); assert.equal(prepared.trace.at(-1)!.isError, false);
+  assert.equal((prepared.trace.at(-1)!.output as RefundOperation).status, "prepared", "audit must not pretend the completed operation was rolled back");
+}
+console.log("[support-controller] cancellation after final service retains actual read/prepare audit without publishing or repeating PASS");
 
 {
   const test = setup();
@@ -611,3 +632,158 @@ console.log("[support-controller] generic modified product references bind only 
   assert.equal(multiple.evidence.actualCalls.length, 0, "several user questions cannot be laundered into one topic by model classification");
 }
 console.log("[support-controller] one user question can retain multiple real sources; separate questions still clarify PASS");
+
+// v2.2 selects bounded semantics in the action. These supplied actions test the
+// executor contract, not whether a real model chooses the correct action.
+const protocol = "v2.2" as const;
+const standalone = { kind: "standalone" as const };
+const focus = { kind: "focus" as const };
+{
+  const valid = { protocol, kind: "policy" as const, question: "一般规则是什么？", questionContext: standalone };
+  assert.deepEqual(parseContextSupportAction(valid), valid);
+  for (const invalid of [
+    { kind: "policy", question: "旧协议不能出现在当前工具中" },
+    { ...valid, questionContext: undefined }, { ...valid, questionContext: { kind: "previous" } },
+    { ...valid, scope: { productId: "forged" } }, { ...valid, protocol: "v2.1" },
+    { protocol, kind: "refund_prepare", orderRef: { kind: "alternative" } },
+    { protocol, kind: "paid_amount_compare", orderRef: focus, amountRef: { requestId: "shown" }, amountCents: 1 },
+    { protocol, kind: "paid_amount_compare", orderRef: focus, amountRef: { requestId: "shown" }, approved: true },
+    { protocol, kind: "paid_amount_compare", orderRef: { kind: "alternative" }, amountRef: { requestId: "shown" } },
+  ]) assert.throws(() => parseContextSupportAction(invalid), SupportProtocolError);
+  const test = setup(), raw = "这张退款办理成功了的券，还能再申请吗？";
+  const result = await test.controller.createTurn(test.context(raw, { focusOrderId: orderId }))
+    .execute({ protocol, kind: "refund_eligibility", question: "模型的归纳不能覆盖原问", questionContext: standalone, orderRef: focus });
+  assert.equal(result.outcome, "ready"); assert.equal(result.evidence.order!.id, orderId);
+  assert.equal(result.evidence.knowledge[0]!.context.protocol, protocol);
+  assert.ok(result.evidence.knowledge[0]!.context.effectiveQuery.startsWith(raw));
+  assert.match(result.evidence.knowledge[0]!.context.effectiveQuery, /未核销退款/, "user status words never replace fresh facts");
+  const turn = test.controller.createTurn(test.context("这份单人餐周日能用吗？", { focusOrderId: orderId }));
+  const action: ContextSupportAction = { protocol, kind: "policy", question: "规则", questionContext: standalone, orderRef: focus, productMention: "双人餐" };
+  const before = test.trace.length;
+  await assert.rejects(turn.execute(action), SupportProtocolError);
+  assert.equal(test.trace.length, before, "invented product text is repairable before locking or any service call");
+  assert.equal((await turn.execute({ ...action, productMention: "单人餐" })).outcome, "ready");
+  const wrong = await test.controller.createTurn(test.context("这份海鲜套餐能用吗？", { focusOrderId: orderId }))
+    .execute({ ...action, productMention: "海鲜套餐" });
+  assert.equal(wrong.outcome, "clarification"); assert.deepEqual(wrong.evidence.actualCalls.map(call => call.name), ["get_order"]);
+  const noScope = await test.controller.createTurn(test.context("海鲜套餐能用吗？"))
+    .execute({ protocol, kind: "policy", question: "规则", questionContext: standalone, productMention: "海鲜套餐" });
+  assert.equal(noScope.outcome, "clarification"); assert.equal(noScope.evidence.actualCalls.length, 0);
+  const prepare = test.controller.createTurn(test.context());
+  const command: ContextSupportAction = { protocol, kind: "refund_prepare", orderRef: explicit };
+  const prepared = await prepare.execute(command);
+  assert.strictEqual(await prepare.execute(command), prepared); assert.equal(test.preparations, 1);
+  assert.throws(() => prepare.execute({ protocol, kind: "order", orderRef: explicit }), SupportProtocolError);
+  assert.equal(test.preparations, 1, "the current protocol never unlocks an action after starting a business operation");
+}
+console.log("[support-controller] v2.2 strict protocol, raw question preservation and grounded product slots PASS");
+
+{
+  const test = setup();
+  const first = await test.controller.createTurn(test.context(`${orderId} 的入店使用时间有哪些要求？`))
+    .execute({ protocol, kind: "policy", question: "使用时间", questionContext: standalone, orderRef: explicit });
+  const topic = first.verifiedPolicyTopic!;
+  assert.equal(topic.originalQuery, `${orderId} 的入店使用时间有哪些要求？`);
+  const action: ContextSupportAction = { protocol, kind: "policy", question: "当前问题", orderRef: focus,
+    questionContext: { kind: "previous", requestId: topic.requestId } };
+  const text = "如果周日过去，还沿用你刚才查到的安排么？";
+  const followed = await test.controller.createTurn(test.context(text, { focusOrderId: orderId, policyTopic: topic })).execute(action);
+  assert.equal(followed.outcome, "ready");
+  assert.ok(followed.evidence.knowledge[0]!.context.effectiveQuery.includes(topic.originalQuery.replaceAll(orderId, "该订单")));
+  for (const policyTopic of [undefined, { ...topic, requestId: "other-result" }, { ...topic, sourceKey: "other-actor" },
+    { ...topic, groupOpenid: "other-group" }, { ...topic, orderId: "COUPON-9999" }]) {
+    const result = await test.controller.createTurn(test.context(text, { focusOrderId: orderId, policyTopic })).execute(action);
+    assert.equal(result.outcome, "clarification"); assert.equal(result.evidence.actualCalls.length, 0);
+  }
+  const changedScope = structuredClone(topic); changedScope.scope.productId = "old-product";
+  const rejectedScope = await test.controller.createTurn(test.context(text, { focusOrderId: orderId, policyTopic: changedScope })).execute(action);
+  assert.equal(rejectedScope.outcome, "clarification"); assert.deepEqual(rejectedScope.evidence.actualCalls.map(call => call.name), ["get_order"]);
+  const global = await test.controller.createTurn(test.context("预约改期通常需要谁审批？"))
+    .execute({ protocol, kind: "policy", question: "预约审批", questionContext: standalone });
+  const globalNext = await test.controller.createTurn(test.context("没有他的许可可以直接办理么？", { policyTopic: global.verifiedPolicyTopic }))
+    .execute({ protocol, kind: "policy", question: "许可", questionContext: { kind: "previous", requestId: global.verifiedPolicyTopic!.requestId } });
+  assert.equal(globalNext.outcome, "ready");
+  assert.ok(globalNext.evidence.knowledge[0]!.context.effectiveQuery.includes("预约改期通常需要谁审批"));
+}
+console.log("[support-controller] v2.2 previous-topic ID, actor/group/order/scope binding and global continuation PASS");
+
+{
+  const test = setup(), otherId = "COUPON-2088", binding = { sourceKey: merchantSourceKey(identity, group), groupOpenid: group };
+  const other = { ...structuredClone(order), id: otherId, status: "refunded", amounts: { ...order.amounts, refundedCents: 7980 } };
+  let revoked = false;
+  test.services.store.getOrder = async (who, id) => {
+    assert.deepEqual(who, identity); if (revoked) throw new OrderAccessError("changed owner");
+    assert.ok([orderId, otherId].includes(id)); return structuredClone(id === otherId ? other : order);
+  };
+  const prior = await test.controller.createTurn(test.context(`${otherId} 已经退款成功，还可以再次退款吗？`))
+    .execute({ protocol, kind: "refund_eligibility", orderRef: { kind: "explicit", orderId: otherId }, question: "重复退款", questionContext: standalone });
+  const choices = rememberOrderChoice(rememberOrderChoice(undefined, binding, orderId, "shown-first"), binding, otherId, "shown-second");
+  const ctx = { focusOrderId: otherId, orderChoices: choices, policyTopic: prior.verifiedPolicyTopic! };
+  const action: ContextSupportAction = { protocol, kind: "refund_eligibility", orderRef: { kind: "alternative" }, question: "另一笔资格",
+    questionContext: { kind: "previous", requestId: ctx.policyTopic.requestId } };
+  const switched = await test.controller.createTurn(test.context("那么另一个订单的申请条件呢？", ctx)).execute(action);
+  assert.equal(switched.verifiedOrderId, orderId); assert.equal(switched.evidence.order!.status, "paid");
+  const query = switched.evidence.knowledge[0]!.context.effectiveQuery;
+  assert.match(query, /未核销退款/); assert.doesNotMatch(query, /已经退款成功|再次退款|COUPON-2088/);
+  const independent = await test.controller.createTurn(test.context("另一个订单需要满足哪些退款条件？", { ...ctx, policyTopic: undefined }))
+    .execute({ ...action, questionContext: standalone });
+  assert.equal(independent.outcome, "ready"); assert.equal(independent.verifiedOrderId, orderId);
+  assert.ok(independent.evidence.actualCalls.some(call => call.name === "get_order" && !call.isError && call.input.orderId === orderId));
+  assert.match(independent.evidence.knowledge[0]!.context.effectiveQuery, /未核销退款/);
+  assert.doesNotMatch(independent.evidence.knowledge[0]!.context.effectiveQuery, /已经退款成功|再次退款|COUPON-2088/);
+  for (const orderChoices of [undefined, { ...choices, sourceKey: "other-user" }, { ...choices, groupOpenid: "elsewhere" },
+    rememberOrderChoice(choices, binding, "COUPON-2089", "third"), { ...choices, overflow: true }]) {
+    const result = await test.controller.createTurn(test.context("另外一笔呢？", { ...ctx, orderChoices })).execute(action);
+    assert.equal(result.outcome, "clarification"); assert.equal(result.evidence.actualCalls.length, 0);
+  }
+  const generic = await test.controller.createTurn(test.context("另一个也沿用吗？", { ...ctx, policyTopic: { ...ctx.policyTopic, intent: "policy" } }))
+    .execute({ ...action, kind: "policy" });
+  assert.equal(generic.outcome, "clarification"); assert.equal(generic.evidence.actualCalls.length, 0);
+  revoked = true;
+  await assert.rejects(test.controller.createTurn(test.context("另一笔呢？", ctx)).execute(action),
+    error => error instanceof SupportServiceError && error.errorKind === "business_denial");
+  assert.equal(test.preparations, 0);
+}
+console.log("[support-controller] v2.2 alternative selection renews authorization without copying historical order state PASS");
+
+{
+  const test = setup(), partial = structuredClone(order);
+  partial.status = "partially_redeemed"; partial.amounts = { totalCents: 9520, paidCents: 9520, refundedCents: 0 };
+  Object.assign(partial.items[0]!, { quantity: 2, unitPriceCents: 4760, totalCents: 9520 });
+  partial.payments[0]!.amountCents = 9520;
+  partial.coupons = [{ ...partial.coupons[0]!, id: "used", status: "redeemed" }, { ...partial.coupons[0]!, id: "remaining" }];
+  let fresh = structuredClone(partial);
+  test.services.store.getOrder = async () => structuredClone(fresh);
+  test.services.store.searchKnowledge = async () => { throw new Error("A paid-fact comparison needs no knowledge request"); };
+  const shown = await test.controller.createTurn(test.context(`查询 ${orderId}`)).execute({ protocol, kind: "order", orderRef: explicit });
+  const reference = shown.verifiedAmountReference!, ctx = { focusOrderId: orderId, amountReference: reference };
+  const action: ContextSupportAction = { protocol, kind: "paid_amount_compare", orderRef: focus, amountRef: { requestId: reference.requestId } };
+  const run = (extra: Partial<SupportTurnContext> = {}) => test.controller.createTurn(test.context("还有那份没有消费，实际支付是不是之前给我看的数？", { ...ctx, ...extra })).execute(action);
+  const compared = await run();
+  assert.equal(compared.evidence.amountComparison!.remainingUnitPaidCents, 4760);
+  assert.equal(compared.evidence.amountComparison!.comparisonEqual, true); assert.equal(compared.evidence.amountComparison!.refundApproved, false);
+  assert.deepEqual(compared.evidence.actualCalls.map(call => call.name), ["get_order"]);
+  assert.equal(compared.evidence.knowledge.length, 0); assert.equal(compared.evidence.rules.length, 0); assert.equal(compared.needsAnswer, false);
+  assert.ok(compared.reply.kind === "order"); assert.match(compared.reply.text, /不是|不代表退款申请上限/);
+  for (const amountReference of [undefined, { ...reference, requestId: "unseen" }, { ...reference, sourceKey: "different-actor" },
+    { ...reference, groupOpenid: "different-group" }]) {
+    const rejected = await run({ amountReference }); assert.equal(rejected.outcome, "clarification"); assert.equal(rejected.evidence.actualCalls.length, 0);
+  }
+  for (const mutate of [
+    () => { fresh.coupons.push({ ...fresh.coupons[1]!, id: "also-unused" }); },
+    () => { fresh.coupons[1]!.expiresAt = "2000-01-01T00:00:00.000Z"; },
+    () => { fresh.amounts.paidCents -= 200; fresh.payments[0]!.amountCents -= 200; },
+    () => { fresh.payments[0]!.amountCents = 1; },
+    () => { fresh.amounts.refundedCents = 10; },
+  ]) {
+    fresh = structuredClone(partial); mutate(); const rejected = await run();
+    assert.equal(rejected.outcome, "clarification"); assert.equal(rejected.evidence.amountComparison, undefined);
+    assert.deepEqual(rejected.evidence.actualCalls.map(call => call.name), ["get_order"]);
+  }
+  fresh = structuredClone(partial); fresh.amounts.totalCents = fresh.amounts.paidCents = 9720;
+  Object.assign(fresh.items[0]!, { unitPriceCents: 4860, totalCents: 9720 }); fresh.payments[0]!.amountCents = 9720;
+  const changed = await run(); assert.equal(changed.evidence.amountComparison!.remainingUnitPaidCents, 4860);
+  assert.equal(changed.evidence.amountComparison!.referencePaidCents, 4760); assert.equal(changed.evidence.amountComparison!.comparisonEqual, false);
+  assert.equal(test.preparations, 0);
+}
+console.log("[support-controller] v2.2 displayed-amount reference, fresh paid arithmetic and zero-knowledge read-only comparison PASS");

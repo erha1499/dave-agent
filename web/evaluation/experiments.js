@@ -134,10 +134,13 @@ function expComboError(config) {
     for (const variant of config.variants) {
       if (variant.architecture === "atomic" && variant.parameters?.knowledgeMode === "m4-support")
         return `方案 ${variant.id}：atomic 仅支持本地词项知识检索；m4-support 请使用 Controller。`;
-      // typed 仅在 Controller + m4-support 合法；非法组合提示修正路径，不偷偷改参数。
+      // typed/固定 Pro 仅在 Controller + m4-support 合法；非法组合提示修正路径，不偷偷改参数。
       if (variant.parameters?.knowledgeSupport === "typed"
         && (variant.architecture !== "controller" || (variant.parameters?.knowledgeMode ?? "lexical") !== "m4-support"))
         return `方案 ${variant.id}：typed 事实支持判别需 Controller + m4-support 知识检索；请改回 binary 或调整组合。`;
+      if (variant.parameters?.knowledgeSupportModel === "deepseek-v4-pro"
+        && (variant.architecture !== "controller" || (variant.parameters?.knowledgeMode ?? "lexical") !== "m4-support"))
+        return `方案 ${variant.id}：固定 Pro 判别模型需 Controller + m4-support 知识检索；请改回 configured 或调整组合。`;
     }
     return "";
   }
@@ -430,7 +433,8 @@ function expParamRow(draft, variant, field, controls) {
   const thresholdNA = field.key === "knowledgeThreshold" && draft.kind === "support" && (params.knowledgeMode ?? "lexical") !== "m4-support";
   const profileApplicable = variant.architecture === "controller" && (params.knowledgeMode ?? "lexical") === "m4-support";
   const profileNA = field.key === "knowledgeSupport" && draft.kind === "support" && !profileApplicable && (params.knowledgeSupport ?? "binary") !== "typed";
-  const notApplicable = repairNA || timeoutNA || thresholdNA || profileNA;
+  const modelNA = field.key === "knowledgeSupportModel" && draft.kind === "support" && !profileApplicable && (params.knowledgeSupportModel ?? "configured") !== "deepseek-v4-pro";
+  const notApplicable = repairNA || timeoutNA || thresholdNA || profileNA || modelNA;
   let control;
   if (field.type === "select") {
     control = node("select", { "data-field": field.key, "data-variant": variant.id });
@@ -439,25 +443,27 @@ function expParamRow(draft, variant, field, controls) {
     control.value = params[field.key] ?? options[0]?.value ?? "";
     control.addEventListener("change", () => {
       params[field.key] = control.value;
-      // knowledgeMode 即时驱动阈值/判别类型适用性：只改 disabled 与行样式，不重建卡片，保留焦点与展开态。
+      // knowledgeMode 即时驱动阈值/判别类型/判别模型适用性：只改 disabled 与行样式，不重建卡片，保留焦点与展开态。
       if (field.key === "knowledgeMode") {
+        const applicable = variant.architecture === "controller" && control.value === "m4-support";
         const linkedThreshold = controls.get("knowledgeThreshold");
         if (linkedThreshold) {
           const na = control.value !== "m4-support";
           linkedThreshold.control.disabled = na;
           linkedThreshold.row.className = `exp-param${na ? " disabled" : ""}`;
         }
-        const linkedProfile = controls.get("knowledgeSupport");
-        if (linkedProfile) {
-          const applicable = variant.architecture === "controller" && control.value === "m4-support";
-          const na = !applicable && linkedProfile.control.value !== "typed";
-          linkedProfile.control.disabled = na;
-          linkedProfile.row.className = `exp-param${na ? " disabled" : ""}`;
+        for (const [key, illegalValue] of [["knowledgeSupport", "typed"], ["knowledgeSupportModel", "deepseek-v4-pro"]]) {
+          const linked = controls.get(key);
+          if (!linked) continue;
+          const na = !applicable && linked.control.value !== illegalValue;
+          linked.control.disabled = na;
+          linked.row.className = `exp-param${na ? " disabled" : ""}`;
         }
       }
-      if (field.key === "knowledgeSupport") {
+      if (field.key === "knowledgeSupport" || field.key === "knowledgeSupportModel") {
         const applicable = variant.architecture === "controller" && (params.knowledgeMode ?? "lexical") === "m4-support";
-        const na = !applicable && control.value !== "typed";
+        const illegalValue = field.key === "knowledgeSupport" ? "typed" : "deepseek-v4-pro";
+        const na = !applicable && control.value !== illegalValue;
         control.disabled = na;
         row.className = `exp-param${na ? " disabled" : ""}`;
       }

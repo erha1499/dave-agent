@@ -5,7 +5,7 @@ import type { AssistantMessage } from "@earendil-works/pi-ai";
 import type { Pool } from "mysql2/promise";
 import { createBailianClient } from "../src/bailian.ts";
 import { CouponStore } from "../src/coupon-store.ts";
-import { createEvidenceSupportClient, evidenceSupportInputHash } from "../src/evidence-support.ts";
+import { createEvidenceSupportClient, evidenceSupportInputHash, resolveEvidenceSupportModel } from "../src/evidence-support.ts";
 import { createKnowledgeService, type KnowledgeServiceOptions } from "../src/knowledge-service.ts";
 import { rankKnowledge } from "../src/knowledge-retrieval.ts";
 import type { RetrievalDocument } from "../src/retrieval-ranking.ts";
@@ -36,7 +36,7 @@ const rerank = createBailianClient({ timeoutMs: 1000, retries: 0, env: { DASHSCO
     if (rerankError) throw new Error("SECRET provider error");
     return new Response(JSON.stringify({ results: rerankInvalid ? [] : scores.map((score, index) => ({ index, relevance_score: score })), usage: { total_tokens: 100 } }));
   } });
-const model = { provider: "deepseek", id: "mock-support", api: "openai-completions", baseUrl: "https://api.deepseek.com", maxTokens: 4096,
+const model = { provider: "deepseek", id: resolveEvidenceSupportModel().model, api: "openai-completions", baseUrl: "https://api.deepseek.com", maxTokens: 4096,
   cost: { input: .1, output: .2, cacheRead: .01, cacheWrite: 0 } };
 const support = await createEvidenceSupportClient({ timeoutMs: 1000, runtime: { model, complete: async (context, options): Promise<AssistantMessage> => {
   judges++; await onSupport(); assert.equal(options.maxRetries, 0); assert.deepEqual(context.tools, []);
@@ -53,6 +53,7 @@ const service = createKnowledgeService(store, options);
 const stages: string[] = [];
 const good = await service.search({ query, originalQuery: "那退款呢？", scope, onStage: stage => stages.push(stage) });
 assert.equal(good.trace.status, "accepted"); assert.equal(good.trace.query, query); assert.equal(good.trace.originalQuery, "那退款呢？");
+assert.equal(good.trace.supportModel, "configured"); assert.equal(good.trace.settings!.support!.model, model.id);
 assert.equal(good.trace.threshold, .71); assert.deepEqual(stages, ["read", "rerank", "support", "recheck"]);
 assert.deepEqual(good.documents.map(doc => doc.sourceId), ["A", "B"]); assert.equal(reads, 2); assert.equal(reranks, 1); assert.equal(judges, 1);
 assert.equal(good.trace.sourceHashes.before, good.trace.sourceHashes.after);
@@ -133,6 +134,8 @@ assert.equal(badRerank.trace.status, "unavailable"); assert.equal(badRerank.trac
 supportInvalid = true; const badSupport = await service.search({ query, scope });
 assert.equal(badSupport.trace.status, "unavailable"); assert.deepEqual(badSupport.documents, []); assert.equal(badSupport.trace.usage.supportTokens, 50); supportInvalid = false;
 assert.equal(badSupport.trace.supportVerification, undefined, "invalid provider output is not presented as verified decisions");
+assert.equal(badSupport.trace.supportFailure!.code, "invalid_quote"); assert.match(badSupport.trace.supportFailure!.outputHash!, /^[a-f0-9]{64}$/);
+assert.deepEqual(Object.keys(badSupport.trace.supportFailure!).sort(), ["code", "outputHash"]);
 
 const cancelled = new AbortController(); cancelled.abort(); const callsBeforeAbort = reranks;
 assert.equal((await service.search({ query, scope, signal: cancelled.signal })).trace.reason, "aborted"); assert.equal(reranks, callsBeforeAbort);
@@ -185,8 +188,28 @@ const typedResult = await typedService.search({ query, scope });
 assert.equal(typedJudges, 1); assert.equal(typedResult.trace.supportProfile, "typed");
 assert.deepEqual(typedResult.documents.map(doc => doc.sourceId), ["A"], "only direct facts are accepted; limitation remains an auditable rejection");
 assert.deepEqual(typedResult.trace.supportVerification!.value.map(row => [row.category, row.supported]), [["direct_fact", true], ["limitation_only", false]]);
-assert.equal(typedResult.trace.settings!.support!.promptVersion, "fact-support-typed-v2");
+assert.equal(typedResult.trace.settings!.support!.promptVersion, "fact-support-typed-v3");
 assert.deepEqual(typedResult.trace.sources!.map(source => source.sourceId), ["A"]);
+
+// Only the support judge changes model; mismatched injected clients cannot make the switch a no-op.
+assert.throws(() => createKnowledgeService(store, { supportModel: "deepseek-v4-pro" }), /仅适用于/);
+assert.throws(() => createKnowledgeService(store, { ...options, supportModel: "deepseek-v4-pro" }), /模型不一致/);
+const proClient = await createEvidenceSupportClient({ modelSelection: "deepseek-v4-pro", profile: "typed", timeoutMs: 1000,
+  env: { MODEL_PROVIDER: "deepseek" }, runtime: { model: { ...model, id: "deepseek-v4-pro" }, complete: async context => {
+    const input = JSON.parse(String(context.messages[0]!.content));
+    return { role: "assistant", api: "openai-completions", provider: "deepseek", model: "deepseek-v4-pro", stopReason: "stop", timestamp: 0,
+      content: [{ type: "text", text: JSON.stringify({ decisions: input.documents.map((doc: { id: string; body: string }) => ({
+        id: doc.id, category: "direct_fact", quote: doc.body, reason: "工程模型切换检查",
+      })) }) }], usage: { input: 30, output: 20, cacheRead: 0, cacheWrite: 0, totalTokens: 50,
+        cost: { input: .000003, output: .000004, cacheRead: 0, cacheWrite: 0, total: .000007 } } };
+  } } });
+assert.throws(() => createKnowledgeService(store, { ...options, supportProfile: "typed", clients: { rerank, support: proClient } }), /模型不一致/);
+const proResult = await createKnowledgeService(store, { ...options, supportProfile: "typed", supportModel: "deepseek-v4-pro",
+  clients: { rerank, support: proClient } }).search({ query, scope });
+assert.equal(proResult.trace.status, "accepted"); assert.equal(proResult.trace.supportModel, "deepseek-v4-pro");
+assert.equal(proResult.trace.settings!.support!.model, "deepseek-v4-pro");
+assert.equal(proResult.trace.settings!.rerank!.rerankModel, good.trace.settings!.rerank!.rerankModel);
+assert.equal(proResult.trace.supportVerification!.attempts[0]!.model, "deepseek-v4-pro");
 
 // Actual Bailian input validation happens before its send hook: a local refusal is not a provider request.
 const oversized = [{ ...docs[0]!, body: "长".repeat(33_000) }];

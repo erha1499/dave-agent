@@ -152,7 +152,7 @@ export async function runSupportV2Live({ architecture, label, batch, parameters,
   const sales = architecture === "atomic" ? traced(merchant, { prepare: "prepare_merchant_request", getTask: "get_merchant_request" }, "business-service") : merchant;
   const refundTools = architecture === "atomic" ? traced(refunds, { prepare: "prepare_refund", get: "get_refund" }, "business-service") : refunds;
   const refundHost = traced(refunds, { confirm: "confirm_refund", markPresented: "mark_presented" }, "confirmation-service");
-  const knowledge = createKnowledgeService(fixtureStore, { mode: resolved.knowledgeMode, supportProfile: resolved.knowledgeSupport, threshold: resolved.knowledgeThreshold, timeoutMs: resolved.knowledgeTimeoutMs });
+  const knowledge = createKnowledgeService(fixtureStore, { mode: resolved.knowledgeMode, supportProfile: resolved.knowledgeSupport, supportModel: resolved.knowledgeSupportModel, threshold: resolved.knowledgeThreshold, timeoutMs: resolved.knowledgeTimeoutMs });
   function onControllerCall(call: SupportCall) {
     if (!current || call.parentSpanId !== current.id) return;
     const span: EvalSpan = { id: call.id, parentSpanId: current.id, actor: "host", trigger: current.trigger,
@@ -214,7 +214,7 @@ export async function runSupportV2Live({ architecture, label, batch, parameters,
       .map(({ name, description, parameters }) => ({ name, description, parameters }));
     const snapshot = await createObjectiveSnapshot({ plan, dataset, tools,
       model: { provider: session!.model!.provider, id: session!.model!.id, maxTokens: session!.model!.maxTokens, thinking: session!.thinkingLevel, temperature: null },
-      files: ["scripts/support-v2-live.ts", datasetPath, "data/support-v2-development.json", "scripts/merchant-test-fixture.ts", "src/support-evaluation.ts", "src/support-controller.ts", "src/support-action.ts", "src/support-session.ts", "src/support-parameters.ts",
+      files: ["scripts/support-v2-live.ts", datasetPath, "data/support-v2-development.json", "scripts/merchant-test-fixture.ts", "src/support-evaluation.ts", "src/support-controller.ts", "src/support-action.ts", "src/support-context-action.ts", "src/support-session.ts", "src/support-parameters.ts",
         "src/support-context.ts", "prompts/customer-service-v2.md", "skills/shop-support-v2/SKILL.md",
         "src/knowledge-service.ts", "src/knowledge-evaluation.ts", "src/bailian.ts", "src/evidence-support.ts", "src/evidence-acceptance.ts", "src/retrieval-ranking.ts",
         "src/agent.ts", "src/qq-agent.ts", "src/coupon-store.ts", "src/knowledge-retrieval.ts", "src/refunds.ts", "src/refund-entry.ts", "src/after-sales.ts", "src/after-sales-entry.ts", "src/merchant-notifications.ts", "src/reply.ts", "src/reply-from-tools.ts"],
@@ -296,7 +296,7 @@ export async function runSupportV2Live({ architecture, label, batch, parameters,
         const after = await state(watchedOrders), receipt = receipts[receiptStart], calls = spans.filter(span => span.component === "business-service");
         const knowledgeComplete = architecture !== "controller" || calls.filter(call => call.name === "search_faq").every(call => {
           const trace = call.knowledge?.trace;
-          return trace?.mode === resolved.knowledgeMode && trace.supportProfile === resolved.knowledgeSupport && Array.isArray(call.output)
+          return trace?.mode === resolved.knowledgeMode && trace.supportProfile === resolved.knowledgeSupport && trace.supportModel === resolved.knowledgeSupportModel && Array.isArray(call.output)
             && (example.knowledge === "error" ? trace.status === "unavailable" && trace.reason === "database_unavailable" && call.output.length === 0
               : trace.status !== "unavailable") && (!call.usage) && trace.calls.every(provider => provider.status === "ok");
         });
@@ -384,7 +384,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     const { plan } = await checkSupportLiveDataset();
     console.log(`v2真实入口就绪：${plan.cases.length}案例/${plan.cases.reduce((sum, item) => sum + item.turns.length, 0)}轮；未连接数据库或调用模型。需显式 --live --architecture atomic|controller --repeat 3。`);
   } else {
-    const flags = ["--architecture", "--repeat", "--label", "--dataset", "--knowledge-mode", "--knowledge-support", "--knowledge-threshold", "--knowledge-timeout-ms"];
+    const flags = ["--architecture", "--repeat", "--label", "--dataset", "--knowledge-mode", "--knowledge-support", "--knowledge-support-model", "--knowledge-threshold", "--knowledge-timeout-ms"];
     assert.ok(args.every((arg, index) => arg === "--live" || flags.includes(arg) || flags.includes(args[index - 1] ?? "")), "未知参数");
     const value = (name: string) => args[args.indexOf(name) + 1];
     const architecture = value("--architecture"); assert.ok(architecture === "atomic" || architecture === "controller", "必须明确选择architecture");
@@ -394,6 +394,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     const parameters: Partial<SupportExperimentParameters> = {
       ...(args.includes("--knowledge-mode") ? { knowledgeMode: value("--knowledge-mode") as SupportExperimentParameters["knowledgeMode"] } : {}),
       ...(args.includes("--knowledge-support") ? { knowledgeSupport: value("--knowledge-support") as SupportExperimentParameters["knowledgeSupport"] } : {}),
+      ...(args.includes("--knowledge-support-model") ? { knowledgeSupportModel: value("--knowledge-support-model") as SupportExperimentParameters["knowledgeSupportModel"] } : {}),
       ...(args.includes("--knowledge-threshold") ? { knowledgeThreshold: Number(value("--knowledge-threshold")) } : {}),
       ...(args.includes("--knowledge-timeout-ms") ? { knowledgeTimeoutMs: Number(value("--knowledge-timeout-ms")) } : {}),
     };

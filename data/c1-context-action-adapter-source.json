@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "dataset": {
+    "path": "data/c1-context-action-adapter.json",
+    "sha256": "539602f6f2e439a8941660a49612b13bc57f753d89b9268cb4b3952cca95532b",
+    "bytes": 6675
+  },
+  "originalDatasets": {
+    "data/c1-context-validation.json": "cc6a457731d8abc2d147e569cb766796a3064b65beb1016861aa1d24589a2271",
+    "data/c1-context-development.json": "e25a9198ae9aa5b1461e8cb4454415f4d8bbe08f6586e4bcf4d9d893fedd9913",
+    "data/c1-context-validation-v2.json": "9a1516165b5ef1d27cef844858802978c86553dc68b254d8af8807e205683166",
+    "data/c1-context-validation-v3.json": "31e2bc995367ab5e56bc37f5a48c704bd7259a5d40217b07e4dca4fe7dd5623e"
+  },
+  "caseCount": 31,
+  "stage": "frozen-development-adapter-before-execution",
+  "notNewValidation": true
+}

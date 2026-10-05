@@ -9,9 +9,9 @@ import type { CouponStore, QQIdentity } from "./coupon-store.ts";
 import type { KnowledgeService } from "./knowledge-service.ts";
 import type { RefundStore } from "./refunds.ts";
 import type { Reply } from "./reply.ts";
-import { parseSupportAction, supportActionParameters } from "./support-action.ts";
-import { hasAmbiguousOrderReference, SupportController, type SupportCall, type SupportResult, type TrustedPolicyTopic } from "./support-controller.ts";
-import { rememberOrderChoice, selectAlternativeOrder, supportObjectReference, type TrustedAmountReference, type TrustedOrderChoices } from "./support-context.ts";
+import { parseContextSupportAction, contextSupportActionParameters } from "./support-context-action.ts";
+import { SupportController, type SupportCall, type SupportResult, type TrustedPolicyTopic } from "./support-controller.ts";
+import { rememberOrderChoice, selectAlternativeOrder, type TrustedAmountReference, type TrustedOrderChoices } from "./support-context.ts";
 import { resolveSupportParameters } from "./support-parameters.ts";
 
 export type SupportPrompt = {
@@ -48,7 +48,9 @@ export const getSupportResult = (session: AgentSession) => sessions.get(session)
 export const isSupportSession = (session: AgentSession) => sessions.has(session);
 export function cancelSupportTurn(session: AgentSession) {
   const state = sessions.get(session);
-  if (state) { state.abort?.abort(); clearReferences(state); }
+  // Keep an already published host receipt for model-failure recovery. A new
+  // ingress clears it; cancellation cannot undo an operation already completed.
+  if (state) { state.abort?.abort(); state.turnError = true; clearReferences(state); }
 }
 
 // Only an in-process, successful Controller result can choose a business card.
@@ -83,14 +85,29 @@ export async function createSupportSession(
   let turn: ReturnType<SupportController["createTurn"]> | undefined;
   const tools = [defineTool({
     name: "support_action", label: "处理客服业务动作",
-    description: "每轮选择一个业务动作。身份、权限、订单事实、金额、批准和确认均由宿主核验。订单出现在当前消息用explicit；唯一已核验历史订单用focus；指代不清用clarify。宿主完成内部查询与前置条件，不要重复执行或追加冲突动作。",
-    parameters: supportActionParameters,
+    description: "每轮选择一个 protocol=v2.2 的业务动作。模型判断语义，宿主验证引用和事实：当前写明订单用explicit，唯一当前订单用focus，另一笔只读订单用alternative；政策问题区分standalone/previous，previous必须带宿主话题requestId。实付比较用paid_amount_compare及宿主amountRef。不接收身份、范围、金额或批准；缺引用或多义用clarify。",
+    parameters: contextSupportActionParameters,
     execute: async (_id, { action }) => {
       if (!turn) throw new Error("业务轮次尚未初始化。");
-      state.abort?.signal.throwIfAborted();
+      const executingTurn = turn, executingAbort = state.abort;
+      const isCurrent = () => turn === executingTurn && state.abort === executingAbort && !executingAbort?.signal.aborted;
+      const assertCurrent = () => {
+        executingAbort?.signal.throwIfAborted();
+        if (!isCurrent()) throw new Error("业务轮次已切换，不能发布旧轮次结果。");
+      };
+      assertCurrent();
       let result: SupportResult;
-      try { result = await turn.execute(action); }
-      catch (error) { clearReferences(state); throw error; }
+      try { result = await executingTurn.execute(action); }
+      catch (error) { if (isCurrent()) clearReferences(state); throw error; }
+      assertCurrent();
+      let focusWriteFailed = false;
+      if (result.verifiedOrderId) {
+        // A write already started cannot be rolled back by cancellation. Wait
+        // before publishing local state, and never let a late failure clear a new turn.
+        try { await options.focus?.write(result.verifiedOrderId); }
+        catch { focusWriteFailed = true; }
+        assertCurrent();
+      }
       state.result = result;
       state.policyTopic = result.verifiedPolicyTopic;
       state.amountReference = result.verifiedAmountReference;
@@ -98,10 +115,10 @@ export async function createSupportSession(
         state.orderChoices = rememberOrderChoice(state.orderChoices, { sourceKey, groupOpenid }, result.evidence.order.id, result.evidence.requestId);
       } else state.orderChoices = undefined;
       if (result.verifiedOrderId) {
-        state.focusOrderId = result.verifiedOrderId;
+        state.focusOrderId = focusWriteFailed ? undefined : result.verifiedOrderId;
+        state.focusUnavailable = focusWriteFailed;
         // A failed context write must not turn a prepared operation into a retry.
-        try { await options.focus?.write(result.verifiedOrderId); state.focusUnavailable = false; }
-        catch { state.focusOrderId = undefined; clearReferences(state); state.focusUnavailable = true; }
+        if (focusWriteFailed) clearReferences(state);
       }
       const { order, rules, task, operation, amountComparison, displayedPaidUnit } = result.evidence;
       return { content: [{ type: "text", text: JSON.stringify({
@@ -135,14 +152,13 @@ export async function createSupportSession(
           } catch { state.focusOrderId = undefined; clearReferences(state); state.focusUnavailable = true; }
         }
         const explicit = [...new Set(userText.match(/COUPON-\d{4}(?!\d)/g) ?? [])];
-        const objectReference = supportObjectReference(userText);
-        const hasObjectReference = objectReference === "remaining_amount" ? Boolean(state.amountReference)
-          : objectReference === "alternative_order" && Boolean(state.policyTopic && selectAlternativeOrder(state.orderChoices, { sourceKey, groupOpenid }, state.focusOrderId));
-        if (hasAmbiguousOrderReference(userText) && !hasObjectReference || (explicit.length === 1 && explicit[0] !== state.focusOrderId)) {
+        // Semantic references are selected by the one model action. Only an
+        // explicit locator changes these host references before fresh execution.
+        if (explicit.length > 1 || (explicit.length === 1 && explicit[0] !== state.focusOrderId)) {
           state.focusOrderId = undefined;
           state.policyTopic = undefined;
           state.amountReference = undefined;
-          if (hasAmbiguousOrderReference(userText)) state.orderChoices = undefined;
+          if (explicit.length > 1) state.orderChoices = undefined;
           try { await options.focus?.write(undefined); }
           catch { state.focusUnavailable = true; }
         }
@@ -152,11 +168,13 @@ export async function createSupportSession(
           focusOrderId: state.focusOrderId, policyTopic: state.policyTopic, orderChoices: state.orderChoices, amountReference: state.amountReference,
           signal: state.abort.signal, onCall: current.onCall ?? options.onCall,
         });
-        return JSON.stringify({ kind: "host_order_reference", orderId: state.focusOrderId ?? null,
-          policyQuestion: state.policyTopic?.originalQuery ?? null,
-          itemPaidUnit: state.amountReference ? { orderId: state.amountReference.orderId, paidCents: state.amountReference.paidCents } : null,
+        return JSON.stringify({ kind: "host_order_reference", protocol: "v2.2", orderId: state.focusOrderId ?? null,
+          policyTopic: state.policyTopic ? { requestId: state.policyTopic.requestId, originalQuery: state.policyTopic.originalQuery,
+            intent: state.policyTopic.intent, orderId: state.policyTopic.orderId } : null,
+          itemPaidUnit: state.amountReference ? { requestId: state.amountReference.requestId, orderId: state.amountReference.orderId,
+            field: state.amountReference.field, paidCents: state.amountReference.paidCents } : null,
           alternativeOrderId: selectAlternativeOrder(state.orderChoices, { sourceKey, groupOpenid }, state.focusOrderId) ?? null,
-          instruction: "仅用于明确的当前指代，不代表批准或确认。当前有订单号用explicit；省略用focus。剩余券金额比较仅在itemPaidUnit存在时选择只读policy/refund_eligibility；另一张仅在alternativeOrderId与policyQuestion存在时选择只读续问，不能生成方案。宿主重新授权并决定对象；缺引用或多义需clarify。policyQuestion只标记话题，不是旧答案或授权。" });
+          instruction: "使用protocol=v2.2。这些是有界定位引用，不代表批准或确认。当前有订单号用explicit；当前单用focus；唯一另一单用alternative且仅只读。依赖前文的话题用previous与policyTopic.requestId；独立完整问题用standalone。只读实付比较用paid_amount_compare与itemPaidUnit.requestId。引用为空、多义或不匹配先clarify，禁止从历史聊天自造引用或把旧状态带到新单；宿主每轮重新授权取证。" });
       } catch {
         turn = undefined;
         state.abort.abort();
@@ -174,8 +192,8 @@ export async function createSupportSession(
       try {
         if (part.name !== "support_action" || Object.keys(part.arguments).length !== 1 || !("action" in part.arguments)) throw new Error();
         // Count pure reference/protocol failures in the same bounded repair budget as schema errors.
-        if (turn) turn.validate(part.arguments.action);
-        else parseSupportAction(part.arguments.action);
+        const action = parseContextSupportAction(part.arguments.action);
+        if (turn) turn.validate(action);
       } catch { state.invalidActions++; }
     }
     if (state.invalidActions > repairBudget) {

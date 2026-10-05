@@ -1,0 +1,42 @@
+{
+  "version": 1,
+  "stage": "fixed-before-support-development-execution",
+  "createdAt": "2026-10-05T17:49:01.970Z",
+  "dataset": {
+    "path": "data/c1-support-development-v2.json",
+    "sha256": "6b62723bb0497e09da5a3b509f20023e47036e24d0c51989fcf1f96f2a084b0d",
+    "bytes": 7258
+  },
+  "counts": {
+    "pairs": 5,
+    "questions": 10,
+    "direct_fact": 2,
+    "boundary_answer": 3,
+    "limitation_only": 5,
+    "accepted": 5,
+    "rejected": 5
+  },
+  "baseFiles": {
+    "data/acceptance-online.json": "5f97b7f4e77cd1695a38ef9b0c42e53f52f40f7ae869a39fcdcdae5ae8971b72",
+    "data/acceptance-validation.json": "0ead08f6c37cf43be8d84b47557692e3ac2cc264fe37994f2f030cddf7d50592",
+    "data/reference/kefu-harness/data/knowledge/docs.jsonl": "d3cd80ba76fdc82e57c1eefdc66a20987f09bc9b3dd0fbd1287c709146217fae",
+    "data/reference/kefu-harness/source.json": "42c6791ca2edfabcb98d9c49c2cd063c81e7705c29e94a6c1858357000c1d5cf",
+    "data/c1-support-development.json": "fda5404be9fdf413661d16f54b9353c0ec973ab29e195d3d95f89ad079d8f56d",
+    "data/c1-support-development-source.json": "5e50d745855a1de85cc18e2e5ad0f2a1c0f060e0e47a14244c3bbf45d5094dae"
+  },
+  "review": {
+    "isBlind": false,
+    "beforeExecution": true,
+    "sourcePerPair": "Same complete existing document/scope; only requested fact changes.",
+    "oldSixVerbatim": true,
+    "newCases": [
+      "c1-pair-007",
+      "c1-pair-008",
+      "c1-pair-009",
+      "c1-pair-010"
+    ],
+    "coverageRubric": "Explicit documentation coverage questions accept direct_fact or boundary_answer; actual business fact questions without facts reject as limitation_only.",
+    "exposedFailureUsed": true,
+    "noV4InputUsed": true
+  }
+}

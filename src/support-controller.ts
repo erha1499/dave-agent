@@ -5,7 +5,9 @@ import { OrderAccessError, type CouponStore, type QQIdentity } from "./coupon-st
 import type { KnowledgeService, KnowledgeTrace } from "./knowledge-service.ts";
 import { RefundBusinessError, type RefundStore } from "./refunds.ts";
 import { isRefundOperation, type Reply } from "./reply.ts";
-import { parseSupportAction, SupportProtocolError, type SupportAction, type SupportOrderRef } from "./support-action.ts";
+import { SupportProtocolError } from "./support-action.ts";
+import { isContextSupportAction, parseAnySupportAction, type AnySupportAction, type ContextOrderRef } from "./support-context-action.ts";
+export { parseAnySupportAction as parseExecutedSupportAction } from "./support-context-action.ts";
 import { compareRemainingAmount, createAmountReference, selectAlternativeOrder, supportObjectReference,
   type RemainingAmountComparison, type TrustedAmountReference, type TrustedOrderChoices } from "./support-context.ts";
 export type { RemainingAmountComparison, TrustedAmountReference, TrustedOrderChoices } from "./support-context.ts";
@@ -28,6 +30,7 @@ export type SupportKnowledgeContext = {
   facts: { orderId: string; asOf: string; status: string; productId: string; productName: string; refundState: string } | null;
   policyTopic: TrustedPolicyTopic | null;
   objectReference: { kind: "remaining_amount" | "alternative_order"; sourceRequestIds: string[]; fromOrderId: string; toOrderId: string } | null;
+  protocol?: "v2.2";
 };
 export type TrustedPolicyTopic = {
   requestId: string; sourceKey: string; groupOpenid: string; originalQuery: string; orderId: string | null;
@@ -36,7 +39,8 @@ export type TrustedPolicyTopic = {
   intent?: "policy" | "refund_eligibility";
 };
 
-// Surface ambiguity must be resolved by a bounded host reference before any store access.
+// Legacy v2.1 replay only. Current v2.2 sessions select bounded references in the
+// action; these language heuristics must not route a current action.
 export function hasAmbiguousOrderReference(text: string) {
   const ids = [...new Set(text.match(/COUPON-\d{4}(?!\d)/g) ?? [])];
   return ids.length > 1 || ids.length === 0
@@ -85,7 +89,7 @@ export type SupportTurnContext = {
 };
 export type EvidenceBundle = {
   version: 1; requestId: string; trustedRoute: SupportTurnContext["trustedRoute"];
-  action: SupportAction; actualCalls: SupportCall[];
+  action: AnySupportAction; actualCalls: SupportCall[];
   traceDeliveryFailed?: boolean;
   order?: Order; rules: Array<Knowledge[number] & { version: string }>;
   knowledge: Array<{ callId: string; context: SupportKnowledgeContext; trace: KnowledgeTrace }>;
@@ -95,7 +99,7 @@ export type EvidenceBundle = {
   operation?: Awaited<ReturnType<RefundStore["get"]>> | null;
 };
 export type SupportResult = {
-  action: SupportAction; outcome: "ready" | "clarification" | "blocked" | "non_business";
+  action: AnySupportAction; outcome: "ready" | "clarification" | "blocked" | "non_business";
   reply: Reply; evidence: EvidenceBundle; needsAnswer: boolean;
   // Explicit selection or a unique trusted alternative changes focus only after fresh getOrder authorization.
   verifiedOrderId?: string;
@@ -142,28 +146,33 @@ export class SupportController {
       ...(context.policyTopic ? { policyTopic: structuredClone(context.policyTopic) } : {}),
       ...(context.orderChoices ? { orderChoices: structuredClone(context.orderChoices) } : {}),
       ...(context.amountReference ? { amountReference: structuredClone(context.amountReference) } : {}) };
-    let accepted: SupportAction | undefined;
+    let accepted: AnySupportAction | undefined;
     let pending: Promise<SupportResult> | undefined;
-    const validate = (input: unknown): SupportAction => {
-      const action = parseSupportAction(input);
+    const validate = (input: unknown): AnySupportAction => {
+      const action = parseAnySupportAction(input);
       // Pure preflight: invalid current-message references can be repaired before locking any action.
-      if (action.kind === "clarify" || action.kind === "non_business" || hasAmbiguousOrderReference(trusted.userText)) return action;
+      if (action.kind === "clarify" || action.kind === "non_business"
+        || !isContextSupportAction(action) && hasAmbiguousOrderReference(trusted.userText)) return action;
       const ids = [...new Set(trusted.userText.match(/COUPON-\d{4}(?!\d)/g) ?? [])];
       if (action.orderRef?.kind === "explicit" && !ids.includes(action.orderRef.orderId)) {
         throw new SupportProtocolError("订单引用不在当前用户消息中；历史唯一订单应使用 focus，不能编造显式选单。");
       }
-      if (action.orderRef?.kind === "focus" && ids.length) {
+      if ((action.orderRef?.kind === "focus" || action.orderRef?.kind === "alternative") && ids.length) {
         throw new SupportProtocolError("当前用户已写明订单，请使用该显式订单引用，不能沿用旧焦点。");
       }
       if (action.kind === "policy" && !action.orderRef && ids.length) {
         throw new SupportProtocolError("当前问题涉及明确订单，请提供该订单引用以查询实际套餐范围。");
+      }
+      if (isContextSupportAction(action) && "productMention" in action && action.productMention
+        && (action.productMention.trim() !== action.productMention || !trusted.userText.includes(action.productMention))) {
+        throw new SupportProtocolError("商品描述必须摘取本轮用户原文的连续片段，不能补写或从历史话术生成。");
       }
       return action;
     };
     return {
       validate,
       execute: (input: unknown): Promise<SupportResult> => {
-        const action = parseSupportAction(input);
+        const action = parseAnySupportAction(input);
         if (accepted) {
           if (!isDeepStrictEqual(action, accepted)) throw new SupportProtocolError("本轮已有业务动作，不能追加冲突动作；请在下一轮明确需求。");
           return pending!;
@@ -177,7 +186,7 @@ export class SupportController {
     };
   }
 
-  private async execute(context: SupportTurnContext, action: SupportAction): Promise<SupportResult> {
+  private async execute(context: SupportTurnContext, action: AnySupportAction): Promise<SupportResult> {
     const evidence: EvidenceBundle = { version: 1, requestId: context.requestId, trustedRoute: { ...context.trustedRoute }, action,
       actualCalls: [], rules: [], knowledge: [] };
     let verifiedOrderId: string | undefined;
@@ -213,6 +222,9 @@ export class SupportController {
       step.durationMs = performance.now() - started;
       evidence.actualCalls.push(step);
       emit(step);
+      // The service may have completed after cancellation. Preserve its audit,
+      // but do not publish a result or continue to the next business operation.
+      context.signal?.throwIfAborted();
       return value;
     };
     const clarify = (field: "order" | "reason" | "intent") => result(notice({
@@ -226,44 +238,58 @@ export class SupportController {
       : "当前仅支持模拟团购券咨询、订单查询、协商和退款，不支持这项请求。"), "non_business");
 
     const binding = { sourceKey: context.sourceKey, groupOpenid: context.trustedRoute.groupOpenid };
-    const objectReference = supportObjectReference(context.userText);
-    const readOnlyQuestion = action.kind === "policy" || action.kind === "refund_eligibility";
+    const semantic = isContextSupportAction(action);
+    const objectReference = semantic ? action.kind === "paid_amount_compare" ? "remaining_amount"
+      : action.orderRef?.kind === "alternative" ? "alternative_order" : null : supportObjectReference(context.userText);
+    const readOnlyQuestion = action.kind === "policy" || action.kind === "refund_eligibility" || action.kind === "paid_amount_compare";
     if (objectReference === "ambiguous" || new Set(context.userText.match(/COUPON-\d{4}(?!\d)/g) ?? []).size > 1) return clarify("order");
-    if (readOnlyQuestion && multiplePolicyQuestions(context.userText)) return clarify("intent");
+    if (!semantic && readOnlyQuestion && multiplePolicyQuestions(context.userText)) return clarify("intent");
     let alternativeOrderId: string | undefined;
     if (objectReference) {
       const selectedOrderId = action.orderRef?.kind === "explicit" ? action.orderRef.orderId : context.focusOrderId;
       if (!readOnlyQuestion || !action.orderRef || !selectedOrderId) return clarify("order");
       if (objectReference === "alternative_order") {
-        if (action.orderRef.kind !== "focus" || !context.focusOrderId) return clarify("order");
+        if ((!semantic && action.orderRef.kind !== "focus") || !context.focusOrderId) return clarify("order");
         alternativeOrderId = selectAlternativeOrder(context.orderChoices, binding, context.focusOrderId);
-        if (!alternativeOrderId || !policyTopicMatches(context.policyTopic, { ...binding, orderId: context.focusOrderId })
-          || !["policy", "refund_eligibility"].includes(context.policyTopic!.intent ?? "")) return clarify("order");
+        if (!alternativeOrderId || !semantic && (!policyTopicMatches(context.policyTopic, { ...binding, orderId: context.focusOrderId })
+          || !["policy", "refund_eligibility"].includes(context.policyTopic!.intent ?? ""))) return clarify("order");
       } else if (!context.amountReference || context.amountReference.sourceKey !== context.sourceKey
-        || context.amountReference.groupOpenid !== binding.groupOpenid || context.amountReference.orderId !== selectedOrderId) return clarify("order");
-      if (objectReference === "remaining_amount" && /(?:[\d零一二三四五六七八九十百千万两]+(?:\.\d+)?\s*(?:元|块)|[￥¥]\s*\d|(?:金额|单价|价格)\s*(?:是|为|=|：|:)?\s*\d)/u.test(context.userText)) {
+        || context.amountReference.groupOpenid !== binding.groupOpenid || context.amountReference.orderId !== selectedOrderId
+        || action.kind === "paid_amount_compare" && action.amountRef.requestId !== context.amountReference.requestId) return clarify("order");
+      if (!semantic && objectReference === "remaining_amount" && /(?:[\d零一二三四五六七八九十百千万两]+(?:\.\d+)?\s*(?:元|块)|[￥¥]\s*\d|(?:金额|单价|价格)\s*(?:是|为|=|：|:)?\s*\d)/u.test(context.userText)) {
         return result(notice("请明确要比较之前展示的每券实付，还是本轮新提到的金额；本轮不会把新金额当作已批准退款额。"), "clarification");
       }
-      if (objectReference === "remaining_amount" && /(?:上限|最高|最多|最大|批准|获批|核准|同意|承诺)/u.test(context.userText)) {
+      if (!semantic && objectReference === "remaining_amount" && /(?:上限|最高|最多|最大|批准|获批|核准|同意|承诺)/u.test(context.userText)) {
         return result(notice("当前只能核对券的实付金额，不能据此确定部分退款申请上限或获批金额。请先明确要核对实付，还是咨询退款资格。"), "clarification");
       }
-    } else if (hasAmbiguousOrderReference(context.userText)) return clarify("order");
-    const resolveOrder = (ref: SupportOrderRef): string | undefined => {
+    } else if (!semantic && hasAmbiguousOrderReference(context.userText)) return clarify("order");
+    const resolveOrder = (ref: ContextOrderRef): string | undefined => {
       if (ref.kind === "explicit") return ref.orderId;
       return alternativeOrderId ?? context.focusOrderId;
     };
     const orderId = action.orderRef ? resolveOrder(action.orderRef) : undefined;
     if (action.kind !== "policy" && !orderId) return clarify("order");
     if (action.orderRef && !orderId) return clarify("order");
-    if (!orderId && action.kind === "policy" && needsOrderScope(context.userText)) return clarify("order");
-    const alternateAnchor = alternativeOrderId ? context.policyTopic!.originalQuery.replaceAll(context.focusOrderId!, alternativeOrderId) : undefined;
-    const question = objectReference === "remaining_amount"
+    if (!orderId && action.kind === "policy" && (semantic ? Boolean(action.productMention) : needsOrderScope(context.userText))) return clarify("order");
+    const alternateAnchor = !semantic && alternativeOrderId ? context.policyTopic!.originalQuery.replaceAll(context.focusOrderId!, alternativeOrderId) : undefined;
+    let question = semantic ? { query: context.userText, topic: null as TrustedPolicyTopic | null, needsClarification: false }
+      : objectReference === "remaining_amount"
       ? { query: `${context.userText}\n已解析为同单唯一剩余未核销券的实付单价比较。规则问题：剩余券退款申请金额是否按对应券实付单价计算？具体金额由宿主本轮订单事实单独核对。`,
         topic: policyTopicMatches(context.policyTopic, { ...binding, orderId: orderId! }) ? structuredClone(context.policyTopic!) : null, needsClarification: false }
-      : alternativeOrderId ? { query: `${context.userText}\n继续咨询已重新选定订单的问题：${alternateAnchor}。旧问题中的订单状态假设不沿用，以本轮订单事实为准。`,
+      : !semantic && alternativeOrderId ? { query: `${context.userText}\n继续咨询已重新选定订单的问题：${alternateAnchor}。旧问题中的订单状态假设不沿用，以本轮订单事实为准。`,
         topic: structuredClone(context.policyTopic!), needsClarification: false }
       : resolveSupportPolicyQuestion({ originalQuery: context.userText, sourceKey: context.sourceKey,
         groupOpenid: context.trustedRoute.groupOpenid, orderId: orderId ?? null, policyTopic: context.policyTopic });
+    if (semantic && (action.kind === "policy" || action.kind === "refund_eligibility") && action.questionContext.kind === "previous") {
+      if (!policyTopicMatches(context.policyTopic, { ...binding, orderId: alternativeOrderId ? context.focusOrderId! : orderId ?? null })
+        || action.questionContext.requestId !== context.policyTopic!.requestId) return clarify("intent");
+      if (alternativeOrderId && (action.kind !== "refund_eligibility" || context.policyTopic!.intent !== "refund_eligibility")) return clarify("intent");
+      // A historical question can contain old order-state assumptions. Moving to
+      // another order carries only this bounded intent, never the old sentence.
+      question = { query: alternativeOrderId ? `${context.userText}\n本轮继续咨询新选定订单的退款申请资格与条件。`
+        : `${context.userText}\n上轮已完成取证的问题（仅用于理解本轮指代）：${context.policyTopic!.originalQuery}`,
+        topic: structuredClone(context.policyTopic!), needsClarification: false };
+    }
     if ((action.kind === "policy" || action.kind === "refund_eligibility") && question.needsClarification) return clarify("intent");
 
     const getOrder = async () => {
@@ -318,8 +344,10 @@ export class SupportController {
     // Status queries also verify the explicit selection, so the host can safely update conversation focus.
     // Their short path has no FAQ read or prepare operation.
     const order = orderId ? await getOrder() : undefined;
-    if (order && readOnlyQuestion && productReferences(context.userText).some(modifier => modifier
-      && !order.items.some(item => item.productName.normalize("NFKC").replace(/\s+/gu, "").includes(modifier)))) {
+    const mentions = semantic ? "productMention" in action && action.productMention ? [action.productMention] : [] : productReferences(context.userText);
+    if (order && readOnlyQuestion && mentions.some(modifier => modifier
+      && !order.items.some(item => item.productName.normalize("NFKC").replace(/\s+/gu, "")
+        .includes(semantic ? modifier.normalize("NFKC").replace(/\s+/gu, "") : modifier)))) {
       return result(notice("当前已核验订单中的商品与您描述不一致，请提供对应订单号或明确商品；不能把旧订单的规则套到另一商品。"), "clarification");
     }
     if (action.kind === "merchant_status") {
@@ -349,9 +377,16 @@ export class SupportController {
       evidence.amountComparison = compareRemainingAmount(order!, context.amountReference, binding);
       if (!evidence.amountComparison) return result(notice("无法唯一核对剩余券与之前展示的实付单价。请明确具体券；存在多张剩余券、已过期或优惠分摊数据缺失时不能推算。"), "clarification");
     }
+    if (action.kind === "paid_amount_compare") {
+      const comparison = evidence.amountComparison!;
+      showPaidUnit();
+      return result(orderReply(order!, [], `当前唯一剩余未核销券实付 ${(comparison.remainingUnitPaidCents / 100).toFixed(2)} 元，`
+        + `与上次宿主展示的每券实付 ${(comparison.referencePaidCents / 100).toFixed(2)} 元${comparison.comparisonEqual ? "相同" : "不同"}。`
+        + "本轮只核对订单和支付事实，不代表退款申请上限、商家批准或可执行退款金额；未生成或提交退款。"));
+    }
     if (order && new Set(order.items.map(item => item.productId)).size !== 1) return clarify("order");
     const prerequisite = action.kind === "merchant_prepare" || action.kind === "refund_prepare";
-    const refundQuestion = alternativeOrderId ? context.policyTopic!.intent === "refund_eligibility"
+    const refundQuestion = !semantic && alternativeOrderId ? context.policyTopic!.intent === "refund_eligibility"
       : action.kind === "refund_eligibility" || objectReference === "remaining_amount";
     // The model may classify the request, but cannot replace an unknown fact with an easier policy question.
     const currentScope = { shopId: order?.shop.id ?? null, productId: order?.items[0]?.productId ?? null };
@@ -371,18 +406,19 @@ export class SupportController {
       policyTopic: question.topic,
       objectReference: objectReference ? { kind: objectReference, fromOrderId: objectReference === "remaining_amount" ? context.amountReference!.orderId : context.focusOrderId!, toOrderId: orderId!,
         sourceRequestIds: objectReference === "remaining_amount" ? [context.amountReference!.requestId]
-          : [context.policyTopic!.requestId, ...context.orderChoices!.orders.map(row => row.requestId)] } : null,
+          : [...(question.topic ? [question.topic.requestId] : []), ...context.orderChoices!.orders.map(row => row.requestId)] } : null,
+      ...(semantic ? { protocol: "v2.2" as const } : {}),
       facts: order ? { orderId: order.id, asOf: order.asOf, status: order.status,
         productId: order.items[0]!.productId, productName: order.items[0]!.productName, refundState: refundQuery(order) } : null };
     const ids = await getRules(knowledgeContext, order);
     if (action.kind === "policy" || action.kind === "refund_eligibility") {
-      const anchor = alternateAnchor ?? question.topic?.originalQuery ?? context.userText;
+      const anchor = semantic && alternativeOrderId ? context.userText : alternateAnchor ?? question.topic?.originalQuery ?? context.userText;
       // A single handled question may have several real sources; source count is not an intent count.
       if (ids.length > 0 && ids.length <= 5 && (objectReference !== "remaining_amount" || question.topic)
-        && !/[；;、\n]|[?？].*\S|(?:以及|同时|另外|并且|顺便|和|与)/u.test(anchor)) {
+        && (semantic || !/[；;、\n]|[?？].*\S|(?:以及|同时|另外|并且|顺便|和|与)/u.test(anchor))) {
         verifiedPolicyTopic = { requestId: context.requestId, sourceKey: context.sourceKey, groupOpenid: context.trustedRoute.groupOpenid,
           originalQuery: anchor, orderId: order?.id ?? null, scope: currentScope,
-          intent: alternativeOrderId ? context.policyTopic!.intent : action.kind,
+          intent: !semantic && alternativeOrderId ? context.policyTopic!.intent : action.kind,
           sources: evidence.rules.map(rule => ({ sourceId: rule.sourceId, version: rule.version })) };
       }
       if (evidence.amountComparison) {
