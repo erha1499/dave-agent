@@ -1,0 +1,716 @@
+{
+  "version": 1,
+  "stage": "exposed-development",
+  "runId": "2e8c6c72-9ca9-4b9f-b4dc-16554dc1629a",
+  "sourceCommit": "3b4f2b1",
+  "rawArtifact": ".runtime/c1-reference-selection/2e8c6c72-9ca9-4b9f-b4dc-16554dc1629a.json",
+  "rawSha256": "c4855cb6176f7d31f41c43ece7e00a1eca463a12f5d022f369da6e71d3574e4a",
+  "manifestPath": "data/c1-reference-selection-development-manifest.json",
+  "manifestHash": "9eb050fb768250e8e0a86fb9ad383dec5437291a0cbbb5eff20964941a8deb23",
+  "datasetSha256": "46c603f0f9e0a111e9248d02b1d95a08051db2a4261c0affdc0c71f5c25a1acc",
+  "startedAt": "2026-10-05T23:42:47.498Z",
+  "finishedAt": "2026-10-05T23:43:23.702Z",
+  "wallDurationMs": 36204,
+  "summary": {
+    "plannedCases": 4,
+    "plannedTurns": 19,
+    "completed": 13,
+    "passed": 12,
+    "failed": 1,
+    "skipped": 6,
+    "actualHttp": 36,
+    "answersReviewed": 13,
+    "unknownCosts": 0,
+    "supportInvalidDecisions": 0,
+    "passedCases": 3,
+    "referenceProofPassedExecuted": 13,
+    "knowledgeTurns": 5,
+    "knowledgeTurnsPassed": 4,
+    "hostSelections": 1,
+    "turnsWithActionRepair": 2,
+    "answersPassed": 13,
+    "answersUnreviewed": 6,
+    "fullyPassedTurns": 12
+  },
+  "integrity": {
+    "runIntegrityPassed": true,
+    "executionComplete": false,
+    "usageComplete": true,
+    "codeStable": true,
+    "dependenciesStable": true,
+    "localPackagesStable": true
+  },
+  "usage": {
+    "agent": {
+      "requests": 26,
+      "unknownCosts": 0,
+      "knownEstimatedCost": 0.010779528000000002,
+      "estimatedCost": 0.010779528000000002,
+      "totalTokens": 228037
+    },
+    "rerank": {
+      "requests": 5,
+      "unknownCosts": 0,
+      "knownEstimatedCost": 0.011551999999999998,
+      "estimatedCost": 0.011551999999999998,
+      "totalTokens": 23104
+    },
+    "support": {
+      "requests": 5,
+      "unknownCosts": 0,
+      "knownEstimatedCost": 0.0075187200000000004,
+      "estimatedCost": 0.0075187200000000004,
+      "totalTokens": 10992
+    }
+  },
+  "estimatedCost": {
+    "usd": 0.018298248000000003,
+    "cny": 0.011551999999999998,
+    "source": "reported usage and frozen estimates; not invoice"
+  },
+  "latency": {
+    "scope": "12 executed model turns; excludes the one host selection and six skipped turns",
+    "p50Ms": 1799,
+    "p95Ms": 5292
+  },
+  "failure": null,
+  "stopReason": null,
+  "cleanup": [
+    {
+      "caseId": "single-policy",
+      "sessionDisposed": true,
+      "remainingOrders": 0
+    },
+    {
+      "caseId": "competing-policy",
+      "sessionDisposed": true,
+      "remainingOrders": 0
+    },
+    {
+      "caseId": "orders",
+      "sessionDisposed": true,
+      "remainingOrders": 0
+    },
+    {
+      "caseId": "two-orders",
+      "sessionDisposed": true,
+      "remainingOrders": 0
+    }
+  ],
+  "rows": [
+    {
+      "caseId": "single-policy",
+      "turn": 1,
+      "execution": "completed",
+      "status": "passed",
+      "reason": null,
+      "durationMs": 4039,
+      "replyHash": "ec75e92dd270d5e49696f145db4f0ff9d185fdd05f09efdbda914cc7bc57e4f5",
+      "criteriaHash": "b612130064ea862defc9ce9b482d3e7f74aed6589395597f390d622f653e75ff",
+      "score": {
+        "engineeringPassed": true,
+        "knowledgePassed": true,
+        "referenceEvidencePassed": true,
+        "passed": true,
+        "issues": []
+      },
+      "goldIds": [
+        "RF005"
+      ],
+      "acceptedIds": [
+        "RF005"
+      ],
+      "action": {
+        "kind": "policy",
+        "question": "信用卡支付的团购券退款审核通过后，通常多久能到账？",
+        "questionContext": {
+          "kind": "standalone"
+        },
+        "evidenceTarget": {
+          "kind": "rule_only",
+          "basis": "信用卡支付的团购券退款审核通过后，通常多久能到账？"
+        },
+        "protocol": "v2.2"
+      },
+      "hostReceipt": null,
+      "actualHttp": 4,
+      "actualBusinessCalls": [
+        "search_faq"
+      ],
+      "actionValidationErrors": []
+    },
+    {
+      "caseId": "single-policy",
+      "turn": 2,
+      "execution": "completed",
+      "status": "passed",
+      "reason": null,
+      "durationMs": 5292,
+      "replyHash": "2bc2a7f31f8f67ab16ba341d75559866b1a9d1be34f6fa1930613ca11f03a5c0",
+      "criteriaHash": "c7639238875e56f141f70b930bbcb30cc4826115e17eaf3930ab5fd116b72247",
+      "score": {
+        "engineeringPassed": true,
+        "knowledgePassed": true,
+        "referenceEvidencePassed": true,
+        "passed": true,
+        "issues": []
+      },
+      "goldIds": [
+        "RF005"
+      ],
+      "acceptedIds": [
+        "RF005"
+      ],
+      "action": {
+        "kind": "policy",
+        "question": "如果过了刚才说的最长等待时间还没到账，接下来怎么办？",
+        "questionContext": {
+          "kind": "previous",
+          "requestId": "2e8c6c72-9ca9-4b9f-b4dc-16554dc1629a:single-policy:1"
+        },
+        "protocol": "v2.2"
+      },
+      "hostReceipt": null,
+      "actualHttp": 5,
+      "actualBusinessCalls": [
+        "search_faq"
+      ],
+      "actionValidationErrors": [
+        {
+          "name": "support_action",
+          "input": {
+            "action": {
+              "kind": "policy",
+              "question": "如果过了刚才说的最长等待时间还没到账，接下来怎么办？",
+              "questionContext": {
+                "kind": "previous",
+                "requestId": "2e8c6c72-9ca9-4b9f-b4dc-16554dc1629a:single-policy:1"
+              },
+              "evidenceTarget": {
+                "kind": "rule_only",
+                "basis": "信用卡支付的团购券退款审核通过后，通常多久能到账？如果过了刚才说的最长等待时间还没到账，接下来怎么办？"
+              }
+            }
+          },
+          "error": "规则解释依据不在当前原文或匹配的可信前序中；不能补造条件或搬用另一订单的假设。"
+        }
+      ]
+    },
+    {
+      "caseId": "single-policy",
+      "turn": 3,
+      "execution": "completed",
+      "status": "passed",
+      "reason": null,
+      "durationMs": 5213,
+      "replyHash": "59036d849895f32de6e4e8bccb9c636af4a4605da48a0794af3dc5cc506e5c68",
+      "criteriaHash": "ec73de7083d1e2aaeba9a2a3179b11bdc538bbcde7641b2073a21e89d7473830",
+      "score": {
+        "engineeringPassed": true,
+        "knowledgePassed": true,
+        "referenceEvidencePassed": true,
+        "passed": true,
+        "issues": []
+      },
+      "goldIds": [
+        "RF005"
+      ],
+      "acceptedIds": [
+        "RF005"
+      ],
+      "action": {
+        "kind": "policy",
+        "question": "那核对之后还没解决，该找谁协助查询？",
+        "questionContext": {
+          "kind": "previous",
+          "requestId": "2e8c6c72-9ca9-4b9f-b4dc-16554dc1629a:single-policy:2"
+        },
+        "protocol": "v2.2"
+      },
+      "hostReceipt": null,
+      "actualHttp": 4,
+      "actualBusinessCalls": [
+        "search_faq"
+      ],
+      "actionValidationErrors": []
+    },
+    {
+      "caseId": "competing-policy",
+      "turn": 1,
+      "execution": "completed",
+      "status": "failed",
+      "reason": "development_contract_failed",
+      "durationMs": 4593,
+      "replyHash": "c889c9a6afdece949ccd072c35d1836408709547af55358d014fc7837746f7df",
+      "criteriaHash": "ed8eea37d89fa017c3295c72bbc8fd5809214663e33aaa8d6f56639dedeecb38",
+      "score": {
+        "engineeringPassed": true,
+        "knowledgePassed": false,
+        "referenceEvidencePassed": true,
+        "passed": false,
+        "issues": [
+          "knowledge_proof_gold_or_integrity"
+        ]
+      },
+      "goldIds": [
+        "RF005"
+      ],
+      "acceptedIds": [
+        "RF005",
+        "RF001"
+      ],
+      "action": {
+        "kind": "policy",
+        "question": "银行卡支付的团购券退款审核通过后，通常需要多久到账？",
+        "questionContext": {
+          "kind": "standalone"
+        },
+        "evidenceTarget": {
+          "kind": "rule_only",
+          "basis": "银行卡支付的团购券退款审核通过后，通常需要多久到账？"
+        },
+        "protocol": "v2.2"
+      },
+      "hostReceipt": null,
+      "actualHttp": 4,
+      "actualBusinessCalls": [
+        "search_faq"
+      ],
+      "actionValidationErrors": []
+    },
+    {
+      "caseId": "competing-policy",
+      "turn": 2,
+      "execution": "not_run",
+      "status": "skipped",
+      "reason": "required_prior_failed",
+      "durationMs": null,
+      "replyHash": null,
+      "criteriaHash": "b612130064ea862defc9ce9b482d3e7f74aed6589395597f390d622f653e75ff",
+      "score": null,
+      "goldIds": [
+        "RF005"
+      ],
+      "acceptedIds": [],
+      "action": null,
+      "hostReceipt": null,
+      "actualHttp": 0,
+      "actualBusinessCalls": [],
+      "actionValidationErrors": []
+    },
+    {
+      "caseId": "competing-policy",
+      "turn": 3,
+      "execution": "not_run",
+      "status": "skipped",
+      "reason": "required_prior_failed",
+      "durationMs": null,
+      "replyHash": null,
+      "criteriaHash": "b7f66cd117f60d1cf014f1876990d23609fd8adcebbc9e32d90cf4da4522a9b5",
+      "score": null,
+      "goldIds": [],
+      "acceptedIds": [],
+      "action": null,
+      "hostReceipt": null,
+      "actualHttp": 0,
+      "actualBusinessCalls": [],
+      "actionValidationErrors": []
+    },
+    {
+      "caseId": "competing-policy",
+      "turn": 4,
+      "execution": "not_run",
+      "status": "skipped",
+      "reason": "required_prior_failed",
+      "durationMs": null,
+      "replyHash": null,
+      "criteriaHash": "9543c9c4a4f84b97fd54af34a29f27e89b346a3f76520fc3900d4e2d5ba32cfb",
+      "score": null,
+      "goldIds": [
+        "RS003"
+      ],
+      "acceptedIds": [],
+      "action": null,
+      "hostReceipt": null,
+      "actualHttp": 0,
+      "actualBusinessCalls": [],
+      "actionValidationErrors": []
+    },
+    {
+      "caseId": "competing-policy",
+      "turn": 5,
+      "execution": "not_run",
+      "status": "skipped",
+      "reason": "required_prior_failed",
+      "durationMs": null,
+      "replyHash": null,
+      "criteriaHash": "4266990995a98d23288acf5f62614b05215fb3ace07d30af14ab8a8b254560eb",
+      "score": null,
+      "goldIds": [],
+      "acceptedIds": [],
+      "action": null,
+      "hostReceipt": null,
+      "actualHttp": 0,
+      "actualBusinessCalls": [],
+      "actionValidationErrors": []
+    },
+    {
+      "caseId": "competing-policy",
+      "turn": 6,
+      "execution": "not_run",
+      "status": "skipped",
+      "reason": "required_prior_failed",
+      "durationMs": null,
+      "replyHash": null,
+      "criteriaHash": "c7639238875e56f141f70b930bbcb30cc4826115e17eaf3930ab5fd116b72247",
+      "score": null,
+      "goldIds": [
+        "RF005"
+      ],
+      "acceptedIds": [],
+      "action": null,
+      "hostReceipt": null,
+      "actualHttp": 0,
+      "actualBusinessCalls": [],
+      "actionValidationErrors": []
+    },
+    {
+      "caseId": "competing-policy",
+      "turn": 7,
+      "execution": "not_run",
+      "status": "skipped",
+      "reason": "required_prior_failed",
+      "durationMs": null,
+      "replyHash": null,
+      "criteriaHash": "091829a759ee677053135b2f84891e204c381656cc02df963ad7cacbdc353a40",
+      "score": null,
+      "goldIds": [
+        "RF005"
+      ],
+      "acceptedIds": [],
+      "action": null,
+      "hostReceipt": null,
+      "actualHttp": 0,
+      "actualBusinessCalls": [],
+      "actionValidationErrors": []
+    },
+    {
+      "caseId": "orders",
+      "turn": 1,
+      "execution": "completed",
+      "status": "passed",
+      "reason": null,
+      "durationMs": 1597,
+      "replyHash": "aa92dbc1e43baf48315cc35c2b22ef924c4ae604ba8cd699b92e353fc27defcc",
+      "criteriaHash": "69c9ee14d9f724793260407def256e804a859ea139d30bf7652fa83ae2df92db",
+      "score": {
+        "engineeringPassed": true,
+        "knowledgePassed": true,
+        "referenceEvidencePassed": true,
+        "passed": true,
+        "issues": []
+      },
+      "goldIds": [],
+      "acceptedIds": [],
+      "action": {
+        "kind": "order",
+        "orderRef": {
+          "kind": "explicit",
+          "orderId": "COUPON-6401"
+        },
+        "protocol": "v2.2"
+      },
+      "hostReceipt": null,
+      "actualHttp": 2,
+      "actualBusinessCalls": [
+        "get_order"
+      ],
+      "actionValidationErrors": []
+    },
+    {
+      "caseId": "orders",
+      "turn": 2,
+      "execution": "completed",
+      "status": "passed",
+      "reason": null,
+      "durationMs": 1639,
+      "replyHash": "d69ec72aed3a51695ae3da450e569747e2437a371fe36cac28235bcf47dc62e1",
+      "criteriaHash": "376380d403d32829a5c038bf9ba54905a24e488c9eb42832a980f5a625b01fde",
+      "score": {
+        "engineeringPassed": true,
+        "knowledgePassed": true,
+        "referenceEvidencePassed": true,
+        "passed": true,
+        "issues": []
+      },
+      "goldIds": [],
+      "acceptedIds": [],
+      "action": {
+        "kind": "order",
+        "orderRef": {
+          "kind": "explicit",
+          "orderId": "COUPON-6402"
+        },
+        "protocol": "v2.2"
+      },
+      "hostReceipt": null,
+      "actualHttp": 2,
+      "actualBusinessCalls": [
+        "get_order"
+      ],
+      "actionValidationErrors": []
+    },
+    {
+      "caseId": "orders",
+      "turn": 3,
+      "execution": "completed",
+      "status": "passed",
+      "reason": null,
+      "durationMs": 1799,
+      "replyHash": "aeb523d3a6e30cb463092cc6eb28eaf684f8dff9e01d675e994611ca74f38d56",
+      "criteriaHash": "7288e364b3535f050028c62ddc7fcc4d9bc18dbaefa72f22394e31979fe4d221",
+      "score": {
+        "engineeringPassed": true,
+        "knowledgePassed": true,
+        "referenceEvidencePassed": true,
+        "passed": true,
+        "issues": []
+      },
+      "goldIds": [],
+      "acceptedIds": [],
+      "action": {
+        "kind": "order",
+        "orderRef": {
+          "kind": "explicit",
+          "orderId": "COUPON-6403"
+        },
+        "protocol": "v2.2"
+      },
+      "hostReceipt": null,
+      "actualHttp": 2,
+      "actualBusinessCalls": [
+        "get_order"
+      ],
+      "actionValidationErrors": []
+    },
+    {
+      "caseId": "orders",
+      "turn": 4,
+      "execution": "completed",
+      "status": "passed",
+      "reason": null,
+      "durationMs": 1648,
+      "replyHash": "6c34570b688b145890c4df6003b5e3c61e46d4d450883dbc5adcd915eab9d482",
+      "criteriaHash": "48af2b7fd15339848fd19e8592db43b17d75952c2b10fda25eaf377d90de617e",
+      "score": {
+        "engineeringPassed": true,
+        "knowledgePassed": true,
+        "referenceEvidencePassed": true,
+        "passed": true,
+        "issues": []
+      },
+      "goldIds": [],
+      "acceptedIds": [],
+      "action": {
+        "kind": "clarify",
+        "field": "order",
+        "reason": "ambiguous",
+        "protocol": "v2.2"
+      },
+      "hostReceipt": null,
+      "actualHttp": 2,
+      "actualBusinessCalls": [],
+      "actionValidationErrors": []
+    },
+    {
+      "caseId": "orders",
+      "turn": 5,
+      "execution": "completed",
+      "status": "passed",
+      "reason": null,
+      "durationMs": 2,
+      "replyHash": "2d75b34e70624677a2d573410e36af2b5c7d0494b656b2d282d97d5f213da75c",
+      "criteriaHash": "63c221019e180956ec7c7ebab5c9c7d0d170f76d8259927de7144123d722ae74",
+      "score": {
+        "engineeringPassed": true,
+        "knowledgePassed": true,
+        "referenceEvidencePassed": true,
+        "passed": true,
+        "issues": []
+      },
+      "goldIds": [],
+      "acceptedIds": [],
+      "action": null,
+      "hostReceipt": {
+        "version": "reference-selection-v1",
+        "outcome": "selected",
+        "presentationRequestId": "2e8c6c72-9ca9-4b9f-b4dc-16554dc1629a:orders:4",
+        "selectedRequestId": "2e8c6c72-9ca9-4b9f-b4dc-16554dc1629a:orders:1"
+      },
+      "actualHttp": 0,
+      "actualBusinessCalls": [],
+      "actionValidationErrors": []
+    },
+    {
+      "caseId": "orders",
+      "turn": 6,
+      "execution": "completed",
+      "status": "passed",
+      "reason": null,
+      "durationMs": 2169,
+      "replyHash": "aa92dbc1e43baf48315cc35c2b22ef924c4ae604ba8cd699b92e353fc27defcc",
+      "criteriaHash": "69c9ee14d9f724793260407def256e804a859ea139d30bf7652fa83ae2df92db",
+      "score": {
+        "engineeringPassed": true,
+        "knowledgePassed": true,
+        "referenceEvidencePassed": true,
+        "passed": true,
+        "issues": []
+      },
+      "goldIds": [],
+      "acceptedIds": [],
+      "action": {
+        "kind": "order",
+        "orderRef": {
+          "kind": "focus"
+        },
+        "protocol": "v2.2"
+      },
+      "hostReceipt": null,
+      "actualHttp": 3,
+      "actualBusinessCalls": [
+        "get_order"
+      ],
+      "actionValidationErrors": [
+        {
+          "name": "support_action",
+          "input": {
+            "action": {
+              "kind": "order",
+              "orderRef": {
+                "kind": "explicit",
+                "orderId": "COUPON-6401"
+              },
+              "protocol": "v2.2"
+            }
+          },
+          "error": "订单引用不在当前用户消息中；历史唯一订单应使用 focus，不能编造显式选单。"
+        }
+      ]
+    },
+    {
+      "caseId": "two-orders",
+      "turn": 1,
+      "execution": "completed",
+      "status": "passed",
+      "reason": null,
+      "durationMs": 1485,
+      "replyHash": "aa92dbc1e43baf48315cc35c2b22ef924c4ae604ba8cd699b92e353fc27defcc",
+      "criteriaHash": "69c9ee14d9f724793260407def256e804a859ea139d30bf7652fa83ae2df92db",
+      "score": {
+        "engineeringPassed": true,
+        "knowledgePassed": true,
+        "referenceEvidencePassed": true,
+        "passed": true,
+        "issues": []
+      },
+      "goldIds": [],
+      "acceptedIds": [],
+      "action": {
+        "kind": "order",
+        "orderRef": {
+          "kind": "explicit",
+          "orderId": "COUPON-6401"
+        },
+        "protocol": "v2.2"
+      },
+      "hostReceipt": null,
+      "actualHttp": 2,
+      "actualBusinessCalls": [
+        "get_order"
+      ],
+      "actionValidationErrors": []
+    },
+    {
+      "caseId": "two-orders",
+      "turn": 2,
+      "execution": "completed",
+      "status": "passed",
+      "reason": null,
+      "durationMs": 1529,
+      "replyHash": "d69ec72aed3a51695ae3da450e569747e2437a371fe36cac28235bcf47dc62e1",
+      "criteriaHash": "376380d403d32829a5c038bf9ba54905a24e488c9eb42832a980f5a625b01fde",
+      "score": {
+        "engineeringPassed": true,
+        "knowledgePassed": true,
+        "referenceEvidencePassed": true,
+        "passed": true,
+        "issues": []
+      },
+      "goldIds": [],
+      "acceptedIds": [],
+      "action": {
+        "kind": "order",
+        "orderRef": {
+          "kind": "explicit",
+          "orderId": "COUPON-6402"
+        },
+        "protocol": "v2.2"
+      },
+      "hostReceipt": null,
+      "actualHttp": 2,
+      "actualBusinessCalls": [
+        "get_order"
+      ],
+      "actionValidationErrors": []
+    },
+    {
+      "caseId": "two-orders",
+      "turn": 3,
+      "execution": "completed",
+      "status": "passed",
+      "reason": null,
+      "durationMs": 5010,
+      "replyHash": "47eef2603a970703db43160e02428875b571b8ca4523e73b508287b5f60404be",
+      "criteriaHash": "a75aea3fe59d1a84ddda1b0af3f93e5bd53fe13a2916eb656a6846b94a493008",
+      "score": {
+        "engineeringPassed": true,
+        "knowledgePassed": true,
+        "referenceEvidencePassed": true,
+        "passed": true,
+        "issues": []
+      },
+      "goldIds": [
+        "KB-REFUND-UNUSED"
+      ],
+      "acceptedIds": [
+        "KB-REFUND-UNUSED"
+      ],
+      "action": {
+        "kind": "refund_eligibility",
+        "orderRef": {
+          "kind": "alternative"
+        },
+        "question": "另一笔订单如果申请退款，需要满足哪些条件？请按它目前的支付、核销和有效期说明，只咨询，不提交申请。",
+        "questionContext": {
+          "kind": "standalone"
+        },
+        "evidenceTarget": {
+          "kind": "current_order"
+        },
+        "protocol": "v2.2"
+      },
+      "hostReceipt": null,
+      "actualHttp": 4,
+      "actualBusinessCalls": [
+        "get_order",
+        "search_faq"
+      ],
+      "actionValidationErrors": []
+    }
+  ],
+  "answerReviews": "data/c1-reference-selection-development-reviews.json",
+  "admitted": false,
+  "decision": "Keep candidate; complete-run development gate not met. Preserve fixed results and diagnose RF001 extra evidence before a separately registered follow-up.",
+  "reviewFileSha256": "8c3cc84c79d48d3f9f0306c643331c95c651a9557a4aebea084091945e9f4502"
+}

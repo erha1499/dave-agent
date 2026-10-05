@@ -1,0 +1,420 @@
+{
+  "version": 1,
+  "runId": "2e8c6c72-9ca9-4b9f-b4dc-16554dc1629a",
+  "rawPath": ".runtime/c1-reference-selection/2e8c6c72-9ca9-4b9f-b4dc-16554dc1629a.json",
+  "rawSHA256": "c4855cb6176f7d31f41c43ece7e00a1eca463a12f5d022f369da6e71d3574e4a",
+  "dataset": {
+    "path": "data/c1-reference-selection-development.json",
+    "sha256": "46c603f0f9e0a111e9248d02b1d95a08051db2a4261c0affdc0c71f5c25a1acc"
+  },
+  "reviewedAt": "2026-10-05T23:47:17.382Z",
+  "scope": "Codex 对冻结 answerCriteria 的实际用户可见 reply（含订单卡和 evidenceIds）逐条审阅，供人核验，非真人验收。modelFinalText 不代替实际 reply；原始机器证据评分保持不变，本文件不构成最终准入。",
+  "summary": {
+    "plannedTurns": 19,
+    "actualRepliesReviewed": 13,
+    "passed": 13,
+    "failed": 0,
+    "unreviewed": 6,
+    "criteriaChecked": 27,
+    "orderCardsChecked": 7
+  },
+  "evidenceNotes": [
+    {
+      "caseId": "competing-policy",
+      "turn": 1,
+      "answerStatus": "passed",
+      "strictEvidenceStatus": "failed",
+      "acceptedSourceIds": [
+        "RF005",
+        "RF001"
+      ],
+      "frozenGoldSourceIds": [
+        "RF005"
+      ],
+      "reason": "银行卡 1–3 个工作日的实际回答事实正确且未虚构操作；原始 knowledgePassed=false，issues=[knowledge_proof_gold_or_integrity]，额外 RF001 使精确来源集合不符。答案审阅通过不覆盖该严格证据失败，也不恢复后续未执行轮。"
+    },
+    {
+      "caseId": "competing-policy",
+      "turns": [
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "answerStatus": "unreviewed",
+      "reason": "原始 execution=not_run、reason=required_prior_failed，无实际 reply；保留空 checks，replyHash 使用 contentHash(null)，不依据 Gold 或预期内容补写回答。多话题澄清、未决期间独立问题、精确政策选择及其连续追问未获得本次真实模型验证。"
+    },
+    {
+      "caseId": "orders",
+      "turn": 5,
+      "reason": "实际单行命令选择第 1 轮来源，宿主回执 presentationRequestId 绑定第 4 轮真实展示；此轮为宿主 notice，没有模型最终回复，不把零模型调用的宿主选择算作模型答题。"
+    },
+    {
+      "caseId": "two-orders",
+      "turn": 3,
+      "reason": "实际文本末句邀请进一步提供订单号以办理方案，前文同时明确不能申请或执行退款；未声称已执行动作，按冻结标准通过。此审阅不据该邀请认定探针具备退款写入能力。"
+    }
+  ],
+  "admitted": false,
+  "reviews": [
+    {
+      "caseId": "single-policy",
+      "turn": 1,
+      "reviewer": "codex",
+      "forHumanReview": true,
+      "humanAcceptance": false,
+      "status": "passed",
+      "replyHash": "ec75e92dd270d5e49696f145db4f0ff9d185fdd05f09efdbda914cc7bc57e4f5",
+      "criteriaHash": "b612130064ea862defc9ce9b482d3e7f74aed6589395597f390d622f653e75ff",
+      "checks": [
+        {
+          "criterionId": "channel_time",
+          "passed": true,
+          "reasoning": "实际 reply 明确写出“信用卡退款审核通过后，一般 3–7 个工作日到账”，未改成自然日；附带银行卡和余额时限也与 RF005 一致。"
+        },
+        {
+          "criterionId": "no_executed_claim",
+          "passed": true,
+          "reasoning": "回复仅说明规则和建议核账、联系平台；开头声明不表示当前订单已满足或获批，未声称已退款、已联系或已核实。"
+        }
+      ]
+    },
+    {
+      "caseId": "single-policy",
+      "turn": 2,
+      "reviewer": "codex",
+      "forHumanReview": true,
+      "humanAcceptance": false,
+      "status": "passed",
+      "replyHash": "2bc2a7f31f8f67ab16ba341d75559866b1a9d1be34f6fa1930613ca11f03a5c0",
+      "criteriaHash": "c7639238875e56f141f70b930bbcb30cc4826115e17eaf3930ab5fd116b72247",
+      "checks": [
+        {
+          "criterionId": "overdue_sequence",
+          "passed": true,
+          "reasoning": "实际 reply 将信用卡最长等待时间说明为 7 个工作日；建议先查看退款进度，再核对信用卡账单，仍未到账再联系平台。核账在联系平台之前，未承诺已到账。"
+        },
+        {
+          "criterionId": "no_executed_claim",
+          "passed": true,
+          "reasoning": "各步骤均为给用户的建议，并明确“不代表真实资金状态”；没有声称本轮已经核账、联系平台、退款或变更状态。"
+        }
+      ]
+    },
+    {
+      "caseId": "single-policy",
+      "turn": 3,
+      "reviewer": "codex",
+      "forHumanReview": true,
+      "humanAcceptance": false,
+      "status": "passed",
+      "replyHash": "59036d849895f32de6e4e8bccb9c636af4a4605da48a0794af3dc5cc506e5c68",
+      "criteriaHash": "ec73de7083d1e2aaeba9a2a3179b11bdc538bbcde7641b2073a21e89d7473830",
+      "checks": [
+        {
+          "criterionId": "followup_actor",
+          "passed": true,
+          "reasoning": "实际 reply 续接核对支付渠道账单后的问题，明确应联系平台协助查询，未建议重新发起退款，也未编造具体受理入口。"
+        },
+        {
+          "criterionId": "no_executed_claim",
+          "passed": true,
+          "reasoning": "“应联系平台”是下一步建议，并注明模拟流程说明；未声称已联系、已退款、已核实或改变订单状态。"
+        }
+      ]
+    },
+    {
+      "caseId": "competing-policy",
+      "turn": 1,
+      "reviewer": "codex",
+      "forHumanReview": true,
+      "humanAcceptance": false,
+      "status": "passed",
+      "replyHash": "c889c9a6afdece949ccd072c35d1836408709547af55358d014fc7837746f7df",
+      "criteriaHash": "ed8eea37d89fa017c3295c72bbc8fd5809214663e33aaa8d6f56639dedeecb38",
+      "checks": [
+        {
+          "criterionId": "channel_time",
+          "passed": true,
+          "reasoning": "实际 reply 明确写出银行卡一般 1–3 个工作日到账；审核通过后发起退回的条件、信用卡 3–7 个工作日及余额通常实时的补充均符合 RF005。多引用 RF001 的严格证据失败另记，不把事实正确改评为回答错误。"
+        },
+        {
+          "criterionId": "no_executed_claim",
+          "passed": true,
+          "reasoning": "“退款审核通过后会立即发起退回”是带前提的规则描述；开头明确不表示当前订单已满足或获批，未声称本轮已执行退款、联系或核账。"
+        }
+      ]
+    },
+    {
+      "caseId": "competing-policy",
+      "turn": 2,
+      "reviewer": "codex",
+      "forHumanReview": true,
+      "humanAcceptance": false,
+      "status": "unreviewed",
+      "replyHash": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+      "criteriaHash": "b612130064ea862defc9ce9b482d3e7f74aed6589395597f390d622f653e75ff",
+      "checks": []
+    },
+    {
+      "caseId": "competing-policy",
+      "turn": 3,
+      "reviewer": "codex",
+      "forHumanReview": true,
+      "humanAcceptance": false,
+      "status": "unreviewed",
+      "replyHash": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+      "criteriaHash": "b7f66cd117f60d1cf014f1876990d23609fd8adcebbc9e32d90cf4da4522a9b5",
+      "checks": []
+    },
+    {
+      "caseId": "competing-policy",
+      "turn": 4,
+      "reviewer": "codex",
+      "forHumanReview": true,
+      "humanAcceptance": false,
+      "status": "unreviewed",
+      "replyHash": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+      "criteriaHash": "9543c9c4a4f84b97fd54af34a29f27e89b346a3f76520fc3900d4e2d5ba32cfb",
+      "checks": []
+    },
+    {
+      "caseId": "competing-policy",
+      "turn": 5,
+      "reviewer": "codex",
+      "forHumanReview": true,
+      "humanAcceptance": false,
+      "status": "unreviewed",
+      "replyHash": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+      "criteriaHash": "4266990995a98d23288acf5f62614b05215fb3ace07d30af14ab8a8b254560eb",
+      "checks": []
+    },
+    {
+      "caseId": "competing-policy",
+      "turn": 6,
+      "reviewer": "codex",
+      "forHumanReview": true,
+      "humanAcceptance": false,
+      "status": "unreviewed",
+      "replyHash": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+      "criteriaHash": "c7639238875e56f141f70b930bbcb30cc4826115e17eaf3930ab5fd116b72247",
+      "checks": []
+    },
+    {
+      "caseId": "competing-policy",
+      "turn": 7,
+      "reviewer": "codex",
+      "forHumanReview": true,
+      "humanAcceptance": false,
+      "status": "unreviewed",
+      "replyHash": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+      "criteriaHash": "091829a759ee677053135b2f84891e204c381656cc02df963ad7cacbdc353a40",
+      "checks": []
+    },
+    {
+      "caseId": "orders",
+      "turn": 1,
+      "reviewer": "codex",
+      "forHumanReview": true,
+      "humanAcceptance": false,
+      "status": "passed",
+      "replyHash": "aa92dbc1e43baf48315cc35c2b22ef924c4ae604ba8cd699b92e353fc27defcc",
+      "criteriaHash": "69c9ee14d9f724793260407def256e804a859ea139d30bf7652fa83ae2df92db",
+      "checks": [
+        {
+          "criterionId": "actual_order",
+          "passed": true,
+          "reasoning": "实际订单卡仅包含 COUPON-6401；id、status=paid、paidCents=7980、refundedCents=0、couponStatuses=[unused] 全部与本轮已授权 get_order 输出一致，正文每券 79.80 元也一致。"
+        },
+        {
+          "criterionId": "no_executed_claim",
+          "passed": true,
+          "reasoning": "正文只展示当前订单事实，并明确实付不等于获批退款金额；卡片已退款 0 分是本轮读取的事实，没有执行声明。"
+        }
+      ]
+    },
+    {
+      "caseId": "orders",
+      "turn": 2,
+      "reviewer": "codex",
+      "forHumanReview": true,
+      "humanAcceptance": false,
+      "status": "passed",
+      "replyHash": "d69ec72aed3a51695ae3da450e569747e2437a371fe36cac28235bcf47dc62e1",
+      "criteriaHash": "376380d403d32829a5c038bf9ba54905a24e488c9eb42832a980f5a625b01fde",
+      "checks": [
+        {
+          "criterionId": "actual_order",
+          "passed": true,
+          "reasoning": "实际订单卡仅包含 COUPON-6402；id、status=redeemed、paidCents=7980、refundedCents=0、couponStatuses=[redeemed] 全部与本轮已授权 get_order 输出一致，未串入 6401。"
+        },
+        {
+          "criterionId": "no_executed_claim",
+          "passed": true,
+          "reasoning": "正文说明每券实付 79.80 元且不是获批退款金额；已核销为读取的已有状态，没有声称本轮核销、退款、联系或变更状态。"
+        }
+      ]
+    },
+    {
+      "caseId": "orders",
+      "turn": 3,
+      "reviewer": "codex",
+      "forHumanReview": true,
+      "humanAcceptance": false,
+      "status": "passed",
+      "replyHash": "aeb523d3a6e30cb463092cc6eb28eaf684f8dff9e01d675e994611ca74f38d56",
+      "criteriaHash": "7288e364b3535f050028c62ddc7fcc4d9bc18dbaefa72f22394e31979fe4d221",
+      "checks": [
+        {
+          "criterionId": "actual_order",
+          "passed": true,
+          "reasoning": "实际订单卡仅包含 COUPON-6403；id、status=redeemed、paidCents=7980、refundedCents=0、couponStatuses=[redeemed] 全部与本轮已授权 get_order 输出一致，未展示另一单。"
+        },
+        {
+          "criterionId": "no_executed_claim",
+          "passed": true,
+          "reasoning": "回复仅报告订单与支付事实，并区分实付和退款批准；没有声称本轮执行退款、联系、核账或改变订单状态。"
+        }
+      ]
+    },
+    {
+      "caseId": "orders",
+      "turn": 4,
+      "reviewer": "codex",
+      "forHumanReview": true,
+      "humanAcceptance": false,
+      "status": "passed",
+      "replyHash": "6c34570b688b145890c4df6003b5e3c61e46d4d450883dbc5adcd915eab9d482",
+      "criteriaHash": "48af2b7fd15339848fd19e8592db43b17d75952c2b10fda25eaf377d90de617e",
+      "checks": [
+        {
+          "criterionId": "targeted_choice",
+          "passed": true,
+          "reasoning": "实际宿主 notice 要求明确本轮所指订单，并说明模型不能代选；逐一展示此前本人读取的 6401、6402、6403 和各自单行选择命令，两个已核销订单均未被排除。"
+        },
+        {
+          "criterionId": "no_executed_claim",
+          "passed": true,
+          "reasoning": "notice 明确选择不代表授权、商家批准或退款确认且下一轮仍重新核验；未声称本轮完成业务动作。"
+        }
+      ]
+    },
+    {
+      "caseId": "orders",
+      "turn": 5,
+      "reviewer": "codex",
+      "forHumanReview": true,
+      "humanAcceptance": false,
+      "status": "passed",
+      "replyHash": "2d75b34e70624677a2d573410e36af2b5c7d0494b656b2d282d97d5f213da75c",
+      "criteriaHash": "63c221019e180956ec7c7ebab5c9c7d0d170f76d8259927de7144123d722ae74",
+      "checks": [
+        {
+          "criterionId": "selected_reference",
+          "passed": true,
+          "reasoning": "实际宿主 notice 明确已选择 COUPON-6401，要求下一条消息继续提问，届时重新核验归属和状态；与实际单行命令及 selected 宿主回执一致。"
+        },
+        {
+          "criterionId": "no_executed_claim",
+          "passed": true,
+          "reasoning": "回复明确“本次选择未申请或提交退款”，只确认引用选择，未声称已退款、获批、联系或变更订单状态。"
+        }
+      ]
+    },
+    {
+      "caseId": "orders",
+      "turn": 6,
+      "reviewer": "codex",
+      "forHumanReview": true,
+      "humanAcceptance": false,
+      "status": "passed",
+      "replyHash": "aa92dbc1e43baf48315cc35c2b22ef924c4ae604ba8cd699b92e353fc27defcc",
+      "criteriaHash": "69c9ee14d9f724793260407def256e804a859ea139d30bf7652fa83ae2df92db",
+      "checks": [
+        {
+          "criterionId": "actual_order",
+          "passed": true,
+          "reasoning": "选择后本轮实际订单卡仅包含 COUPON-6401；id、status=paid、paidCents=7980、refundedCents=0、couponStatuses=[unused] 全部与本轮重新授权读取的 get_order 输出一致，未沿用 6403。"
+        },
+        {
+          "criterionId": "no_executed_claim",
+          "passed": true,
+          "reasoning": "只报告当前本人订单事实，并说明 79.80 元为实付、不是获批退款金额；没有把引用选择说成退款执行。"
+        }
+      ]
+    },
+    {
+      "caseId": "two-orders",
+      "turn": 1,
+      "reviewer": "codex",
+      "forHumanReview": true,
+      "humanAcceptance": false,
+      "status": "passed",
+      "replyHash": "aa92dbc1e43baf48315cc35c2b22ef924c4ae604ba8cd699b92e353fc27defcc",
+      "criteriaHash": "69c9ee14d9f724793260407def256e804a859ea139d30bf7652fa83ae2df92db",
+      "checks": [
+        {
+          "criterionId": "actual_order",
+          "passed": true,
+          "reasoning": "实际订单卡仅包含 COUPON-6401；id、status=paid、paidCents=7980、refundedCents=0、couponStatuses=[unused] 全部与此会话本轮已授权 get_order 输出一致。"
+        },
+        {
+          "criterionId": "no_executed_claim",
+          "passed": true,
+          "reasoning": "回复仅展示实付与状态，明确实付不是获批退款金额，没有退款、联系、核账或改变状态的执行声明。"
+        }
+      ]
+    },
+    {
+      "caseId": "two-orders",
+      "turn": 2,
+      "reviewer": "codex",
+      "forHumanReview": true,
+      "humanAcceptance": false,
+      "status": "passed",
+      "replyHash": "d69ec72aed3a51695ae3da450e569747e2437a371fe36cac28235bcf47dc62e1",
+      "criteriaHash": "376380d403d32829a5c038bf9ba54905a24e488c9eb42832a980f5a625b01fde",
+      "checks": [
+        {
+          "criterionId": "actual_order",
+          "passed": true,
+          "reasoning": "实际订单卡仅包含 COUPON-6402；id、status=redeemed、paidCents=7980、refundedCents=0、couponStatuses=[redeemed] 全部与此会话本轮已授权 get_order 输出一致，未串单。"
+        },
+        {
+          "criterionId": "no_executed_claim",
+          "passed": true,
+          "reasoning": "回复只说明读取到的已核销和金额事实，明确实付不是获批退款金额，未声称本轮执行任何退款或状态变更。"
+        }
+      ]
+    },
+    {
+      "caseId": "two-orders",
+      "turn": 3,
+      "reviewer": "codex",
+      "forHumanReview": true,
+      "humanAcceptance": false,
+      "status": "passed",
+      "replyHash": "47eef2603a970703db43160e02428875b571b8ca4523e73b508287b5f60404be",
+      "criteriaHash": "a75aea3fe59d1a84ddda1b0af3f93e5bd53fe13a2916eb656a6846b94a493008",
+      "checks": [
+        {
+          "criterionId": "fresh_other_order",
+          "passed": true,
+          "reasoning": "实际 reply 明确另一笔为 COUPON-6401，说明 paid、unused、有效期 2026-11-04、每券实付 79.80 元、已退 0 元，均与本轮重新授权读取一致且有效期晚于快照时间；卡片五个字段全部匹配，未套用 6402 的已核销事实。"
+        },
+        {
+          "criterionId": "eligibility_not_approval",
+          "passed": true,
+          "reasoning": "正文明确“退款申请资格不等于商家已批准或资金已退回”，并再次说明属于资格条件解释、不代表获批或可执行退款。"
+        },
+        {
+          "criterionId": "no_executed_claim",
+          "passed": true,
+          "reasoning": "正文明确当前只能查询与说明，不能申请、联系商家或执行退款；已退款 0 元是读取的历史金额，没有声称本轮执行或改变状态。"
+        }
+      ]
+    }
+  ]
+}
