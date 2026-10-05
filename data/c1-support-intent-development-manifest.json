@@ -1,0 +1,177 @@
+{
+  "version": 1,
+  "stage": "exposed-development-fixed-input-support-prompt-ablation",
+  "limits": {
+    "requests": 40,
+    "estimatedUsd": 0.15,
+    "deadlineMs": 480000,
+    "timeoutMs": 60000
+  },
+  "versions": [
+    "fact-support-typed-v5",
+    "fact-support-typed-v6"
+  ],
+  "settings": {
+    "fact-support-typed-v5": {
+      "provider": "deepseek",
+      "model": "deepseek-v4-pro",
+      "api": "openai-completions",
+      "endpoint": "https://api.deepseek.com",
+      "timeoutMs": 60000,
+      "temperature": 0,
+      "maxTokens": 2048,
+      "maxRetries": 0,
+      "promptVersion": "fact-support-typed-v5",
+      "promptHash": "6f90373dc229648806bfa93957041bc7bb8ba7f50c76e61fe316827561b2453b",
+      "serialization": "json-query-id-title-tags-body-v1",
+      "serializationHash": "1d16c5e3ef4647c120fe6ddce72417c9ec618ee41dc77faa447ec214e5749c4a",
+      "pricing": {
+        "currency": "USD",
+        "estimated": true,
+        "source": "Pi model catalog",
+        "rates": {
+          "input": 1.32,
+          "output": 3.96,
+          "cacheRead": 0.044,
+          "cacheWrite": 0
+        }
+      },
+      "profile": "typed",
+      "validationVersion": "typed-candidate-isolation-v1"
+    },
+    "fact-support-typed-v6": {
+      "provider": "deepseek",
+      "model": "deepseek-v4-pro",
+      "api": "openai-completions",
+      "endpoint": "https://api.deepseek.com",
+      "timeoutMs": 60000,
+      "temperature": 0,
+      "maxTokens": 2048,
+      "maxRetries": 0,
+      "promptVersion": "fact-support-typed-v6",
+      "promptHash": "889596997b27deccf91339f46b7a3825aa239a50fbcde92ce5109b67a77f19fa",
+      "serialization": "json-query-id-title-tags-body-v1",
+      "serializationHash": "1d16c5e3ef4647c120fe6ddce72417c9ec618ee41dc77faa447ec214e5749c4a",
+      "pricing": {
+        "currency": "USD",
+        "estimated": true,
+        "source": "Pi model catalog",
+        "rates": {
+          "input": 1.32,
+          "output": 3.96,
+          "cacheRead": 0.044,
+          "cacheWrite": 0
+        }
+      },
+      "profile": "typed",
+      "validationVersion": "typed-candidate-isolation-v1"
+    }
+  },
+  "sourceHashes": {
+    "data/c1-language-support-development.json": "925c5ce543c40192d85a36f46df4cc1545a3c99250f2522b1923eba950169163",
+    "data/c1-query-development-results.json": "2741b398f87f51d1026d81af4ccec969d29d8afba5ecf92d609e4d8600fea1e6",
+    "data/c1-query-development.json": "286e2c31d7c72325fb8b10c19911978a091dfea3c3d4fe6797f90ff6c5afc973",
+    "data/c1-session-validation.json": "42186a94c413ee245ebd2a0c33254c8e75ba9c360cc866f26c85ac4db1bd6c8b",
+    "data/c1-support-development-v2.json": "6b62723bb0497e09da5a3b509f20023e47036e24d0c51989fcf1f96f2a084b0d",
+    "data/c1-support-intent-development.json": "f293404cf6167ec7cf0488a3da5fffb3478b6e4ce239e1c2cf3c1c2743f7764b",
+    "prompts/customer-service-v2.md": "a56b0b5824126b31cc431c86e6959fa0f0ec794e1a6332f89491ce0373351264",
+    "scripts/c1-session-validation-check.ts": "465f874aa3897256feea47f957f42ed567689d3202944ba2c6c384c551635d66",
+    "scripts/c1-session-validation-live.ts": "0ddc47ac47455439d7bf90405d3933bd5417ad13307b1bd077d6f12f5f48c823",
+    "scripts/c1-support-intent-development.ts": "91764ec7fb8222abdf17fd4ad7998c6575ef0046c98c45bee8246ab41e54589a",
+    "skills/shop-support-v2/SKILL.md": "9acbe71187d0454c77a3663ee90b9c8e3a743195c6cea9952977b4b43b4f83d1",
+    "src/after-sales-entry.ts": "bb2ec9d9a7585efefc4af7fcd87c0e9a4d978315d4fd576d4a1ad76a17ea1162",
+    "src/after-sales.ts": "16f063484cfb9fb381f70b3adc03425ca9e418897787673f0fefbe25a2d26b14",
+    "src/agent.ts": "90f63b64503acde752a7cd74a85c97d9b4613df42afe5eb4c7cabf82e9e47de3",
+    "src/bailian.ts": "ed7fc42f703bd3e49ee38581c4bfa5d35f886872f5039c2b467e74682c1d95b1",
+    "src/cli.ts": "447a16b5f2e88e295c3a68da5b336ec4ab18464523c3cd0517f5b435f9bfd4ff",
+    "src/coupon-store.ts": "9886c9f3bd7e364850d49bff9aa94a5fddc41c7f2e88240a8a32fb459a376f8f",
+    "src/eval-analysis.ts": "8e7f23098e84eb841a445c90e91c84f1d12647aa3d453c7041c1dd4f533281b9",
+    "src/eval-capture.ts": "e485728471d3d9f97cab666a832157b2ae802fb189c704f1f4b54d7c5b03d324",
+    "src/eval-server.ts": "50601e5b1f0ea16a9c3d2b0c414ae6e7d81307a230c71209e538886afa3ed591",
+    "src/eval-store.ts": "c215fb7fa5446a3b775ab2f524a7a49f7e7348ee1708b3c73e6aca2f652e9680",
+    "src/evaluation.ts": "a36a158cd4632ca31c613848c3ed48d3443967b2b8763494043652557fcf8106",
+    "src/evidence-acceptance.ts": "6e8040cf1ea30135dd7c18a44ed72d255ce94131226223325df3ab209b61d368",
+    "src/evidence-support.ts": "134689ffdac8a91b376fee7b28c8609391d9c07880ee5b79a81e7d25c650cf0a",
+    "src/experiment-config.ts": "10b3f9e3baed8432d5f9f8eb42235e42a4a698aa5c0d1f4060e1f24b3baa6cca",
+    "src/experiment-jobs.ts": "b1432a8373e5384603bd0a21a0679b91e03c9c785615a9d6e3618932bde203c7",
+    "src/knowledge-applicability.ts": "8d7a6d338cc30b00a26b60e201b5bcb21c14b0000d5cac03bdfbc3ffa7895b3f",
+    "src/knowledge-evaluation.ts": "27088e91b6a312be662f94aad7d78a6fbcb21f362284d3fa9b9864158bcd1df9",
+    "src/knowledge-retrieval.ts": "89a9c606cabc1579b2cbe45ec25675260731e0a0fbe2fe99133515d7df8ebf00",
+    "src/knowledge-service.ts": "65befd15be9b32bb646c213e591a317735689c31bfe1bb17e19ba0c675c8e55f",
+    "src/merchant-notifications.ts": "82f13fc510f832155f246c127075e46dbec1b57e81e71d26d03a62db71c6cc5f",
+    "src/qq-agent.ts": "38c318cb579a83b1abb95f96c6eac745f433d4becb02263fb397b4b84e4724ea",
+    "src/qq-http.ts": "a6e380771e1ce25be1693263d36c7f18ed4a14aa69855d2e4dcaad151ced9d75",
+    "src/qq-identity.ts": "b081c6faae50708875cf9142b7fd238b448404de99828ee2813981b301ab0f9e",
+    "src/qq-reply.ts": "e7ca9ad9ce1363b58913da659f6394ef1572ad52077c4d0b287d5c23291f464c",
+    "src/qq.ts": "51d054cbe68cd005e489ee5d41819b8c40e28ef7c9ff1efc26b502ac9a58cff0",
+    "src/refund-entry.ts": "ee0047a29cb45b13325ef98b886b6d5aa704b61369a97aa19128940f8d133e7f",
+    "src/refunds.ts": "a00872bf5e20114752fd2fe001b3f9ab3bc3b94895b95fa22b44c64bb047df3d",
+    "src/reply-from-tools.ts": "d208059bbe689dc9c9a7dea5841e835219c6238307ed800ecfa10b777db23643",
+    "src/reply.ts": "c6b8a78856042294ffde60577052c7ff74b0c852f5321f3264aa3b5415478540",
+    "src/retrieval-ranking.ts": "6391fcf74f4bfb79f01c018d8c3cc0fb3f969a2256f9269e3127b5f907f6dc89",
+    "src/support-action.ts": "4d8449d054b730a6d2e0ea32f752ff5f227166b689a7e6e96d955c8d9caec291",
+    "src/support-context-action.ts": "75200e4949026d12cbe1dd4991e68e834e296c3b7c41ab00b97de687b887bed5",
+    "src/support-context.ts": "040f19768f87f8aaf1fdfbedfbc46b2f56ecaef30de434e3f008c1ba8d54301c",
+    "src/support-controller.ts": "f93b4b30b88f5c946149952407cfe3d220ed82290e73af85aeaee6c758d666ed",
+    "src/support-evaluation.ts": "1d5669d1ca812deebd03bf38022cd61d62c7fd4655dae04d5b989c74ee54bf8a",
+    "src/support-evidence-context.ts": "5ced6e5d9b10d0113aa2761a16e482f46721e0e26a8e000f66803af9b2f599d0",
+    "src/support-parameters.ts": "58b554be8c7db3d4732168eb4ec6724236d8df87e147af3f507147bf78304518",
+    "src/support-session.ts": "9c5dce70ea7ddb13fe7907a76e4955fbba713df45bf6d211313324973a6a5727"
+  },
+  "dependencies": {
+    "version": 1,
+    "rootDeclarations": {
+      "@earendil-works/pi-ai": "1.0.0",
+      "@earendil-works/pi-agent-core": null,
+      "@earendil-works/pi-coding-agent": "1.0.0",
+      "mysql2": "3.24.5"
+    },
+    "packages": [
+      {
+        "path": "node_modules/@earendil-works/pi-ai",
+        "name": "@earendil-works/pi-ai",
+        "installedVersion": "1.0.0",
+        "lockedVersion": "1.0.0",
+        "lockIntegrity": "sha512-3/W1vdDaVtpeMd23ElvJC12HLA5yS/BGqqcXF+0SK082dN7cbgNcCwguTBRBC258Ke8SzSvUW1B75iAf8w8IxA==",
+        "dependencyDeclarations": {}
+      },
+      {
+        "path": "node_modules/@earendil-works/pi-coding-agent",
+        "name": "@earendil-works/pi-coding-agent",
+        "installedVersion": "1.0.0",
+        "lockedVersion": "1.0.0",
+        "lockIntegrity": "sha512-/FtbxoSQU/mEv1QnichJjRjqteqaIaMWxmhB4G367+MwZfX7/DI5B9YAg5lqbN7nztFskBEtUSZ+FlmMBECtMw==",
+        "dependencyDeclarations": {
+          "@earendil-works/pi-ai": "^1.0.0",
+          "@earendil-works/pi-agent-core": "^1.0.0"
+        }
+      },
+      {
+        "path": "node_modules/@earendil-works/pi-coding-agent/node_modules/@earendil-works/pi-agent-core",
+        "name": "@earendil-works/pi-agent-core",
+        "installedVersion": "1.0.0",
+        "lockedVersion": "1.0.0",
+        "lockIntegrity": null,
+        "dependencyDeclarations": {
+          "@earendil-works/pi-ai": "^1.0.0"
+        }
+      },
+      {
+        "path": "node_modules/@earendil-works/pi-coding-agent/node_modules/@earendil-works/pi-ai",
+        "name": "@earendil-works/pi-ai",
+        "installedVersion": "1.0.0",
+        "lockedVersion": "1.0.0",
+        "lockIntegrity": null,
+        "dependencyDeclarations": {}
+      },
+      {
+        "path": "node_modules/mysql2",
+        "name": "mysql2",
+        "installedVersion": "3.24.5",
+        "lockedVersion": "3.24.5",
+        "lockIntegrity": "sha512-X6Ujsr2QSkkLpkQGjxzpKRAPn9nu4axpR63ntBzquFVEvPOArgbUQ1sJjFKI7hnaYtiVZxa17Z7q18KSubW0IQ==",
+        "dependencyDeclarations": {}
+      }
+    ]
+  }
+}

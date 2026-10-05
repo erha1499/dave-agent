@@ -1,0 +1,1436 @@
+{
+  "version": 1,
+  "suiteId": "c1-support-intent-exposed-development-v1",
+  "stage": "development-not-validation",
+  "selectionRule": "All 10 cases from c1-support-development-v2 plus all 8 from c1-language-support-development, in original order; append exactly original 9652 session plan 019/1 and 023/1 using completed combined support inputs from query comparison 7740f402. No selection based on new prompt outcomes, no deleted cases, no changed original gold.",
+  "hashSerialization": "sha256 of UTF-8 file bytes for source sha256; sha256 of JSON.stringify(value) for object hashes, preserving field and array order. inputHash hashes {query,scope,candidates} in that order and deliberately excludes prompt/settings for paired-input equality.",
+  "measurement": {
+    "inputCount": 20,
+    "groups": [
+      "fact-support-typed-v5",
+      "fact-support-typed-v6"
+    ],
+    "plannedSupportRequests": 40,
+    "modelInputEquality": "Both prompt groups receive identical query, scope and ordered complete candidates, proven by inputHash; only promptVersion/promptHash may differ in support settings.",
+    "fixedSyntheticRankRows": 18,
+    "recordedRankRows": 2,
+    "retrievalEvaluated": false,
+    "actionSelectionEvaluated": false,
+    "finalAnswerEvaluated": false,
+    "goldPolicy": "First 18 expected objects are exact copies. Last two reuse existing paired-008/007 expected objects verbatim and retain the full original session expected object under originalExpected; no legacy acceptance or category rubric is relaxed.",
+    "evidenceLimit": "Exposed development probes. Replayed historical inputs require fresh remote classification to compare prompts; this file contains no new model results and proves no gain."
+  },
+  "sources": [
+    {
+      "path": "data/c1-support-development-v2.json",
+      "sha256": "6b62723bb0497e09da5a3b509f20023e47036e24d0c51989fcf1f96f2a084b0d",
+      "bytes": 7258
+    },
+    {
+      "path": "data/c1-support-development-v2-source.json",
+      "sha256": "2100eb0f30cc142d548179d94ea9357654ed5357161c3e74d4e3202edf28782a",
+      "bytes": 1689
+    },
+    {
+      "path": "data/c1-language-support-development.json",
+      "sha256": "925c5ce543c40192d85a36f46df4cc1545a3c99250f2522b1923eba950169163",
+      "bytes": 6882
+    },
+    {
+      "path": "data/c1-language-support-development-source.json",
+      "sha256": "9a6bbe566aa756e259fe22334d8d94db746f690056bab93d727c4d271e246d48",
+      "bytes": 2495
+    },
+    {
+      "path": "data/acceptance-online.json",
+      "sha256": "5f97b7f4e77cd1695a38ef9b0c42e53f52f40f7ae869a39fcdcdae5ae8971b72",
+      "bytes": 5787
+    },
+    {
+      "path": "data/acceptance-validation.json",
+      "sha256": "0ead08f6c37cf43be8d84b47557692e3ac2cc264fe37994f2f030cddf7d50592",
+      "bytes": 34893
+    },
+    {
+      "path": "data/reference/kefu-harness/data/knowledge/docs.jsonl",
+      "sha256": "d3cd80ba76fdc82e57c1eefdc66a20987f09bc9b3dd0fbd1287c709146217fae",
+      "bytes": 14267
+    },
+    {
+      "path": "data/reference/kefu-harness/source.json",
+      "sha256": "42c6791ca2edfabcb98d9c49c2cd063c81e7705c29e94a6c1858357000c1d5cf",
+      "bytes": 1223
+    },
+    {
+      "path": "data/c1-support-development.json",
+      "sha256": "fda5404be9fdf413661d16f54b9353c0ec973ab29e195d3d95f89ad079d8f56d",
+      "bytes": 4485
+    },
+    {
+      "path": "data/c1-support-development-source.json",
+      "sha256": "5e50d745855a1de85cc18e2e5ad0f2a1c0f060e0e47a14244c3bbf45d5094dae",
+      "bytes": 1106
+    },
+    {
+      "path": "data/acceptance-source.json",
+      "sha256": "a142141b94aea8b5a3ac9812d6abc2bb9171b2e437e47c69d615a9c688bd042c",
+      "bytes": 21225
+    },
+    {
+      "path": "data/c1-query-development.json",
+      "sha256": "286e2c31d7c72325fb8b10c19911978a091dfea3c3d4fe6797f90ff6c5afc973",
+      "bytes": 80682
+    },
+    {
+      "path": "data/c1-session-validation.json",
+      "sha256": "42186a94c413ee245ebd2a0c33254c8e75ba9c360cc866f26c85ac4db1bd6c8b",
+      "bytes": 120954
+    },
+    {
+      "path": ".runtime/c1-session-validation/9652d6eb-4a35-4e95-a22d-4b72d7e10731.json",
+      "sha256": "8c2281cd8b3f425b5e1edaf52dbe64435a4c98a860a4ccf31d64b079586b4fd6",
+      "bytes": 2498433
+    },
+    {
+      "path": ".runtime/c1-query-development/7740f402-e083-4193-a684-9411f2817ac5.json",
+      "sha256": "32edf46fb1f55c65a312508735a9b93a5a9d579df4b2929c9e192ec21fa6d392",
+      "bytes": 840385
+    }
+  ],
+  "historicalSupportSettings": {
+    "provider": "deepseek",
+    "model": "deepseek-v4-pro",
+    "api": "openai-completions",
+    "endpoint": "https://api.deepseek.com",
+    "timeoutMs": 60000,
+    "temperature": 0,
+    "maxTokens": 2048,
+    "maxRetries": 0,
+    "promptVersion": "fact-support-typed-v5",
+    "promptHash": "6f90373dc229648806bfa93957041bc7bb8ba7f50c76e61fe316827561b2453b",
+    "serialization": "json-query-id-title-tags-body-v1",
+    "serializationHash": "1d16c5e3ef4647c120fe6ddce72417c9ec618ee41dc77faa447ec214e5749c4a",
+    "pricing": {
+      "currency": "USD",
+      "estimated": true,
+      "source": "Pi model catalog",
+      "rates": {
+        "input": 1.32,
+        "output": 3.96,
+        "cacheRead": 0.044,
+        "cacheWrite": 0
+      }
+    },
+    "profile": "typed",
+    "validationVersion": "typed-candidate-isolation-v1"
+  },
+  "counts": {
+    "total": 20,
+    "expanded": 10,
+    "language": 8,
+    "contextual": 2,
+    "candidates": 20,
+    "direct_fact": 5,
+    "boundary_answer": 5,
+    "limitation_only": 10,
+    "accepted": 10,
+    "rejected": 10
+  },
+  "cases": [
+    {
+      "id": "c1-pair-001",
+      "group": "expanded",
+      "corpus": "online",
+      "query": "已过期但未核销的团购券，申请退款之前需要谁确认？",
+      "scope": {
+        "shopId": null,
+        "productId": null
+      },
+      "candidates": [
+        {
+          "id": "KB-REFUND-EXPIRED",
+          "shopId": null,
+          "productId": null,
+          "title": "过期团购券售后规则",
+          "body": "【演示规则】已过期但未核销的券需要商家确认能否退款、延期以及金额。知识库未提供过期自动退款或自动延期政策。不得把未过期券的规则套用到过期券，也不能自行编造门店承诺。当前助手只提供查询和说明。",
+          "tags": [
+            "退款",
+            "过期",
+            "失效",
+            "到期",
+            "延期",
+            "有效期",
+            "没用",
+            "未核销"
+          ],
+          "status": "active",
+          "rank": 1,
+          "score": 1
+        }
+      ],
+      "expected": {
+        "category": "direct_fact",
+        "supported": true,
+        "evidenceQuote": "已过期但未核销的券需要商家确认能否退款、延期以及金额",
+        "reason": "询问政策本身规定的确认主体；原文已给出商家确认这个前提，不要求实例审批结果。"
+      },
+      "source": {
+        "path": "data/c1-support-development-v2.json",
+        "sha256": "6b62723bb0497e09da5a3b509f20023e47036e24d0c51989fcf1f96f2a084b0d",
+        "bytes": 7258,
+        "caseId": "c1-pair-001",
+        "index": 0,
+        "caseSha256": "caa763e4fd04dba39f25fd4734c4cd930158285792255693683b3f8eb8923461",
+        "manifestPath": "data/c1-support-development-v2-source.json",
+        "candidatesDerivation": "loadC1SupportDevelopment: complete source document; fixed rank=1 and score=1 are schema placeholders only, with no retrieval or threshold claim.",
+        "originalSourceId": "KB-REFUND-EXPIRED",
+        "documentSha256": "f7162bbe3fcef2387970846b1c342bf2da65c87cd4edabd82fb99f32a6c0fb3c"
+      },
+      "inputHash": "3bf9f04031a2793d98bc26b61589e4e726541b1aa6eadfe3d905b270b0d3a6da"
+    },
+    {
+      "id": "c1-pair-002",
+      "group": "expanded",
+      "corpus": "online",
+      "query": "我这笔已过期但未核销的团购券，商家现在已经批准退款了吗？",
+      "scope": {
+        "shopId": null,
+        "productId": null
+      },
+      "candidates": [
+        {
+          "id": "KB-REFUND-EXPIRED",
+          "shopId": null,
+          "productId": null,
+          "title": "过期团购券售后规则",
+          "body": "【演示规则】已过期但未核销的券需要商家确认能否退款、延期以及金额。知识库未提供过期自动退款或自动延期政策。不得把未过期券的规则套用到过期券，也不能自行编造门店承诺。当前助手只提供查询和说明。",
+          "tags": [
+            "退款",
+            "过期",
+            "失效",
+            "到期",
+            "延期",
+            "有效期",
+            "没用",
+            "未核销"
+          ],
+          "status": "active",
+          "rank": 1,
+          "score": 1
+        }
+      ],
+      "expected": {
+        "category": "limitation_only",
+        "supported": false,
+        "evidenceQuote": "已过期但未核销的券需要商家确认能否退款、延期以及金额",
+        "reason": "询问本单是否已经批准；政策前提没有提供实例商家结果。"
+      },
+      "source": {
+        "path": "data/c1-support-development-v2.json",
+        "sha256": "6b62723bb0497e09da5a3b509f20023e47036e24d0c51989fcf1f96f2a084b0d",
+        "bytes": 7258,
+        "caseId": "c1-pair-002",
+        "index": 1,
+        "caseSha256": "8cc0810c0fca459442ed865f7554c72e11b2316d175f850e28a2abea6f2f077e",
+        "manifestPath": "data/c1-support-development-v2-source.json",
+        "candidatesDerivation": "loadC1SupportDevelopment: complete source document; fixed rank=1 and score=1 are schema placeholders only, with no retrieval or threshold claim.",
+        "originalSourceId": "KB-REFUND-EXPIRED",
+        "documentSha256": "f7162bbe3fcef2387970846b1c342bf2da65c87cd4edabd82fb99f32a6c0fb3c"
+      },
+      "inputHash": "8fc9870e735f2384b154a08294744dac1a77f7dcb311a9da0054f9dd595edc02"
+    },
+    {
+      "id": "c1-pair-003",
+      "group": "expanded",
+      "corpus": "reference",
+      "query": "未核销且在有效期内的团购券退款，款项按规则退到哪个账户？",
+      "scope": {
+        "shopId": null,
+        "productId": null
+      },
+      "candidates": [
+        {
+          "id": "RF001",
+          "title": "未核销团购券退款规则",
+          "body": "未核销且在有效期内的团购券,支持随时申请退款,退款金额为实际支付金额,无需商家同意。退款将原路退回至原支付账户,一般1-3个工作日到账,具体到账时间以支付渠道为准。若券已过有效期但未核销,同样支持过期退。",
+          "tags": [
+            "退款",
+            "未核销",
+            "随时退"
+          ],
+          "industry": "通用",
+          "shopId": null,
+          "rank": 1,
+          "score": 1
+        }
+      ],
+      "expected": {
+        "category": "direct_fact",
+        "supported": true,
+        "evidenceQuote": "退款将原路退回至原支付账户",
+        "reason": "询问政策规定的退款资金路径，不询问某笔到账事件。"
+      },
+      "source": {
+        "path": "data/c1-support-development-v2.json",
+        "sha256": "6b62723bb0497e09da5a3b509f20023e47036e24d0c51989fcf1f96f2a084b0d",
+        "bytes": 7258,
+        "caseId": "c1-pair-003",
+        "index": 2,
+        "caseSha256": "d4fb5a749e846826a00fe28d131ec64de561a89688e119b69ccb1b7c8b091b78",
+        "manifestPath": "data/c1-support-development-v2-source.json",
+        "candidatesDerivation": "loadC1SupportDevelopment: complete source document; fixed rank=1 and score=1 are schema placeholders only, with no retrieval or threshold claim.",
+        "originalSourceId": "RF001",
+        "documentSha256": "2e7795c349e768f0c2e31fd4b049795425df519312fba0dc2ebe20b235e53101"
+      },
+      "inputHash": "7e224775636df297d1ca7a99f5fd23437aef11401a7260bfb849f3b9b55a85b6"
+    },
+    {
+      "id": "c1-pair-004",
+      "group": "expanded",
+      "corpus": "reference",
+      "query": "我这笔未核销团购券的退款，现在已经到账到我的原支付账户了吗？",
+      "scope": {
+        "shopId": null,
+        "productId": null
+      },
+      "candidates": [
+        {
+          "id": "RF001",
+          "title": "未核销团购券退款规则",
+          "body": "未核销且在有效期内的团购券,支持随时申请退款,退款金额为实际支付金额,无需商家同意。退款将原路退回至原支付账户,一般1-3个工作日到账,具体到账时间以支付渠道为准。若券已过有效期但未核销,同样支持过期退。",
+          "tags": [
+            "退款",
+            "未核销",
+            "随时退"
+          ],
+          "industry": "通用",
+          "shopId": null,
+          "rank": 1,
+          "score": 1
+        }
+      ],
+      "expected": {
+        "category": "limitation_only",
+        "supported": false,
+        "evidenceQuote": "退款将原路退回至原支付账户,一般1-3个工作日到账,具体到账时间以支付渠道为准",
+        "reason": "询问本单是否已到账；通用路径和一般时效不证明实际事件已经发生。"
+      },
+      "source": {
+        "path": "data/c1-support-development-v2.json",
+        "sha256": "6b62723bb0497e09da5a3b509f20023e47036e24d0c51989fcf1f96f2a084b0d",
+        "bytes": 7258,
+        "caseId": "c1-pair-004",
+        "index": 3,
+        "caseSha256": "9932a6e34b760cb269a7822683eb1a316911759fdf8ed34f9f65209c84f8feac",
+        "manifestPath": "data/c1-support-development-v2-source.json",
+        "candidatesDerivation": "loadC1SupportDevelopment: complete source document; fixed rank=1 and score=1 are schema placeholders only, with no retrieval or threshold claim.",
+        "originalSourceId": "RF001",
+        "documentSha256": "2e7795c349e768f0c2e31fd4b049795425df519312fba0dc2ebe20b235e53101"
+      },
+      "inputHash": "fbaf490abdc36ee82604235b777496432857176d9fbc5c119f7e4042a083e379"
+    },
+    {
+      "id": "c1-pair-005",
+      "group": "expanded",
+      "corpus": "online",
+      "query": "仅凭双人午餐团购券这个名称，就能推断出这张券的具体截止日期吗？",
+      "scope": {
+        "shopId": "shop-demo-1",
+        "productId": "product-demo-1"
+      },
+      "candidates": [
+        {
+          "id": "KB-PRODUCT-LUNCH",
+          "shopId": "shop-demo-1",
+          "productId": "product-demo-1",
+          "title": "双人午餐套餐说明",
+          "body": "【演示规则】双人午餐团购券标价79.80元，一张券对应两人午餐套餐，核销一次即视为整张券已使用。每张券具体截止时间以订单返回的 expiresAt 为准，不能从标价推断实付金额。菜品明细、过敏原和特殊节假日可用性未录入。",
+          "tags": [
+            "午餐",
+            "双人",
+            "套餐",
+            "价格",
+            "两人",
+            "核销",
+            "有效期"
+          ],
+          "status": "active",
+          "rank": 1,
+          "score": 1
+        }
+      ],
+      "expected": {
+        "category": "boundary_answer",
+        "supported": true,
+        "evidenceQuote": "每张券具体截止时间以订单返回的 expiresAt 为准",
+        "reason": "明确问从名称推断日期是否有依据；原文指定订单 expiresAt 是具体截止时间的依据。"
+      },
+      "source": {
+        "path": "data/c1-support-development-v2.json",
+        "sha256": "6b62723bb0497e09da5a3b509f20023e47036e24d0c51989fcf1f96f2a084b0d",
+        "bytes": 7258,
+        "caseId": "c1-pair-005",
+        "index": 4,
+        "caseSha256": "892c8d5e418e6192df350075a8b8bb278665cdad1cb95190fc1632d10d53c9e3",
+        "manifestPath": "data/c1-support-development-v2-source.json",
+        "candidatesDerivation": "loadC1SupportDevelopment: complete source document; fixed rank=1 and score=1 are schema placeholders only, with no retrieval or threshold claim.",
+        "originalSourceId": "KB-PRODUCT-LUNCH",
+        "documentSha256": "826d8f2dff0e796daafe89758e90f2a7e02103fa60e5c7a43a1c7220fd174681"
+      },
+      "inputHash": "ad2d043f60fd15222466f97d972757bf41c6778571a4c41a0b082bc8515ef56f"
+    },
+    {
+      "id": "c1-pair-006",
+      "group": "expanded",
+      "corpus": "online",
+      "query": "我这张双人午餐团购券的具体到期日是2026年几月几日？",
+      "scope": {
+        "shopId": "shop-demo-1",
+        "productId": "product-demo-1"
+      },
+      "candidates": [
+        {
+          "id": "KB-PRODUCT-LUNCH",
+          "shopId": "shop-demo-1",
+          "productId": "product-demo-1",
+          "title": "双人午餐套餐说明",
+          "body": "【演示规则】双人午餐团购券标价79.80元，一张券对应两人午餐套餐，核销一次即视为整张券已使用。每张券具体截止时间以订单返回的 expiresAt 为准，不能从标价推断实付金额。菜品明细、过敏原和特殊节假日可用性未录入。",
+          "tags": [
+            "午餐",
+            "双人",
+            "套餐",
+            "价格",
+            "两人",
+            "核销",
+            "有效期"
+          ],
+          "status": "active",
+          "rank": 1,
+          "score": 1
+        }
+      ],
+      "expected": {
+        "category": "limitation_only",
+        "supported": false,
+        "evidenceQuote": "每张券具体截止时间以订单返回的 expiresAt 为准",
+        "reason": "直接索要本单实际日期；原文只有查询位置，没有 expiresAt 实例值。"
+      },
+      "source": {
+        "path": "data/c1-support-development-v2.json",
+        "sha256": "6b62723bb0497e09da5a3b509f20023e47036e24d0c51989fcf1f96f2a084b0d",
+        "bytes": 7258,
+        "caseId": "c1-pair-006",
+        "index": 5,
+        "caseSha256": "c5437b55f3388a628c51feff7bb1409487664a3142dc5c56b48c71fd9d87b973",
+        "manifestPath": "data/c1-support-development-v2-source.json",
+        "candidatesDerivation": "loadC1SupportDevelopment: complete source document; fixed rank=1 and score=1 are schema placeholders only, with no retrieval or threshold claim.",
+        "originalSourceId": "KB-PRODUCT-LUNCH",
+        "documentSha256": "826d8f2dff0e796daafe89758e90f2a7e02103fa60e5c7a43a1c7220fd174681"
+      },
+      "inputHash": "a08cab1d25fed775576d44609c1f713c714281a1577e36b4dc7191b0ac37e833"
+    },
+    {
+      "id": "c1-pair-007",
+      "group": "expanded",
+      "corpus": "online",
+      "query": "知识库有没有列出双人午餐套餐的过敏原信息？",
+      "scope": {
+        "shopId": "shop-demo-1",
+        "productId": "product-demo-1"
+      },
+      "candidates": [
+        {
+          "id": "KB-PRODUCT-LUNCH",
+          "shopId": "shop-demo-1",
+          "productId": "product-demo-1",
+          "title": "双人午餐套餐说明",
+          "body": "【演示规则】双人午餐团购券标价79.80元，一张券对应两人午餐套餐，核销一次即视为整张券已使用。每张券具体截止时间以订单返回的 expiresAt 为准，不能从标价推断实付金额。菜品明细、过敏原和特殊节假日可用性未录入。",
+          "tags": [
+            "午餐",
+            "双人",
+            "套餐",
+            "价格",
+            "两人",
+            "核销",
+            "有效期"
+          ],
+          "status": "active",
+          "rank": 1,
+          "score": 1
+        }
+      ],
+      "expected": {
+        "category": "boundary_answer",
+        "acceptableCategories": [
+          "boundary_answer",
+          "direct_fact"
+        ],
+        "supported": true,
+        "evidenceQuote": "菜品明细、过敏原和特殊节假日可用性未录入。",
+        "reason": "询问文档是否记载；明确未录入足以回答文档覆盖为否，不推断实际过敏原。"
+      },
+      "source": {
+        "path": "data/c1-support-development-v2.json",
+        "sha256": "6b62723bb0497e09da5a3b509f20023e47036e24d0c51989fcf1f96f2a084b0d",
+        "bytes": 7258,
+        "caseId": "c1-pair-007",
+        "index": 6,
+        "caseSha256": "1ef666aacb113b0114fb26e4bb0878669658b6c30385effa61b3873b1c7b929c",
+        "manifestPath": "data/c1-support-development-v2-source.json",
+        "candidatesDerivation": "loadC1SupportDevelopment: complete source document; fixed rank=1 and score=1 are schema placeholders only, with no retrieval or threshold claim.",
+        "originalSourceId": "KB-PRODUCT-LUNCH",
+        "documentSha256": "826d8f2dff0e796daafe89758e90f2a7e02103fa60e5c7a43a1c7220fd174681"
+      },
+      "inputHash": "a61a72b91f294f906f1305fe5073e9257fa7f6dcb18809e04e48dc6d1b8be557"
+    },
+    {
+      "id": "c1-pair-008",
+      "group": "expanded",
+      "corpus": "online",
+      "query": "双人午餐套餐具体含有哪些过敏原？请列出来。",
+      "scope": {
+        "shopId": "shop-demo-1",
+        "productId": "product-demo-1"
+      },
+      "candidates": [
+        {
+          "id": "KB-PRODUCT-LUNCH",
+          "shopId": "shop-demo-1",
+          "productId": "product-demo-1",
+          "title": "双人午餐套餐说明",
+          "body": "【演示规则】双人午餐团购券标价79.80元，一张券对应两人午餐套餐，核销一次即视为整张券已使用。每张券具体截止时间以订单返回的 expiresAt 为准，不能从标价推断实付金额。菜品明细、过敏原和特殊节假日可用性未录入。",
+          "tags": [
+            "午餐",
+            "双人",
+            "套餐",
+            "价格",
+            "两人",
+            "核销",
+            "有效期"
+          ],
+          "status": "active",
+          "rank": 1,
+          "score": 1
+        }
+      ],
+      "expected": {
+        "category": "limitation_only",
+        "supported": false,
+        "evidenceQuote": "菜品明细、过敏原和特殊节假日可用性未录入。",
+        "reason": "索要具体业务属性；未录入不能提供实际过敏原清单。"
+      },
+      "source": {
+        "path": "data/c1-support-development-v2.json",
+        "sha256": "6b62723bb0497e09da5a3b509f20023e47036e24d0c51989fcf1f96f2a084b0d",
+        "bytes": 7258,
+        "caseId": "c1-pair-008",
+        "index": 7,
+        "caseSha256": "749d2d49d756254614752251eaca050e40d51c933e85f67e64f30997c61b108d",
+        "manifestPath": "data/c1-support-development-v2-source.json",
+        "candidatesDerivation": "loadC1SupportDevelopment: complete source document; fixed rank=1 and score=1 are schema placeholders only, with no retrieval or threshold claim.",
+        "originalSourceId": "KB-PRODUCT-LUNCH",
+        "documentSha256": "826d8f2dff0e796daafe89758e90f2a7e02103fa60e5c7a43a1c7220fd174681"
+      },
+      "inputHash": "972b8b631022a68e646519c99617c8e41bb7acd88a2dc06528fe4cf18b0b5ede"
+    },
+    {
+      "id": "c1-pair-009",
+      "group": "expanded",
+      "corpus": "online",
+      "query": "知识库是否已经写清这家店私享套餐的使用限制？",
+      "scope": {
+        "shopId": "shop-demo-1",
+        "productId": null
+      },
+      "candidates": [
+        {
+          "id": "KB-SHOP-DEMO-1",
+          "shopId": "shop-demo-1",
+          "productId": null,
+          "title": "演示门店使用与预约说明",
+          "body": "【演示规则】云味餐厅演示店为虚构餐饮门店，演示地址为虚拟市演示路1号。常规午餐与晚餐套餐允许普通周末使用，到店前需用户自行与商家确认接待情况；助手目前不能预约、外呼、查询实时库存或安排接待。法定节假日、特殊活动和私享套餐使用限制没有录入，遇到这些问题应明确规则缺失并建议向商家核实。",
+          "tags": [
+            "门店",
+            "地址",
+            "周末",
+            "预约",
+            "营业",
+            "套餐",
+            "接待",
+            "节假日",
+            "五一",
+            "十一",
+            "私享"
+          ],
+          "status": "active",
+          "rank": 1,
+          "score": 1
+        }
+      ],
+      "expected": {
+        "category": "boundary_answer",
+        "acceptableCategories": [
+          "boundary_answer",
+          "direct_fact"
+        ],
+        "supported": true,
+        "evidenceQuote": "法定节假日、特殊活动和私享套餐使用限制没有录入",
+        "reason": "只问文档覆盖范围；原文直接说明没有录入，可以回答未记载。"
+      },
+      "source": {
+        "path": "data/c1-support-development-v2.json",
+        "sha256": "6b62723bb0497e09da5a3b509f20023e47036e24d0c51989fcf1f96f2a084b0d",
+        "bytes": 7258,
+        "caseId": "c1-pair-009",
+        "index": 8,
+        "caseSha256": "1da7368ed0939096ba2e680cd64958afd23c03bb027ea28db2364dad78795f7b",
+        "manifestPath": "data/c1-support-development-v2-source.json",
+        "candidatesDerivation": "loadC1SupportDevelopment: complete source document; fixed rank=1 and score=1 are schema placeholders only, with no retrieval or threshold claim.",
+        "originalSourceId": "KB-SHOP-DEMO-1",
+        "documentSha256": "2e780084652a02f7c975c23c3ef77e9c79e2c7373eeb0cf73372f147400a6399"
+      },
+      "inputHash": "1684a1c861f950c18f8f695852429c6c22bf9aa25a7430fca5cdf6cd37f3ad52"
+    },
+    {
+      "id": "c1-pair-010",
+      "group": "expanded",
+      "corpus": "online",
+      "query": "这家店的私享套餐，普通周六可以到店使用吗？",
+      "scope": {
+        "shopId": "shop-demo-1",
+        "productId": null
+      },
+      "candidates": [
+        {
+          "id": "KB-SHOP-DEMO-1",
+          "shopId": "shop-demo-1",
+          "productId": null,
+          "title": "演示门店使用与预约说明",
+          "body": "【演示规则】云味餐厅演示店为虚构餐饮门店，演示地址为虚拟市演示路1号。常规午餐与晚餐套餐允许普通周末使用，到店前需用户自行与商家确认接待情况；助手目前不能预约、外呼、查询实时库存或安排接待。法定节假日、特殊活动和私享套餐使用限制没有录入，遇到这些问题应明确规则缺失并建议向商家核实。",
+          "tags": [
+            "门店",
+            "地址",
+            "周末",
+            "预约",
+            "营业",
+            "套餐",
+            "接待",
+            "节假日",
+            "五一",
+            "十一",
+            "私享"
+          ],
+          "status": "active",
+          "rank": 1,
+          "score": 1
+        }
+      ],
+      "expected": {
+        "category": "limitation_only",
+        "supported": false,
+        "evidenceQuote": "法定节假日、特殊活动和私享套餐使用限制没有录入",
+        "reason": "询问实际使用资格；常规套餐的周末规则和私享限制未录入都不能提供本类可用性事实。"
+      },
+      "source": {
+        "path": "data/c1-support-development-v2.json",
+        "sha256": "6b62723bb0497e09da5a3b509f20023e47036e24d0c51989fcf1f96f2a084b0d",
+        "bytes": 7258,
+        "caseId": "c1-pair-010",
+        "index": 9,
+        "caseSha256": "014afef0bd9e249a690cbce5d596b60920598a135e0f5422aa2dc31bcf3f0692",
+        "manifestPath": "data/c1-support-development-v2-source.json",
+        "candidatesDerivation": "loadC1SupportDevelopment: complete source document; fixed rank=1 and score=1 are schema placeholders only, with no retrieval or threshold claim.",
+        "originalSourceId": "KB-SHOP-DEMO-1",
+        "documentSha256": "2e780084652a02f7c975c23c3ef77e9c79e2c7373eeb0cf73372f147400a6399"
+      },
+      "inputHash": "5e15aa17a9756391ccfa129aa06d9cdd7602dd50b34897598252dd4d2a18b09d"
+    },
+    {
+      "id": "c1-language-001",
+      "group": "language",
+      "corpus": "reference",
+      "query": "对未核销且还在有效期内的团购券，规则里的退钱去向，是不是我最初付款用的那个账户？",
+      "scope": {
+        "shopId": null,
+        "productId": null
+      },
+      "candidates": [
+        {
+          "id": "RF001",
+          "title": "未核销团购券退款规则",
+          "body": "未核销且在有效期内的团购券,支持随时申请退款,退款金额为实际支付金额,无需商家同意。退款将原路退回至原支付账户,一般1-3个工作日到账,具体到账时间以支付渠道为准。若券已过有效期但未核销,同样支持过期退。",
+          "tags": [
+            "退款",
+            "未核销",
+            "随时退"
+          ],
+          "industry": "通用",
+          "shopId": null,
+          "rank": 1,
+          "score": 1
+        }
+      ],
+      "expected": {
+        "category": "direct_fact",
+        "supported": true,
+        "evidenceQuote": "退款将原路退回至原支付账户",
+        "reason": "退钱和退款、最初付款用的账户和原支付账户是语义等价表达；这是资金路径规则，不证明本次已到账。"
+      },
+      "source": {
+        "path": "data/c1-language-support-development.json",
+        "sha256": "925c5ce543c40192d85a36f46df4cc1545a3c99250f2522b1923eba950169163",
+        "bytes": 6882,
+        "caseId": "c1-language-001",
+        "index": 0,
+        "caseSha256": "57307b540f07330999a1153934df668ee708156d6ef35ebef445e0c0bbb2f6b6",
+        "manifestPath": "data/c1-language-support-development-source.json",
+        "candidatesDerivation": "loadC1SupportDevelopment: complete source document; fixed rank=1 and score=1 are schema placeholders only, with no retrieval or threshold claim.",
+        "originalSourceId": "RF001",
+        "documentSha256": "2e7795c349e768f0c2e31fd4b049795425df519312fba0dc2ebe20b235e53101"
+      },
+      "inputHash": "882fc1f3ac5e8388f1a4ef7b62f27f211a0060053a6f88fc46ee84bfe4d360cb"
+    },
+    {
+      "id": "c1-language-002",
+      "group": "language",
+      "corpus": "reference",
+      "query": "我这笔未核销且还在有效期内的团购券，最初付款用的那个账户现在已经收到退回的钱了吗？",
+      "scope": {
+        "shopId": null,
+        "productId": null
+      },
+      "candidates": [
+        {
+          "id": "RF001",
+          "title": "未核销团购券退款规则",
+          "body": "未核销且在有效期内的团购券,支持随时申请退款,退款金额为实际支付金额,无需商家同意。退款将原路退回至原支付账户,一般1-3个工作日到账,具体到账时间以支付渠道为准。若券已过有效期但未核销,同样支持过期退。",
+          "tags": [
+            "退款",
+            "未核销",
+            "随时退"
+          ],
+          "industry": "通用",
+          "shopId": null,
+          "rank": 1,
+          "score": 1
+        }
+      ],
+      "expected": {
+        "category": "limitation_only",
+        "supported": false,
+        "evidenceQuote": "退款将原路退回至原支付账户,一般1-3个工作日到账,具体到账时间以支付渠道为准",
+        "reason": "政策提供路径和一般时效，但没有本单实际到账记录；语言理解不能补实例事件。"
+      },
+      "source": {
+        "path": "data/c1-language-support-development.json",
+        "sha256": "925c5ce543c40192d85a36f46df4cc1545a3c99250f2522b1923eba950169163",
+        "bytes": 6882,
+        "caseId": "c1-language-002",
+        "index": 1,
+        "caseSha256": "c135db7d30b67c3bea48164682381da6ed8a0869a0ee8523f058015f0d4a975a",
+        "manifestPath": "data/c1-language-support-development-source.json",
+        "candidatesDerivation": "loadC1SupportDevelopment: complete source document; fixed rank=1 and score=1 are schema placeholders only, with no retrieval or threshold claim.",
+        "originalSourceId": "RF001",
+        "documentSha256": "2e7795c349e768f0c2e31fd4b049795425df519312fba0dc2ebe20b235e53101"
+      },
+      "inputHash": "a865df35ed5394dce731aaa3c05b2fd2f83f9fc9d6b8faf36562cb9665cfc7e8"
+    },
+    {
+      "id": "c1-language-003",
+      "group": "language",
+      "corpus": "reference",
+      "query": "假设商家在正常营业且没有节假日调整，只比较午市券的限定时段：中午12点是否落在允许使用的时间区间内？",
+      "scope": {
+        "shopId": null,
+        "productId": null
+      },
+      "candidates": [
+        {
+          "id": "RS002",
+          "title": "预约时段与营业时间",
+          "body": "预约时段须落在商家营业时间内,且部分商品限定可用时段,例如午市券仅限11:00-14:00使用,晚市券仅限17:00-21:00。法定节假日营业时间可能调整,以商家实际公告为准。超出可用时段到店,商家有权拒绝使用该券。",
+          "tags": [
+            "预约",
+            "时段",
+            "营业时间"
+          ],
+          "industry": "通用",
+          "shopId": null,
+          "rank": 1,
+          "score": 1
+        }
+      ],
+      "expected": {
+        "category": "direct_fact",
+        "supported": true,
+        "evidenceQuote": "午市券仅限11:00-14:00使用",
+        "reason": "12:00属于原文明确给出的时间区间；问题显式假设其他营业前提，不要求补现实商家状态。"
+      },
+      "source": {
+        "path": "data/c1-language-support-development.json",
+        "sha256": "925c5ce543c40192d85a36f46df4cc1545a3c99250f2522b1923eba950169163",
+        "bytes": 6882,
+        "caseId": "c1-language-003",
+        "index": 2,
+        "caseSha256": "f88cd34d2f8876cd3b2e7b5e7232a1c29ddd3fcf8935fe22488a9399ff99f8a8",
+        "manifestPath": "data/c1-language-support-development-source.json",
+        "candidatesDerivation": "loadC1SupportDevelopment: complete source document; fixed rank=1 and score=1 are schema placeholders only, with no retrieval or threshold claim.",
+        "originalSourceId": "RS002",
+        "documentSha256": "4ecda1c05ed7f533f4995f75a662803f66b308b36f34fbd3b967f36ac5b9dacc"
+      },
+      "inputHash": "536ffcd0d0dcf18b81ec22f6ed9576414745d24f25c62b8f6facb54738a62456"
+    },
+    {
+      "id": "c1-language-004",
+      "group": "language",
+      "corpus": "reference",
+      "query": "这家商店今天中午12点一定正常营业，而且一定会接待我使用午市券吗？",
+      "scope": {
+        "shopId": null,
+        "productId": null
+      },
+      "candidates": [
+        {
+          "id": "RS002",
+          "title": "预约时段与营业时间",
+          "body": "预约时段须落在商家营业时间内,且部分商品限定可用时段,例如午市券仅限11:00-14:00使用,晚市券仅限17:00-21:00。法定节假日营业时间可能调整,以商家实际公告为准。超出可用时段到店,商家有权拒绝使用该券。",
+          "tags": [
+            "预约",
+            "时段",
+            "营业时间"
+          ],
+          "industry": "通用",
+          "shopId": null,
+          "rank": 1,
+          "score": 1
+        }
+      ],
+      "expected": {
+        "category": "limitation_only",
+        "supported": false,
+        "evidenceQuote": "法定节假日营业时间可能调整,以商家实际公告为准",
+        "reason": "具体日期的实际营业、商家公告及接待状态未给出；区间包含关系不能证明这些现实前提。"
+      },
+      "source": {
+        "path": "data/c1-language-support-development.json",
+        "sha256": "925c5ce543c40192d85a36f46df4cc1545a3c99250f2522b1923eba950169163",
+        "bytes": 6882,
+        "caseId": "c1-language-004",
+        "index": 3,
+        "caseSha256": "bb5bbf76c4d9b88f16cccf870078b1c12c5680220076188c0085673f7576d6d1",
+        "manifestPath": "data/c1-language-support-development-source.json",
+        "candidatesDerivation": "loadC1SupportDevelopment: complete source document; fixed rank=1 and score=1 are schema placeholders only, with no retrieval or threshold claim.",
+        "originalSourceId": "RS002",
+        "documentSha256": "4ecda1c05ed7f533f4995f75a662803f66b308b36f34fbd3b967f36ac5b9dacc"
+      },
+      "inputHash": "2c42e8d25ccac25082b643e44bded8feb8dc1c2f16441aaf740e2ec12dc9fa59"
+    },
+    {
+      "id": "c1-language-005",
+      "group": "language",
+      "corpus": "online",
+      "query": "这张券星期天也按刚才的规则使用吗？\n上轮已完成取证的问题（仅用于理解本轮指代）：该订单 对应的常规午餐套餐，普通周末能用吗？\n已核实订单商品：双人午餐团购券。",
+      "scope": {
+        "shopId": "shop-demo-1",
+        "productId": "product-demo-1"
+      },
+      "candidates": [
+        {
+          "id": "KB-SHOP-DEMO-1",
+          "shopId": "shop-demo-1",
+          "productId": null,
+          "title": "演示门店使用与预约说明",
+          "body": "【演示规则】云味餐厅演示店为虚构餐饮门店，演示地址为虚拟市演示路1号。常规午餐与晚餐套餐允许普通周末使用，到店前需用户自行与商家确认接待情况；助手目前不能预约、外呼、查询实时库存或安排接待。法定节假日、特殊活动和私享套餐使用限制没有录入，遇到这些问题应明确规则缺失并建议向商家核实。",
+          "tags": [
+            "门店",
+            "地址",
+            "周末",
+            "预约",
+            "营业",
+            "套餐",
+            "接待",
+            "节假日",
+            "五一",
+            "十一",
+            "私享"
+          ],
+          "status": "active",
+          "rank": 1,
+          "score": 1
+        }
+      ],
+      "expected": {
+        "category": "direct_fact",
+        "supported": true,
+        "evidenceQuote": "常规午餐与晚餐套餐允许普通周末使用，到店前需用户自行与商家确认接待情况",
+        "reason": "逐字重放已曝光失败的有效query；可信前文限定普通周末，可按原规则条件解释词义关系，仍须保留自行确认接待和特殊日期例外，不证明任何具体日期可用。"
+      },
+      "source": {
+        "path": "data/c1-language-support-development.json",
+        "sha256": "925c5ce543c40192d85a36f46df4cc1545a3c99250f2522b1923eba950169163",
+        "bytes": 6882,
+        "caseId": "c1-language-005",
+        "index": 4,
+        "caseSha256": "d22b6fe261ed455bf8833ef5f982a014ff524db51bc99936af5fcc8b5b6703c1",
+        "manifestPath": "data/c1-language-support-development-source.json",
+        "candidatesDerivation": "loadC1SupportDevelopment: complete source document; fixed rank=1 and score=1 are schema placeholders only, with no retrieval or threshold claim.",
+        "originalSourceId": "KB-SHOP-DEMO-1",
+        "documentSha256": "2e780084652a02f7c975c23c3ef77e9c79e2c7373eeb0cf73372f147400a6399"
+      },
+      "inputHash": "b377081099b3d008a247d428f92a95a607be479e5af2ea0408f20fb87451078c"
+    },
+    {
+      "id": "c1-language-006",
+      "group": "language",
+      "corpus": "online",
+      "query": "这张券在2026年10月11日一定可以用、商家也一定会接待吗？\n上轮已完成取证的问题（仅用于理解本轮指代）：该订单 对应的常规午餐套餐，普通周末能用吗？\n已核实订单商品：双人午餐团购券。",
+      "scope": {
+        "shopId": "shop-demo-1",
+        "productId": "product-demo-1"
+      },
+      "candidates": [
+        {
+          "id": "KB-SHOP-DEMO-1",
+          "shopId": "shop-demo-1",
+          "productId": null,
+          "title": "演示门店使用与预约说明",
+          "body": "【演示规则】云味餐厅演示店为虚构餐饮门店，演示地址为虚拟市演示路1号。常规午餐与晚餐套餐允许普通周末使用，到店前需用户自行与商家确认接待情况；助手目前不能预约、外呼、查询实时库存或安排接待。法定节假日、特殊活动和私享套餐使用限制没有录入，遇到这些问题应明确规则缺失并建议向商家核实。",
+          "tags": [
+            "门店",
+            "地址",
+            "周末",
+            "预约",
+            "营业",
+            "套餐",
+            "接待",
+            "节假日",
+            "五一",
+            "十一",
+            "私享"
+          ],
+          "status": "active",
+          "rank": 1,
+          "score": 1
+        }
+      ],
+      "expected": {
+        "category": "limitation_only",
+        "supported": false,
+        "evidenceQuote": "到店前需用户自行与商家确认接待情况；助手目前不能预约、外呼、查询实时库存或安排接待",
+        "reason": "给出日期不等于核实是否普通周末、特殊活动或接待情况；普通词义不能补外部日历事件和商家承诺。"
+      },
+      "source": {
+        "path": "data/c1-language-support-development.json",
+        "sha256": "925c5ce543c40192d85a36f46df4cc1545a3c99250f2522b1923eba950169163",
+        "bytes": 6882,
+        "caseId": "c1-language-006",
+        "index": 5,
+        "caseSha256": "9e63f2e89a73f771104ea1de344feb364e8c0a976e3f4b1541582e3c4f360c0f",
+        "manifestPath": "data/c1-language-support-development-source.json",
+        "candidatesDerivation": "loadC1SupportDevelopment: complete source document; fixed rank=1 and score=1 are schema placeholders only, with no retrieval or threshold claim.",
+        "originalSourceId": "KB-SHOP-DEMO-1",
+        "documentSha256": "2e780084652a02f7c975c23c3ef77e9c79e2c7373eeb0cf73372f147400a6399"
+      },
+      "inputHash": "50010d23efa440c959b627ee6fe2f723a51063a981a9ca243662a45d9bca6b54"
+    },
+    {
+      "id": "c1-language-007",
+      "group": "language",
+      "corpus": "online",
+      "query": "现有文档是否已经记载特殊活动期间和私享套餐的使用限制？",
+      "scope": {
+        "shopId": "shop-demo-1",
+        "productId": null
+      },
+      "candidates": [
+        {
+          "id": "KB-SHOP-DEMO-1",
+          "shopId": "shop-demo-1",
+          "productId": null,
+          "title": "演示门店使用与预约说明",
+          "body": "【演示规则】云味餐厅演示店为虚构餐饮门店，演示地址为虚拟市演示路1号。常规午餐与晚餐套餐允许普通周末使用，到店前需用户自行与商家确认接待情况；助手目前不能预约、外呼、查询实时库存或安排接待。法定节假日、特殊活动和私享套餐使用限制没有录入，遇到这些问题应明确规则缺失并建议向商家核实。",
+          "tags": [
+            "门店",
+            "地址",
+            "周末",
+            "预约",
+            "营业",
+            "套餐",
+            "接待",
+            "节假日",
+            "五一",
+            "十一",
+            "私享"
+          ],
+          "status": "active",
+          "rank": 1,
+          "score": 1
+        }
+      ],
+      "expected": {
+        "category": "boundary_answer",
+        "supported": true,
+        "evidenceQuote": "法定节假日、特殊活动和私享套餐使用限制没有录入",
+        "reason": "明确询问文档覆盖；原文的缺失声明支持文档未记录的否定答案，不涉及现实使用许可。"
+      },
+      "source": {
+        "path": "data/c1-language-support-development.json",
+        "sha256": "925c5ce543c40192d85a36f46df4cc1545a3c99250f2522b1923eba950169163",
+        "bytes": 6882,
+        "caseId": "c1-language-007",
+        "index": 6,
+        "caseSha256": "ee4f17933f70d608f46348a2c30a6feafb00dc3507336f1d01a01780e1a73f9c",
+        "manifestPath": "data/c1-language-support-development-source.json",
+        "candidatesDerivation": "loadC1SupportDevelopment: complete source document; fixed rank=1 and score=1 are schema placeholders only, with no retrieval or threshold claim.",
+        "originalSourceId": "KB-SHOP-DEMO-1",
+        "documentSha256": "2e780084652a02f7c975c23c3ef77e9c79e2c7373eeb0cf73372f147400a6399"
+      },
+      "inputHash": "5118451b9c949849f0ad4edf65a5c19c6a0eac9f86e2e10770fc828676c112af"
+    },
+    {
+      "id": "c1-language-008",
+      "group": "language",
+      "corpus": "online",
+      "query": "我的私享套餐团购券在普通周末一定能够使用吗？\n已核实订单商品：私享套餐团购券。",
+      "scope": {
+        "shopId": "shop-demo-1",
+        "productId": null
+      },
+      "candidates": [
+        {
+          "id": "KB-SHOP-DEMO-1",
+          "shopId": "shop-demo-1",
+          "productId": null,
+          "title": "演示门店使用与预约说明",
+          "body": "【演示规则】云味餐厅演示店为虚构餐饮门店，演示地址为虚拟市演示路1号。常规午餐与晚餐套餐允许普通周末使用，到店前需用户自行与商家确认接待情况；助手目前不能预约、外呼、查询实时库存或安排接待。法定节假日、特殊活动和私享套餐使用限制没有录入，遇到这些问题应明确规则缺失并建议向商家核实。",
+          "tags": [
+            "门店",
+            "地址",
+            "周末",
+            "预约",
+            "营业",
+            "套餐",
+            "接待",
+            "节假日",
+            "五一",
+            "十一",
+            "私享"
+          ],
+          "status": "active",
+          "rank": 1,
+          "score": 1
+        }
+      ],
+      "expected": {
+        "category": "limitation_only",
+        "supported": false,
+        "evidenceQuote": "法定节假日、特殊活动和私享套餐使用限制没有录入",
+        "reason": "私享套餐不能凭名称或语义相近推为常规午餐或晚餐；同篇原文对该商品类别的限制未录入，缺失声明不能授权可用。"
+      },
+      "source": {
+        "path": "data/c1-language-support-development.json",
+        "sha256": "925c5ce543c40192d85a36f46df4cc1545a3c99250f2522b1923eba950169163",
+        "bytes": 6882,
+        "caseId": "c1-language-008",
+        "index": 7,
+        "caseSha256": "ed699ba778732ee01566bb1c7f11ca9d1bb00da385b85ea46aeda5e9fc754be5",
+        "manifestPath": "data/c1-language-support-development-source.json",
+        "candidatesDerivation": "loadC1SupportDevelopment: complete source document; fixed rank=1 and score=1 are schema placeholders only, with no retrieval or threshold claim.",
+        "originalSourceId": "KB-SHOP-DEMO-1",
+        "documentSha256": "2e780084652a02f7c975c23c3ef77e9c79e2c7373eeb0cf73372f147400a6399"
+      },
+      "inputHash": "5c9f02d59a962a5159f8f1e9cdc582efe4b6c00a59ae32f1802d4402e2b6d817"
+    },
+    {
+      "id": "c1-session-fixed-019:1",
+      "group": "contextual",
+      "corpus": "online",
+      "query": "该订单 的双人午餐团购券，套餐具体含哪些过敏原？请列出名称。\n已核实订单商品：双人午餐团购券。\n已核实订单状态：paid；状态对应条件：未核销退款。\n已核实本单券数：共1张，未核销1张、已核销0张、已过期0张、已退款0张（按券状态字段计数）。\n有效期事实（截至2026-10-05T00:00:00.000Z）：未核销券：日期已过期0张、未到期1张、截止时间未知0张。",
+      "scope": {
+        "shopId": "shop-demo-1",
+        "productId": "product-demo-1"
+      },
+      "candidates": [
+        {
+          "id": "KB-PRODUCT-LUNCH",
+          "shopId": "shop-demo-1",
+          "productId": "product-demo-1",
+          "title": "双人午餐套餐说明",
+          "body": "【演示规则】双人午餐团购券标价79.80元，一张券对应两人午餐套餐，核销一次即视为整张券已使用。每张券具体截止时间以订单返回的 expiresAt 为准，不能从标价推断实付金额。菜品明细、过敏原和特殊节假日可用性未录入。",
+          "tags": [
+            "午餐",
+            "双人",
+            "套餐",
+            "价格",
+            "两人",
+            "核销",
+            "有效期"
+          ],
+          "status": "active",
+          "score": 0.5870193481192598,
+          "rank": 1
+        }
+      ],
+      "expected": {
+        "category": "limitation_only",
+        "supported": false,
+        "evidenceQuote": "菜品明细、过敏原和特殊节假日可用性未录入。",
+        "reason": "索要具体业务属性；未录入不能提供实际过敏原清单。"
+      },
+      "originalExpected": {
+        "allowedKinds": [
+          "policy"
+        ],
+        "outcome": "ready",
+        "knowledge": "rejected",
+        "gold": [],
+        "scope": {
+          "shopId": "shop-demo-1",
+          "productId": "product-demo-1"
+        },
+        "freshOrder": {
+          "source": "demo-database",
+          "id": "COUPON-6001",
+          "status": "paid",
+          "asOf": "2026-10-05T00:00:00.000Z",
+          "amounts": {
+            "totalCents": 7980,
+            "paidCents": 7980,
+            "refundedCents": 0
+          },
+          "createdAt": "2026-10-05T00:00:00.000Z",
+          "paidAt": "2026-10-05T00:00:00.000Z",
+          "shop": {
+            "id": "shop-demo-1",
+            "name": "云味餐厅",
+            "merchantName": "演示商家",
+            "address": "演示地址"
+          },
+          "items": [
+            {
+              "productId": "product-demo-1",
+              "quantity": 1,
+              "unitPriceCents": 7980,
+              "totalCents": 7980,
+              "id": "COUPON-6001-item-0",
+              "productName": "双人午餐团购券"
+            }
+          ],
+          "coupons": [
+            {
+              "id": "COUPON-6001-coupon-0",
+              "orderItemId": "COUPON-6001-item-0",
+              "status": "unused",
+              "expiresAt": "2026-11-04T00:00:00.000Z",
+              "redeemedAt": null,
+              "redeemedShopId": null
+            }
+          ],
+          "payments": [
+            {
+              "status": "succeeded",
+              "amountCents": 7980,
+              "paidAt": "2026-10-05T00:00:00.000Z"
+            }
+          ],
+          "refunds": []
+        },
+        "answerCriteria": [
+          {
+            "id": "fact",
+            "kind": "required_fact",
+            "statement": "明确当前资料没有过敏原名单，不能列出确切过敏原，可建议向商家核实。",
+            "basis": "冻结语料逐篇审阅及受控订单完整字段均无所问事实"
+          },
+          {
+            "id": "no_invention",
+            "kind": "forbidden_claim",
+            "statement": "不得编出花生、蛋、奶等成分，也不能保证无过敏原。",
+            "basis": "冻结语料逐篇审阅及受控订单完整字段均无所问事实"
+          },
+          {
+            "id": "conditions",
+            "kind": "condition",
+            "statement": "诚实说明当前证据无法确定该具体事实；可建议核实，但不能以未录入声明代替所问数值/名单。",
+            "basis": "冻结语料逐篇审阅及受控订单完整字段均无所问事实"
+          }
+        ]
+      },
+      "source": {
+        "path": ".runtime/c1-query-development/7740f402-e083-4193-a684-9411f2817ac5.json",
+        "sha256": "32edf46fb1f55c65a312508735a9b93a5a9d579df4b2929c9e192ec21fa6d392",
+        "bytes": 840385,
+        "runId": "7740f402-e083-4193-a684-9411f2817ac5",
+        "caseId": "c1-session-fixed-019",
+        "turn": 1,
+        "index": 28,
+        "caseSha256": "c0e84617e060a28f5401330f092c831a46857cb0a442bd5988f8cb25b85dce7f",
+        "mode": "combined",
+        "queryPath": "rows[28].result.trace.queries.evidence",
+        "candidatesDerivation": "acceptEvidence(frozen corpus, recorded rawRanking, recorded threshold=0.5) then gateKnowledgeApplicability(frozen applicability snapshot, rebuilt binding); historical support inputHash and requestHash verified, with no gold used in candidate construction.",
+        "rawRanking": [
+          {
+            "id": "KB-PRODUCT-LUNCH",
+            "score": 0.5870193481192598
+          },
+          {
+            "id": "KB-REFUND-PARTIAL",
+            "score": 0.3226682901595175
+          },
+          {
+            "id": "KB-REFUND-UNUSED",
+            "score": 0.31902054852781847
+          },
+          {
+            "id": "KB-REFUND-EXPIRED",
+            "score": 0.29940420487200137
+          },
+          {
+            "id": "KB-REFUND-REDEEMED",
+            "score": 0.2932821445441153
+          },
+          {
+            "id": "KB-SHOP-DEMO-1",
+            "score": 0.26913958881505196
+          },
+          {
+            "id": "KB-REFUND-PAYMENT",
+            "score": 0.2625167211159619
+          }
+        ],
+        "threshold": 0.5,
+        "supportInputHash": "207cd14fbc245cc9c66786e764b2bcafbd32d644acd975b25abf4b381754aff6",
+        "supportRequestHash": "23c6f5f64609f32ed2246e8abe1b797a522a65cc3f701d13a8927c138d6cc393",
+        "fixture": {
+          "path": "data/c1-query-development.json",
+          "sha256": "286e2c31d7c72325fb8b10c19911978a091dfea3c3d4fe6797f90ff6c5afc973",
+          "bytes": 80682,
+          "index": 14,
+          "caseSha256": "5d53c5c0a5893ad2d0dd48ad3cf295969264c959b2d6720985ebbebe63df9b72"
+        },
+        "originalPlan": {
+          "path": "data/c1-session-validation.json",
+          "sha256": "42186a94c413ee245ebd2a0c33254c8e75ba9c360cc866f26c85ac4db1bd6c8b",
+          "bytes": 120954,
+          "sourceRunId": "9652d6eb-4a35-4e95-a22d-4b72d7e10731",
+          "sourceRawPath": ".runtime/c1-session-validation/9652d6eb-4a35-4e95-a22d-4b72d7e10731.json",
+          "planSha256": "48284ac2fd65664e0f946aed24fe2417a2b19044f508636955a6cd46bdf5dda7",
+          "caseIndex": 18,
+          "turnIndex": 0,
+          "caseSha256": "02c9b6233d2441628d6201057d9be6123d14d2308adb1648dcca5be100ce3379",
+          "expectedSha256": "7884f32164b14bf19abd1b98a196c49b2596c7347cd9a850efdc6d7767ef29a9"
+        },
+        "classificationContract": {
+          "path": "data/c1-support-development-v2.json",
+          "sha256": "6b62723bb0497e09da5a3b509f20023e47036e24d0c51989fcf1f96f2a084b0d",
+          "bytes": 7258,
+          "caseId": "c1-pair-008",
+          "index": 7,
+          "caseSha256": "749d2d49d756254614752251eaca050e40d51c933e85f67e64f30997c61b108d",
+          "rule": "Copy the existing paired-case classification contract verbatim; preserve original session expected/knowledge/gold separately and require matching acceptance behavior."
+        }
+      },
+      "inputHash": "273a5fbdb02e2fd9c9945b8de4fdfaa3b23f939458619955c53900fb9aa8e44b"
+    },
+    {
+      "id": "c1-session-fixed-023:1",
+      "group": "contextual",
+      "corpus": "online",
+      "query": "请核对该订单 的双人午餐团购券：现有商品资料有没有记录过敏原明细？只问资料覆盖，不要求你列出成分。\n已核实订单商品：双人午餐团购券。\n已核实订单状态：paid；状态对应条件：未核销退款。\n已核实本单券数：共1张，未核销1张、已核销0张、已过期0张、已退款0张（按券状态字段计数）。\n有效期事实（截至2026-10-05T00:00:00.000Z）：未核销券：日期已过期0张、未到期1张、截止时间未知0张。",
+      "scope": {
+        "shopId": "shop-demo-1",
+        "productId": "product-demo-1"
+      },
+      "candidates": [
+        {
+          "id": "KB-PRODUCT-LUNCH",
+          "shopId": "shop-demo-1",
+          "productId": "product-demo-1",
+          "title": "双人午餐套餐说明",
+          "body": "【演示规则】双人午餐团购券标价79.80元，一张券对应两人午餐套餐，核销一次即视为整张券已使用。每张券具体截止时间以订单返回的 expiresAt 为准，不能从标价推断实付金额。菜品明细、过敏原和特殊节假日可用性未录入。",
+          "tags": [
+            "午餐",
+            "双人",
+            "套餐",
+            "价格",
+            "两人",
+            "核销",
+            "有效期"
+          ],
+          "status": "active",
+          "score": 0.7297883002359287,
+          "rank": 1
+        }
+      ],
+      "expected": {
+        "category": "boundary_answer",
+        "acceptableCategories": [
+          "boundary_answer",
+          "direct_fact"
+        ],
+        "supported": true,
+        "evidenceQuote": "菜品明细、过敏原和特殊节假日可用性未录入。",
+        "reason": "询问文档是否记载；明确未录入足以回答文档覆盖为否，不推断实际过敏原。"
+      },
+      "originalExpected": {
+        "allowedKinds": [
+          "policy"
+        ],
+        "outcome": "ready",
+        "knowledge": "evidence",
+        "gold": [
+          {
+            "sourceId": "KB-PRODUCT-LUNCH",
+            "quote": "菜品明细、过敏原和特殊节假日可用性未录入"
+          }
+        ],
+        "scope": {
+          "shopId": "shop-demo-1",
+          "productId": "product-demo-1"
+        },
+        "freshOrder": {
+          "source": "demo-database",
+          "id": "COUPON-6001",
+          "status": "paid",
+          "asOf": "2026-10-05T00:00:00.000Z",
+          "amounts": {
+            "totalCents": 7980,
+            "paidCents": 7980,
+            "refundedCents": 0
+          },
+          "createdAt": "2026-10-05T00:00:00.000Z",
+          "paidAt": "2026-10-05T00:00:00.000Z",
+          "shop": {
+            "id": "shop-demo-1",
+            "name": "云味餐厅",
+            "merchantName": "演示商家",
+            "address": "演示地址"
+          },
+          "items": [
+            {
+              "productId": "product-demo-1",
+              "quantity": 1,
+              "unitPriceCents": 7980,
+              "totalCents": 7980,
+              "id": "COUPON-6001-item-0",
+              "productName": "双人午餐团购券"
+            }
+          ],
+          "coupons": [
+            {
+              "id": "COUPON-6001-coupon-0",
+              "orderItemId": "COUPON-6001-item-0",
+              "status": "unused",
+              "expiresAt": "2026-11-04T00:00:00.000Z",
+              "redeemedAt": null,
+              "redeemedShopId": null
+            }
+          ],
+          "payments": [
+            {
+              "status": "succeeded",
+              "amountCents": 7980,
+              "paidAt": "2026-10-05T00:00:00.000Z"
+            }
+          ],
+          "refunds": []
+        },
+        "answerCriteria": [
+          {
+            "id": "fact",
+            "kind": "required_fact",
+            "statement": "明确现有商品资料没有记录过敏原明细。",
+            "basis": "KB-PRODUCT-LUNCH: 菜品明细、过敏原和特殊节假日可用性未录入"
+          },
+          {
+            "id": "no_invention",
+            "kind": "forbidden_claim",
+            "statement": "不得从未录入推出套餐没有过敏原或食用安全，不编成分名单。",
+            "basis": "KB-PRODUCT-LUNCH: 菜品明细、过敏原和特殊节假日可用性未录入"
+          },
+          {
+            "id": "conditions",
+            "kind": "condition",
+            "statement": "结论限定资料覆盖；实际成分仍须商家核实。",
+            "basis": "KB-PRODUCT-LUNCH: 菜品明细、过敏原和特殊节假日可用性未录入"
+          }
+        ]
+      },
+      "source": {
+        "path": ".runtime/c1-query-development/7740f402-e083-4193-a684-9411f2817ac5.json",
+        "sha256": "32edf46fb1f55c65a312508735a9b93a5a9d579df4b2929c9e192ec21fa6d392",
+        "bytes": 840385,
+        "runId": "7740f402-e083-4193-a684-9411f2817ac5",
+        "caseId": "c1-session-fixed-023",
+        "turn": 1,
+        "index": 36,
+        "caseSha256": "53e149236eecbf514252abc57613d529d3f891b21b26b0c9c1dd0fc65b2d9d45",
+        "mode": "combined",
+        "queryPath": "rows[36].result.trace.queries.evidence",
+        "candidatesDerivation": "acceptEvidence(frozen corpus, recorded rawRanking, recorded threshold=0.5) then gateKnowledgeApplicability(frozen applicability snapshot, rebuilt binding); historical support inputHash and requestHash verified, with no gold used in candidate construction.",
+        "rawRanking": [
+          {
+            "id": "KB-PRODUCT-LUNCH",
+            "score": 0.7297883002359287
+          },
+          {
+            "id": "KB-REFUND-UNUSED",
+            "score": 0.49210579534148047
+          },
+          {
+            "id": "KB-REFUND-PARTIAL",
+            "score": 0.4775697668415278
+          },
+          {
+            "id": "KB-REFUND-REDEEMED",
+            "score": 0.4513523878632888
+          },
+          {
+            "id": "KB-REFUND-EXPIRED",
+            "score": 0.3969059492711431
+          },
+          {
+            "id": "KB-REFUND-PAYMENT",
+            "score": 0.30880481896279416
+          },
+          {
+            "id": "KB-SHOP-DEMO-1",
+            "score": 0.25789878135001876
+          }
+        ],
+        "threshold": 0.5,
+        "supportInputHash": "ec1d35b4da63f438bc040fea2c692a61262760dd578fdc41fb273d1798a4a093",
+        "supportRequestHash": "34b75410f4ad73d210f5e346c55f985cdb3815d496378e479305b14b40cd7524",
+        "fixture": {
+          "path": "data/c1-query-development.json",
+          "sha256": "286e2c31d7c72325fb8b10c19911978a091dfea3c3d4fe6797f90ff6c5afc973",
+          "bytes": 80682,
+          "index": 18,
+          "caseSha256": "e4f33fcc24c2b496c159ed04d5ba64df4af54c04f35c80e6a5160658dd424800"
+        },
+        "originalPlan": {
+          "path": "data/c1-session-validation.json",
+          "sha256": "42186a94c413ee245ebd2a0c33254c8e75ba9c360cc866f26c85ac4db1bd6c8b",
+          "bytes": 120954,
+          "sourceRunId": "9652d6eb-4a35-4e95-a22d-4b72d7e10731",
+          "sourceRawPath": ".runtime/c1-session-validation/9652d6eb-4a35-4e95-a22d-4b72d7e10731.json",
+          "planSha256": "48284ac2fd65664e0f946aed24fe2417a2b19044f508636955a6cd46bdf5dda7",
+          "caseIndex": 22,
+          "turnIndex": 0,
+          "caseSha256": "d244420413edc87eac5f7059381d6ed7088f7f81995756512cf97d5dae2e71c1",
+          "expectedSha256": "20020de1437dc9932d7546083dd4d2bec8854f00fc899427babfbae2a5d0d70e"
+        },
+        "classificationContract": {
+          "path": "data/c1-support-development-v2.json",
+          "sha256": "6b62723bb0497e09da5a3b509f20023e47036e24d0c51989fcf1f96f2a084b0d",
+          "bytes": 7258,
+          "caseId": "c1-pair-007",
+          "index": 6,
+          "caseSha256": "1ef666aacb113b0114fb26e4bb0878669658b6c30385effa61b3873b1c7b929c",
+          "rule": "Copy the existing paired-case classification contract verbatim; preserve original session expected/knowledge/gold separately and require matching acceptance behavior."
+        }
+      },
+      "inputHash": "052d3865ecd9e75b0b92bbb2cf47c28a6a2fc0a3bf3b375ac6021935140d9c01"
+    }
+  ]
+}

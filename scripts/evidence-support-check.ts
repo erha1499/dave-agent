@@ -1,12 +1,13 @@
 import assert from "node:assert/strict";
 import type { AssistantMessage } from "@earendil-works/pi-ai";
 import { acceptEvidence, resolveEvidenceAcceptance } from "../src/evidence-acceptance.ts";
-import { applyEvidenceSupport, createEvidenceSupportClient, EvidenceSupportError, evidenceSupportInputHash, validateEvidenceSupport,
+import { applyEvidenceSupport, createEvidenceSupportClient, EvidenceSupportError, evidenceSupportInputHash, evidenceSupportRequestHash, validateEvidenceSupport,
   validateEvidenceSupportVerification, verifyEvidenceSupport, evidenceSupportPrompt, evidenceSupportTypedPrompt, evidenceSupportTypedPromptVersion,
   evidenceSupportTypedV1Prompt, evidenceSupportTypedV1PromptHash, evidenceSupportTypedV1PromptVersion,
   evidenceSupportTypedV2Prompt, evidenceSupportTypedV2PromptHash, evidenceSupportTypedV2PromptVersion,
   evidenceSupportTypedV3Prompt, evidenceSupportTypedV3PromptHash, evidenceSupportTypedV3PromptVersion,
-  evidenceSupportTypedV4Prompt, evidenceSupportTypedV4PromptHash, evidenceSupportTypedV4PromptVersion, resolveEvidenceSupportModel, type EvidenceSupportDecision } from "../src/evidence-support.ts";
+  evidenceSupportTypedV4Prompt, evidenceSupportTypedV4PromptHash, evidenceSupportTypedV4PromptVersion,
+  evidenceSupportTypedV6Prompt, evidenceSupportTypedV6PromptHash, evidenceSupportTypedV6PromptVersion, resolveEvidenceSupportModel, type EvidenceSupportDecision } from "../src/evidence-support.ts";
 import { contentHash } from "../src/bailian.ts";
 
 const documents = [
@@ -143,6 +144,40 @@ assert.equal(typed.settings.promptVersion, "fact-support-typed-v5"); assert.notE
 assert.equal(typed.settings.promptHash, "6f90373dc229648806bfa93957041bc7bb8ba7f50c76e61fe316827561b2453b");
 const typedChecked = await verifyEvidenceSupport({ query, scope, candidates, client: typed });
 assert.equal(typedCalls, 1); assert.notEqual(typedChecked.requestHash, checked.requestHash);
+// Frozen before adding v6: both v5 parser modes keep their settings/request
+// bytes. These are transport/version checks, not evidence of model accuracy.
+assert.equal(evidenceSupportTypedV6PromptVersion, "fact-support-typed-v6");
+assert.equal(contentHash(evidenceSupportTypedV6Prompt), evidenceSupportTypedV6PromptHash);
+assert.equal(evidenceSupportTypedV6PromptHash, "889596997b27deccf91339f46b7a3825aa239a50fbcde92ce5109b67a77f19fa");
+assert.ok(evidenceSupportTypedV6Prompt.endsWith(`\n\n${evidenceSupportTypedPrompt}`), "v6 adds only the preceding intent contract; the complete v5 text is unchanged");
+for (const baseline of [
+  { validationVersion: "typed-batch-v1" as const, settingsHash: "c6b0ce7cd17c90c0e7f8ed2c1da11612c0a4c6cd8a33a0773a34b251c770eb0f", requestHash: "feef836bbb63fe1b0507d4d19e59c5e0dd297c8e0ac9edcb618c22d8729619dd" },
+  { validationVersion: undefined, settingsHash: "0aab2fd06b0438d5bb793b2da8724f57bd85deb7301da0f5b33be58f162450ec", requestHash: "77b4140e5ca414f4b299b3415843bc7aead7c53871f66942762c46b9d7121a5e" },
+]) {
+  let candidateCalls = 0;
+  const defaultV5 = await createEvidenceSupportClient({ profile: "typed", validationVersion: baseline.validationVersion, timeoutMs: 1000,
+    runtime: { model, complete: async () => { throw Error("default settings only"); } } });
+  assert.equal(defaultV5.settings.promptVersion, "fact-support-typed-v5");
+  assert.equal(contentHash(defaultV5.settings), baseline.settingsHash);
+  assert.equal(evidenceSupportRequestHash({ query, candidates, settings: defaultV5.settings }), baseline.requestHash);
+  const candidate = await createEvidenceSupportClient({ profile: "typed", typedPromptVersion: evidenceSupportTypedV6PromptVersion,
+    validationVersion: baseline.validationVersion, timeoutMs: 1000, runtime: { model, complete: async (context, options) => {
+      candidateCalls++; assert.equal(context.systemPrompt, evidenceSupportTypedV6Prompt);
+      assert.deepEqual(context.tools, []); assert.equal(options.maxRetries, 0);
+      assert.deepEqual(JSON.parse(String(context.messages[0]!.content)), { query, documents: candidates.map(({ id, title, tags, body }) => ({ id, title, tags, body })) });
+      return message({ decisions: typedRows });
+    } } });
+  assert.equal(candidate.settings.promptVersion, evidenceSupportTypedV6PromptVersion);
+  assert.equal(candidate.settings.promptHash, evidenceSupportTypedV6PromptHash);
+  assert.deepEqual({ ...candidate.settings, promptVersion: defaultV5.settings.promptVersion, promptHash: defaultV5.settings.promptHash }, defaultV5.settings,
+    "v6 changes only prompt identity/content, never parser, serialization, model or retry settings");
+  const verification = await verifyEvidenceSupport({ query, scope, candidates, client: candidate });
+  assert.equal(candidateCalls, 1); assert.notEqual(verification.requestHash, baseline.requestHash);
+  assert.equal(validateEvidenceSupportVerification(verification, { ...bound, settings: candidate.settings }), true);
+  assert.equal(validateEvidenceSupportVerification(verification, { ...bound, settings: defaultV5.settings }), false);
+  assert.equal(validateEvidenceSupportVerification(typedChecked, { ...bound, settings: candidate.settings }), false);
+  assert.equal(applyEvidenceSupport({ prepared, verification, query, scope, documents, settings: defaultV5.settings }).status, "unavailable");
+}
 // Historical prompt and parser selections are independent; neither may silently reuse a new prompt with old hashes.
 let replayCalls = 0;
 const typedV3 = await createEvidenceSupportClient({ profile: "typed", typedPromptVersion: evidenceSupportTypedV3PromptVersion,
@@ -180,7 +215,10 @@ for (const legacy of [
   assert.equal(applyEvidenceSupport({ prepared, verification: replayed, query, scope, documents, settings: typed.settings }).status, "unavailable");
 }
 for (const options of [{ profile: "binary", typedPromptVersion: evidenceSupportTypedV3PromptVersion },
-  { profile: "typed", typedPromptVersion: "fact-support-typed-invalid" }] as const) {
+  { profile: "binary", typedPromptVersion: evidenceSupportTypedV6PromptVersion },
+  { profile: "typed", typedPromptVersion: "fact-support-typed-invalid" },
+  { profile: "typed", typedPromptVersion: "fact-support-typed-v7" },
+  { profile: "typed", typedPromptVersion: null }] as const) {
   await assert.rejects(createEvidenceSupportClient({ ...options, typedPromptVersion: options.typedPromptVersion as typeof evidenceSupportTypedV3PromptVersion,
     runtime: { model, complete: async () => { throw Error("must not run"); } } }), /提示词版本无效/);
 }
