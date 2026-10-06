@@ -1,0 +1,547 @@
+{
+  "version": 1,
+  "stage": "fresh-fixed-policy-scope-session-not-blind",
+  "frozenAt": "2026-10-06T10:38:25.805Z",
+  "frozenBeforeExecution": true,
+  "remoteExecutions": 1,
+  "dataset": {
+    "path": "data/c1-policy-scope-session-development.json",
+    "sha256": "58b985b078af89d8b99f25b8697e1ba2eb6c9f1423afdd6f93bb38a8a7bbac90"
+  },
+  "counts": {
+    "casesPerArm": 4,
+    "turnsPerArm": 8,
+    "pairedTurns": 16
+  },
+  "sourceHashes": {
+    "data/acceptance-online.json": "5f97b7f4e77cd1695a38ef9b0c42e53f52f40f7ae869a39fcdcdae5ae8971b72",
+    "data/c1-policy-scope-session-development.json": "58b985b078af89d8b99f25b8697e1ba2eb6c9f1423afdd6f93bb38a8a7bbac90",
+    "data/knowledge-applicability-v2.json": "d228b3331b48087063837971cd38b224704e882fa48d0196a830ac67e62e48cf",
+    "data/knowledge-applicability.json": "c3af34125bf0e2d693a82bd3729aef1cf05be314a4ae60d7332c8b8c9c98eb4e",
+    "db/02-seed.sql": "82c7143840ac30d166207dcf92c227b3368b98af899412a4f669f04bfb976560",
+    "docs/c1-policy-scope-repair.md": "4ea7202959b7b4e3647b18829219796807dc5b6ce40ade6d8b41b6f3a3fc5cb8",
+    "prompts/customer-service-v2.md": "0ce7234817f7cfd9925c32c4e0230253c3c73c06723c270e477c4cf4f3527a85",
+    "scripts/c1-policy-scope-session-development.ts": "a6d1ac1ddf75a980efa844024d02c6bb71e43878caf80afadbb0b083a4dd2656",
+    "scripts/c1-reference-evidence.ts": "de290d8865be3dac6f515eb9a43e54f229cc8ccc385f3b30604e4a3ea61755d7",
+    "scripts/c1-session-live.ts": "6cb3783b72a4d80682f6e2baf470b6a62d2753ac99da436d1f780d8b305c0ab3",
+    "scripts/c1-session-validation-check.ts": "0ccfd48376a76905a141a473b067c0491a0ac13edc4f3e4fe641b2357659c94c",
+    "scripts/c1-session-validation-live.ts": "78eb7ce9cc63436eb8ce53f14b755b92c5a58aea4f3ec678dfce48217d0d6ef7",
+    "skills/shop-support-v2/SKILL.md": "c59ac5eaea1771605e8c46df7c731ee518e8bdb30525b3ee510a470584921a04",
+    "src/after-sales-entry.ts": "bb2ec9d9a7585efefc4af7fcd87c0e9a4d978315d4fd576d4a1ad76a17ea1162",
+    "src/after-sales.ts": "1100a2158af2e368e4e13706fc850c901bda647e3b874850f1c4d593c3a3a5d1",
+    "src/agent.ts": "b8875d92a15f8ca66cb076b51dd17a2eb3c94581e6ed9e6857bb2ee8e35349d1",
+    "src/bailian.ts": "ed7fc42f703bd3e49ee38581c4bfa5d35f886872f5039c2b467e74682c1d95b1",
+    "src/cli.ts": "5731d83c2bc3c98bb2c2e7e6837f8107ad3145033a6079b86e94729522aff290",
+    "src/conversation-state.ts": "5dc215be064b59657a53cdf66e2ccf67ccf39d2f9f0a0a8affb5353d4ea9ea79",
+    "src/coupon-store.ts": "9886c9f3bd7e364850d49bff9aa94a5fddc41c7f2e88240a8a32fb459a376f8f",
+    "src/eval-analysis.ts": "8e7f23098e84eb841a445c90e91c84f1d12647aa3d453c7041c1dd4f533281b9",
+    "src/eval-capture.ts": "d6ea50d72fdabc6dae1c815f5a5dfbae5415b8bf5ecc436079294e1e44f38a30",
+    "src/eval-server.ts": "50601e5b1f0ea16a9c3d2b0c414ae6e7d81307a230c71209e538886afa3ed591",
+    "src/eval-store.ts": "c215fb7fa5446a3b775ab2f524a7a49f7e7348ee1708b3c73e6aca2f652e9680",
+    "src/evaluation.ts": "a4de22f064677868f084a94e5840f991b5c28a23bd539a1ced73e85ba07a73ff",
+    "src/evidence-acceptance.ts": "6e8040cf1ea30135dd7c18a44ed72d255ce94131226223325df3ab209b61d368",
+    "src/evidence-support.ts": "e92c6374f8c13d4289e94d6e40cb9fd53ed5b9a2ff4a81fba52f38396e672a31",
+    "src/experiment-config.ts": "6769124abcaaa0a15a0581cf0fc85c8b29bf19eab12778a74a6edd4321a9933f",
+    "src/experiment-jobs.ts": "b1432a8373e5384603bd0a21a0679b91e03c9c785615a9d6e3618932bde203c7",
+    "src/knowledge-applicability.ts": "aa31ca19dca3f33814a3f18d0fe36fe916dcf56ae1cd94a0d7c1499613eddd39",
+    "src/knowledge-evaluation.ts": "9740d55f495c5ac2e2ffea85f66ec986fcb4b73b472e6e1ac1c0fca8e8cbb7c2",
+    "src/knowledge-retrieval.ts": "89a9c606cabc1579b2cbe45ec25675260731e0a0fbe2fe99133515d7df8ebf00",
+    "src/knowledge-service.ts": "60114999337a5644b46096e87c7c16bdffbc9a0a6f0fd2596eef69bfaf7a8536",
+    "src/merchant-notifications.ts": "aada6867e0ea8c13628c14a25d7122560438b6f0f9a80c8b9eebd29160881d85",
+    "src/model-selection.ts": "e9b1eedd0d6a22d1a67164a07bed9bc425e7c85c0e575d2c1dca3bd7e0a21631",
+    "src/qq-agent.ts": "38c318cb579a83b1abb95f96c6eac745f433d4becb02263fb397b4b84e4724ea",
+    "src/qq-http.ts": "a6e380771e1ce25be1693263d36c7f18ed4a14aa69855d2e4dcaad151ced9d75",
+    "src/qq-identity.ts": "b081c6faae50708875cf9142b7fd238b448404de99828ee2813981b301ab0f9e",
+    "src/qq-reply.ts": "e7ca9ad9ce1363b58913da659f6394ef1572ad52077c4d0b287d5c23291f464c",
+    "src/qq.ts": "e8067e31d5051549d231d8d0cdce01ec7c712a3f7f18b5bf8693a9fedef36f03",
+    "src/refund-entry.ts": "ee0047a29cb45b13325ef98b886b6d5aa704b61369a97aa19128940f8d133e7f",
+    "src/refunds.ts": "a00872bf5e20114752fd2fe001b3f9ab3bc3b94895b95fa22b44c64bb047df3d",
+    "src/reply-from-tools.ts": "d208059bbe689dc9c9a7dea5841e835219c6238307ed800ecfa10b777db23643",
+    "src/reply.ts": "c6b8a78856042294ffde60577052c7ff74b0c852f5321f3264aa3b5415478540",
+    "src/retrieval-ranking.ts": "6391fcf74f4bfb79f01c018d8c3cc0fb3f969a2256f9269e3127b5f907f6dc89",
+    "src/support-action.ts": "4d8449d054b730a6d2e0ea32f752ff5f227166b689a7e6e96d955c8d9caec291",
+    "src/support-context-action.ts": "8fbf6e09b699e5542f11c0cc0ffb7b59c900c69dd7fe121180fbc6725b0194c6",
+    "src/support-context.ts": "6d7e251dab36f6d12bf0365d0ab90f6cc41f5318f36f84b4b1777fd97c2d7bfb",
+    "src/support-controller.ts": "5f995bc3fe955aa44376c1c4fa018adefb7d0043bbdaa2e09af2ce701497c8ce",
+    "src/support-evaluation.ts": "1d5669d1ca812deebd03bf38022cd61d62c7fd4655dae04d5b989c74ee54bf8a",
+    "src/support-evidence-context.ts": "cd68e46389194df14f375e6cec271b39e5616e8c76cba43d28fd7c74b2742bf3",
+    "src/support-parameters.ts": "2ad1ca33195b8bc5c174443c15dfd885c674178f76913e50a32d95265d21e530",
+    "src/support-reference-selection.ts": "ca311ef20479e30c9418c1c8a06d607774d0a18ffa4dec0de8a3b920ea3b83aa",
+    "src/support-session.ts": "41efe19506a1a212a597bf839618e67a1dc0463598bb876e592763dc78b520c8",
+    "src/support-task-context.ts": "1243f7907e17683d6feaa6d0f91d022712158f561e672615d7a2869d8e792b70"
+  },
+  "configuration": {
+    "architecture": "controller",
+    "arms": [
+      {
+        "arm": "budget0",
+        "parameters": {
+          "timeoutMs": 75000,
+          "repairBudget": 0,
+          "agentModel": "deepseek-flash",
+          "merchantEvents": "host",
+          "knowledgeMode": "m4-support",
+          "knowledgeSupport": "typed",
+          "knowledgeSupportModel": "deepseek-v4-pro",
+          "knowledgeSupportPrompt": "v6",
+          "knowledgeApplicability": "declared-v2",
+          "knowledgeQueryMode": "separated",
+          "knowledgeThreshold": 0.5,
+          "knowledgeTimeoutMs": 60000
+        },
+        "applicabilitySnapshot": {
+          "version": 2,
+          "serialization": "knowledge-document-v1",
+          "documents": [
+            {
+              "sourceId": "KB-REFUND-UNUSED",
+              "scope": {
+                "shopId": null,
+                "productId": null
+              },
+              "sourceHash": "6a5f9cbdffe64ed0bb59c8772892022811ade454afbf911c216f5aa5981a314c",
+              "atLeastOneCouponInStates": [
+                "unused"
+              ],
+              "basis": [
+                {
+                  "field": "atLeastOneCouponInStates",
+                  "quote": "已支付、未核销且尚未过期的团购券可以申请退款。"
+                }
+              ],
+              "reviewNote": "仅声明当前订单至少存在未核销状态券这一必要条件；状态不是有效期，unused且expiresAt已过期仍可出现。支付、日期、具体券、金额和申请资格仍未被本门控证明。"
+            },
+            {
+              "sourceId": "KB-REFUND-REDEEMED",
+              "scope": {
+                "shopId": null,
+                "productId": null
+              },
+              "sourceHash": "595a4a3440a1a39164346563825db1c004492622071436bf6b123cc1ec93cd5c",
+              "atLeastOneCouponInStates": [
+                "redeemed"
+              ],
+              "basis": [
+                {
+                  "field": "atLeastOneCouponInStates",
+                  "quote": "已经核销的团购券不适用未核销自动退款规则，需由商家核实实际消费与售后原因后决定。"
+                }
+              ],
+              "reviewNote": "仅证明当前订单存在已核销券；不证明用户所指具体券就是它，不代表商家核实、批准或拒绝退款。"
+            },
+            {
+              "sourceId": "KB-REFUND-EXPIRED",
+              "scope": {
+                "shopId": null,
+                "productId": null
+              },
+              "sourceHash": "5c44c33ada0ae0242549a401b5b3c0545a8bc33a144c8dd6f808efffaf66e637",
+              "atLeastOneCouponInStates": [
+                "unused",
+                "expired"
+              ],
+              "basis": [
+                {
+                  "field": "atLeastOneCouponInStates",
+                  "quote": "已过期但未核销的券需要商家确认能否退款、延期以及金额。"
+                }
+              ],
+              "reviewNote": "未核销且过期的必要状态投影：原始status可为expired，也可仍为unused而expiresAt已过期。此处不检查时间，不把unused推断为未过期，也不把匹配推断为已过期；日期与商家确认仍由后续原文及事实判断。"
+            },
+            {
+              "sourceId": "KB-REFUND-PARTIAL",
+              "scope": {
+                "shopId": null,
+                "productId": null
+              },
+              "sourceHash": "655d41cbdce64f81cf75065ca25bd354658bd18f26a39d716d4c5d33d75249e5",
+              "minimumCouponCount": 2,
+              "basis": [
+                {
+                  "field": "minimumCouponCount",
+                  "quote": "同一订单有多张券时必须逐券核对。"
+                }
+              ],
+              "reviewNote": "多张只声明同订单券总数至少2；正文没有要求一定已核销一张，因此不凭标题或tags加该限制。不证明逐券资格、分摊金额或退款批准。"
+            },
+            {
+              "sourceId": "KB-REFUND-PAYMENT",
+              "scope": {
+                "shopId": null,
+                "productId": null
+              },
+              "sourceHash": "82a07decf07014e3579d13aac72b4760878292336afca620ef245b41a17bb69e",
+              "basis": [],
+              "reviewNote": "none_declared：本轮审阅未声明可独立执行的订单券数量/券状态必要前提；不是规则全面适用。本文其他范围、支付历史、商品、日期、未知事实或操作限制仍由原文与现有宿主/支持判别处理。"
+            },
+            {
+              "sourceId": "KB-SHOP-DEMO-1",
+              "scope": {
+                "shopId": "shop-demo-1",
+                "productId": null
+              },
+              "sourceHash": "19f2e70c05fc908845741ec17e78e9d686aa7ce34ad1c2df73e66d5acf0a0cb0",
+              "basis": [
+                {
+                  "field": "requiredProductCategories",
+                  "quote": "常规午餐与晚餐套餐允许普通周末使用"
+                }
+              ],
+              "reviewNote": "原文逐字声明普通周末规则的适用范围为常规午餐或晚餐套餐；这里仅新增至少满足一个类别的必要前提。regular_lunch和regular_dinner是作者为本项目合成业务维护的分类名，商品到类别的关系来自本文件作者声明，不冒称原文已有精确SKU分类映射或外部商家认证。其余订单券数量/券状态、来源哈希及scope沿用v1审阅；类别匹配不证明特定日期、节假日、实时接待、预约、库存、申请资格或任何资金权限。",
+              "requiredProductCategories": [
+                "regular_lunch",
+                "regular_dinner"
+              ]
+            },
+            {
+              "sourceId": "KB-PRODUCT-LUNCH",
+              "scope": {
+                "shopId": "shop-demo-1",
+                "productId": "product-demo-1"
+              },
+              "sourceHash": "63f35348e326895d5b51da7f4e1151ff2776228875c6de0293122e59c921c64d",
+              "basis": [],
+              "reviewNote": "none_declared：本轮审阅未声明可独立执行的订单券数量/券状态必要前提；不是规则全面适用。本文其他范围、支付历史、商品、日期、未知事实或操作限制仍由原文与现有宿主/支持判别处理。"
+            },
+            {
+              "sourceId": "KB-PRODUCT-DINNER",
+              "scope": {
+                "shopId": "shop-demo-1",
+                "productId": "product-demo-2"
+              },
+              "sourceHash": "1e69587d266e6b6ca51b8963075fa4776b64de2a996225f24afc6cdc1a95f251",
+              "basis": [],
+              "reviewNote": "none_declared：本轮审阅未声明可独立执行的订单券数量/券状态必要前提；不是规则全面适用。本文其他范围、支付历史、商品、日期、未知事实或操作限制仍由原文与现有宿主/支持判别处理。"
+            }
+          ],
+          "productCatalog": [
+            {
+              "shopId": "shop-demo-1",
+              "productId": "product-demo-1",
+              "productName": "双人午餐团购券",
+              "categories": [
+                "regular_lunch"
+              ],
+              "reviewNote": "作者赋类：将合成商品“双人午餐团购券”定义为regular_lunch。身份shopId/productId/productName逐字核对db/02-seed.sql，文件SHA-256 82c7143840ac30d166207dcf92c227b3368b98af899412a4f669f04bfb976560；商品原始知识来自data/acceptance-online.json，文件SHA-256 5f97b7f4e77cd1695a38ef9b0c42e53f52f40f7ae869a39fcdcdae5ae8971b72；八篇规则既有声明来自data/knowledge-applicability.json，文件SHA-256 c3af34125bf0e2d693a82bd3729aef1cf05be314a4ae60d7332c8b8c9c98eb4e。seed和知识原文没有精确SKU到这些新类别标签的既有映射；本项是版本化的作者合成业务定义，不是按名称相似度推断、用户文本声明、模型结论或外部商家认证，也不构成预约、接待或退款批准。"
+            },
+            {
+              "shopId": "shop-demo-1",
+              "productId": "product-demo-2",
+              "productName": "单人晚餐团购券",
+              "categories": [
+                "regular_dinner"
+              ],
+              "reviewNote": "作者赋类：将合成商品“单人晚餐团购券”定义为regular_dinner。身份shopId/productId/productName逐字核对db/02-seed.sql，文件SHA-256 82c7143840ac30d166207dcf92c227b3368b98af899412a4f669f04bfb976560；商品原始知识来自data/acceptance-online.json，文件SHA-256 5f97b7f4e77cd1695a38ef9b0c42e53f52f40f7ae869a39fcdcdae5ae8971b72；八篇规则既有声明来自data/knowledge-applicability.json，文件SHA-256 c3af34125bf0e2d693a82bd3729aef1cf05be314a4ae60d7332c8b8c9c98eb4e。seed和知识原文没有精确SKU到这些新类别标签的既有映射；本项是版本化的作者合成业务定义，不是按名称相似度推断、用户文本声明、模型结论或外部商家认证，也不构成预约、接待或退款批准。"
+            }
+          ],
+          "sha256": "5abd26fa96e1678fd5c1b6c26563ee3310f30508b3d4e18d5a85cfa5a574c396",
+          "sourceSha256": "d228b3331b48087063837971cd38b224704e882fa48d0196a830ac67e62e48cf"
+        }
+      },
+      {
+        "arm": "budget1",
+        "parameters": {
+          "timeoutMs": 75000,
+          "repairBudget": 1,
+          "agentModel": "deepseek-flash",
+          "merchantEvents": "host",
+          "knowledgeMode": "m4-support",
+          "knowledgeSupport": "typed",
+          "knowledgeSupportModel": "deepseek-v4-pro",
+          "knowledgeSupportPrompt": "v6",
+          "knowledgeApplicability": "declared-v2",
+          "knowledgeQueryMode": "separated",
+          "knowledgeThreshold": 0.5,
+          "knowledgeTimeoutMs": 60000
+        },
+        "applicabilitySnapshot": {
+          "version": 2,
+          "serialization": "knowledge-document-v1",
+          "documents": [
+            {
+              "sourceId": "KB-REFUND-UNUSED",
+              "scope": {
+                "shopId": null,
+                "productId": null
+              },
+              "sourceHash": "6a5f9cbdffe64ed0bb59c8772892022811ade454afbf911c216f5aa5981a314c",
+              "atLeastOneCouponInStates": [
+                "unused"
+              ],
+              "basis": [
+                {
+                  "field": "atLeastOneCouponInStates",
+                  "quote": "已支付、未核销且尚未过期的团购券可以申请退款。"
+                }
+              ],
+              "reviewNote": "仅声明当前订单至少存在未核销状态券这一必要条件；状态不是有效期，unused且expiresAt已过期仍可出现。支付、日期、具体券、金额和申请资格仍未被本门控证明。"
+            },
+            {
+              "sourceId": "KB-REFUND-REDEEMED",
+              "scope": {
+                "shopId": null,
+                "productId": null
+              },
+              "sourceHash": "595a4a3440a1a39164346563825db1c004492622071436bf6b123cc1ec93cd5c",
+              "atLeastOneCouponInStates": [
+                "redeemed"
+              ],
+              "basis": [
+                {
+                  "field": "atLeastOneCouponInStates",
+                  "quote": "已经核销的团购券不适用未核销自动退款规则，需由商家核实实际消费与售后原因后决定。"
+                }
+              ],
+              "reviewNote": "仅证明当前订单存在已核销券；不证明用户所指具体券就是它，不代表商家核实、批准或拒绝退款。"
+            },
+            {
+              "sourceId": "KB-REFUND-EXPIRED",
+              "scope": {
+                "shopId": null,
+                "productId": null
+              },
+              "sourceHash": "5c44c33ada0ae0242549a401b5b3c0545a8bc33a144c8dd6f808efffaf66e637",
+              "atLeastOneCouponInStates": [
+                "unused",
+                "expired"
+              ],
+              "basis": [
+                {
+                  "field": "atLeastOneCouponInStates",
+                  "quote": "已过期但未核销的券需要商家确认能否退款、延期以及金额。"
+                }
+              ],
+              "reviewNote": "未核销且过期的必要状态投影：原始status可为expired，也可仍为unused而expiresAt已过期。此处不检查时间，不把unused推断为未过期，也不把匹配推断为已过期；日期与商家确认仍由后续原文及事实判断。"
+            },
+            {
+              "sourceId": "KB-REFUND-PARTIAL",
+              "scope": {
+                "shopId": null,
+                "productId": null
+              },
+              "sourceHash": "655d41cbdce64f81cf75065ca25bd354658bd18f26a39d716d4c5d33d75249e5",
+              "minimumCouponCount": 2,
+              "basis": [
+                {
+                  "field": "minimumCouponCount",
+                  "quote": "同一订单有多张券时必须逐券核对。"
+                }
+              ],
+              "reviewNote": "多张只声明同订单券总数至少2；正文没有要求一定已核销一张，因此不凭标题或tags加该限制。不证明逐券资格、分摊金额或退款批准。"
+            },
+            {
+              "sourceId": "KB-REFUND-PAYMENT",
+              "scope": {
+                "shopId": null,
+                "productId": null
+              },
+              "sourceHash": "82a07decf07014e3579d13aac72b4760878292336afca620ef245b41a17bb69e",
+              "basis": [],
+              "reviewNote": "none_declared：本轮审阅未声明可独立执行的订单券数量/券状态必要前提；不是规则全面适用。本文其他范围、支付历史、商品、日期、未知事实或操作限制仍由原文与现有宿主/支持判别处理。"
+            },
+            {
+              "sourceId": "KB-SHOP-DEMO-1",
+              "scope": {
+                "shopId": "shop-demo-1",
+                "productId": null
+              },
+              "sourceHash": "19f2e70c05fc908845741ec17e78e9d686aa7ce34ad1c2df73e66d5acf0a0cb0",
+              "basis": [
+                {
+                  "field": "requiredProductCategories",
+                  "quote": "常规午餐与晚餐套餐允许普通周末使用"
+                }
+              ],
+              "reviewNote": "原文逐字声明普通周末规则的适用范围为常规午餐或晚餐套餐；这里仅新增至少满足一个类别的必要前提。regular_lunch和regular_dinner是作者为本项目合成业务维护的分类名，商品到类别的关系来自本文件作者声明，不冒称原文已有精确SKU分类映射或外部商家认证。其余订单券数量/券状态、来源哈希及scope沿用v1审阅；类别匹配不证明特定日期、节假日、实时接待、预约、库存、申请资格或任何资金权限。",
+              "requiredProductCategories": [
+                "regular_lunch",
+                "regular_dinner"
+              ]
+            },
+            {
+              "sourceId": "KB-PRODUCT-LUNCH",
+              "scope": {
+                "shopId": "shop-demo-1",
+                "productId": "product-demo-1"
+              },
+              "sourceHash": "63f35348e326895d5b51da7f4e1151ff2776228875c6de0293122e59c921c64d",
+              "basis": [],
+              "reviewNote": "none_declared：本轮审阅未声明可独立执行的订单券数量/券状态必要前提；不是规则全面适用。本文其他范围、支付历史、商品、日期、未知事实或操作限制仍由原文与现有宿主/支持判别处理。"
+            },
+            {
+              "sourceId": "KB-PRODUCT-DINNER",
+              "scope": {
+                "shopId": "shop-demo-1",
+                "productId": "product-demo-2"
+              },
+              "sourceHash": "1e69587d266e6b6ca51b8963075fa4776b64de2a996225f24afc6cdc1a95f251",
+              "basis": [],
+              "reviewNote": "none_declared：本轮审阅未声明可独立执行的订单券数量/券状态必要前提；不是规则全面适用。本文其他范围、支付历史、商品、日期、未知事实或操作限制仍由原文与现有宿主/支持判别处理。"
+            }
+          ],
+          "productCatalog": [
+            {
+              "shopId": "shop-demo-1",
+              "productId": "product-demo-1",
+              "productName": "双人午餐团购券",
+              "categories": [
+                "regular_lunch"
+              ],
+              "reviewNote": "作者赋类：将合成商品“双人午餐团购券”定义为regular_lunch。身份shopId/productId/productName逐字核对db/02-seed.sql，文件SHA-256 82c7143840ac30d166207dcf92c227b3368b98af899412a4f669f04bfb976560；商品原始知识来自data/acceptance-online.json，文件SHA-256 5f97b7f4e77cd1695a38ef9b0c42e53f52f40f7ae869a39fcdcdae5ae8971b72；八篇规则既有声明来自data/knowledge-applicability.json，文件SHA-256 c3af34125bf0e2d693a82bd3729aef1cf05be314a4ae60d7332c8b8c9c98eb4e。seed和知识原文没有精确SKU到这些新类别标签的既有映射；本项是版本化的作者合成业务定义，不是按名称相似度推断、用户文本声明、模型结论或外部商家认证，也不构成预约、接待或退款批准。"
+            },
+            {
+              "shopId": "shop-demo-1",
+              "productId": "product-demo-2",
+              "productName": "单人晚餐团购券",
+              "categories": [
+                "regular_dinner"
+              ],
+              "reviewNote": "作者赋类：将合成商品“单人晚餐团购券”定义为regular_dinner。身份shopId/productId/productName逐字核对db/02-seed.sql，文件SHA-256 82c7143840ac30d166207dcf92c227b3368b98af899412a4f669f04bfb976560；商品原始知识来自data/acceptance-online.json，文件SHA-256 5f97b7f4e77cd1695a38ef9b0c42e53f52f40f7ae869a39fcdcdae5ae8971b72；八篇规则既有声明来自data/knowledge-applicability.json，文件SHA-256 c3af34125bf0e2d693a82bd3729aef1cf05be314a4ae60d7332c8b8c9c98eb4e。seed和知识原文没有精确SKU到这些新类别标签的既有映射；本项是版本化的作者合成业务定义，不是按名称相似度推断、用户文本声明、模型结论或外部商家认证，也不构成预约、接待或退款批准。"
+            }
+          ],
+          "sha256": "5abd26fa96e1678fd5c1b6c26563ee3310f30508b3d4e18d5a85cfa5a574c396",
+          "sourceSha256": "d228b3331b48087063837971cd38b224704e882fa48d0196a830ac67e62e48cf"
+        },
+        "policyScopeRepair": {
+          "version": "policy-scope-repair-v1",
+          "maxRepairs": 1,
+          "repairBudget": 1
+        }
+      }
+    ],
+    "model": {
+      "provider": "deepseek",
+      "id": "deepseek-flash",
+      "api": "openai-completions",
+      "baseUrl": "https://api.deepseek.com",
+      "maxTokens": 2048,
+      "cost": {
+        "input": 0.3,
+        "output": 1.2,
+        "cacheRead": 0.006,
+        "cacheWrite": 0
+      }
+    },
+    "support": {
+      "provider": "deepseek",
+      "model": "deepseek-v4-pro",
+      "api": "openai-completions",
+      "endpoint": "https://api.deepseek.com",
+      "timeoutMs": 60000,
+      "temperature": 0,
+      "maxTokens": 2048,
+      "maxRetries": 0,
+      "promptVersion": "fact-support-typed-v6",
+      "promptHash": "889596997b27deccf91339f46b7a3825aa239a50fbcde92ce5109b67a77f19fa",
+      "serialization": "json-query-id-title-tags-body-v1",
+      "serializationHash": "1d16c5e3ef4647c120fe6ddce72417c9ec618ee41dc77faa447ec214e5749c4a",
+      "pricing": {
+        "currency": "USD",
+        "estimated": true,
+        "source": "Pi model catalog",
+        "rates": {
+          "input": 1.32,
+          "output": 3.96,
+          "cacheRead": 0.044,
+          "cacheWrite": 0
+        }
+      },
+      "profile": "typed",
+      "validationVersion": "typed-candidate-isolation-v1"
+    },
+    "rerank": {
+      "endpoints": {
+        "origin": "https://ws-tiy939iiusj2254o.cn-beijing.maas.aliyuncs.com",
+        "embedding": "https://ws-tiy939iiusj2254o.cn-beijing.maas.aliyuncs.com/compatible-mode/v1/embeddings",
+        "rerank": "https://ws-tiy939iiusj2254o.cn-beijing.maas.aliyuncs.com/compatible-api/v1/reranks"
+      },
+      "timeoutMs": 60000,
+      "retries": 0,
+      "embeddingModel": "text-embedding-v4",
+      "dimensions": 1024,
+      "rerankModel": "qwen3-rerank",
+      "rerankInstruction": "Given a web search query, retrieve relevant passages that answer the query."
+    },
+    "limits": {
+      "requests": {
+        "agent": 48,
+        "rerank": 16,
+        "support": 16
+      },
+      "deadlineMs": 600000,
+      "turnTimeoutMs": 75000,
+      "estimatedUsd": 0.08,
+      "estimatedCny": 0.02
+    },
+    "agentSelection": "deepseek-flash",
+    "supportSelection": "deepseek-v4-pro",
+    "providerRetries": 0,
+    "sessionAutomaticRetries": 0,
+    "operationStop": "per-operation",
+    "evidenceBindingVersion": "order-evidence-binding-v2",
+    "referenceEvidenceRequired": true,
+    "dependencySnapshot": {
+      "version": 1,
+      "rootDeclarations": {
+        "@earendil-works/pi-ai": "1.0.0",
+        "@earendil-works/pi-agent-core": null,
+        "@earendil-works/pi-coding-agent": "1.0.0",
+        "mysql2": "3.24.5"
+      },
+      "packages": [
+        {
+          "path": "node_modules/@earendil-works/pi-ai",
+          "name": "@earendil-works/pi-ai",
+          "installedVersion": "1.0.0",
+          "lockedVersion": "1.0.0",
+          "lockIntegrity": "sha512-3/W1vdDaVtpeMd23ElvJC12HLA5yS/BGqqcXF+0SK082dN7cbgNcCwguTBRBC258Ke8SzSvUW1B75iAf8w8IxA==",
+          "dependencyDeclarations": {}
+        },
+        {
+          "path": "node_modules/@earendil-works/pi-coding-agent",
+          "name": "@earendil-works/pi-coding-agent",
+          "installedVersion": "1.0.0",
+          "lockedVersion": "1.0.0",
+          "lockIntegrity": "sha512-/FtbxoSQU/mEv1QnichJjRjqteqaIaMWxmhB4G367+MwZfX7/DI5B9YAg5lqbN7nztFskBEtUSZ+FlmMBECtMw==",
+          "dependencyDeclarations": {
+            "@earendil-works/pi-ai": "^1.0.0",
+            "@earendil-works/pi-agent-core": "^1.0.0"
+          }
+        },
+        {
+          "path": "node_modules/@earendil-works/pi-coding-agent/node_modules/@earendil-works/pi-agent-core",
+          "name": "@earendil-works/pi-agent-core",
+          "installedVersion": "1.0.0",
+          "lockedVersion": "1.0.0",
+          "lockIntegrity": null,
+          "dependencyDeclarations": {
+            "@earendil-works/pi-ai": "^1.0.0"
+          }
+        },
+        {
+          "path": "node_modules/@earendil-works/pi-coding-agent/node_modules/@earendil-works/pi-ai",
+          "name": "@earendil-works/pi-ai",
+          "installedVersion": "1.0.0",
+          "lockedVersion": "1.0.0",
+          "lockIntegrity": null,
+          "dependencyDeclarations": {}
+        },
+        {
+          "path": "node_modules/mysql2",
+          "name": "mysql2",
+          "installedVersion": "3.24.5",
+          "lockedVersion": "3.24.5",
+          "lockIntegrity": "sha512-X6Ujsr2QSkkLpkQGjxzpKRAPn9nu4axpR63ntBzquFVEvPOArgbUQ1sJjFKI7hnaYtiVZxa17Z7q18KSubW0IQ==",
+          "dependencyDeclarations": {}
+        }
+      ]
+    },
+    "pricing": {
+      "estimated": true,
+      "asOf": "2026-10-06",
+      "source": "Pi catalog and Bailian Beijing token estimate, not an invoice",
+      "rerankCnyPerMillionTokens": 0.5
+    }
+  },
+  "configurationHash": "89119167164fd43a74f4ef748cfd73577672fda2757b32b3c484987f620a78b0"
+}

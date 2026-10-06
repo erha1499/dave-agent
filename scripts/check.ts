@@ -85,6 +85,7 @@ const { checkC1ProductCategory } = await import("./c1-product-category-check.ts"
 await checkC1ProductCategory();
 const { checkCategorySession } = await import("./c1-category-session-development.ts");
 await checkCategorySession();
+await (await import("./c1-policy-scope-session-development.ts")).checkPolicyScopeSession();
 const { checkC1BusinessEvidenceAudit } = await import("./c1-business-evidence-check.ts");
 await checkC1BusinessEvidenceAudit();
 const { loadC1SupportDevelopment } = await import("./c1-support-check.ts");

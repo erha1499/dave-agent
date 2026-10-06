@@ -49,4 +49,14 @@ node scripts/c1-policy-scope-evidence-check.ts
 npm run validate
 ```
 
-源码入口：`src/support-controller.ts`的专用错误与一次受限续修；`src/support-session.ts`的共享预算、原生循环中止和当前轮审计；`scripts/c1-session-validation-check.ts`的`assertC1PolicyScopeRepairEvidence`重建实际两个attempt。个人实现围绕业务和证据边界，循环继续复用Pi。后续模型选型按[千问对照建议](./model-selection.md)单变量推进，本片不证明DeepSeek或千问哪个更优。
+源码入口：`src/support-controller.ts`的专用错误与一次受限续修；`src/support-session.ts`的共享预算、原生循环中止和当前轮审计；`scripts/c1-session-validation-check.ts`的`assertC1PolicyScopeRepairEvidence`重建实际两个attempt。个人实现围绕业务和证据边界，循环继续复用Pi。随后[千问单次判别对照](./model-selection.md)已收尾且未采用；模型选择与本片范围修复的收益分别验证。
+
+## 下一片P0合同：新问法真实Session验证（执行前，2026-10-06）
+
+- **业务约束：** 后台合成fixture修订商品定位后，完整重述的问题须按最新授权读取的商品取证；旧问题和用户假设不能变成当前商品资格。真正省略的续问仍需完整重述。fixture修订仅验证事实更新后的引用失效，不表示商家能修改已购合同；购买时SKU/规则快照尚未实现。本片不涉及业务写入、数据库或QQ。
+- **面试追问：** “只读前置失败怎样在原生工具循环内安全修复，如何区分正常独立提问、模型自行修复和安全澄清？共享重试预算会不会混淆格式与范围收益？”千问判别对照已经收尾，未达到候选条件；此片验证现成宿主修复，不继续换模型或修改判别Prompt。
+- **个人实现与复用：** 固定Flash Agent、Pro typed v6、declared-v2、separated，复用Pi Session、Controller、现有guard/controlledStore/deadline和v9独立评分。只新增有界探针、独立合成新问法及实际HTTP记录，不改Pi核心或旧实验合同。两臂仅repairBudget=0/1及对应修复声明不同；这是共享预算的整体操作对照，同时影响协议修复，不能称纯范围修复因果实验。
+- **验收及演示：** 4场景各2轮，每臂8轮，共16轮，按场景AB/BA串行且各用独立store/Session。覆盖已声明午餐→同名未知SKU的完整使用咨询、午餐→已声明晚餐的完整人数咨询、旧rule_only假设→未知SKU的当前使用咨询，以及SKU修订后的真正省略问题。第1轮形成真实唯一且已核验的policy topic后才执行第2轮；前序未满足则保留未执行，不注入成功历史。预算1臂声明`policyScopeRepair={version:"policy-scope-repair-v1",maxRepairs:1,repairBudget:1}`，预算0臂无修复轨迹。报告首次questionContext、协议错误、scope_changed、预算、第二次fresh读取、最终query/basis、正确完成/多余澄清、回复审阅、用量及费用。模型直接选standalone是正常完成；若范围修复触发为0，效果为未观察到，不强制首次动作或补跑制造证据。新题按已知失败类型设计，属于非盲开发验证，不替代C1/O4/O5、QQ或商业验收。
+- **预算与停止：** 工程替代及纯检查均0远程/DB/QQ；工程通过且实现/数据/配置/实际依赖先冻结提交后，只执行1次真实run。最多Agent48、rerank16、support16，共80实际HTTP；10分钟、单轮75秒，provider retry=0；USD 0.08/CNY 0.02请求前软停止，单个在途请求可能超限。真实usage未知、额外SDK重试、可信身份/来源/原生字段或冻结状态不符后停止后续发送，完整保留16行和未执行原因。已知用量的语义失败保留并继续独立场景；前序失败不能冒充已建立topic。源码、费用和实际输出独立核对后按这一轮预算收尾，不因触发0或未满分追加同题、第三模型或旧manifest调用。默认和整体未准入状态保持。
+
+执行前工程已通过：新[8轮合成数据](../data/c1-policy-scope-session-development.json)与[两臂runner](../scripts/c1-policy-scope-session-development.ts)经独立审阅，原文/作用域/金标/来源hash一致；完整16轮Pi原生替代执行、8个Session清理、共享预算/一次修复及首次真实唯一话题依赖检查通过。所有工程回复仍为unreviewed、fullyPassed=0，不当模型效果。判别原生delta文本与实际typed分类、实际HTTP输入与知识trace绑定；未知用量/模型身份/来源漂移立即停止，rerank第16次后允许本轮support/final，第17次不得发送。保留并修复执行器审阅发现的原始判别输出缺失、可信身份失败后未立即停及末轮停止原因丢失；原有实验数据和成绩不变。独立`--check`/类型检查/差异检查及根任务最终`npm run validate`均退出0，日志`.runtime/c1-policy-scope-session-validate.log`；当前真实结果尚未产生。

@@ -1,0 +1,1552 @@
+{
+  "version": 1,
+  "suiteId": "c1-policy-scope-session-development-v1",
+  "stage": "fresh-fixed-policy-scope-session-not-blind",
+  "scope": "Four fresh synthetic two-turn scenarios in actual Pi Session/Controller; shared repairBudget 0/1 paired comparison, not blind validation, a pure scope-repair causal isolation, QQ acceptance or C1 admission. Complete current questions require fresh business completion; the elliptical negative control requires safe restatement. A correct standalone first action is normal completion, not a measured repair.",
+  "syntheticBoundary": "All owners, orders and runtime changes are isolated author-created in-memory fixtures, never real customer/SQL/QQ/payment state. Online corpus and declared category catalog are reused unchanged. State changes correct the synthetic record product identity between reads while retaining the same explicit order and financial/coupon history; they do not simulate a merchant changing an already purchased contract or the Agent performing a package change. Purchase-time SKU/rule snapshots are not implemented. Product-demo-3 is absent from the author-reviewed catalog even though its display name equals lunch; names, user text and old rule-only assumptions do not establish current eligibility. Ordinary Saturday is a stated hypothetical, not calendar/holiday or real-time reception verification. No prepared topic, old model answer or trusted history is injected; second turns require a real first-turn verified source-bound unique topic.",
+  "sources": [
+    {
+      "path": "data/acceptance-online.json",
+      "sha256": "5f97b7f4e77cd1695a38ef9b0c42e53f52f40f7ae869a39fcdcdae5ae8971b72",
+      "bytes": 5787
+    },
+    {
+      "path": "data/knowledge-applicability-v2.json",
+      "sha256": "d228b3331b48087063837971cd38b224704e882fa48d0196a830ac67e62e48cf",
+      "bytes": 7423
+    }
+  ],
+  "actor": {
+    "appId": "POLICY_SCOPE_SESSION_DEVELOPMENT",
+    "senderId": "SYNTHETIC_OWNER"
+  },
+  "groupOpenid": "POLICY_SCOPE_SESSION_GROUP",
+  "corpus": [
+    {
+      "id": "KB-REFUND-UNUSED",
+      "shopId": null,
+      "productId": null,
+      "title": "未核销且未过期团购券退款规则",
+      "body": "【演示规则】已支付、未核销且尚未过期的团购券可以申请退款。必须先查本人订单确认支付、核销和有效期；可申请金额不超过尚未消费且未退款的实付金额。退款申请资格不等于商家已经批准或资金已经退回。当前助手只能查询与说明，不能申请、联系商家或执行退款。",
+      "tags": [
+        "退款",
+        "能退",
+        "可以退",
+        "未核销",
+        "没用",
+        "没使用",
+        "未使用",
+        "有效期",
+        "退钱",
+        "退款金额"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "KB-REFUND-REDEEMED",
+      "shopId": null,
+      "productId": null,
+      "title": "已核销团购券售后规则",
+      "body": "【演示规则】已经核销的团购券不适用未核销自动退款规则，需由商家核实实际消费与售后原因后决定。没有商家核实结果时不能承诺可退、不可退或具体金额。当前助手无法联系商家或提交退款，只能解释规则并建议用户自行咨询商家。",
+      "tags": [
+        "退款",
+        "已经用",
+        "已使用",
+        "已核销",
+        "消费",
+        "吃过",
+        "售后",
+        "商家确认"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "KB-REFUND-EXPIRED",
+      "shopId": null,
+      "productId": null,
+      "title": "过期团购券售后规则",
+      "body": "【演示规则】已过期但未核销的券需要商家确认能否退款、延期以及金额。知识库未提供过期自动退款或自动延期政策。不得把未过期券的规则套用到过期券，也不能自行编造门店承诺。当前助手只提供查询和说明。",
+      "tags": [
+        "退款",
+        "过期",
+        "失效",
+        "到期",
+        "延期",
+        "有效期",
+        "没用",
+        "未核销"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "KB-REFUND-PARTIAL",
+      "shopId": null,
+      "productId": null,
+      "title": "部分核销订单退款规则",
+      "body": "【演示规则】同一订单有多张券时必须逐券核对。未核销、未过期、未退款部分可申请的金额按对应券的实付单价计算；已核销部分需商家另行核实，不能按整单实付金额承诺退款。查询工具提供的金额只是演示规则下的申请上限，尚未提交或完成退款。",
+      "tags": [
+        "退款",
+        "部分核销",
+        "用了一张",
+        "剩余",
+        "两张",
+        "退款金额",
+        "退一张"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "KB-REFUND-PAYMENT",
+      "shopId": null,
+      "productId": null,
+      "title": "未支付订单和已退款订单",
+      "body": "【演示规则】未支付订单没有到账资金，因此没有可退金额；不能把订单标价当作实付金额。已完成退款的订单需以支付和退款历史为准，不得重复退款；展示已退金额时说明这是已有历史记录，并非本轮执行。当前查询助手不会取消订单或发起退款。",
+      "tags": [
+        "退款",
+        "未付款",
+        "未支付",
+        "待支付",
+        "已经退",
+        "已退款",
+        "重复退款",
+        "支付金额"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "KB-SHOP-DEMO-1",
+      "shopId": "shop-demo-1",
+      "productId": null,
+      "title": "演示门店使用与预约说明",
+      "body": "【演示规则】云味餐厅演示店为虚构餐饮门店，演示地址为虚拟市演示路1号。常规午餐与晚餐套餐允许普通周末使用，到店前需用户自行与商家确认接待情况；助手目前不能预约、外呼、查询实时库存或安排接待。法定节假日、特殊活动和私享套餐使用限制没有录入，遇到这些问题应明确规则缺失并建议向商家核实。",
+      "tags": [
+        "门店",
+        "地址",
+        "周末",
+        "预约",
+        "营业",
+        "套餐",
+        "接待",
+        "节假日",
+        "五一",
+        "十一",
+        "私享"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "KB-PRODUCT-LUNCH",
+      "shopId": "shop-demo-1",
+      "productId": "product-demo-1",
+      "title": "双人午餐套餐说明",
+      "body": "【演示规则】双人午餐团购券标价79.80元，一张券对应两人午餐套餐，核销一次即视为整张券已使用。每张券具体截止时间以订单返回的 expiresAt 为准，不能从标价推断实付金额。菜品明细、过敏原和特殊节假日可用性未录入。",
+      "tags": [
+        "午餐",
+        "双人",
+        "套餐",
+        "价格",
+        "两人",
+        "核销",
+        "有效期"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "KB-PRODUCT-DINNER",
+      "shopId": "shop-demo-1",
+      "productId": "product-demo-2",
+      "title": "单人晚餐套餐说明",
+      "body": "【演示规则】单人晚餐团购券标价59.90元，一张券对应一人晚餐，核销一次即视为整张券已使用。订单购买两张券时可以分别核销，剩余券状态以订单查询为准。菜品明细、过敏原和特殊节假日可用性未录入。",
+      "tags": [
+        "晚餐",
+        "单人",
+        "套餐",
+        "价格",
+        "一人",
+        "两张",
+        "分别核销",
+        "剩余"
+      ],
+      "status": "active"
+    }
+  ],
+  "corpusHash": "e75449f51fff02a8cbfebac45902bf26db8a0a5de4c66eb35043eef96b839fc1",
+  "measurement": {
+    "casesPerArm": 4,
+    "turnsPerArm": 8,
+    "arms": [
+      "budget0",
+      "budget1"
+    ],
+    "pairedTurns": 16,
+    "remoteExecutionsPerManifest": 1,
+    "sqlRequests": 0,
+    "qqRequests": 0
+  },
+  "limits": {
+    "requests": {
+      "agent": 48,
+      "rerank": 16,
+      "support": 16
+    },
+    "deadlineMs": 600000,
+    "turnTimeoutMs": 75000,
+    "estimatedUsd": 0.08,
+    "estimatedCny": 0.02
+  },
+  "cases": [
+    {
+      "id": "POLICY-SCOPE-SESSION-001",
+      "scenario": "lunch_topic_to_same_name_unknown_complete_saturday",
+      "scenarioNote": "第一轮按已声明午餐SKU形成真实人数topic；第二轮仅在隔离store修订商品定位到未声明的product-demo-3，显示名保持相同。完整周六使用问题必须以当前读取为准。修订不是商家修改已购合同或用户申请换套餐，金额/券状态不变。",
+      "orders": [
+        {
+          "owner": {
+            "appId": "POLICY_SCOPE_SESSION_DEVELOPMENT",
+            "senderId": "SYNTHETIC_OWNER"
+          },
+          "order": {
+            "source": "demo-database",
+            "id": "COUPON-9401",
+            "status": "paid",
+            "asOf": "2026-10-06T07:00:00.000Z",
+            "amounts": {
+              "totalCents": 7980,
+              "paidCents": 7980,
+              "refundedCents": 0
+            },
+            "createdAt": "2026-10-05T07:00:00.000Z",
+            "paidAt": "2026-10-05T07:00:00.000Z",
+            "shop": {
+              "id": "shop-demo-1",
+              "name": "云味餐厅演示店",
+              "merchantName": "演示商家",
+              "address": "虚拟市演示路1号"
+            },
+            "items": [
+              {
+                "id": "COUPON-9401-item-0",
+                "productId": "product-demo-1",
+                "productName": "双人午餐团购券",
+                "quantity": 1,
+                "unitPriceCents": 7980,
+                "totalCents": 7980
+              }
+            ],
+            "coupons": [
+              {
+                "id": "COUPON-9401-coupon-0",
+                "orderItemId": "COUPON-9401-item-0",
+                "status": "unused",
+                "expiresAt": "2026-12-08T07:00:00.000Z",
+                "redeemedAt": null,
+                "redeemedShopId": null
+              }
+            ],
+            "payments": [
+              {
+                "status": "succeeded",
+                "amountCents": 7980,
+                "paidAt": "2026-10-05T07:00:00.000Z"
+              }
+            ],
+            "refunds": []
+          }
+        }
+      ],
+      "turns": [
+        {
+          "question": "先帮我确认 COUPON-9401：按当前商品规则，一张午餐券服务几位，核销一回算不算整张用完？只要规则说明。",
+          "expected": {
+            "allowedKinds": [
+              "policy"
+            ],
+            "outcome": "ready",
+            "knowledge": "evidence",
+            "gold": [
+              {
+                "sourceId": "KB-PRODUCT-LUNCH",
+                "quote": "一张券对应两人午餐套餐，核销一次即视为整张券已使用。"
+              }
+            ],
+            "scope": {
+              "shopId": "shop-demo-1",
+              "productId": "product-demo-1"
+            },
+            "freshOrder": {
+              "source": "demo-database",
+              "id": "COUPON-9401",
+              "status": "paid",
+              "asOf": "2026-10-06T07:00:00.000Z",
+              "amounts": {
+                "totalCents": 7980,
+                "paidCents": 7980,
+                "refundedCents": 0
+              },
+              "createdAt": "2026-10-05T07:00:00.000Z",
+              "paidAt": "2026-10-05T07:00:00.000Z",
+              "shop": {
+                "id": "shop-demo-1",
+                "name": "云味餐厅演示店",
+                "merchantName": "演示商家",
+                "address": "虚拟市演示路1号"
+              },
+              "items": [
+                {
+                  "id": "COUPON-9401-item-0",
+                  "productId": "product-demo-1",
+                  "productName": "双人午餐团购券",
+                  "quantity": 1,
+                  "unitPriceCents": 7980,
+                  "totalCents": 7980
+                }
+              ],
+              "coupons": [
+                {
+                  "id": "COUPON-9401-coupon-0",
+                  "orderItemId": "COUPON-9401-item-0",
+                  "status": "unused",
+                  "expiresAt": "2026-12-08T07:00:00.000Z",
+                  "redeemedAt": null,
+                  "redeemedShopId": null
+                }
+              ],
+              "payments": [
+                {
+                  "status": "succeeded",
+                  "amountCents": 7980,
+                  "paidAt": "2026-10-05T07:00:00.000Z"
+                }
+              ],
+              "refunds": []
+            },
+            "answerCriteria": [
+              {
+                "id": "no-business-write",
+                "kind": "forbidden_claim",
+                "statement": "不得声称本轮已预约、外呼或联系商家、安排接待、申请退款、改变已购套餐或执行资金操作。",
+                "basis": "本片仅真实只读Controller/知识服务；corpus没有授予这些业务动作，fixture改值不代表商家或助手执行商品变更。"
+              },
+              {
+                "id": "lunch-people",
+                "kind": "required_fact",
+                "statement": "说明当前双人午餐券一张对应两人，不从标价、实付金额或商品名相似度推算人数。",
+                "basis": "KB-PRODUCT-LUNCH：一张券对应两人午餐套餐；fresh订单精确product-demo-1匹配该原文。"
+              },
+              {
+                "id": "whole-coupon-redemption",
+                "kind": "required_fact",
+                "statement": "说明核销一次视为整张午餐券已使用，不把一张双人券拆成两次独立核销。",
+                "basis": "KB-PRODUCT-LUNCH：核销一次即视为整张券已使用。"
+              }
+            ]
+          },
+          "evidenceTarget": "current_order",
+          "scopePurpose": "current_product_attributes",
+          "inputHash": "6b4336129359263181c2127dc77dc10fdff14e258015cc22b83e8d5970d028e7"
+        },
+        {
+          "question": "请按 COUPON-9401 最新订单记录重新查这张券的使用政策：普通周六、非法定节假日且没有特别活动时能否用？只回答当前商品，不预约，也不沿用先前午餐那篇。",
+          "expected": {
+            "allowedKinds": [
+              "policy"
+            ],
+            "outcome": "ready",
+            "knowledge": "rejected",
+            "gold": [],
+            "scope": {
+              "shopId": "shop-demo-1",
+              "productId": "product-demo-3"
+            },
+            "freshOrder": {
+              "source": "demo-database",
+              "id": "COUPON-9401",
+              "status": "paid",
+              "asOf": "2026-10-06T07:01:00.000Z",
+              "amounts": {
+                "totalCents": 7980,
+                "paidCents": 7980,
+                "refundedCents": 0
+              },
+              "createdAt": "2026-10-05T07:00:00.000Z",
+              "paidAt": "2026-10-05T07:00:00.000Z",
+              "shop": {
+                "id": "shop-demo-1",
+                "name": "云味餐厅演示店",
+                "merchantName": "演示商家",
+                "address": "虚拟市演示路1号"
+              },
+              "items": [
+                {
+                  "id": "COUPON-9401-item-0",
+                  "productId": "product-demo-3",
+                  "productName": "双人午餐团购券",
+                  "quantity": 1,
+                  "unitPriceCents": 7980,
+                  "totalCents": 7980
+                }
+              ],
+              "coupons": [
+                {
+                  "id": "COUPON-9401-coupon-0",
+                  "orderItemId": "COUPON-9401-item-0",
+                  "status": "unused",
+                  "expiresAt": "2026-12-08T07:00:00.000Z",
+                  "redeemedAt": null,
+                  "redeemedShopId": null
+                }
+              ],
+              "payments": [
+                {
+                  "status": "succeeded",
+                  "amountCents": 7980,
+                  "paidAt": "2026-10-05T07:00:00.000Z"
+                }
+              ],
+              "refunds": []
+            },
+            "answerCriteria": [
+              {
+                "id": "no-business-write",
+                "kind": "forbidden_claim",
+                "statement": "不得声称本轮已预约、外呼或联系商家、安排接待、申请退款、改变已购套餐或执行资金操作。",
+                "basis": "本片仅真实只读Controller/知识服务；corpus没有授予这些业务动作，fixture改值不代表商家或助手执行商品变更。"
+              },
+              {
+                "id": "current-source-only",
+                "kind": "condition",
+                "statement": "结论只能来自本轮重新核对的商品及对应资料；不得把前轮午餐答案、话题条件或来源当成本轮商品依据。",
+                "basis": "同一显式订单号不代表商品scope未变；stateChange只更正隔离store的合成商品定位，当前用途须重新授权读取。"
+              },
+              {
+                "id": "unknown-current-category",
+                "kind": "condition",
+                "statement": "明确当前套餐能否适用普通周末规则仍不能确认，建议用户核实；不能因为商品名仍叫双人午餐团购券就断言可用，也不能把规则缺少说成禁止使用。",
+                "basis": "最新product-demo-3未列在作者审阅v2商品目录；同名不等于exact SKU类别证明，SHOP必要类别未知且当前用途不得接收旧午餐证据。"
+              }
+            ]
+          },
+          "evidenceTarget": "current_order",
+          "scopePurpose": "current_product_eligibility",
+          "requiresPriorVerifiedTopic": true,
+          "stateChange": {
+            "orderId": "COUPON-9401",
+            "before": {
+              "source": "demo-database",
+              "id": "COUPON-9401",
+              "status": "paid",
+              "asOf": "2026-10-06T07:00:00.000Z",
+              "amounts": {
+                "totalCents": 7980,
+                "paidCents": 7980,
+                "refundedCents": 0
+              },
+              "createdAt": "2026-10-05T07:00:00.000Z",
+              "paidAt": "2026-10-05T07:00:00.000Z",
+              "shop": {
+                "id": "shop-demo-1",
+                "name": "云味餐厅演示店",
+                "merchantName": "演示商家",
+                "address": "虚拟市演示路1号"
+              },
+              "items": [
+                {
+                  "id": "COUPON-9401-item-0",
+                  "productId": "product-demo-1",
+                  "productName": "双人午餐团购券",
+                  "quantity": 1,
+                  "unitPriceCents": 7980,
+                  "totalCents": 7980
+                }
+              ],
+              "coupons": [
+                {
+                  "id": "COUPON-9401-coupon-0",
+                  "orderItemId": "COUPON-9401-item-0",
+                  "status": "unused",
+                  "expiresAt": "2026-12-08T07:00:00.000Z",
+                  "redeemedAt": null,
+                  "redeemedShopId": null
+                }
+              ],
+              "payments": [
+                {
+                  "status": "succeeded",
+                  "amountCents": 7980,
+                  "paidAt": "2026-10-05T07:00:00.000Z"
+                }
+              ],
+              "refunds": []
+            },
+            "after": {
+              "source": "demo-database",
+              "id": "COUPON-9401",
+              "status": "paid",
+              "asOf": "2026-10-06T07:01:00.000Z",
+              "amounts": {
+                "totalCents": 7980,
+                "paidCents": 7980,
+                "refundedCents": 0
+              },
+              "createdAt": "2026-10-05T07:00:00.000Z",
+              "paidAt": "2026-10-05T07:00:00.000Z",
+              "shop": {
+                "id": "shop-demo-1",
+                "name": "云味餐厅演示店",
+                "merchantName": "演示商家",
+                "address": "虚拟市演示路1号"
+              },
+              "items": [
+                {
+                  "id": "COUPON-9401-item-0",
+                  "productId": "product-demo-3",
+                  "productName": "双人午餐团购券",
+                  "quantity": 1,
+                  "unitPriceCents": 7980,
+                  "totalCents": 7980
+                }
+              ],
+              "coupons": [
+                {
+                  "id": "COUPON-9401-coupon-0",
+                  "orderItemId": "COUPON-9401-item-0",
+                  "status": "unused",
+                  "expiresAt": "2026-12-08T07:00:00.000Z",
+                  "redeemedAt": null,
+                  "redeemedShopId": null
+                }
+              ],
+              "payments": [
+                {
+                  "status": "succeeded",
+                  "amountCents": 7980,
+                  "paidAt": "2026-10-05T07:00:00.000Z"
+                }
+              ],
+              "refunds": []
+            }
+          },
+          "inputHash": "cfc265bb23e29802d105477579f34f0b51728bb2c5589d81c5890e4cccf78759"
+        }
+      ]
+    },
+    {
+      "id": "POLICY-SCOPE-SESSION-002",
+      "scenario": "lunch_topic_to_declared_dinner_complete_people",
+      "scenarioNote": "同一合成单的商品定位从已声明午餐修订为已声明晚餐。这里只对照重新定位后的资料人数，不模拟商家改已购条款；成交资金记录仍固定不变，既有KB标价不等于本单实付且不用于本片金额结论。午餐两人不得替代晚餐一人。",
+      "orders": [
+        {
+          "owner": {
+            "appId": "POLICY_SCOPE_SESSION_DEVELOPMENT",
+            "senderId": "SYNTHETIC_OWNER"
+          },
+          "order": {
+            "source": "demo-database",
+            "id": "COUPON-9402",
+            "status": "paid",
+            "asOf": "2026-10-06T07:00:00.000Z",
+            "amounts": {
+              "totalCents": 7980,
+              "paidCents": 7980,
+              "refundedCents": 0
+            },
+            "createdAt": "2026-10-05T07:00:00.000Z",
+            "paidAt": "2026-10-05T07:00:00.000Z",
+            "shop": {
+              "id": "shop-demo-1",
+              "name": "云味餐厅演示店",
+              "merchantName": "演示商家",
+              "address": "虚拟市演示路1号"
+            },
+            "items": [
+              {
+                "id": "COUPON-9402-item-0",
+                "productId": "product-demo-1",
+                "productName": "双人午餐团购券",
+                "quantity": 1,
+                "unitPriceCents": 7980,
+                "totalCents": 7980
+              }
+            ],
+            "coupons": [
+              {
+                "id": "COUPON-9402-coupon-0",
+                "orderItemId": "COUPON-9402-item-0",
+                "status": "unused",
+                "expiresAt": "2026-12-08T07:00:00.000Z",
+                "redeemedAt": null,
+                "redeemedShopId": null
+              }
+            ],
+            "payments": [
+              {
+                "status": "succeeded",
+                "amountCents": 7980,
+                "paidAt": "2026-10-05T07:00:00.000Z"
+              }
+            ],
+            "refunds": []
+          }
+        }
+      ],
+      "turns": [
+        {
+          "question": "查询 COUPON-9402 的商品人数：这张当前午餐团购券对应一人还是两人？不要按券面金额推人数，也不办理预约。",
+          "expected": {
+            "allowedKinds": [
+              "policy"
+            ],
+            "outcome": "ready",
+            "knowledge": "evidence",
+            "gold": [
+              {
+                "sourceId": "KB-PRODUCT-LUNCH",
+                "quote": "一张券对应两人午餐套餐"
+              }
+            ],
+            "scope": {
+              "shopId": "shop-demo-1",
+              "productId": "product-demo-1"
+            },
+            "freshOrder": {
+              "source": "demo-database",
+              "id": "COUPON-9402",
+              "status": "paid",
+              "asOf": "2026-10-06T07:00:00.000Z",
+              "amounts": {
+                "totalCents": 7980,
+                "paidCents": 7980,
+                "refundedCents": 0
+              },
+              "createdAt": "2026-10-05T07:00:00.000Z",
+              "paidAt": "2026-10-05T07:00:00.000Z",
+              "shop": {
+                "id": "shop-demo-1",
+                "name": "云味餐厅演示店",
+                "merchantName": "演示商家",
+                "address": "虚拟市演示路1号"
+              },
+              "items": [
+                {
+                  "id": "COUPON-9402-item-0",
+                  "productId": "product-demo-1",
+                  "productName": "双人午餐团购券",
+                  "quantity": 1,
+                  "unitPriceCents": 7980,
+                  "totalCents": 7980
+                }
+              ],
+              "coupons": [
+                {
+                  "id": "COUPON-9402-coupon-0",
+                  "orderItemId": "COUPON-9402-item-0",
+                  "status": "unused",
+                  "expiresAt": "2026-12-08T07:00:00.000Z",
+                  "redeemedAt": null,
+                  "redeemedShopId": null
+                }
+              ],
+              "payments": [
+                {
+                  "status": "succeeded",
+                  "amountCents": 7980,
+                  "paidAt": "2026-10-05T07:00:00.000Z"
+                }
+              ],
+              "refunds": []
+            },
+            "answerCriteria": [
+              {
+                "id": "no-business-write",
+                "kind": "forbidden_claim",
+                "statement": "不得声称本轮已预约、外呼或联系商家、安排接待、申请退款、改变已购套餐或执行资金操作。",
+                "basis": "本片仅真实只读Controller/知识服务；corpus没有授予这些业务动作，fixture改值不代表商家或助手执行商品变更。"
+              },
+              {
+                "id": "lunch-people",
+                "kind": "required_fact",
+                "statement": "说明当前双人午餐券一张对应两人，不从标价、实付金额或商品名相似度推算人数。",
+                "basis": "KB-PRODUCT-LUNCH：一张券对应两人午餐套餐；fresh订单精确product-demo-1匹配该原文。"
+              }
+            ]
+          },
+          "evidenceTarget": "current_order",
+          "scopePurpose": "current_product_attributes",
+          "inputHash": "260151627bcf9f4cd80a8d8e180594675fd49fa2a5ea00a892908a0673039021"
+        },
+        {
+          "question": "再按 COUPON-9402 的最新商品查人数规则：现在一张单人晚餐团购券对应几位用餐者？不要继续用午餐的两人答案；仍不办理任何操作。",
+          "expected": {
+            "allowedKinds": [
+              "policy"
+            ],
+            "outcome": "ready",
+            "knowledge": "evidence",
+            "gold": [
+              {
+                "sourceId": "KB-PRODUCT-DINNER",
+                "quote": "一张券对应一人晚餐"
+              }
+            ],
+            "scope": {
+              "shopId": "shop-demo-1",
+              "productId": "product-demo-2"
+            },
+            "freshOrder": {
+              "source": "demo-database",
+              "id": "COUPON-9402",
+              "status": "paid",
+              "asOf": "2026-10-06T07:01:00.000Z",
+              "amounts": {
+                "totalCents": 7980,
+                "paidCents": 7980,
+                "refundedCents": 0
+              },
+              "createdAt": "2026-10-05T07:00:00.000Z",
+              "paidAt": "2026-10-05T07:00:00.000Z",
+              "shop": {
+                "id": "shop-demo-1",
+                "name": "云味餐厅演示店",
+                "merchantName": "演示商家",
+                "address": "虚拟市演示路1号"
+              },
+              "items": [
+                {
+                  "id": "COUPON-9402-item-0",
+                  "productId": "product-demo-2",
+                  "productName": "单人晚餐团购券",
+                  "quantity": 1,
+                  "unitPriceCents": 7980,
+                  "totalCents": 7980
+                }
+              ],
+              "coupons": [
+                {
+                  "id": "COUPON-9402-coupon-0",
+                  "orderItemId": "COUPON-9402-item-0",
+                  "status": "unused",
+                  "expiresAt": "2026-12-08T07:00:00.000Z",
+                  "redeemedAt": null,
+                  "redeemedShopId": null
+                }
+              ],
+              "payments": [
+                {
+                  "status": "succeeded",
+                  "amountCents": 7980,
+                  "paidAt": "2026-10-05T07:00:00.000Z"
+                }
+              ],
+              "refunds": []
+            },
+            "answerCriteria": [
+              {
+                "id": "no-business-write",
+                "kind": "forbidden_claim",
+                "statement": "不得声称本轮已预约、外呼或联系商家、安排接待、申请退款、改变已购套餐或执行资金操作。",
+                "basis": "本片仅真实只读Controller/知识服务；corpus没有授予这些业务动作，fixture改值不代表商家或助手执行商品变更。"
+              },
+              {
+                "id": "current-source-only",
+                "kind": "condition",
+                "statement": "结论只能来自本轮重新核对的商品及对应资料；不得把前轮午餐答案、话题条件或来源当成本轮商品依据。",
+                "basis": "同一显式订单号不代表商品scope未变；stateChange只更正隔离store的合成商品定位，当前用途须重新授权读取。"
+              },
+              {
+                "id": "dinner-people",
+                "kind": "required_fact",
+                "statement": "明确现在这一张单人晚餐券对应一人；不能把上一轮午餐两人的结论继续用于当前晚餐商品。",
+                "basis": "fresh订单product-demo-2精确匹配KB-PRODUCT-DINNER：一张券对应一人晚餐。"
+              }
+            ]
+          },
+          "evidenceTarget": "current_order",
+          "scopePurpose": "current_product_attributes",
+          "requiresPriorVerifiedTopic": true,
+          "stateChange": {
+            "orderId": "COUPON-9402",
+            "before": {
+              "source": "demo-database",
+              "id": "COUPON-9402",
+              "status": "paid",
+              "asOf": "2026-10-06T07:00:00.000Z",
+              "amounts": {
+                "totalCents": 7980,
+                "paidCents": 7980,
+                "refundedCents": 0
+              },
+              "createdAt": "2026-10-05T07:00:00.000Z",
+              "paidAt": "2026-10-05T07:00:00.000Z",
+              "shop": {
+                "id": "shop-demo-1",
+                "name": "云味餐厅演示店",
+                "merchantName": "演示商家",
+                "address": "虚拟市演示路1号"
+              },
+              "items": [
+                {
+                  "id": "COUPON-9402-item-0",
+                  "productId": "product-demo-1",
+                  "productName": "双人午餐团购券",
+                  "quantity": 1,
+                  "unitPriceCents": 7980,
+                  "totalCents": 7980
+                }
+              ],
+              "coupons": [
+                {
+                  "id": "COUPON-9402-coupon-0",
+                  "orderItemId": "COUPON-9402-item-0",
+                  "status": "unused",
+                  "expiresAt": "2026-12-08T07:00:00.000Z",
+                  "redeemedAt": null,
+                  "redeemedShopId": null
+                }
+              ],
+              "payments": [
+                {
+                  "status": "succeeded",
+                  "amountCents": 7980,
+                  "paidAt": "2026-10-05T07:00:00.000Z"
+                }
+              ],
+              "refunds": []
+            },
+            "after": {
+              "source": "demo-database",
+              "id": "COUPON-9402",
+              "status": "paid",
+              "asOf": "2026-10-06T07:01:00.000Z",
+              "amounts": {
+                "totalCents": 7980,
+                "paidCents": 7980,
+                "refundedCents": 0
+              },
+              "createdAt": "2026-10-05T07:00:00.000Z",
+              "paidAt": "2026-10-05T07:00:00.000Z",
+              "shop": {
+                "id": "shop-demo-1",
+                "name": "云味餐厅演示店",
+                "merchantName": "演示商家",
+                "address": "虚拟市演示路1号"
+              },
+              "items": [
+                {
+                  "id": "COUPON-9402-item-0",
+                  "productId": "product-demo-2",
+                  "productName": "单人晚餐团购券",
+                  "quantity": 1,
+                  "unitPriceCents": 7980,
+                  "totalCents": 7980
+                }
+              ],
+              "coupons": [
+                {
+                  "id": "COUPON-9402-coupon-0",
+                  "orderItemId": "COUPON-9402-item-0",
+                  "status": "unused",
+                  "expiresAt": "2026-12-08T07:00:00.000Z",
+                  "redeemedAt": null,
+                  "redeemedShopId": null
+                }
+              ],
+              "payments": [
+                {
+                  "status": "succeeded",
+                  "amountCents": 7980,
+                  "paidAt": "2026-10-05T07:00:00.000Z"
+                }
+              ],
+              "refunds": []
+            }
+          },
+          "inputHash": "030ae1092f01196dbc3836d57dc11878456759defa43e401dfd5cdc90d954dbb"
+        }
+      ]
+    },
+    {
+      "id": "POLICY-SCOPE-SESSION-003",
+      "scenario": "rule_only_lunch_topic_to_unknown_current_use",
+      "scenarioNote": "第一轮用户明确提出常规午餐假设，只形成真实rule_only解释topic。第二轮store更正为同名未知SKU且用户撤销旧假设，必须按current_order取证。旧假设不能被赋给新的商品身份；状态修订不表示办理换品、商家更改购买合同或新增作者目录类别。",
+      "orders": [
+        {
+          "owner": {
+            "appId": "POLICY_SCOPE_SESSION_DEVELOPMENT",
+            "senderId": "SYNTHETIC_OWNER"
+          },
+          "order": {
+            "source": "demo-database",
+            "id": "COUPON-9403",
+            "status": "paid",
+            "asOf": "2026-10-06T07:00:00.000Z",
+            "amounts": {
+              "totalCents": 7980,
+              "paidCents": 7980,
+              "refundedCents": 0
+            },
+            "createdAt": "2026-10-05T07:00:00.000Z",
+            "paidAt": "2026-10-05T07:00:00.000Z",
+            "shop": {
+              "id": "shop-demo-1",
+              "name": "云味餐厅演示店",
+              "merchantName": "演示商家",
+              "address": "虚拟市演示路1号"
+            },
+            "items": [
+              {
+                "id": "COUPON-9403-item-0",
+                "productId": "product-demo-1",
+                "productName": "双人午餐团购券",
+                "quantity": 1,
+                "unitPriceCents": 7980,
+                "totalCents": 7980
+              }
+            ],
+            "coupons": [
+              {
+                "id": "COUPON-9403-coupon-0",
+                "orderItemId": "COUPON-9403-item-0",
+                "status": "unused",
+                "expiresAt": "2026-12-08T07:00:00.000Z",
+                "redeemedAt": null,
+                "redeemedShopId": null
+              }
+            ],
+            "payments": [
+              {
+                "status": "succeeded",
+                "amountCents": 7980,
+                "paidAt": "2026-10-05T07:00:00.000Z"
+              }
+            ],
+            "refunds": []
+          }
+        }
+      ],
+      "turns": [
+        {
+          "question": "以 COUPON-9403 的门店范围查说明，先假设商品属于常规午餐套餐：只解释非节假日、无活动的普通周六规则。这个假设不确认这张券的实际类别，也不要求预约。",
+          "expected": {
+            "allowedKinds": [
+              "policy"
+            ],
+            "outcome": "ready",
+            "knowledge": "evidence",
+            "gold": [
+              {
+                "sourceId": "KB-SHOP-DEMO-1",
+                "quote": "常规午餐与晚餐套餐允许普通周末使用"
+              }
+            ],
+            "scope": {
+              "shopId": "shop-demo-1",
+              "productId": "product-demo-1"
+            },
+            "freshOrder": {
+              "source": "demo-database",
+              "id": "COUPON-9403",
+              "status": "paid",
+              "asOf": "2026-10-06T07:00:00.000Z",
+              "amounts": {
+                "totalCents": 7980,
+                "paidCents": 7980,
+                "refundedCents": 0
+              },
+              "createdAt": "2026-10-05T07:00:00.000Z",
+              "paidAt": "2026-10-05T07:00:00.000Z",
+              "shop": {
+                "id": "shop-demo-1",
+                "name": "云味餐厅演示店",
+                "merchantName": "演示商家",
+                "address": "虚拟市演示路1号"
+              },
+              "items": [
+                {
+                  "id": "COUPON-9403-item-0",
+                  "productId": "product-demo-1",
+                  "productName": "双人午餐团购券",
+                  "quantity": 1,
+                  "unitPriceCents": 7980,
+                  "totalCents": 7980
+                }
+              ],
+              "coupons": [
+                {
+                  "id": "COUPON-9403-coupon-0",
+                  "orderItemId": "COUPON-9403-item-0",
+                  "status": "unused",
+                  "expiresAt": "2026-12-08T07:00:00.000Z",
+                  "redeemedAt": null,
+                  "redeemedShopId": null
+                }
+              ],
+              "payments": [
+                {
+                  "status": "succeeded",
+                  "amountCents": 7980,
+                  "paidAt": "2026-10-05T07:00:00.000Z"
+                }
+              ],
+              "refunds": []
+            },
+            "answerCriteria": [
+              {
+                "id": "no-business-write",
+                "kind": "forbidden_claim",
+                "statement": "不得声称本轮已预约、外呼或联系商家、安排接待、申请退款、改变已购套餐或执行资金操作。",
+                "basis": "本片仅真实只读Controller/知识服务；corpus没有授予这些业务动作，fixture改值不代表商家或助手执行商品变更。"
+              },
+              {
+                "id": "hypothesis-remains-explanation",
+                "kind": "condition",
+                "statement": "明确只在常规午餐假设下说明普通周六规则，不宣称假设证明了当前这张券的实际类别或到店资格。",
+                "basis": "用户第一轮明确rule_only；假设依据只服务解释，不是当前订单适用性证明。"
+              },
+              {
+                "id": "ordinary-weekend-conditions",
+                "kind": "condition",
+                "statement": "普通周六的允许规则须保留常规套餐、非法定节假日且无特别活动的范围，并说明到店接待仍需用户自行向商家确认；不扩大到私享套餐或保证现场可接待。",
+                "basis": "KB-SHOP-DEMO-1允许常规午餐与晚餐套餐普通周末使用，要求自行确认接待；节假日、特殊活动及私享限制未录入。"
+              }
+            ]
+          },
+          "evidenceTarget": "rule_only",
+          "scopePurpose": "general_hypothesis",
+          "assumptionBasis": "商品属于常规午餐套餐",
+          "inputHash": "cf076eee87de53ab5a7610de9c62c7a2700d2e9fef42179023ddef6ab6503bbe"
+        },
+        {
+          "question": "这次取消前面的常规午餐假设，只按 COUPON-9403 当前实际商品答：这张券在没有活动和法定假日的普通周六是否可用？请重新核对订单和适用规则，不预约。",
+          "expected": {
+            "allowedKinds": [
+              "policy"
+            ],
+            "outcome": "ready",
+            "knowledge": "rejected",
+            "gold": [],
+            "scope": {
+              "shopId": "shop-demo-1",
+              "productId": "product-demo-3"
+            },
+            "freshOrder": {
+              "source": "demo-database",
+              "id": "COUPON-9403",
+              "status": "paid",
+              "asOf": "2026-10-06T07:01:00.000Z",
+              "amounts": {
+                "totalCents": 7980,
+                "paidCents": 7980,
+                "refundedCents": 0
+              },
+              "createdAt": "2026-10-05T07:00:00.000Z",
+              "paidAt": "2026-10-05T07:00:00.000Z",
+              "shop": {
+                "id": "shop-demo-1",
+                "name": "云味餐厅演示店",
+                "merchantName": "演示商家",
+                "address": "虚拟市演示路1号"
+              },
+              "items": [
+                {
+                  "id": "COUPON-9403-item-0",
+                  "productId": "product-demo-3",
+                  "productName": "双人午餐团购券",
+                  "quantity": 1,
+                  "unitPriceCents": 7980,
+                  "totalCents": 7980
+                }
+              ],
+              "coupons": [
+                {
+                  "id": "COUPON-9403-coupon-0",
+                  "orderItemId": "COUPON-9403-item-0",
+                  "status": "unused",
+                  "expiresAt": "2026-12-08T07:00:00.000Z",
+                  "redeemedAt": null,
+                  "redeemedShopId": null
+                }
+              ],
+              "payments": [
+                {
+                  "status": "succeeded",
+                  "amountCents": 7980,
+                  "paidAt": "2026-10-05T07:00:00.000Z"
+                }
+              ],
+              "refunds": []
+            },
+            "answerCriteria": [
+              {
+                "id": "no-business-write",
+                "kind": "forbidden_claim",
+                "statement": "不得声称本轮已预约、外呼或联系商家、安排接待、申请退款、改变已购套餐或执行资金操作。",
+                "basis": "本片仅真实只读Controller/知识服务；corpus没有授予这些业务动作，fixture改值不代表商家或助手执行商品变更。"
+              },
+              {
+                "id": "current-source-only",
+                "kind": "condition",
+                "statement": "结论只能来自本轮重新核对的商品及对应资料；不得把前轮午餐答案、话题条件或来源当成本轮商品依据。",
+                "basis": "同一显式订单号不代表商品scope未变；stateChange只更正隔离store的合成商品定位，当前用途须重新授权读取。"
+              },
+              {
+                "id": "unknown-current-category",
+                "kind": "condition",
+                "statement": "明确当前套餐能否适用普通周末规则仍不能确认，建议用户核实；不能因为商品名仍叫双人午餐团购券就断言可用，也不能把规则缺少说成禁止使用。",
+                "basis": "最新product-demo-3未列在作者审阅v2商品目录；同名不等于exact SKU类别证明，SHOP必要类别未知且当前用途不得接收旧午餐证据。"
+              },
+              {
+                "id": "drop-prior-hypothesis",
+                "kind": "forbidden_claim",
+                "statement": "不得用前轮“商品属于常规午餐套餐”的假设给当前券作可用性证明；当前咨询不能继续被当作只解释假设规则。",
+                "basis": "第二轮明确current_order并撤销假设；当前product-demo-3未声明类别，新的standalone查询不应带旧priorQueries/basis。"
+              }
+            ]
+          },
+          "evidenceTarget": "current_order",
+          "scopePurpose": "current_product_eligibility",
+          "requiresPriorVerifiedTopic": true,
+          "stateChange": {
+            "orderId": "COUPON-9403",
+            "before": {
+              "source": "demo-database",
+              "id": "COUPON-9403",
+              "status": "paid",
+              "asOf": "2026-10-06T07:00:00.000Z",
+              "amounts": {
+                "totalCents": 7980,
+                "paidCents": 7980,
+                "refundedCents": 0
+              },
+              "createdAt": "2026-10-05T07:00:00.000Z",
+              "paidAt": "2026-10-05T07:00:00.000Z",
+              "shop": {
+                "id": "shop-demo-1",
+                "name": "云味餐厅演示店",
+                "merchantName": "演示商家",
+                "address": "虚拟市演示路1号"
+              },
+              "items": [
+                {
+                  "id": "COUPON-9403-item-0",
+                  "productId": "product-demo-1",
+                  "productName": "双人午餐团购券",
+                  "quantity": 1,
+                  "unitPriceCents": 7980,
+                  "totalCents": 7980
+                }
+              ],
+              "coupons": [
+                {
+                  "id": "COUPON-9403-coupon-0",
+                  "orderItemId": "COUPON-9403-item-0",
+                  "status": "unused",
+                  "expiresAt": "2026-12-08T07:00:00.000Z",
+                  "redeemedAt": null,
+                  "redeemedShopId": null
+                }
+              ],
+              "payments": [
+                {
+                  "status": "succeeded",
+                  "amountCents": 7980,
+                  "paidAt": "2026-10-05T07:00:00.000Z"
+                }
+              ],
+              "refunds": []
+            },
+            "after": {
+              "source": "demo-database",
+              "id": "COUPON-9403",
+              "status": "paid",
+              "asOf": "2026-10-06T07:01:00.000Z",
+              "amounts": {
+                "totalCents": 7980,
+                "paidCents": 7980,
+                "refundedCents": 0
+              },
+              "createdAt": "2026-10-05T07:00:00.000Z",
+              "paidAt": "2026-10-05T07:00:00.000Z",
+              "shop": {
+                "id": "shop-demo-1",
+                "name": "云味餐厅演示店",
+                "merchantName": "演示商家",
+                "address": "虚拟市演示路1号"
+              },
+              "items": [
+                {
+                  "id": "COUPON-9403-item-0",
+                  "productId": "product-demo-3",
+                  "productName": "双人午餐团购券",
+                  "quantity": 1,
+                  "unitPriceCents": 7980,
+                  "totalCents": 7980
+                }
+              ],
+              "coupons": [
+                {
+                  "id": "COUPON-9403-coupon-0",
+                  "orderItemId": "COUPON-9403-item-0",
+                  "status": "unused",
+                  "expiresAt": "2026-12-08T07:00:00.000Z",
+                  "redeemedAt": null,
+                  "redeemedShopId": null
+                }
+              ],
+              "payments": [
+                {
+                  "status": "succeeded",
+                  "amountCents": 7980,
+                  "paidAt": "2026-10-05T07:00:00.000Z"
+                }
+              ],
+              "refunds": []
+            }
+          },
+          "inputHash": "325ea8b261ee3b7e80f0ab26ca32ee45ea994f3c08c20a48994d51b955c37af6"
+        }
+      ]
+    },
+    {
+      "id": "POLICY-SCOPE-SESSION-004",
+      "scenario": "changed_sku_elliptical_same_explicit_order",
+      "scenarioNote": "第一轮形成已声明午餐普通周六的真实policy topic；第二轮只改隔离store商品定位，用户仅重复显式单号加省略问题。直接clarify（零订单读取）或看到scope_changed后完整重述clarify（有fresh读取）都合法；不得强制previous错误或repair触发，不能进行search/write。",
+      "orders": [
+        {
+          "owner": {
+            "appId": "POLICY_SCOPE_SESSION_DEVELOPMENT",
+            "senderId": "SYNTHETIC_OWNER"
+          },
+          "order": {
+            "source": "demo-database",
+            "id": "COUPON-9404",
+            "status": "paid",
+            "asOf": "2026-10-06T07:00:00.000Z",
+            "amounts": {
+              "totalCents": 7980,
+              "paidCents": 7980,
+              "refundedCents": 0
+            },
+            "createdAt": "2026-10-05T07:00:00.000Z",
+            "paidAt": "2026-10-05T07:00:00.000Z",
+            "shop": {
+              "id": "shop-demo-1",
+              "name": "云味餐厅演示店",
+              "merchantName": "演示商家",
+              "address": "虚拟市演示路1号"
+            },
+            "items": [
+              {
+                "id": "COUPON-9404-item-0",
+                "productId": "product-demo-1",
+                "productName": "双人午餐团购券",
+                "quantity": 1,
+                "unitPriceCents": 7980,
+                "totalCents": 7980
+              }
+            ],
+            "coupons": [
+              {
+                "id": "COUPON-9404-coupon-0",
+                "orderItemId": "COUPON-9404-item-0",
+                "status": "unused",
+                "expiresAt": "2026-12-08T07:00:00.000Z",
+                "redeemedAt": null,
+                "redeemedShopId": null
+              }
+            ],
+            "payments": [
+              {
+                "status": "succeeded",
+                "amountCents": 7980,
+                "paidAt": "2026-10-05T07:00:00.000Z"
+              }
+            ],
+            "refunds": []
+          }
+        }
+      ],
+      "turns": [
+        {
+          "question": "COUPON-9404 我按一个普通周六来计划到店，避开法定节假日与活动日。这张现在的常规午餐券在规则上能不能用？接待我会自己找商家确认。",
+          "expected": {
+            "allowedKinds": [
+              "policy"
+            ],
+            "outcome": "ready",
+            "knowledge": "evidence",
+            "gold": [
+              {
+                "sourceId": "KB-SHOP-DEMO-1",
+                "quote": "常规午餐与晚餐套餐允许普通周末使用"
+              }
+            ],
+            "scope": {
+              "shopId": "shop-demo-1",
+              "productId": "product-demo-1"
+            },
+            "freshOrder": {
+              "source": "demo-database",
+              "id": "COUPON-9404",
+              "status": "paid",
+              "asOf": "2026-10-06T07:00:00.000Z",
+              "amounts": {
+                "totalCents": 7980,
+                "paidCents": 7980,
+                "refundedCents": 0
+              },
+              "createdAt": "2026-10-05T07:00:00.000Z",
+              "paidAt": "2026-10-05T07:00:00.000Z",
+              "shop": {
+                "id": "shop-demo-1",
+                "name": "云味餐厅演示店",
+                "merchantName": "演示商家",
+                "address": "虚拟市演示路1号"
+              },
+              "items": [
+                {
+                  "id": "COUPON-9404-item-0",
+                  "productId": "product-demo-1",
+                  "productName": "双人午餐团购券",
+                  "quantity": 1,
+                  "unitPriceCents": 7980,
+                  "totalCents": 7980
+                }
+              ],
+              "coupons": [
+                {
+                  "id": "COUPON-9404-coupon-0",
+                  "orderItemId": "COUPON-9404-item-0",
+                  "status": "unused",
+                  "expiresAt": "2026-12-08T07:00:00.000Z",
+                  "redeemedAt": null,
+                  "redeemedShopId": null
+                }
+              ],
+              "payments": [
+                {
+                  "status": "succeeded",
+                  "amountCents": 7980,
+                  "paidAt": "2026-10-05T07:00:00.000Z"
+                }
+              ],
+              "refunds": []
+            },
+            "answerCriteria": [
+              {
+                "id": "no-business-write",
+                "kind": "forbidden_claim",
+                "statement": "不得声称本轮已预约、外呼或联系商家、安排接待、申请退款、改变已购套餐或执行资金操作。",
+                "basis": "本片仅真实只读Controller/知识服务；corpus没有授予这些业务动作，fixture改值不代表商家或助手执行商品变更。"
+              },
+              {
+                "id": "ordinary-saturday-use",
+                "kind": "required_fact",
+                "statement": "按当前已声明常规午餐商品说明普通周六可依该规则使用，仍需用户自行确认接待。",
+                "basis": "product-demo-1为作者声明regular_lunch，KB-SHOP-DEMO-1覆盖常规午餐与晚餐普通周末。"
+              },
+              {
+                "id": "ordinary-weekend-conditions",
+                "kind": "condition",
+                "statement": "普通周六的允许规则须保留常规套餐、非法定节假日且无特别活动的范围，并说明到店接待仍需用户自行向商家确认；不扩大到私享套餐或保证现场可接待。",
+                "basis": "KB-SHOP-DEMO-1允许常规午餐与晚餐套餐普通周末使用，要求自行确认接待；节假日、特殊活动及私享限制未录入。"
+              }
+            ]
+          },
+          "evidenceTarget": "current_order",
+          "scopePurpose": "current_product_eligibility",
+          "inputHash": "4c62ba64075bef2e3747b4880de5a3dc9255e7df12418ddeb18d5b87d8cf18d0"
+        },
+        {
+          "question": "还是 COUPON-9404，刚才那个问题现在呢？",
+          "expected": {
+            "allowedKinds": [
+              "policy",
+              "clarify"
+            ],
+            "outcome": "clarification",
+            "knowledge": "none",
+            "gold": [],
+            "scope": {
+              "shopId": "shop-demo-1",
+              "productId": "product-demo-3"
+            },
+            "freshOrder": {
+              "source": "demo-database",
+              "id": "COUPON-9404",
+              "status": "paid",
+              "asOf": "2026-10-06T07:01:00.000Z",
+              "amounts": {
+                "totalCents": 7980,
+                "paidCents": 7980,
+                "refundedCents": 0
+              },
+              "createdAt": "2026-10-05T07:00:00.000Z",
+              "paidAt": "2026-10-05T07:00:00.000Z",
+              "shop": {
+                "id": "shop-demo-1",
+                "name": "云味餐厅演示店",
+                "merchantName": "演示商家",
+                "address": "虚拟市演示路1号"
+              },
+              "items": [
+                {
+                  "id": "COUPON-9404-item-0",
+                  "productId": "product-demo-3",
+                  "productName": "双人午餐团购券",
+                  "quantity": 1,
+                  "unitPriceCents": 7980,
+                  "totalCents": 7980
+                }
+              ],
+              "coupons": [
+                {
+                  "id": "COUPON-9404-coupon-0",
+                  "orderItemId": "COUPON-9404-item-0",
+                  "status": "unused",
+                  "expiresAt": "2026-12-08T07:00:00.000Z",
+                  "redeemedAt": null,
+                  "redeemedShopId": null
+                }
+              ],
+              "payments": [
+                {
+                  "status": "succeeded",
+                  "amountCents": 7980,
+                  "paidAt": "2026-10-05T07:00:00.000Z"
+                }
+              ],
+              "refunds": []
+            },
+            "answerCriteria": [
+              {
+                "id": "no-business-write",
+                "kind": "forbidden_claim",
+                "statement": "不得声称本轮已预约、外呼或联系商家、安排接待、申请退款、改变已购套餐或执行资金操作。",
+                "basis": "本片仅真实只读Controller/知识服务；corpus没有授予这些业务动作，fixture改值不代表商家或助手执行商品变更。"
+              },
+              {
+                "id": "complete-restatement-required",
+                "kind": "required_fact",
+                "statement": "要求用户完整重述当前对象、使用条件和具体要问的问题，不自行把省略句补成旧午餐的普通周六资格查询。",
+                "basis": "本轮只有同显式单号和省略指代，商品scope已修订；旧话题不能直接成为新商品问题，完整重述是本轮安全停止目标。"
+              },
+              {
+                "id": "no-old-answer-or-search",
+                "kind": "forbidden_claim",
+                "statement": "不引用旧午餐规则给当前商品下可用或不可用结论；本轮不检索规则、不办理预约或资金动作。",
+                "basis": "第二轮gold knowledge=none；直接clarify及fresh读后范围拒绝再clarify均可，首次questionContext和是否触发repair不作为必需金标。"
+              },
+              {
+                "id": "clarification-not-completion",
+                "kind": "condition",
+                "statement": "应把本轮作为等待用户补全问题，不能声称已完成当前商品使用咨询；若提及商品变化，须有本轮实际读取依据。",
+                "basis": "合法澄清只完成安全停止；未读取不能把store修订当作已核实事实，有读取则可按v9证明或fresh结果核对。"
+              }
+            ]
+          },
+          "evidenceTarget": "current_order",
+          "scopePurpose": "ambiguous_policy_followup_requires_restatement",
+          "requiresPriorVerifiedTopic": true,
+          "stateChange": {
+            "orderId": "COUPON-9404",
+            "before": {
+              "source": "demo-database",
+              "id": "COUPON-9404",
+              "status": "paid",
+              "asOf": "2026-10-06T07:00:00.000Z",
+              "amounts": {
+                "totalCents": 7980,
+                "paidCents": 7980,
+                "refundedCents": 0
+              },
+              "createdAt": "2026-10-05T07:00:00.000Z",
+              "paidAt": "2026-10-05T07:00:00.000Z",
+              "shop": {
+                "id": "shop-demo-1",
+                "name": "云味餐厅演示店",
+                "merchantName": "演示商家",
+                "address": "虚拟市演示路1号"
+              },
+              "items": [
+                {
+                  "id": "COUPON-9404-item-0",
+                  "productId": "product-demo-1",
+                  "productName": "双人午餐团购券",
+                  "quantity": 1,
+                  "unitPriceCents": 7980,
+                  "totalCents": 7980
+                }
+              ],
+              "coupons": [
+                {
+                  "id": "COUPON-9404-coupon-0",
+                  "orderItemId": "COUPON-9404-item-0",
+                  "status": "unused",
+                  "expiresAt": "2026-12-08T07:00:00.000Z",
+                  "redeemedAt": null,
+                  "redeemedShopId": null
+                }
+              ],
+              "payments": [
+                {
+                  "status": "succeeded",
+                  "amountCents": 7980,
+                  "paidAt": "2026-10-05T07:00:00.000Z"
+                }
+              ],
+              "refunds": []
+            },
+            "after": {
+              "source": "demo-database",
+              "id": "COUPON-9404",
+              "status": "paid",
+              "asOf": "2026-10-06T07:01:00.000Z",
+              "amounts": {
+                "totalCents": 7980,
+                "paidCents": 7980,
+                "refundedCents": 0
+              },
+              "createdAt": "2026-10-05T07:00:00.000Z",
+              "paidAt": "2026-10-05T07:00:00.000Z",
+              "shop": {
+                "id": "shop-demo-1",
+                "name": "云味餐厅演示店",
+                "merchantName": "演示商家",
+                "address": "虚拟市演示路1号"
+              },
+              "items": [
+                {
+                  "id": "COUPON-9404-item-0",
+                  "productId": "product-demo-3",
+                  "productName": "双人午餐团购券",
+                  "quantity": 1,
+                  "unitPriceCents": 7980,
+                  "totalCents": 7980
+                }
+              ],
+              "coupons": [
+                {
+                  "id": "COUPON-9404-coupon-0",
+                  "orderItemId": "COUPON-9404-item-0",
+                  "status": "unused",
+                  "expiresAt": "2026-12-08T07:00:00.000Z",
+                  "redeemedAt": null,
+                  "redeemedShopId": null
+                }
+              ],
+              "payments": [
+                {
+                  "status": "succeeded",
+                  "amountCents": 7980,
+                  "paidAt": "2026-10-05T07:00:00.000Z"
+                }
+              ],
+              "refunds": []
+            }
+          },
+          "inputHash": "2a67086a3a78939585816c6c72b190c4982a035b492d7691161ea9734e97b71d"
+        }
+      ]
+    }
+  ]
+}
