@@ -22,6 +22,7 @@ console.log("模型配置检查通过：DeepSeek 默认配置、显式覆盖、�
 
 await import("./model-selection-check.ts");
 await (await import("./bailian-model-wire-check.ts")).checkBailianModelWire();
+await (await import("./c1-model-support-comparison.ts")).checkModelSupportComparison();
 
 await import("./retrieval-check.ts");
 await import("./retrieval-context-check.ts");

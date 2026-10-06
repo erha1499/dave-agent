@@ -1,0 +1,473 @@
+{
+  "version": 1,
+  "suiteId": "c1-model-support-comparison-v1",
+  "stage": "fresh-fixed-input-model-comparison-not-blind",
+  "arms": {
+    "A": "deepseek-v4-pro",
+    "B": "qwen3.7-plus-2026-05-26"
+  },
+  "limits": {
+    "maxSupportHttp": 24,
+    "maxAgentHttp": 0,
+    "maxRerankHttp": 0,
+    "maxDatabaseRequests": 0,
+    "maxQqRequests": 0,
+    "maxEstimatedCostUsd": 0.08,
+    "maxEstimatedCostCny": 0.2,
+    "maxDurationMs": 600000,
+    "perRequestTimeoutMs": 60000,
+    "maxTokens": 2048,
+    "maxRetries": 0,
+    "temperature": 0
+  },
+  "executionOrder": [
+    {
+      "caseId": "model-001",
+      "arm": "A",
+      "sequence": 1
+    },
+    {
+      "caseId": "model-001",
+      "arm": "B",
+      "sequence": 2
+    },
+    {
+      "caseId": "model-002",
+      "arm": "B",
+      "sequence": 3
+    },
+    {
+      "caseId": "model-002",
+      "arm": "A",
+      "sequence": 4
+    },
+    {
+      "caseId": "model-003",
+      "arm": "A",
+      "sequence": 5
+    },
+    {
+      "caseId": "model-003",
+      "arm": "B",
+      "sequence": 6
+    },
+    {
+      "caseId": "model-004",
+      "arm": "B",
+      "sequence": 7
+    },
+    {
+      "caseId": "model-004",
+      "arm": "A",
+      "sequence": 8
+    },
+    {
+      "caseId": "model-005",
+      "arm": "A",
+      "sequence": 9
+    },
+    {
+      "caseId": "model-005",
+      "arm": "B",
+      "sequence": 10
+    },
+    {
+      "caseId": "model-006",
+      "arm": "B",
+      "sequence": 11
+    },
+    {
+      "caseId": "model-006",
+      "arm": "A",
+      "sequence": 12
+    },
+    {
+      "caseId": "model-007",
+      "arm": "A",
+      "sequence": 13
+    },
+    {
+      "caseId": "model-007",
+      "arm": "B",
+      "sequence": 14
+    },
+    {
+      "caseId": "model-008",
+      "arm": "B",
+      "sequence": 15
+    },
+    {
+      "caseId": "model-008",
+      "arm": "A",
+      "sequence": 16
+    },
+    {
+      "caseId": "model-009",
+      "arm": "A",
+      "sequence": 17
+    },
+    {
+      "caseId": "model-009",
+      "arm": "B",
+      "sequence": 18
+    },
+    {
+      "caseId": "model-010",
+      "arm": "B",
+      "sequence": 19
+    },
+    {
+      "caseId": "model-010",
+      "arm": "A",
+      "sequence": 20
+    },
+    {
+      "caseId": "model-011",
+      "arm": "A",
+      "sequence": 21
+    },
+    {
+      "caseId": "model-011",
+      "arm": "B",
+      "sequence": 22
+    },
+    {
+      "caseId": "model-012",
+      "arm": "B",
+      "sequence": 23
+    },
+    {
+      "caseId": "model-012",
+      "arm": "A",
+      "sequence": 24
+    }
+  ],
+  "settings": {
+    "A": {
+      "provider": "deepseek",
+      "model": "deepseek-v4-pro",
+      "api": "openai-completions",
+      "endpoint": "https://api.deepseek.com",
+      "timeoutMs": 60000,
+      "temperature": 0,
+      "maxTokens": 2048,
+      "maxRetries": 0,
+      "promptVersion": "fact-support-typed-v7",
+      "promptHash": "c2d8e1f3de93d86ef658a0d691fe753138efcab7240c9a13f20f499d41937a9c",
+      "serialization": "json-query-id-title-tags-body-v1",
+      "serializationHash": "1d16c5e3ef4647c120fe6ddce72417c9ec618ee41dc77faa447ec214e5749c4a",
+      "pricing": {
+        "currency": "USD",
+        "estimated": true,
+        "source": "Pi model catalog",
+        "rates": {
+          "input": 1.32,
+          "output": 3.96,
+          "cacheRead": 0.044,
+          "cacheWrite": 0
+        }
+      },
+      "profile": "typed",
+      "validationVersion": "typed-candidate-isolation-v1"
+    },
+    "B": {
+      "provider": "bailian",
+      "model": "qwen3.7-plus-2026-05-26",
+      "api": "openai-completions",
+      "endpoint": "https://ws-tiy939iiusj2254o.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
+      "timeoutMs": 60000,
+      "temperature": 0,
+      "maxTokens": 2048,
+      "maxRetries": 0,
+      "promptVersion": "fact-support-typed-v7",
+      "promptHash": "c2d8e1f3de93d86ef658a0d691fe753138efcab7240c9a13f20f499d41937a9c",
+      "serialization": "json-query-id-title-tags-body-v1",
+      "serializationHash": "1d16c5e3ef4647c120fe6ddce72417c9ec618ee41dc77faa447ec214e5749c4a",
+      "pricing": {
+        "currency": "CNY",
+        "estimated": true,
+        "source": "Alibaba Cloud Model Studio",
+        "version": "bailian-beijing-2026-10-06-v1",
+        "region": "cn-beijing",
+        "inputTierMaxTokens": 256000,
+        "cacheDiscounts": false,
+        "rates": {
+          "input": 2,
+          "output": 8,
+          "cacheRead": 2,
+          "cacheWrite": 2
+        }
+      },
+      "profile": "typed",
+      "validationVersion": "typed-candidate-isolation-v1"
+    }
+  },
+  "wireContracts": {
+    "A": {
+      "instructionRole": "system",
+      "outputLimitField": "max_tokens"
+    },
+    "B": {
+      "instructionRole": "system",
+      "outputLimitField": "max_completion_tokens"
+    }
+  },
+  "sourceHashes": {
+    "data/c1-model-support-comparison.json": {
+      "sha256": "e46afaaf46234d57205611c3de8ead68023595b7bb575ce8a45a7e0bcd1d3549",
+      "bytes": 36008
+    },
+    "docs/model-selection.md": {
+      "sha256": "0a7083d4db7a979b4770ab59fa6c87df0294d4685c324b6871868dfa7e64116d",
+      "bytes": 12020
+    },
+    "prompts/customer-service-v2.md": {
+      "sha256": "0ce7234817f7cfd9925c32c4e0230253c3c73c06723c270e477c4cf4f3527a85",
+      "bytes": 7925
+    },
+    "scripts/c1-model-support-comparison.ts": {
+      "sha256": "843fd47102666cff7f32fcb48717e4a4f6076f2ee831d8e81ff2b16c671736f2",
+      "bytes": 53778
+    },
+    "scripts/c1-reference-evidence.ts": {
+      "sha256": "de290d8865be3dac6f515eb9a43e54f229cc8ccc385f3b30604e4a3ea61755d7",
+      "bytes": 19490
+    },
+    "scripts/c1-session-validation-check.ts": {
+      "sha256": "0ccfd48376a76905a141a473b067c0491a0ac13edc4f3e4fe641b2357659c94c",
+      "bytes": 139289
+    },
+    "scripts/c1-session-validation-live.ts": {
+      "sha256": "78eb7ce9cc63436eb8ce53f14b755b92c5a58aea4f3ec678dfce48217d0d6ef7",
+      "bytes": 44253
+    },
+    "skills/shop-support-v2/SKILL.md": {
+      "sha256": "c59ac5eaea1771605e8c46df7c731ee518e8bdb30525b3ee510a470584921a04",
+      "bytes": 7433
+    },
+    "src/after-sales-entry.ts": {
+      "sha256": "bb2ec9d9a7585efefc4af7fcd87c0e9a4d978315d4fd576d4a1ad76a17ea1162",
+      "bytes": 1817
+    },
+    "src/after-sales.ts": {
+      "sha256": "1100a2158af2e368e4e13706fc850c901bda647e3b874850f1c4d593c3a3a5d1",
+      "bytes": 19684
+    },
+    "src/agent.ts": {
+      "sha256": "b8875d92a15f8ca66cb076b51dd17a2eb3c94581e6ed9e6857bb2ee8e35349d1",
+      "bytes": 13115
+    },
+    "src/bailian.ts": {
+      "sha256": "ed7fc42f703bd3e49ee38581c4bfa5d35f886872f5039c2b467e74682c1d95b1",
+      "bytes": 9799
+    },
+    "src/cli.ts": {
+      "sha256": "5731d83c2bc3c98bb2c2e7e6837f8107ad3145033a6079b86e94729522aff290",
+      "bytes": 7171
+    },
+    "src/conversation-state.ts": {
+      "sha256": "5dc215be064b59657a53cdf66e2ccf67ccf39d2f9f0a0a8affb5353d4ea9ea79",
+      "bytes": 19520
+    },
+    "src/coupon-store.ts": {
+      "sha256": "9886c9f3bd7e364850d49bff9aa94a5fddc41c7f2e88240a8a32fb459a376f8f",
+      "bytes": 9844
+    },
+    "src/eval-analysis.ts": {
+      "sha256": "8e7f23098e84eb841a445c90e91c84f1d12647aa3d453c7041c1dd4f533281b9",
+      "bytes": 24744
+    },
+    "src/eval-capture.ts": {
+      "sha256": "d6ea50d72fdabc6dae1c815f5a5dfbae5415b8bf5ecc436079294e1e44f38a30",
+      "bytes": 4871
+    },
+    "src/eval-server.ts": {
+      "sha256": "50601e5b1f0ea16a9c3d2b0c414ae6e7d81307a230c71209e538886afa3ed591",
+      "bytes": 9224
+    },
+    "src/eval-store.ts": {
+      "sha256": "c215fb7fa5446a3b775ab2f524a7a49f7e7348ee1708b3c73e6aca2f652e9680",
+      "bytes": 8201
+    },
+    "src/evaluation.ts": {
+      "sha256": "a4de22f064677868f084a94e5840f991b5c28a23bd539a1ced73e85ba07a73ff",
+      "bytes": 6439
+    },
+    "src/evidence-acceptance.ts": {
+      "sha256": "6e8040cf1ea30135dd7c18a44ed72d255ce94131226223325df3ab209b61d368",
+      "bytes": 6669
+    },
+    "src/evidence-support.ts": {
+      "sha256": "e92c6374f8c13d4289e94d6e40cb9fd53ed5b9a2ff4a81fba52f38396e672a31",
+      "bytes": 43459
+    },
+    "src/experiment-config.ts": {
+      "sha256": "6769124abcaaa0a15a0581cf0fc85c8b29bf19eab12778a74a6edd4321a9933f",
+      "bytes": 19369
+    },
+    "src/experiment-jobs.ts": {
+      "sha256": "b1432a8373e5384603bd0a21a0679b91e03c9c785615a9d6e3618932bde203c7",
+      "bytes": 15702
+    },
+    "src/knowledge-applicability.ts": {
+      "sha256": "aa31ca19dca3f33814a3f18d0fe36fe916dcf56ae1cd94a0d7c1499613eddd39",
+      "bytes": 19820
+    },
+    "src/knowledge-evaluation.ts": {
+      "sha256": "9740d55f495c5ac2e2ffea85f66ec986fcb4b73b472e6e1ac1c0fca8e8cbb7c2",
+      "bytes": 3251
+    },
+    "src/knowledge-retrieval.ts": {
+      "sha256": "89a9c606cabc1579b2cbe45ec25675260731e0a0fbe2fe99133515d7df8ebf00",
+      "bytes": 3893
+    },
+    "src/knowledge-service.ts": {
+      "sha256": "60114999337a5644b46096e87c7c16bdffbc9a0a6f0fd2596eef69bfaf7a8536",
+      "bytes": 23875
+    },
+    "src/merchant-notifications.ts": {
+      "sha256": "aada6867e0ea8c13628c14a25d7122560438b6f0f9a80c8b9eebd29160881d85",
+      "bytes": 2575
+    },
+    "src/model-selection.ts": {
+      "sha256": "e9b1eedd0d6a22d1a67164a07bed9bc425e7c85c0e575d2c1dca3bd7e0a21631",
+      "bytes": 4602
+    },
+    "src/qq-agent.ts": {
+      "sha256": "38c318cb579a83b1abb95f96c6eac745f433d4becb02263fb397b4b84e4724ea",
+      "bytes": 13044
+    },
+    "src/qq-http.ts": {
+      "sha256": "a6e380771e1ce25be1693263d36c7f18ed4a14aa69855d2e4dcaad151ced9d75",
+      "bytes": 1909
+    },
+    "src/qq-identity.ts": {
+      "sha256": "b081c6faae50708875cf9142b7fd238b448404de99828ee2813981b301ab0f9e",
+      "bytes": 1062
+    },
+    "src/qq-reply.ts": {
+      "sha256": "e7ca9ad9ce1363b58913da659f6394ef1572ad52077c4d0b287d5c23291f464c",
+      "bytes": 2271
+    },
+    "src/qq.ts": {
+      "sha256": "e8067e31d5051549d231d8d0cdce01ec7c712a3f7f18b5bf8693a9fedef36f03",
+      "bytes": 10781
+    },
+    "src/refund-entry.ts": {
+      "sha256": "ee0047a29cb45b13325ef98b886b6d5aa704b61369a97aa19128940f8d133e7f",
+      "bytes": 1774
+    },
+    "src/refunds.ts": {
+      "sha256": "a00872bf5e20114752fd2fe001b3f9ab3bc3b94895b95fa22b44c64bb047df3d",
+      "bytes": 13710
+    },
+    "src/reply-from-tools.ts": {
+      "sha256": "d208059bbe689dc9c9a7dea5841e835219c6238307ed800ecfa10b777db23643",
+      "bytes": 5095
+    },
+    "src/reply.ts": {
+      "sha256": "c6b8a78856042294ffde60577052c7ff74b0c852f5321f3264aa3b5415478540",
+      "bytes": 11842
+    },
+    "src/retrieval-ranking.ts": {
+      "sha256": "6391fcf74f4bfb79f01c018d8c3cc0fb3f969a2256f9269e3127b5f907f6dc89",
+      "bytes": 11294
+    },
+    "src/support-action.ts": {
+      "sha256": "4d8449d054b730a6d2e0ea32f752ff5f227166b689a7e6e96d955c8d9caec291",
+      "bytes": 3058
+    },
+    "src/support-context-action.ts": {
+      "sha256": "8fbf6e09b699e5542f11c0cc0ffb7b59c900c69dd7fe121180fbc6725b0194c6",
+      "bytes": 7688
+    },
+    "src/support-context.ts": {
+      "sha256": "6d7e251dab36f6d12bf0365d0ab90f6cc41f5318f36f84b4b1777fd97c2d7bfb",
+      "bytes": 11468
+    },
+    "src/support-controller.ts": {
+      "sha256": "5f995bc3fe955aa44376c1c4fa018adefb7d0043bbdaa2e09af2ce701497c8ce",
+      "bytes": 52286
+    },
+    "src/support-evaluation.ts": {
+      "sha256": "1d5669d1ca812deebd03bf38022cd61d62c7fd4655dae04d5b989c74ee54bf8a",
+      "bytes": 11751
+    },
+    "src/support-evidence-context.ts": {
+      "sha256": "cd68e46389194df14f375e6cec271b39e5616e8c76cba43d28fd7c74b2742bf3",
+      "bytes": 11659
+    },
+    "src/support-parameters.ts": {
+      "sha256": "2ad1ca33195b8bc5c174443c15dfd885c674178f76913e50a32d95265d21e530",
+      "bytes": 7689
+    },
+    "src/support-reference-selection.ts": {
+      "sha256": "ca311ef20479e30c9418c1c8a06d607774d0a18ffa4dec0de8a3b920ea3b83aa",
+      "bytes": 11031
+    },
+    "src/support-session.ts": {
+      "sha256": "41efe19506a1a212a597bf839618e67a1dc0463598bb876e592763dc78b520c8",
+      "bytes": 55473
+    },
+    "src/support-task-context.ts": {
+      "sha256": "1243f7907e17683d6feaa6d0f91d022712158f561e672615d7a2869d8e792b70",
+      "bytes": 8863
+    }
+  },
+  "dependencies": {
+    "version": 1,
+    "rootDeclarations": {
+      "@earendil-works/pi-ai": "1.0.0",
+      "@earendil-works/pi-agent-core": null,
+      "@earendil-works/pi-coding-agent": "1.0.0",
+      "mysql2": "3.24.5"
+    },
+    "packages": [
+      {
+        "path": "node_modules/@earendil-works/pi-ai",
+        "name": "@earendil-works/pi-ai",
+        "installedVersion": "1.0.0",
+        "lockedVersion": "1.0.0",
+        "lockIntegrity": "sha512-3/W1vdDaVtpeMd23ElvJC12HLA5yS/BGqqcXF+0SK082dN7cbgNcCwguTBRBC258Ke8SzSvUW1B75iAf8w8IxA==",
+        "dependencyDeclarations": {}
+      },
+      {
+        "path": "node_modules/@earendil-works/pi-coding-agent",
+        "name": "@earendil-works/pi-coding-agent",
+        "installedVersion": "1.0.0",
+        "lockedVersion": "1.0.0",
+        "lockIntegrity": "sha512-/FtbxoSQU/mEv1QnichJjRjqteqaIaMWxmhB4G367+MwZfX7/DI5B9YAg5lqbN7nztFskBEtUSZ+FlmMBECtMw==",
+        "dependencyDeclarations": {
+          "@earendil-works/pi-ai": "^1.0.0",
+          "@earendil-works/pi-agent-core": "^1.0.0"
+        }
+      },
+      {
+        "path": "node_modules/@earendil-works/pi-coding-agent/node_modules/@earendil-works/pi-agent-core",
+        "name": "@earendil-works/pi-agent-core",
+        "installedVersion": "1.0.0",
+        "lockedVersion": "1.0.0",
+        "lockIntegrity": null,
+        "dependencyDeclarations": {
+          "@earendil-works/pi-ai": "^1.0.0"
+        }
+      },
+      {
+        "path": "node_modules/@earendil-works/pi-coding-agent/node_modules/@earendil-works/pi-ai",
+        "name": "@earendil-works/pi-ai",
+        "installedVersion": "1.0.0",
+        "lockedVersion": "1.0.0",
+        "lockIntegrity": null,
+        "dependencyDeclarations": {}
+      },
+      {
+        "path": "node_modules/mysql2",
+        "name": "mysql2",
+        "installedVersion": "3.24.5",
+        "lockedVersion": "3.24.5",
+        "lockIntegrity": "sha512-X6Ujsr2QSkkLpkQGjxzpKRAPn9nu4axpR63ntBzquFVEvPOArgbUQ1sJjFKI7hnaYtiVZxa17Z7q18KSubW0IQ==",
+        "dependencyDeclarations": {}
+      }
+    ]
+  }
+}

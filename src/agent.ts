@@ -61,7 +61,8 @@ export async function createConfiguredModelRuntime(env: NodeJS.ProcessEnv = proc
       // Pi's catalog assumes USD; NaN preserves unknown USD in memory. Reviewed
       // CNY rates and finite estimates live in model-selection.ts, not this cost.
       cost: { input: NaN, output: NaN, cacheRead: NaN, cacheWrite: NaN },
-      compat: { thinkingFormat: "qwen", supportsReasoningEffort: false } }],
+      compat: { thinkingFormat: "qwen", supportsReasoningEffort: false, supportsDeveloperRole: false,
+        maxTokensField: "max_completion_tokens" } }],
   });
   const model = modelRuntime.getModel(provider, modelId);
   if (!model) throw new Error(`Pi 模型目录未找到 ${provider}/${modelId}。`);

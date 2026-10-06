@@ -67,6 +67,7 @@ export async function checkModelSelection() {
     assert.equal(qwen.model.baseUrl, "https://workspace.cn-beijing.maas.aliyuncs.com/compatible-mode/v1");
     assert.deepEqual(qwen.model.input, ["text"]); assert.equal(qwen.model.reasoning, true);
     assert.ok(qwen.model.compat && "thinkingFormat" in qwen.model.compat); assert.equal(qwen.model.compat.thinkingFormat, "qwen");
+    assert.equal(qwen.model.compat.supportsDeveloperRole, false); assert.equal(qwen.model.compat.maxTokensField, "max_completion_tokens");
     assert.equal(qwen.model.contextWindow, 1_000_000); assert.equal(qwen.model.maxTokens, 131_072);
     assert.equal(qwen.modelRuntime.getProviderAuthStatus("bailian").source, "runtime");
     assert.equal((await qwen.modelRuntime.getAuth(qwen.model))!.auth.apiKey, "synthetic-qwen");

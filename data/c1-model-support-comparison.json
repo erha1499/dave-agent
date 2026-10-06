@@ -1,0 +1,746 @@
+{
+  "version": 1,
+  "suiteId": "c1-model-support-comparison-v1",
+  "stage": "fresh-fixed-input-model-comparison-not-blind",
+  "syntheticBoundary": "All channels, shops, SKUs, policies, permissions and document-coverage statements are original self-contained synthetic offline data. They are not external quotations, live/demo business rules, verified current-order facts or transaction authorization. This suite is authored from known failure types before observing these model outputs; it is fresh fixed-input comparison, not a blind or production admission benchmark. It is not inserted into SQL and does not replace the eight online rules.",
+  "sources": [
+    {
+      "kind": "original-synthetic",
+      "description": "Original Chinese offline cases authored on 2026-10-06 for payment-channel coverage, approval-actor permissions, product/condition coverage and regression controls. Names, amounts, windows and roles are author-assigned synthetic definitions. No external merchant certification, payment API policy or reused historical answer is claimed. The complete dataset file is hashed by the execution manifest; no fictitious source file/hash is assigned to this self-contained description."
+    }
+  ],
+  "measurement": {
+    "plannedInputs": 12,
+    "plannedArms": 2,
+    "plannedHttp": 24,
+    "candidateDecisionsPerArm": 24,
+    "positiveCandidateDecisionsPerArm": 12,
+    "negativeCandidateDecisionsPerArm": 12,
+    "plannedInputsBySet": {
+      "no_answer": 4,
+      "mixed": 4,
+      "positive_control": 4
+    },
+    "selections": [
+      "deepseek-v4-pro",
+      "qwen3.7-plus-2026-05-26"
+    ],
+    "profile": "typed",
+    "promptVersion": "fact-support-typed-v7",
+    "scope": "Support classification only: fresh independent requests, same typed-v7 prompt and query/scope/two candidates for both arms, alternating arm order by input. Candidate rank 1/2 and score 0.88/0.81 are uniform synthetic inputs, not measured ranking. All candidates remain visible in scope; product and condition distinctions in global-policy text must be read semantically. No Agent, rerank, database, QQ, business write or final reply evaluation.",
+    "decision": "Preserve all 24 planned arm-input results and 48 planned candidate decisions, including invalid/missing/unexecuted outcomes. Report exact supported-set and category correctness, false acceptance/rejection, no-answer inputs and positive controls, latency, actual support HTTP and per-currency usage/cost. Gold evidenceQuote is a human source-bound basis, not a required verbatim model quote: limitation_only needs an original nonempty quote and unrelated needs null under production typed-v7 validation.",
+    "stopCondition": "One frozen execution only, at most 24 support HTTP requests and no retries/model fallback/third arm. Stop future sends on unknown usage/cost, unexpected retry, frozen-source/model/endpoint mismatch or a reached request/currency/time cap; preserve incomplete denominators. Pro USD and Qwen CNY limits are separate request-before-send soft stops and an in-flight request can exceed a cap. Do not change gold, delete a hard case, relax boundaries or rerun this suite to chase scores. Only complete trustworthy accounting, zero Qwen negative false acceptance, no new positive false rejection and an improved exact-set count permit consideration of a fresh Session comparison; component results do not admit QQ/Session or replace defaults."
+  },
+  "limits": {
+    "maxSupportHttp": 24,
+    "maxAgentHttp": 0,
+    "maxRerankHttp": 0,
+    "maxDatabaseRequests": 0,
+    "maxQqRequests": 0,
+    "maxEstimatedCostUsd": 0.08,
+    "maxEstimatedCostCny": 0.2,
+    "maxDurationMs": 600000,
+    "perRequestTimeoutMs": 60000,
+    "maxTokens": 2048,
+    "maxRetries": 0,
+    "temperature": 0
+  },
+  "cases": [
+    {
+      "id": "model-001",
+      "group": "channel",
+      "query": "规则咨询：用青砾钱包支付的体验券，审核通过并提交退款单之后，该渠道通常要几个银行工作日到账？",
+      "scope": {
+        "shopId": "shop-model-qingli",
+        "productId": "product-model-qingli"
+      },
+      "candidates": [
+        {
+          "id": "MODEL-D001",
+          "title": "体验券退款清算通则",
+          "body": "【原创合成离线资料，仅供模型对照；非线上政策，不授权任何交易】多数普通支付渠道在退款单提交后预计2至4个银行工作日入账。这份通则明确不涵盖青砾钱包和月签卡；这两种渠道须分别查阅其清算手册，本页未载青砾钱包时限。",
+          "tags": [
+            "退款",
+            "渠道",
+            "清算"
+          ],
+          "shopId": null,
+          "productId": null,
+          "status": "active",
+          "rank": 1,
+          "score": 0.88
+        },
+        {
+          "id": "MODEL-D002",
+          "title": "月签卡体验券退款说明",
+          "body": "【原创合成离线资料，仅供模型对照；非线上政策，不授权任何交易】本条仅说明月签卡：体验券审核通过并提交退款单后，月签卡通常在5至8个银行工作日内入账。月签卡与青砾钱包是两个独立结算渠道，本条不包含青砾钱包到账安排。",
+          "tags": [
+            "月签卡",
+            "退款",
+            "到账"
+          ],
+          "shopId": null,
+          "productId": null,
+          "status": "active",
+          "rank": 2,
+          "score": 0.81
+        }
+      ],
+      "expectedByCandidate": [
+        {
+          "id": "MODEL-D001",
+          "category": "limitation_only",
+          "supported": false,
+          "evidenceQuote": "这份通则明确不涵盖青砾钱包和月签卡；这两种渠道须分别查阅其清算手册，本页未载青砾钱包时限。",
+          "reason": "通则排除所问青砾钱包，只给其他渠道数字；不能借这些数字回答青砾钱包时限。"
+        },
+        {
+          "id": "MODEL-D002",
+          "category": "limitation_only",
+          "supported": false,
+          "evidenceQuote": "月签卡与青砾钱包是两个独立结算渠道，本条不包含青砾钱包到账安排。",
+          "reason": "整篇仅适用于另一个结算渠道；不能把月签卡时限转给青砾钱包。"
+        }
+      ],
+      "inputHash": "0825458afa3c94f055bcd0f5b311691018fb1e1075dcd01c662912bc463808bb"
+    },
+    {
+      "id": "model-002",
+      "group": "channel",
+      "query": "假设一次桅木联付购券扣了40元钱包余额和20元绑定银行卡，退款审核通过后，这60元能合并全部退到银行卡吗？",
+      "scope": {
+        "shopId": "shop-model-weimu",
+        "productId": "product-model-weimu"
+      },
+      "candidates": [
+        {
+          "id": "MODEL-D003",
+          "title": "单银行卡购券退款路径",
+          "body": "【原创合成离线资料，仅供模型对照；非线上政策，不授权任何交易】仅以一张银行卡完成整笔支付的券单，获准退款的券款退回该银行卡。本条没有组合支付拆分规则，不能据此确定余额与银行卡混用订单的退回路径。",
+          "tags": [
+            "银行卡",
+            "退款",
+            "支付来源"
+          ],
+          "shopId": null,
+          "productId": null,
+          "status": "active",
+          "rank": 1,
+          "score": 0.88
+        },
+        {
+          "id": "MODEL-D004",
+          "title": "桅木联付组合购券退款路径",
+          "body": "【原创合成离线资料，仅供模型对照；非线上政策，不授权任何交易】桅木联付由钱包余额与绑定银行卡共同支付时，获准退款的券款按两路实际扣款金额分别原路退回，不合并转入银行卡。例如余额扣40元、银行卡扣20元，全额退款时分别退40元至余额和20元至原银行卡。",
+          "tags": [
+            "桅木联付",
+            "组合支付",
+            "原路退回"
+          ],
+          "shopId": null,
+          "productId": null,
+          "status": "active",
+          "rank": 2,
+          "score": 0.81
+        }
+      ],
+      "expectedByCandidate": [
+        {
+          "id": "MODEL-D003",
+          "category": "limitation_only",
+          "supported": false,
+          "evidenceQuote": "本条没有组合支付拆分规则，不能据此确定余额与银行卡混用订单的退回路径。",
+          "reason": "规则只覆盖单银行卡整笔支付；没有覆盖原问已明示的余额加银行卡组合。"
+        },
+        {
+          "id": "MODEL-D004",
+          "category": "direct_fact",
+          "supported": true,
+          "evidenceQuote": "获准退款的券款按两路实际扣款金额分别原路退回，不合并转入银行卡。",
+          "reason": "明确覆盖组合支付及两路金额，直接回答不能把余额部分合并退入银行卡；仍以退款获准为前提。"
+        }
+      ],
+      "inputHash": "5529e9501cf12bd2ebd46e4d34e8a40a5497f93ad95f2d7a5603fe470d7ac4d7"
+    },
+    {
+      "id": "model-003",
+      "group": "channel",
+      "query": "只问退券规则：星汀预付账户购券获准退款时，会另扣一笔支付通道手续费吗？不涉及把余额提现。",
+      "scope": {
+        "shopId": "shop-model-xingting",
+        "productId": "product-model-xingting"
+      },
+      "candidates": [
+        {
+          "id": "MODEL-D005",
+          "title": "星汀预付账户退券收费说明",
+          "body": "【原创合成离线资料，仅供模型对照；非线上政策，不授权任何交易】星汀预付账户支付的体验券获准退款时，按该券结算实付额原路回到预付账户，不收取支付通道手续费。账户余额提现另有收费说明，提现费用不适用于退券。",
+          "tags": [
+            "星汀预付账户",
+            "退券",
+            "手续费"
+          ],
+          "shopId": null,
+          "productId": null,
+          "status": "active",
+          "rank": 1,
+          "score": 0.88
+        },
+        {
+          "id": "MODEL-D006",
+          "title": "平台储值渠道券款退回标准",
+          "body": "【原创合成离线资料，仅供模型对照；非线上政策，不授权任何交易】本平台所有储值支付渠道的体验券退款均不加收支付通道费，星汀预付账户属于本条覆盖的储值渠道。退款审批、券款金额与提现服务分别处理；不加收通道费不表示退款自动批准，也不表示提现免费。",
+          "tags": [
+            "储值支付",
+            "退款",
+            "通道费"
+          ],
+          "shopId": null,
+          "productId": null,
+          "status": "active",
+          "rank": 2,
+          "score": 0.81
+        }
+      ],
+      "expectedByCandidate": [
+        {
+          "id": "MODEL-D005",
+          "category": "direct_fact",
+          "supported": true,
+          "evidenceQuote": "星汀预付账户支付的体验券获准退款时，按该券结算实付额原路回到预付账户，不收取支付通道手续费。",
+          "reason": "直接规定所问渠道退券不扣通道手续费，并保留获准退款前提。"
+        },
+        {
+          "id": "MODEL-D006",
+          "category": "direct_fact",
+          "supported": true,
+          "evidenceQuote": "本平台所有储值支付渠道的体验券退款均不加收支付通道费，星汀预付账户属于本条覆盖的储值渠道。",
+          "reason": "明示整个储值范围及所问子类归属，可直接回答通道费规则，不能顺带承诺退款批准或提现免费。"
+        }
+      ],
+      "inputHash": "313fc8965ba4181e3fbebbceb685425f3854bde891b5657e0627607c7858de3e"
+    },
+    {
+      "id": "model-004",
+      "group": "actor",
+      "query": "云埠陶室主管回复同意取消预约后，平台券款退款的正式批准由哪个角色签发？这里问批准主体，不问预约能否取消。",
+      "scope": {
+        "shopId": "shop-model-yunbu",
+        "productId": "product-model-yunbu"
+      },
+      "candidates": [
+        {
+          "id": "MODEL-D007",
+          "title": "云埠陶室预约主管权限表",
+          "body": "【原创合成离线资料，仅供模型对照；非线上政策，不授权任何交易】云埠陶室预约主管可以批准本店预约取消、释放座位并通知接待员工。本表仅记录商家预约权限，没有平台券款退款批准角色或签发流程。",
+          "tags": [
+            "预约主管",
+            "商家权限",
+            "售后"
+          ],
+          "shopId": null,
+          "productId": null,
+          "status": "active",
+          "rank": 1,
+          "score": 0.88
+        },
+        {
+          "id": "MODEL-D008",
+          "title": "平台客服工单录入职责",
+          "body": "【原创合成离线资料，仅供模型对照；非线上政策，不授权任何交易】平台客服坐席负责登记退券原因、核对联系方式并把工单转交审核队列；坐席没有券款退款批准权限。本页未列审核队列中正式批准的签发角色。",
+          "tags": [
+            "客服",
+            "工单",
+            "权限"
+          ],
+          "shopId": null,
+          "productId": null,
+          "status": "active",
+          "rank": 2,
+          "score": 0.81
+        }
+      ],
+      "expectedByCandidate": [
+        {
+          "id": "MODEL-D007",
+          "category": "limitation_only",
+          "supported": false,
+          "evidenceQuote": "本表仅记录商家预约权限，没有平台券款退款批准角色或签发流程。",
+          "reason": "批准预约的商家角色不能补足所问平台资金退款签发主体。"
+        },
+        {
+          "id": "MODEL-D008",
+          "category": "limitation_only",
+          "supported": false,
+          "evidenceQuote": "坐席没有券款退款批准权限。本页未列审核队列中正式批准的签发角色。",
+          "reason": "只能排除客服坐席，仍未给出用户所问的正式批准签发角色，不能自行补为商家或坐席。"
+        }
+      ],
+      "inputHash": "32a61a05f47a88043c9466c9e7bf616f4804b5ffb2f7b6a9e488200f0fbbdea2"
+    },
+    {
+      "id": "model-005",
+      "group": "actor",
+      "query": "规则咨询：平台显示待商家复核的退券协商任务，应由哪个角色写入商家批准或拒绝结论？用户点确认提交不能当商家结论。",
+      "scope": {
+        "shopId": "shop-model-beiyun",
+        "productId": "product-model-beiyun"
+      },
+      "candidates": [
+        {
+          "id": "MODEL-D009",
+          "title": "商家复核结论的写入角色",
+          "body": "【原创合成离线资料，仅供模型对照；非线上政策，不授权任何交易】待商家复核的退券协商任务，批准或拒绝结论由经商家身份认证、拥有售后审核权限的审核员写入。用户确认提交仅表示申请意愿；平台客服登记工单也不能代写商家结论。商家结论不等于资金已退。",
+          "tags": [
+            "商家审核",
+            "协商结论",
+            "认证权限"
+          ],
+          "shopId": null,
+          "productId": null,
+          "status": "active",
+          "rank": 1,
+          "score": 0.88
+        },
+        {
+          "id": "MODEL-D010",
+          "title": "平台坐席协商工单操作",
+          "body": "【原创合成离线资料，仅供模型对照；非线上政策，不授权任何交易】平台坐席可创建退券协商工单、编辑用户提供的原因并发送商家催办提醒。这些是工单操作权限，商家复核批准或拒绝的写入角色未在本页定义。",
+          "tags": [
+            "坐席",
+            "协商工单",
+            "催办"
+          ],
+          "shopId": null,
+          "productId": null,
+          "status": "active",
+          "rank": 2,
+          "score": 0.81
+        }
+      ],
+      "expectedByCandidate": [
+        {
+          "id": "MODEL-D009",
+          "category": "direct_fact",
+          "supported": true,
+          "evidenceQuote": "批准或拒绝结论由经商家身份认证、拥有售后审核权限的审核员写入。",
+          "reason": "准确给出所问商家结论角色及身份权限条件，不把用户确认、客服登记或商家批准当成资金已退。"
+        },
+        {
+          "id": "MODEL-D010",
+          "category": "limitation_only",
+          "supported": false,
+          "evidenceQuote": "这些是工单操作权限，商家复核批准或拒绝的写入角色未在本页定义。",
+          "reason": "工单写入与商家审批是不同权限；不能从可创建工单推出可签发商家批准。"
+        }
+      ],
+      "inputHash": "18bb31137ab4f1a71f626ae3c2c57a7203a1328d0cf38ef53de357d45b86e23f"
+    },
+    {
+      "id": "model-006",
+      "group": "actor",
+      "query": "假设商家已同意退券，但平台风控把资金流程标为暂停，解除这个平台风控暂停的批准权限属于谁？",
+      "scope": {
+        "shopId": "shop-model-jinglan",
+        "productId": "product-model-jinglan"
+      },
+      "candidates": [
+        {
+          "id": "MODEL-D011",
+          "title": "平台风控暂停解除权限",
+          "body": "【原创合成离线资料，仅供模型对照；非线上政策，不授权任何交易】商家同意退券只形成商家售后意见。平台资金流程因风控暂停后，解除暂停由平台风控审核员批准；商家售后审核员和用户确认均不能解除该暂停。解除暂停也不等于付款渠道已入账。",
+          "tags": [
+            "平台风控",
+            "暂停",
+            "批准主体"
+          ],
+          "shopId": null,
+          "productId": null,
+          "status": "active",
+          "rank": 1,
+          "score": 0.88
+        },
+        {
+          "id": "MODEL-D012",
+          "title": "资金审核角色分工标准",
+          "body": "【原创合成离线资料，仅供模型对照；非线上政策，不授权任何交易】所有平台退券资金的风控暂停状态都归平台风控审核岗位负责。该岗位完成复核并批准解除后，资金流程才可继续；商家的履约协商结论独立保存，不具有解除平台风控暂停的权限。",
+          "tags": [
+            "资金流程",
+            "风控审核",
+            "角色分工"
+          ],
+          "shopId": null,
+          "productId": null,
+          "status": "active",
+          "rank": 2,
+          "score": 0.81
+        }
+      ],
+      "expectedByCandidate": [
+        {
+          "id": "MODEL-D011",
+          "category": "direct_fact",
+          "supported": true,
+          "evidenceQuote": "平台资金流程因风控暂停后，解除暂停由平台风控审核员批准；商家售后审核员和用户确认均不能解除该暂停。",
+          "reason": "直接覆盖平台风控暂停及其批准主体，明确不能借商家同意或用户确认替代。"
+        },
+        {
+          "id": "MODEL-D012",
+          "category": "direct_fact",
+          "supported": true,
+          "evidenceQuote": "所有平台退券资金的风控暂停状态都归平台风控审核岗位负责。",
+          "reason": "一般角色规则明确覆盖全部平台退券风控暂停，包括原问商家已同意的情形；只证明权限规则。"
+        }
+      ],
+      "inputHash": "fe55bb6302cb9e0f026fe2dbfa63c8b1cf133c4fc1f46d34f18f26485d44221a"
+    },
+    {
+      "id": "model-007",
+      "group": "condition",
+      "query": "假设雾禾照相馆的胶片散客体验预约在周三上午，按该商品规则须提前多久提出一次免费改期？",
+      "scope": {
+        "shopId": "shop-model-wuhe",
+        "productId": "product-model-wuhe-film"
+      },
+      "candidates": [
+        {
+          "id": "MODEL-D013",
+          "title": "雾禾暗房整包体验改期办法",
+          "body": "【原创合成离线资料，仅供模型对照；非线上政策，不授权任何交易】雾禾照相馆暗房整包体验须在预约前36小时提出免费改期，每单限一次。本条只适用于整包体验，胶片散客体验有独立预约办法，本页没有该商品的改期时限。",
+          "tags": [
+            "雾禾照相馆",
+            "改期",
+            "整包体验"
+          ],
+          "shopId": null,
+          "productId": null,
+          "status": "active",
+          "rank": 1,
+          "score": 0.88
+        },
+        {
+          "id": "MODEL-D014",
+          "title": "雾禾一般体验预约须知",
+          "body": "【原创合成离线资料，仅供模型对照；非线上政策，不授权任何交易】雾禾一般体验通常可在预约前24小时申请一次免费改期，但胶片散客体验明确排除在本篇范围之外，其时限及次数另依专用办法。该专用办法尚未收录在这份须知中。",
+          "tags": [
+            "一般体验",
+            "预约",
+            "免费改期"
+          ],
+          "shopId": null,
+          "productId": null,
+          "status": "active",
+          "rank": 2,
+          "score": 0.81
+        }
+      ],
+      "expectedByCandidate": [
+        {
+          "id": "MODEL-D013",
+          "category": "limitation_only",
+          "supported": false,
+          "evidenceQuote": "本条只适用于整包体验，胶片散客体验有独立预约办法，本页没有该商品的改期时限。",
+          "reason": "时间数字属于另一商品，不能因为同店或相同改期主题把36小时移到胶片散客体验。"
+        },
+        {
+          "id": "MODEL-D014",
+          "category": "limitation_only",
+          "supported": false,
+          "evidenceQuote": "胶片散客体验明确排除在本篇范围之外，其时限及次数另依专用办法。",
+          "reason": "一般规则明示排除所问商品，周三并不能补齐商品专用条件，不可套用24小时。"
+        }
+      ],
+      "inputHash": "dbce42df1bb2b2ca5bbaf60f9b823f572a14a2d92bab9387a98ce32ac8d98bb9"
+    },
+    {
+      "id": "model-008",
+      "group": "condition",
+      "query": "假设云垣陶坊双人体验单中一券已核销、一券未用，商家不能接待剩余一人并出具履约说明，未用券的退费申请首先送哪个审核环节？",
+      "scope": {
+        "shopId": "shop-model-yunyuan",
+        "productId": "product-model-yunyuan-pair"
+      },
+      "candidates": [
+        {
+          "id": "MODEL-D015",
+          "title": "双人体验整单自主撤回路径",
+          "body": "【原创合成离线资料，仅供模型对照；非线上政策，不授权任何交易】云垣陶坊双人体验的两张券均未核销、且没有商家履约争议时，自主撤回申请先送预约管理员核对排期。本条仅覆盖整单两券都未用的自主撤回，不记录部分核销后的履约争议审核路径。",
+          "tags": [
+            "双人体验",
+            "整单未用",
+            "自主撤回"
+          ],
+          "shopId": null,
+          "productId": null,
+          "status": "active",
+          "rank": 1,
+          "score": 0.88
+        },
+        {
+          "id": "MODEL-D016",
+          "title": "云垣部分核销履约争议受理",
+          "body": "【原创合成离线资料，仅供模型对照；非线上政策，不授权任何交易】云垣陶坊双人体验单若一券已核销、一券未用，并由商家出具无法接待剩余体验者的履约说明，未用券退费申请先送平台履约争议审核，再视审核结果征集商家退费意见。核销券不在该申请中；本条不保证未用券一定获批或已退款。",
+          "tags": [
+            "部分核销",
+            "商家未履约",
+            "平台审核"
+          ],
+          "shopId": null,
+          "productId": null,
+          "status": "active",
+          "rank": 2,
+          "score": 0.81
+        }
+      ],
+      "expectedByCandidate": [
+        {
+          "id": "MODEL-D015",
+          "category": "limitation_only",
+          "supported": false,
+          "evidenceQuote": "本条仅覆盖整单两券都未用的自主撤回，不记录部分核销后的履约争议审核路径。",
+          "reason": "原问已有一券核销且存在商家不能履约，两个关键条件都不满足，不能借预约管理员这一环节作答。"
+        },
+        {
+          "id": "MODEL-D016",
+          "category": "direct_fact",
+          "supported": true,
+          "evidenceQuote": "未用券退费申请先送平台履约争议审核，再视审核结果征集商家退费意见。",
+          "reason": "整篇同时覆盖双人单、部分核销和商家履约说明，明确第一审核环节；不能扩成已获批或退回核销券。"
+        }
+      ],
+      "inputHash": "bab568b6dd7ada045727da95f49b66648f9aade7bbe4a1477b6a5c175557aae3"
+    },
+    {
+      "id": "model-009",
+      "group": "condition",
+      "query": "假设木沼烘焙店因暴雨发出停课通知并签发店方取消凭证，学员按店方取消路径退券，须在通知后多少小时内提交申请资料？",
+      "scope": {
+        "shopId": "shop-model-muzhao",
+        "productId": "product-model-muzhao-class"
+      },
+      "candidates": [
+        {
+          "id": "MODEL-D017",
+          "title": "木沼烘焙店方取消资料窗口",
+          "body": "【原创合成离线资料，仅供模型对照；非线上政策，不授权任何交易】木沼烘焙课因暴雨或设备故障由店方取消时，持店方取消凭证的学员须在停课通知发出后48小时内提交退券申请资料。此时限是资料受理窗口，不是退款批准或到账期限。",
+          "tags": [
+            "店方取消",
+            "停课凭证",
+            "资料窗口"
+          ],
+          "shopId": null,
+          "productId": null,
+          "status": "active",
+          "rank": 1,
+          "score": 0.88
+        },
+        {
+          "id": "MODEL-D018",
+          "title": "木沼全部烘焙课店方中止通则",
+          "body": "【原创合成离线资料，仅供模型对照；非线上政策，不授权任何交易】本店全部烘焙课由店方主动中止，且已发出停课通知和店方取消凭证的，统一在通知后48小时内接收退券申请资料；原因可以是天气、设备或接待安排。学员自行改变行程不属于此路径，申请仍须审核。",
+          "tags": [
+            "烘焙课",
+            "店方中止",
+            "退券资料"
+          ],
+          "shopId": null,
+          "productId": null,
+          "status": "active",
+          "rank": 2,
+          "score": 0.81
+        }
+      ],
+      "expectedByCandidate": [
+        {
+          "id": "MODEL-D017",
+          "category": "direct_fact",
+          "supported": true,
+          "evidenceQuote": "持店方取消凭证的学员须在停课通知发出后48小时内提交退券申请资料。",
+          "reason": "准确覆盖店方暴雨取消和凭证前提，所求48小时是提交资料窗口，不能与批准或到账混淆。"
+        },
+        {
+          "id": "MODEL-D018",
+          "category": "direct_fact",
+          "supported": true,
+          "evidenceQuote": "本店全部烘焙课由店方主动中止，且已发出停课通知和店方取消凭证的，统一在通知后48小时内接收退券申请资料；原因可以是天气、设备或接待安排。",
+          "reason": "通则明示覆盖全部店方中止及天气原因，包含原问假设，保留凭证与审核要求。"
+        }
+      ],
+      "inputHash": "3a1d266fa08a3c8851459cb381f701f5708f90f6919c29276ac38c4ac2703542"
+    },
+    {
+      "id": "model-010",
+      "group": "regression",
+      "query": "请列出岩枝轻食午间组合中含芝麻的具体配料名称；只说明没录入或要问店员不能代替配料清单。",
+      "scope": {
+        "shopId": "shop-model-yanzhi",
+        "productId": "product-model-yanzhi-lunch"
+      },
+      "candidates": [
+        {
+          "id": "MODEL-D019",
+          "title": "岩枝午间组合配料资料状态",
+          "body": "【原创合成离线资料，仅供模型对照；非线上政策，不授权任何交易】岩枝轻食午间组合的当前合成商品页只登记餐份与价格，配方明细和芝麻过敏原表均未收录。不能据此认定不含芝麻；如需成分，须向门店核实当天配方。",
+          "tags": [
+            "岩枝轻食",
+            "配料",
+            "芝麻"
+          ],
+          "shopId": null,
+          "productId": null,
+          "status": "active",
+          "rank": 1,
+          "score": 0.88
+        },
+        {
+          "id": "MODEL-D020",
+          "title": "岩枝会员积点办法",
+          "body": "【原创合成离线资料，仅供模型对照；非线上政策，不授权任何交易】岩枝会员每次到店签到获得一个积点，积点于发放后90天失效。积点仅抵扣指定饮品，不可兑换现金；生日月份有额外积点活动。",
+          "tags": [
+            "岩枝",
+            "会员",
+            "积点"
+          ],
+          "shopId": null,
+          "productId": null,
+          "status": "active",
+          "rank": 2,
+          "score": 0.81
+        }
+      ],
+      "expectedByCandidate": [
+        {
+          "id": "MODEL-D019",
+          "category": "limitation_only",
+          "supported": false,
+          "evidenceQuote": "配方明细和芝麻过敏原表均未收录。",
+          "reason": "用户明确索要具体配料名称，原文只有缺失与核实说明，不能把事实问题改成资料是否覆盖。"
+        },
+        {
+          "id": "MODEL-D020",
+          "category": "unrelated",
+          "supported": false,
+          "evidenceQuote": "岩枝会员每次到店签到获得一个积点，积点于发放后90天失效。",
+          "reason": "会员积点与所求芝麻配料清单无关；同店名称不能形成成分证据。"
+        }
+      ],
+      "inputHash": "30669157c512d2b3e49ddf5c49bb090ca73066c0d8da62e5aab95bf37fa98288"
+    },
+    {
+      "id": "model-011",
+      "group": "regression",
+      "query": "暂不查任何实际订单，只问一般办理流程：未用券协商退费，从材料核对、商家意见、平台复核到用户确认，先后步骤怎样安排？",
+      "scope": {
+        "shopId": "shop-model-liudu",
+        "productId": "product-model-liudu-basic"
+      },
+      "candidates": [
+        {
+          "id": "MODEL-D021",
+          "title": "未用券协商退费一般步骤",
+          "body": "【原创合成离线资料，仅供模型对照；非线上政策，不授权任何交易】一般办理顺序为：先核对用户资料及券的未用状态，再征求商家意见，然后由平台复核可办理性与实付金额，最后展示方案并等待用户单独确认。各步骤完成才进入相应后续环节，流程介绍不表示任何现存订单已经获批或已退款。",
+          "tags": [
+            "未用券",
+            "协商",
+            "办理步骤"
+          ],
+          "shopId": null,
+          "productId": null,
+          "status": "active",
+          "rank": 1,
+          "score": 0.88
+        },
+        {
+          "id": "MODEL-D022",
+          "title": "活动消息通知设置",
+          "body": "【原创合成离线资料，仅供模型对照；非线上政策，不授权任何交易】账户的消息设置允许停用活动促销通知，同时保留预约提醒。停用促销通知不删除账户，也不会取消现有预约；重新开启后只接收后续活动消息。",
+          "tags": [
+            "消息设置",
+            "活动通知",
+            "预约提醒"
+          ],
+          "shopId": null,
+          "productId": null,
+          "status": "active",
+          "rank": 2,
+          "score": 0.81
+        }
+      ],
+      "expectedByCandidate": [
+        {
+          "id": "MODEL-D021",
+          "category": "direct_fact",
+          "supported": true,
+          "evidenceQuote": "先核对用户资料及券的未用状态，再征求商家意见，然后由平台复核可办理性与实付金额，最后展示方案并等待用户单独确认。",
+          "reason": "完整覆盖只问一般流程的诉求，无需虚构当前订单或已批准事实；保留后续确认条件。"
+        },
+        {
+          "id": "MODEL-D022",
+          "category": "unrelated",
+          "supported": false,
+          "evidenceQuote": "账户的消息设置允许停用活动促销通知，同时保留预约提醒。",
+          "reason": "消息偏好不提供退费审批与确认步骤，即使含预约词也不构成该流程证据。"
+        }
+      ],
+      "inputHash": "608353394a93db6c871081fa5d4edef57d20751bd0d2f12c8fa237fd64eac02b"
+    },
+    {
+      "id": "model-012",
+      "group": "regression",
+      "query": "当前岩枝轻食午间组合的商品资料是否已提供芝麻过敏原清单？若资料缺少，应找谁核实，而不能据空字段推断不含芝麻。",
+      "scope": {
+        "shopId": "shop-model-yanzhi",
+        "productId": "product-model-yanzhi-lunch"
+      },
+      "candidates": [
+        {
+          "id": "MODEL-D023",
+          "title": "岩枝午间组合商品页审阅记录",
+          "body": "【原创合成离线资料，仅供模型对照；非线上政策，不授权任何交易】在本合成资料版本中，岩枝轻食午间组合的商品页已登记份量和售价，芝麻过敏原清单字段明确标为未收录。空字段不能证明菜品不含芝麻；应由门店当日配方负责人提供过敏原信息。",
+          "tags": [
+            "商品资料覆盖",
+            "岩枝午间组合",
+            "过敏原"
+          ],
+          "shopId": null,
+          "productId": null,
+          "status": "active",
+          "rank": 1,
+          "score": 0.88
+        },
+        {
+          "id": "MODEL-D024",
+          "title": "岩枝午间组合资料目录说明",
+          "body": "【原创合成离线资料，仅供模型对照；非线上政策，不授权任何交易】本合成资料目录对应的商品为岩枝轻食午间组合（product-model-yanzhi-lunch），当前条目仅包含份量及售价，没有芝麻过敏原明细附件。需要该信息时，应联系门店当日配方负责人；目录缺少附件不能用作无芝麻声明。",
+          "tags": [
+            "资料目录",
+            "当前商品",
+            "芝麻过敏原"
+          ],
+          "shopId": null,
+          "productId": null,
+          "status": "active",
+          "rank": 2,
+          "score": 0.81
+        }
+      ],
+      "expectedByCandidate": [
+        {
+          "id": "MODEL-D023",
+          "category": "boundary_answer",
+          "supported": true,
+          "evidenceQuote": "芝麻过敏原清单字段明确标为未收录。空字段不能证明菜品不含芝麻；应由门店当日配方负责人提供过敏原信息。",
+          "reason": "用户明确问当前商品资料覆盖与核实来源，原文直接支持未提供清单及找门店配方负责人核实这一边界。"
+        },
+        {
+          "id": "MODEL-D024",
+          "category": "boundary_answer",
+          "supported": true,
+          "evidenceQuote": "当前条目仅包含份量及售价，没有芝麻过敏原明细附件。需要该信息时，应联系门店当日配方负责人；目录缺少附件不能用作无芝麻声明。",
+          "reason": "目录精确绑定原问商品，明确缺少附件与核实主体，回答元边界而非提供未记载的配料事实。"
+        }
+      ],
+      "inputHash": "a0ef87230507446b7595f525304a652c11a4b7c92829e8971ef87e1a6e67c19c"
+    }
+  ]
+}

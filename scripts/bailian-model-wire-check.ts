@@ -15,7 +15,7 @@ import { cancelSupportTurn, createSupportSession, getSupportResult, prepareSuppo
 
 const selection = "qwen3.7-plus-2026-05-26", forced = { type: "function", function: { name: "support_action" } };
 type Wire = { model: string; messages: unknown[]; tools?: unknown[]; tool_choice?: unknown; enable_thinking?: boolean;
-  thinking?: unknown; reasoning_effort?: unknown; response_format?: unknown; temperature?: number; max_tokens?: number };
+  thinking?: unknown; reasoning_effort?: unknown; response_format?: unknown; temperature?: number; max_tokens?: number; max_completion_tokens?: number };
 type Usage = { prompt_tokens: number; completion_tokens: number; total_tokens: number };
 type Step = { text: string; usage?: Usage } | { action: unknown; usage?: Usage } | { error: true } | { cancel: () => void };
 const usage: Usage = { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 }, oneCost = 60 / 1_000_000;
@@ -35,6 +35,8 @@ export async function checkBailianModelWire() {
     const body = JSON.parse(String(init?.body)) as Wire;
     assert.equal(body.model, selection); assert.equal(body.enable_thinking, false);
     assert.equal(body.thinking, undefined); assert.equal(body.reasoning_effort, undefined);
+    assert.equal((body.messages[0] as { role: string }).role, "system");
+    assert.equal(body.max_completion_tokens, 2048); assert.equal(body.max_tokens, undefined);
     wires.push(body); const next = plan.shift(); assert.ok(next, "Unexpected native retry or model fallback");
     if ("cancel" in next) { next.cancel(); init?.signal?.throwIfAborted(); throw new Error("Synthetic canceled transport"); }
     if ("error" in next) return new Response(JSON.stringify({ error: { message: "synthetic request failure", type: "invalid_request_error" } }), { status: 400 });
