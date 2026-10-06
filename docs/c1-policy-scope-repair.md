@@ -1,6 +1,6 @@
 # C1：商品范围变化后的有限只读动作修复
 
-日期：2026-10-06。状态：有限只读动作修复及独立评分v9已实现，工程与完整validate通过；尚无新的真实模型结果。上一批类别对照的6/8、7/8及失败记录不变，不重跑已收尾manifest。
+日期：2026-10-06。状态：有限只读动作修复及独立评分v9已实现，工程与完整validate通过；唯一新Session验证已收尾，两臂完整业务均5/8，未证明净收益。唯一机械修复出现在应澄清的省略负控，仍误接收退款规则。C1未准入、默认不变；上一批类别对照6/8、7/8及失败记录不变，不重跑已收尾manifest。
 
 ## P0 选题合同
 
@@ -59,4 +59,41 @@ npm run validate
 - **验收及演示：** 4场景各2轮，每臂8轮，共16轮，按场景AB/BA串行且各用独立store/Session。覆盖已声明午餐→同名未知SKU的完整使用咨询、午餐→已声明晚餐的完整人数咨询、旧rule_only假设→未知SKU的当前使用咨询，以及SKU修订后的真正省略问题。第1轮形成真实唯一且已核验的policy topic后才执行第2轮；前序未满足则保留未执行，不注入成功历史。预算1臂声明`policyScopeRepair={version:"policy-scope-repair-v1",maxRepairs:1,repairBudget:1}`，预算0臂无修复轨迹。报告首次questionContext、协议错误、scope_changed、预算、第二次fresh读取、最终query/basis、正确完成/多余澄清、回复审阅、用量及费用。模型直接选standalone是正常完成；若范围修复触发为0，效果为未观察到，不强制首次动作或补跑制造证据。新题按已知失败类型设计，属于非盲开发验证，不替代C1/O4/O5、QQ或商业验收。
 - **预算与停止：** 工程替代及纯检查均0远程/DB/QQ；工程通过且实现/数据/配置/实际依赖先冻结提交后，只执行1次真实run。最多Agent48、rerank16、support16，共80实际HTTP；10分钟、单轮75秒，provider retry=0；USD 0.08/CNY 0.02请求前软停止，单个在途请求可能超限。真实usage未知、额外SDK重试、可信身份/来源/原生字段或冻结状态不符后停止后续发送，完整保留16行和未执行原因。已知用量的语义失败保留并继续独立场景；前序失败不能冒充已建立topic。源码、费用和实际输出独立核对后按这一轮预算收尾，不因触发0或未满分追加同题、第三模型或旧manifest调用。默认和整体未准入状态保持。
 
-执行前工程已通过：新[8轮合成数据](../data/c1-policy-scope-session-development.json)与[两臂runner](../scripts/c1-policy-scope-session-development.ts)经独立审阅，原文/作用域/金标/来源hash一致；完整16轮Pi原生替代执行、8个Session清理、共享预算/一次修复及首次真实唯一话题依赖检查通过。所有工程回复仍为unreviewed、fullyPassed=0，不当模型效果。判别原生delta文本与实际typed分类、实际HTTP输入与知识trace绑定；未知用量/模型身份/来源漂移立即停止，rerank第16次后允许本轮support/final，第17次不得发送。保留并修复执行器审阅发现的原始判别输出缺失、可信身份失败后未立即停及末轮停止原因丢失；原有实验数据和成绩不变。独立`--check`/类型检查/差异检查及根任务最终`npm run validate`均退出0，日志`.runtime/c1-policy-scope-session-validate.log`；当前真实结果尚未产生。
+执行前工程已通过：新[8轮合成数据](../data/c1-policy-scope-session-development.json)与[两臂runner](../scripts/c1-policy-scope-session-development.ts)经独立审阅，原文/作用域/金标/来源hash一致；完整16轮Pi原生替代执行、8个Session清理、共享预算/一次修复及首次真实唯一话题依赖检查通过。所有工程回复仍为unreviewed、fullyPassed=0，不当模型效果。判别原生delta文本与实际typed分类、实际HTTP输入与知识trace绑定；未知用量/模型身份/来源漂移立即停止，rerank第16次后允许本轮support/final，第17次不得发送。保留并修复执行器审阅发现的原始判别输出缺失、可信身份失败后未立即停及末轮停止原因丢失；原有实验数据和成绩不变。独立`--check`/类型检查/差异检查及根任务最终`npm run validate`均退出0，日志`.runtime/c1-policy-scope-session-validate.log`。合同、实现、题集及manifest先提交推送`4b0ca4a`，随后仅执行一次，结果如下。
+
+## 单次真实Session结果与收尾
+
+运行`4ee83404-3a6a-4806-beee-caa43c32d227`于2026-10-06完成，56.896秒。16轮计划中14轮实际完成、2轮前序依赖跳过，没有执行器异常。47次真实HTTP：Agent 29、rerank 11、support 7；SDK retry为0。按冻结费率及真实usage估算USD 0.019824152、CNY 0.006906，两币种分列，缺失用量/费用为0；不是账单。SQL、QQ、业务写入均0，8个隔离Session/store全部清理。按预声明单次运行收尾，剩余额度不用于补跑。
+
+| 完整计划分母上的指标 | repairBudget=0 | repairBudget=1 |
+| --- | ---: | ---: |
+| 计划 / 实际 / 未执行轮 | 8 / 7 / 1 | 8 / 7 / 1 |
+| 原始工程及知识通过 | 6/8 | 5/8 |
+| 实际回复审阅通过 | 5/7 | 5/7 |
+| 完整业务通过（工程、知识、回复同时） | 5/8 | 5/8 |
+| 两轮均完整通过的场景 | 2/4 | 2/4 |
+| scope_changed / 机械修复完成 | 0 / 0 | 1 / 1 |
+| 额外接收证据 | 0 | 1：KB-REFUND-UNUSED |
+
+14条实际宿主回复经根任务逐项审阅及独立复核，44条已执行判据中38条通过；另6条判据随两轮未执行保留，完整计划共50条。审阅绑定实际reply与预冻结criteria的hash，`humanAcceptance=false`；不能把工程绿、未发送的`modelFinalText`或尚未进行的人工验收当成通过。原始artifact保留unreviewed和fullyPassed=0，[公开合成结果](../data/c1-policy-scope-session-development-results.json)另外记录原分、逐项审阅和完整业务分，不回写原始记录。
+
+失败及边界：
+
+- **002两臂第一轮：** 用户问当前午餐券人数，主Agent选择`order`而非`policy`，宿主实际只回复实付79.80元，没有人数和资料依据。模型末尾虽然写了人数，但没有成为实际宿主回复。第一轮未建立真实核验policy topic，因此晚餐第二轮两臂依法跳过；不得注入成功话题、删掉该场景或把它记为晚餐已验证。
+- **004预算0第二轮：** 宿主安全澄清，没有检索或写入；但提示补上一次问题并展示旧话题，未要求完整重述当前对象、条件和问题，回复判据失败。安全停止和所要求的澄清质量分别评分。
+- **004预算1第二轮：** 原生Pi首选`previous`，fresh读取product-demo-3后收到专用`POLICY_SCOPE_CHANGED` JSON，共享预算0→1；随后同单`standalone/current_order`再次读取，两个实际attempt、第二读取、来源和预算都通过v9重建，机械修复成立。可是用户本轮只有“刚才那个问题现在呢？”，模型的`action.question`仍抄旧完整问题；宿主实际`effectiveQuery`保留省略句并加入订单状态对应的“未核销退款”。`priorQueries=[]`不等于问题已经完整，最终检索并接收退款规则，返回使用未知及退款资格说明，违反本轮应澄清且不检索的gold。不是只归咎rerank或Pro，也不能把“重新读对了”说成“业务修复好了”。
+- **001/003完整问题：** 两臂均正常按当前商品处理未知类别，未触发范围修复。目标完整重述场景的修复收益未观察到；唯一触发发生在省略负控，不能用于宣称完成率提高。共享repairBudget同时影响协议修复，此一次配对也不支持纯范围修复因果结论。
+
+记录核对：55项源码在运行前后及`4b0ca4a`提交blob一致，实际依赖、package双SHA、唯一attempt锁和manifest匹配；47次请求全部200，raw support输出→typed值、实际wire输入、SDK用量、14行原始评分及summary均独立重建一致。`codeStable`、`dependenciesStable`、`usageComplete`、`requestBindingPassed`均true。`runIntegrityPassed=false`保留全执行要求：`executionComplete=false`，两条跳过记录没有入口且`ingressIntegrityPassed=null`；14条实际执行入口均true。这是依赖未完成，不是身份、账本或费用核验失败；也不修改原聚合结果为true。
+
+冻结入口：[manifest](../data/c1-policy-scope-session-development-manifest.json)，内容hash `62c565533ca43218d090160d4d164a6cbbfae78e4496b631335d7fc05aa202eb`；题集SHA `58b985b078af89d8b99f25b8697e1ba2eb6c9f1423afdd6f93bb38a8a7bbac90`。本地原始artifact为`.runtime/c1-policy-scope-session-development/4ee83404-3a6a-4806-beee-caa43c32d227.json`，文件SHA `3085feea5dcf0ecedddafa47e23786ea0f299ca88462dc3997d430dc313811a4`，内容hash `b556bcffb1f0f199e49db2c7215fb7dc7401df633f1f57bd1ef3b6eef86db781`。完整HTTP body留在忽略目录；公开摘要不能独自复现完整wire审计。本文结果更新发生在运行终态后，执行绑定历史提交，不能在更新后的本文上重新冻结追认成绩。
+
+决定：保留受限只读修复的工程实现与失败证据，C1仍未准入，不切默认模型/架构/检索，不追加同manifest、第三模型或同题付费追分。`--check`可作0远程工程复现；已执行的`--live`不再运行。本轮证明的是Pi原生修复接线及范围/来源的可核验性，没有证明真实咨询完成率改善、QQ体验或商业收益。
+
+## 下一步P0：先明确当前咨询命题的出处（待设计与工程验证）
+
+- **业务约束：** 订单定位完整不等于咨询问题完整。人数/使用条件咨询应取规则，不能用订单事实代答；范围变化后省略句不得由旧问法或订单“未核销”状态补成新的退款诉求。完整重述须可追到当前原文，旧话题只能作为失效定位候选，不自动构成当前咨询授权。身份、fresh、确认与资金边界继续保留。
+- **面试追问：** “证据真实、订单fresh，为何仍会答非所问？怎样区别订单事实、用户命题和历史推断？换大模型能改善动作选择，却能否代替宿主合同？”
+- **个人实现与复用：** 先审阅现有`questionContext`、`modelQuestion/originalQuery/effectiveQuery`与状态扩展，明确当前原文、合法历史引用、订单条件分别进入哪些步骤。比较扩充Prompt、结构化命题出处和更保守澄清的成本/误拒；优先已有Controller/Pi扩展点，不改Pi核心，不加通用工作流框架。本节是方案待办，不把文本相等或关键词黑名单当作语义完整证明。
+- **验收及演示证据：** 先补独立正常咨询、完整重述、真正省略、同名未知SKU和合法历史续问的工程正负控；检查实际宿主回复、资料接收、两次读取及“无完整问题不检索”。保留本轮10/16及误收，调优后另用新题冻结真实验收，不能重评分本轮失败为改善。
+- **投入预算与停止：** 下一片先限制为0远程模型/QQ/DB的设计与工程验证；完成合同审阅和可复现控制即收尾。真实模型验证须另定新题、单次预算与停止条件；不因这次未满分自动获批付费额度，也不自动升级judge Prompt或更换模型。

@@ -105,3 +105,9 @@ Pi的cost字段原生假设USD，本轮仅在原生内存中使用NaN表示未�
 - `node scripts/c1-model-support-comparison.ts --check`及`npm run validate`均为工程回归，0远程/DB/QQ。`--freeze/--inspect`检查实际环境配置但不请求模型；`--live`需要匹配manifest且同manifest本地attempt锁只允许一次。本轮已经执行完毕，不再运行该命令。本文结果更新发生在执行结束后，故当前本文hash与执行前manifest不同；历史实验绑定`b8e8b4b`，不能在当前文件上重新冻结去追认旧成绩。
 
 新增脚本只负责这次有界对照，复用Pi原生完整请求和现有判别/验证；没有建立新的transport框架或修改Pi核心。可讲述的个人贡献是受控模型选择、provider兼容、真实HTTP预算、币种与未知用量合同、预冻结题集和错误收尾；没有真实商业交易，也未验证千问主Agent多轮行为。
+
+## 后续Session诊断与当前建议
+
+后续[唯一只读范围修复Session验证](./c1-policy-scope-repair.md#单次真实session结果与收尾)固定Flash主Agent和Pro typed v6，两个共享repairBudget臂各5/8完整业务，14/16执行、2轮依赖跳过。人数咨询首选`order`导致没有规则话题；省略续问的一次机械修复虽重新读对商品，仍沿用旧意图并将当前省略原文与订单退款状态扩展送入检索，误收退款规则。该结果与上面的v7模型对照是不同合同、角色和题集，不合并分数。
+
+因此当前建议仍是保留DeepSeek默认、千问作为显式可选候选，先补当前咨询命题出处和完整重述合同。主Agent的动作/多轮能力仍可能受模型影响，但目前没有千问主Agent实际对照，不能宣布DeepSeek总体更强；同样不能期待换模型替代宿主的身份、证据、授权和问题来源检查。后续只有明确主Agent瓶颈及新的单次预算，才值得单独比较主Agent，判别模型和其他参数须固定。
