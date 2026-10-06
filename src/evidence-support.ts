@@ -109,6 +109,15 @@ boundary_answer仅用于原问明确询问资料覆盖范围、某种推断是�
 ${evidenceSupportTypedPrompt}`;
 export const evidenceSupportTypedV6PromptHash = "889596997b27deccf91339f46b7a3825aa239a50fbcde92ce5109b67a77f19fa";
 
+// Explicit condition-coverage candidate; the complete v6 prompt and default v5 stay unchanged.
+export const evidenceSupportTypedV7PromptVersion = "fact-support-typed-v7";
+export const evidenceSupportTypedV7Prompt = `条件覆盖合同：一般或假设规则问题也须逐篇覆盖原问及已核实前文中的关键限定，按整篇原文保留适用对象、前提、例外与模态；不能因主题相关或结果数字相同，就把限定不同或关键条件缺失的规则归为direct_fact。
+原文明示适用于整个范围的一般规则，可以支持该范围内子类的条件式回答，不要求原问每个用词逐字出现；但原文明示具体结果取决于渠道、状态等子类规则时，不能用泛化数字或其他文档的结论代替该子类的依据。
+不得把原问及已核实前文没有给出的业务条件当成已知前提，使候选恰好适用；相关但不能独立覆盖所问限定的原文归limitation_only。一般或假设咨询不要求证明现实实例已满足所问条件，也不得据此声称实例已满足。保持下方诉求、分类、引用及输出格式合同不变。
+
+${evidenceSupportTypedV6Prompt}`;
+export const evidenceSupportTypedV7PromptHash = "c2d8e1f3de93d86ef658a0d691fe753138efcab7240c9a13f20f499d41937a9c";
+
 const plain = (value: unknown): value is Record<string, unknown> => Boolean(value && typeof value === "object" && !Array.isArray(value)
   && [Object.prototype, null].includes(Object.getPrototypeOf(value)));
 const keysExactly = (value: Record<string, unknown>, keys: readonly string[]) => Reflect.ownKeys(value).length === keys.length
@@ -196,7 +205,7 @@ type CompletionOptions = { signal: AbortSignal; timeoutMs: number; temperature: 
   samplingParams: { response_format: { type: "json_object" } }; onPayload: (value: unknown) => unknown };
 export async function createEvidenceSupportClient(options: { env?: NodeJS.ProcessEnv; timeoutMs?: number; profile?: EvidenceSupportProfile; modelSelection?: EvidenceSupportModel;
   // Internal replay/development selection; default stays v5, independently of the parser.
-  typedPromptVersion?: typeof evidenceSupportTypedV3PromptVersion | typeof evidenceSupportTypedV4PromptVersion | typeof evidenceSupportTypedPromptVersion | typeof evidenceSupportTypedV6PromptVersion;
+  typedPromptVersion?: typeof evidenceSupportTypedV3PromptVersion | typeof evidenceSupportTypedV4PromptVersion | typeof evidenceSupportTypedPromptVersion | typeof evidenceSupportTypedV6PromptVersion | typeof evidenceSupportTypedV7PromptVersion;
   // Internal historical replay only; no user-facing parser toggle. Legacy typed settings omit validationVersion.
   validationVersion?: "typed-batch-v1" | typeof evidenceSupportValidationVersion;
   // Synthetic diagnostics only: no query or reasoning blocks, bounded text; production does not install an observer.
@@ -207,14 +216,15 @@ export async function createEvidenceSupportClient(options: { env?: NodeJS.Proces
   const timeoutMs = options.timeoutMs ?? 60_000;
   const profile = options.profile ?? "binary";
   if (profile !== "binary" && profile !== "typed") throw new Error("支持性判别 profile 仅支持 binary 或 typed。");
-  if (options.typedPromptVersion !== undefined && (profile !== "typed" || ![evidenceSupportTypedV3PromptVersion, evidenceSupportTypedV4PromptVersion, evidenceSupportTypedPromptVersion, evidenceSupportTypedV6PromptVersion].includes(options.typedPromptVersion))) throw new Error("支持判别提示词版本无效。");
+  if (options.typedPromptVersion !== undefined && (profile !== "typed" || ![evidenceSupportTypedV3PromptVersion, evidenceSupportTypedV4PromptVersion, evidenceSupportTypedPromptVersion, evidenceSupportTypedV6PromptVersion, evidenceSupportTypedV7PromptVersion].includes(options.typedPromptVersion))) throw new Error("支持判别提示词版本无效。");
   if (options.validationVersion !== undefined && (profile !== "typed" || !["typed-batch-v1", evidenceSupportValidationVersion].includes(options.validationVersion))) throw new Error("支持判别校验版本无效。");
   const isolated = profile === "typed" && options.validationVersion !== "typed-batch-v1";
   const promptVersion = profile === "typed" ? options.typedPromptVersion ?? evidenceSupportTypedPromptVersion : evidenceSupportPromptVersion;
   const prompt = profile === "binary" ? evidenceSupportPrompt
     : promptVersion === evidenceSupportTypedV3PromptVersion ? evidenceSupportTypedV3Prompt
     : promptVersion === evidenceSupportTypedV4PromptVersion ? evidenceSupportTypedV4Prompt
-    : promptVersion === evidenceSupportTypedV6PromptVersion ? evidenceSupportTypedV6Prompt : evidenceSupportTypedPrompt;
+    : promptVersion === evidenceSupportTypedV6PromptVersion ? evidenceSupportTypedV6Prompt
+    : promptVersion === evidenceSupportTypedV7PromptVersion ? evidenceSupportTypedV7Prompt : evidenceSupportTypedPrompt;
   if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1000 || timeoutMs > 120_000) throw new Error("支持性判别超时配置无效。");
   const selected = options.modelSelection === undefined ? null : resolveEvidenceSupportModel(options.modelSelection, options.env);
   const configured = options.runtime ?? await (async () => {

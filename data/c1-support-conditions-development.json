@@ -1,0 +1,656 @@
+{
+  "version": 1,
+  "suiteId": "c1-support-conditions-development-v1",
+  "stage": "exposed-development-fixed-input-support-prompt-ablation",
+  "sources": [
+    {
+      "path": "data/c1-reference-selection-development.json",
+      "sha256": "46c603f0f9e0a111e9248d02b1d95a08051db2a4261c0affdc0c71f5c25a1acc",
+      "bytes": 57657
+    },
+    {
+      "path": "data/c1-reference-selection-development-results.json",
+      "sha256": "89ed3ffd9390f7d64641ec24407db62febdee054d7ea6bf8ad431cc0b8dfff47",
+      "bytes": 20550
+    },
+    {
+      "path": "data/c1-support-intent-development.json",
+      "sha256": "f293404cf6167ec7cf0488a3da5fffb3478b6e4ce239e1c2cf3c1c2743f7764b",
+      "bytes": 62506
+    },
+    {
+      "path": "data/reference/kefu-harness/data/knowledge/docs.jsonl",
+      "sha256": "d3cd80ba76fdc82e57c1eefdc66a20987f09bc9b3dd0fbd1287c709146217fae",
+      "bytes": 14267
+    }
+  ],
+  "measurement": {
+    "plannedInputs": 12,
+    "plannedVersions": 2,
+    "plannedHttp": 24,
+    "candidateDecisionsPerVersion": 15,
+    "scope": "Support classification only. No Agent, rerank, QQ, SQL or final reply evaluation.",
+    "decision": "Keep old fixed gold/results unchanged. Compare v6/v7 once; fix target negatives and retain all valid positive rules with no new regression failures; old Sunday failure remains reportable."
+  },
+  "cases": [
+    {
+      "id": "conditions-001",
+      "group": "target",
+      "query": "银行卡支付的团购券退款审核通过后，通常需要多久到账？\n仅解释所问规则条件（原文依据：银行卡支付的团购券退款审核通过后，通常需要多久到账？），不证明当前订单已满足，也不构成退款批准。",
+      "scope": {
+        "shopId": null,
+        "productId": null
+      },
+      "candidates": [
+        {
+          "id": "RF005",
+          "title": "退款到账时间与查询",
+          "body": "退款审核通过后即发起退回,资金到账时间取决于支付渠道:余额与零钱通常实时到账,银行卡1-3个工作日,信用卡3-7个工作日。可在订单详情页的退款进度中查看当前状态。若超过7个工作日未到账,建议先核对支付渠道账单,再联系平台协助查询。",
+          "tags": [
+            "退款",
+            "到账",
+            "时效"
+          ],
+          "industry": "通用",
+          "shopId": null,
+          "score": 0.8692953491969138,
+          "rank": 1
+        },
+        {
+          "id": "RF001",
+          "title": "未核销团购券退款规则",
+          "body": "未核销且在有效期内的团购券,支持随时申请退款,退款金额为实际支付金额,无需商家同意。退款将原路退回至原支付账户,一般1-3个工作日到账,具体到账时间以支付渠道为准。若券已过有效期但未核销,同样支持过期退。",
+          "tags": [
+            "退款",
+            "未核销",
+            "随时退"
+          ],
+          "industry": "通用",
+          "shopId": null,
+          "score": 0.7443222774906205,
+          "rank": 2
+        }
+      ],
+      "expectedByCandidate": [
+        {
+          "id": "RF005",
+          "category": "direct_fact",
+          "supported": true,
+          "evidenceQuote": "银行卡1-3个工作日",
+          "reason": "原文按渠道直接规定银行卡时限，并明确审核通过后发起退回。"
+        },
+        {
+          "id": "RF001",
+          "category": "limitation_only",
+          "supported": false,
+          "evidenceQuote": "退款将原路退回至原支付账户,一般1-3个工作日到账,具体到账时间以支付渠道为准。",
+          "reason": "泛称时限明确依赖支付渠道，未独立给出所问渠道的时限；不能借RF005或相同数值补足。"
+        }
+      ],
+      "source": {
+        "path": "data/c1-reference-selection-development.json",
+        "rawRunId": "2e8c6c72-9ca9-4b9f-b4dc-16554dc1629a",
+        "rawPath": ".runtime/c1-reference-selection/2e8c6c72-9ca9-4b9f-b4dc-16554dc1629a.json",
+        "rawSha256": "c4855cb6176f7d31f41c43ece7e00a1eca463a12f5d022f369da6e71d3574e4a",
+        "caseId": "competing-policy",
+        "turn": 1,
+        "historicalInputHash": "ee8b78133c24bdd6161f499a9b08e90f91bf31db372414345096d64eab2fab2f",
+        "derivation": "Full original documents and observed candidate rank/score. Input 001 exactly reconstructs the actual failed verifier input; other target inputs declare changed query/candidate subsets before new model calls."
+      },
+      "inputHash": "c50bcdb85d048e1d514d8bc1647bd35b9747619c78415594f180fa733962d2fd"
+    },
+    {
+      "id": "conditions-002",
+      "group": "target",
+      "query": "银行卡支付的团购券退款审核通过后，通常需要多久到账？\n仅解释所问规则条件（原文依据：银行卡支付的团购券退款审核通过后，通常需要多久到账？），不证明当前订单已满足，也不构成退款批准。",
+      "scope": {
+        "shopId": null,
+        "productId": null
+      },
+      "candidates": [
+        {
+          "id": "RF001",
+          "title": "未核销团购券退款规则",
+          "body": "未核销且在有效期内的团购券,支持随时申请退款,退款金额为实际支付金额,无需商家同意。退款将原路退回至原支付账户,一般1-3个工作日到账,具体到账时间以支付渠道为准。若券已过有效期但未核销,同样支持过期退。",
+          "tags": [
+            "退款",
+            "未核销",
+            "随时退"
+          ],
+          "industry": "通用",
+          "shopId": null,
+          "score": 0.7443222774906205,
+          "rank": 2
+        }
+      ],
+      "expectedByCandidate": [
+        {
+          "id": "RF001",
+          "category": "limitation_only",
+          "supported": false,
+          "evidenceQuote": "退款将原路退回至原支付账户,一般1-3个工作日到账,具体到账时间以支付渠道为准。",
+          "reason": "泛称时限明确依赖支付渠道，未独立给出所问渠道的时限；不能借RF005或相同数值补足。"
+        }
+      ],
+      "source": {
+        "path": "data/c1-reference-selection-development.json",
+        "rawRunId": "2e8c6c72-9ca9-4b9f-b4dc-16554dc1629a",
+        "rawPath": ".runtime/c1-reference-selection/2e8c6c72-9ca9-4b9f-b4dc-16554dc1629a.json",
+        "rawSha256": "c4855cb6176f7d31f41c43ece7e00a1eca463a12f5d022f369da6e71d3574e4a",
+        "caseId": "competing-policy",
+        "turn": 1,
+        "historicalInputHash": "ee8b78133c24bdd6161f499a9b08e90f91bf31db372414345096d64eab2fab2f",
+        "derivation": "Full original documents and observed candidate rank/score. Input 001 exactly reconstructs the actual failed verifier input; other target inputs declare changed query/candidate subsets before new model calls.",
+        "change": "Only RF001; same query."
+      },
+      "inputHash": "f39ab9a1c80630753414106054f73ba023caef202542ef10de29afc2cc9d23cf"
+    },
+    {
+      "id": "conditions-003",
+      "group": "target",
+      "query": "银行卡支付的团购券退款审核通过后，通常需要多久到账？\n仅解释所问规则条件（原文依据：银行卡支付的团购券退款审核通过后，通常需要多久到账？），不证明当前订单已满足，也不构成退款批准。",
+      "scope": {
+        "shopId": null,
+        "productId": null
+      },
+      "candidates": [
+        {
+          "id": "RF005",
+          "title": "退款到账时间与查询",
+          "body": "退款审核通过后即发起退回,资金到账时间取决于支付渠道:余额与零钱通常实时到账,银行卡1-3个工作日,信用卡3-7个工作日。可在订单详情页的退款进度中查看当前状态。若超过7个工作日未到账,建议先核对支付渠道账单,再联系平台协助查询。",
+          "tags": [
+            "退款",
+            "到账",
+            "时效"
+          ],
+          "industry": "通用",
+          "shopId": null,
+          "score": 0.8692953491969138,
+          "rank": 1
+        }
+      ],
+      "expectedByCandidate": [
+        {
+          "id": "RF005",
+          "category": "direct_fact",
+          "supported": true,
+          "evidenceQuote": "银行卡1-3个工作日",
+          "reason": "完整覆盖原問银行卡、审核通过后与通常时限。"
+        }
+      ],
+      "source": {
+        "path": "data/c1-reference-selection-development.json",
+        "rawRunId": "2e8c6c72-9ca9-4b9f-b4dc-16554dc1629a",
+        "rawPath": ".runtime/c1-reference-selection/2e8c6c72-9ca9-4b9f-b4dc-16554dc1629a.json",
+        "rawSha256": "c4855cb6176f7d31f41c43ece7e00a1eca463a12f5d022f369da6e71d3574e4a",
+        "caseId": "competing-policy",
+        "turn": 1,
+        "historicalInputHash": "ee8b78133c24bdd6161f499a9b08e90f91bf31db372414345096d64eab2fab2f",
+        "derivation": "Full original documents and observed candidate rank/score. Input 001 exactly reconstructs the actual failed verifier input; other target inputs declare changed query/candidate subsets before new model calls.",
+        "change": "Only RF005; same query."
+      },
+      "inputHash": "5d6a1be3d0935587ec9ded0963c63eccfdf193f6ced29f3185f0064ae97e157a"
+    },
+    {
+      "id": "conditions-004",
+      "group": "target",
+      "query": "信用卡支付的团购券退款审核通过后，通常需要多久到账？\n仅解释所问规则条件（原文依据：信用卡支付的团购券退款审核通过后，通常需要多久到账？），不证明当前订单已满足，也不构成退款批准。",
+      "scope": {
+        "shopId": null,
+        "productId": null
+      },
+      "candidates": [
+        {
+          "id": "RF005",
+          "title": "退款到账时间与查询",
+          "body": "退款审核通过后即发起退回,资金到账时间取决于支付渠道:余额与零钱通常实时到账,银行卡1-3个工作日,信用卡3-7个工作日。可在订单详情页的退款进度中查看当前状态。若超过7个工作日未到账,建议先核对支付渠道账单,再联系平台协助查询。",
+          "tags": [
+            "退款",
+            "到账",
+            "时效"
+          ],
+          "industry": "通用",
+          "shopId": null,
+          "score": 0.8692953491969138,
+          "rank": 1
+        },
+        {
+          "id": "RF001",
+          "title": "未核销团购券退款规则",
+          "body": "未核销且在有效期内的团购券,支持随时申请退款,退款金额为实际支付金额,无需商家同意。退款将原路退回至原支付账户,一般1-3个工作日到账,具体到账时间以支付渠道为准。若券已过有效期但未核销,同样支持过期退。",
+          "tags": [
+            "退款",
+            "未核销",
+            "随时退"
+          ],
+          "industry": "通用",
+          "shopId": null,
+          "score": 0.7443222774906205,
+          "rank": 2
+        }
+      ],
+      "expectedByCandidate": [
+        {
+          "id": "RF005",
+          "category": "direct_fact",
+          "supported": true,
+          "evidenceQuote": "信用卡3-7个工作日",
+          "reason": "原文明示信用卡通常时限。"
+        },
+        {
+          "id": "RF001",
+          "category": "limitation_only",
+          "supported": false,
+          "evidenceQuote": "退款将原路退回至原支付账户,一般1-3个工作日到账,具体到账时间以支付渠道为准。",
+          "reason": "泛称时限明确依赖支付渠道，未独立给出所问渠道的时限；不能借RF005或相同数值补足。"
+        }
+      ],
+      "source": {
+        "path": "data/c1-reference-selection-development.json",
+        "rawRunId": "2e8c6c72-9ca9-4b9f-b4dc-16554dc1629a",
+        "rawPath": ".runtime/c1-reference-selection/2e8c6c72-9ca9-4b9f-b4dc-16554dc1629a.json",
+        "rawSha256": "c4855cb6176f7d31f41c43ece7e00a1eca463a12f5d022f369da6e71d3574e4a",
+        "caseId": "competing-policy",
+        "turn": 1,
+        "historicalInputHash": "ee8b78133c24bdd6161f499a9b08e90f91bf31db372414345096d64eab2fab2f",
+        "derivation": "Full original documents and observed candidate rank/score. Input 001 exactly reconstructs the actual failed verifier input; other target inputs declare changed query/candidate subsets before new model calls.",
+        "change": "Replace the explicit channel with credit card in both original question and rule-only premise."
+      },
+      "inputHash": "971b7e0ec6da6efcfc253b5608431a635ad4491f5fc059261815e92400731117"
+    },
+    {
+      "id": "conditions-005",
+      "group": "target",
+      "query": "余额支付的团购券退款审核通过后，通常需要多久到账？\n仅解释所问规则条件（原文依据：余额支付的团购券退款审核通过后，通常需要多久到账？），不证明当前订单已满足，也不构成退款批准。",
+      "scope": {
+        "shopId": null,
+        "productId": null
+      },
+      "candidates": [
+        {
+          "id": "RF005",
+          "title": "退款到账时间与查询",
+          "body": "退款审核通过后即发起退回,资金到账时间取决于支付渠道:余额与零钱通常实时到账,银行卡1-3个工作日,信用卡3-7个工作日。可在订单详情页的退款进度中查看当前状态。若超过7个工作日未到账,建议先核对支付渠道账单,再联系平台协助查询。",
+          "tags": [
+            "退款",
+            "到账",
+            "时效"
+          ],
+          "industry": "通用",
+          "shopId": null,
+          "score": 0.8692953491969138,
+          "rank": 1
+        },
+        {
+          "id": "RF001",
+          "title": "未核销团购券退款规则",
+          "body": "未核销且在有效期内的团购券,支持随时申请退款,退款金额为实际支付金额,无需商家同意。退款将原路退回至原支付账户,一般1-3个工作日到账,具体到账时间以支付渠道为准。若券已过有效期但未核销,同样支持过期退。",
+          "tags": [
+            "退款",
+            "未核销",
+            "随时退"
+          ],
+          "industry": "通用",
+          "shopId": null,
+          "score": 0.7443222774906205,
+          "rank": 2
+        }
+      ],
+      "expectedByCandidate": [
+        {
+          "id": "RF005",
+          "category": "direct_fact",
+          "supported": true,
+          "evidenceQuote": "余额与零钱通常实时到账",
+          "reason": "原文明示余额时限，不从其他渠道推断。"
+        },
+        {
+          "id": "RF001",
+          "category": "limitation_only",
+          "supported": false,
+          "evidenceQuote": "退款将原路退回至原支付账户,一般1-3个工作日到账,具体到账时间以支付渠道为准。",
+          "reason": "泛称时限明确依赖支付渠道，未独立给出所问渠道的时限；不能借RF005或相同数值补足。"
+        }
+      ],
+      "source": {
+        "path": "data/c1-reference-selection-development.json",
+        "rawRunId": "2e8c6c72-9ca9-4b9f-b4dc-16554dc1629a",
+        "rawPath": ".runtime/c1-reference-selection/2e8c6c72-9ca9-4b9f-b4dc-16554dc1629a.json",
+        "rawSha256": "c4855cb6176f7d31f41c43ece7e00a1eca463a12f5d022f369da6e71d3574e4a",
+        "caseId": "competing-policy",
+        "turn": 1,
+        "historicalInputHash": "ee8b78133c24bdd6161f499a9b08e90f91bf31db372414345096d64eab2fab2f",
+        "derivation": "Full original documents and observed candidate rank/score. Input 001 exactly reconstructs the actual failed verifier input; other target inputs declare changed query/candidate subsets before new model calls.",
+        "change": "Replace the explicit channel with balance in both original question and rule-only premise."
+      },
+      "inputHash": "42f8713c14a2ab85672c7a69aee3c363e361da8f70bd409d37946dcb663dc03e"
+    },
+    {
+      "id": "conditions-006",
+      "group": "target",
+      "query": "未核销且在有效期内的团购券退款，规则中描述的一般到账时限是什么，是否还要以支付渠道为准？",
+      "scope": {
+        "shopId": null,
+        "productId": null
+      },
+      "candidates": [
+        {
+          "id": "RF001",
+          "title": "未核销团购券退款规则",
+          "body": "未核销且在有效期内的团购券,支持随时申请退款,退款金额为实际支付金额,无需商家同意。退款将原路退回至原支付账户,一般1-3个工作日到账,具体到账时间以支付渠道为准。若券已过有效期但未核销,同样支持过期退。",
+          "tags": [
+            "退款",
+            "未核销",
+            "随时退"
+          ],
+          "industry": "通用",
+          "shopId": null,
+          "score": 0.7443222774906205,
+          "rank": 2
+        }
+      ],
+      "expectedByCandidate": [
+        {
+          "id": "RF001",
+          "category": "direct_fact",
+          "supported": true,
+          "evidenceQuote": "退款将原路退回至原支付账户,一般1-3个工作日到账,具体到账时间以支付渠道为准。",
+          "reason": "明确询问该原文的一般规则并保留渠道例外；无需虚构特定渠道或真实到账事件。"
+        }
+      ],
+      "source": {
+        "path": "data/c1-reference-selection-development.json",
+        "rawRunId": "2e8c6c72-9ca9-4b9f-b4dc-16554dc1629a",
+        "rawPath": ".runtime/c1-reference-selection/2e8c6c72-9ca9-4b9f-b4dc-16554dc1629a.json",
+        "rawSha256": "c4855cb6176f7d31f41c43ece7e00a1eca463a12f5d022f369da6e71d3574e4a",
+        "caseId": "competing-policy",
+        "turn": 1,
+        "historicalInputHash": "ee8b78133c24bdd6161f499a9b08e90f91bf31db372414345096d64eab2fab2f",
+        "derivation": "Full original documents and observed candidate rank/score. Input 001 exactly reconstructs the actual failed verifier input; other target inputs declare changed query/candidate subsets before new model calls.",
+        "change": "A legitimate general-time positive retaining full document conditions."
+      },
+      "inputHash": "9716c75c9dd4f562ca74fc5d57f81bfb5d7e779111d89da970f800d39da998f9"
+    },
+    {
+      "id": "conditions-007",
+      "group": "regression",
+      "query": "银行卡支付、未核销且在有效期内的团购券退款，款项按规则退到哪个账户？",
+      "scope": {
+        "shopId": null,
+        "productId": null
+      },
+      "candidates": [
+        {
+          "id": "RF001",
+          "title": "未核销团购券退款规则",
+          "body": "未核销且在有效期内的团购券,支持随时申请退款,退款金额为实际支付金额,无需商家同意。退款将原路退回至原支付账户,一般1-3个工作日到账,具体到账时间以支付渠道为准。若券已过有效期但未核销,同样支持过期退。",
+          "tags": [
+            "退款",
+            "未核销",
+            "随时退"
+          ],
+          "industry": "通用",
+          "shopId": null,
+          "rank": 1,
+          "score": 1
+        }
+      ],
+      "expectedByCandidate": [
+        {
+          "id": "RF001",
+          "category": "direct_fact",
+          "supported": true,
+          "evidenceQuote": "退款将原路退回至原支付账户",
+          "reason": "原路退款路径适用于所问未核销券，不因银行卡这个子类限定而改变；该路径未留给渠道另定，不能机械要求原文逐字出现银行卡。"
+        }
+      ],
+      "source": {
+        "path": "data/c1-support-intent-development.json",
+        "caseId": "c1-pair-003",
+        "originalInputHash": "7e224775636df297d1ca7a99f5fd23437aef11401a7260bfb849f3b9b55a85b6",
+        "change": "Adds an explicit payment subclass to test that a genuinely generic refund-route rule still applies."
+      },
+      "inputHash": "f1b25f2396aff2d3e62a3ef10454f432092d5da906214ccd27a27fe86ca00bc3"
+    },
+    {
+      "id": "conditions-008",
+      "group": "regression",
+      "query": "已过期但未核销的团购券，申请退款之前需要谁确认？",
+      "scope": {
+        "shopId": null,
+        "productId": null
+      },
+      "candidates": [
+        {
+          "id": "KB-REFUND-EXPIRED",
+          "shopId": null,
+          "productId": null,
+          "title": "过期团购券售后规则",
+          "body": "【演示规则】已过期但未核销的券需要商家确认能否退款、延期以及金额。知识库未提供过期自动退款或自动延期政策。不得把未过期券的规则套用到过期券，也不能自行编造门店承诺。当前助手只提供查询和说明。",
+          "tags": [
+            "退款",
+            "过期",
+            "失效",
+            "到期",
+            "延期",
+            "有效期",
+            "没用",
+            "未核销"
+          ],
+          "status": "active",
+          "rank": 1,
+          "score": 1
+        }
+      ],
+      "expectedByCandidate": [
+        {
+          "id": "KB-REFUND-EXPIRED",
+          "category": "direct_fact",
+          "supported": true,
+          "evidenceQuote": "已过期但未核销的券需要商家确认能否退款、延期以及金额",
+          "reason": "询问政策本身规定的确认主体；原文已给出商家确认这个前提，不要求实例审批结果。"
+        }
+      ],
+      "source": {
+        "path": "data/c1-support-intent-development.json",
+        "caseId": "c1-pair-001",
+        "originalInputHash": "3bf9f04031a2793d98bc26b61589e4e726541b1aa6eadfe3d905b270b0d3a6da",
+        "change": "Exact query/candidates/expected replay; only wraps expected with source id."
+      },
+      "inputHash": "3bf9f04031a2793d98bc26b61589e4e726541b1aa6eadfe3d905b270b0d3a6da"
+    },
+    {
+      "id": "conditions-009",
+      "group": "regression",
+      "query": "我这笔已过期但未核销的团购券，商家现在已经批准退款了吗？",
+      "scope": {
+        "shopId": null,
+        "productId": null
+      },
+      "candidates": [
+        {
+          "id": "KB-REFUND-EXPIRED",
+          "shopId": null,
+          "productId": null,
+          "title": "过期团购券售后规则",
+          "body": "【演示规则】已过期但未核销的券需要商家确认能否退款、延期以及金额。知识库未提供过期自动退款或自动延期政策。不得把未过期券的规则套用到过期券，也不能自行编造门店承诺。当前助手只提供查询和说明。",
+          "tags": [
+            "退款",
+            "过期",
+            "失效",
+            "到期",
+            "延期",
+            "有效期",
+            "没用",
+            "未核销"
+          ],
+          "status": "active",
+          "rank": 1,
+          "score": 1
+        }
+      ],
+      "expectedByCandidate": [
+        {
+          "id": "KB-REFUND-EXPIRED",
+          "category": "limitation_only",
+          "supported": false,
+          "evidenceQuote": "已过期但未核销的券需要商家确认能否退款、延期以及金额",
+          "reason": "询问本单是否已经批准；政策前提没有提供实例商家结果。"
+        }
+      ],
+      "source": {
+        "path": "data/c1-support-intent-development.json",
+        "caseId": "c1-pair-002",
+        "originalInputHash": "8fc9870e735f2384b154a08294744dac1a77f7dcb311a9da0054f9dd595edc02",
+        "change": "Exact query/candidates/expected replay; only wraps expected with source id."
+      },
+      "inputHash": "8fc9870e735f2384b154a08294744dac1a77f7dcb311a9da0054f9dd595edc02"
+    },
+    {
+      "id": "conditions-010",
+      "group": "regression",
+      "query": "该订单 的双人午餐团购券，套餐具体含哪些过敏原？请列出名称。\n已核实订单商品：双人午餐团购券。\n已核实订单状态：paid；状态对应条件：未核销退款。\n已核实本单券数：共1张，未核销1张、已核销0张、已过期0张、已退款0张（按券状态字段计数）。\n有效期事实（截至2026-10-05T00:00:00.000Z）：未核销券：日期已过期0张、未到期1张、截止时间未知0张。",
+      "scope": {
+        "shopId": "shop-demo-1",
+        "productId": "product-demo-1"
+      },
+      "candidates": [
+        {
+          "id": "KB-PRODUCT-LUNCH",
+          "shopId": "shop-demo-1",
+          "productId": "product-demo-1",
+          "title": "双人午餐套餐说明",
+          "body": "【演示规则】双人午餐团购券标价79.80元，一张券对应两人午餐套餐，核销一次即视为整张券已使用。每张券具体截止时间以订单返回的 expiresAt 为准，不能从标价推断实付金额。菜品明细、过敏原和特殊节假日可用性未录入。",
+          "tags": [
+            "午餐",
+            "双人",
+            "套餐",
+            "价格",
+            "两人",
+            "核销",
+            "有效期"
+          ],
+          "status": "active",
+          "score": 0.5870193481192598,
+          "rank": 1
+        }
+      ],
+      "expectedByCandidate": [
+        {
+          "id": "KB-PRODUCT-LUNCH",
+          "category": "limitation_only",
+          "supported": false,
+          "evidenceQuote": "菜品明细、过敏原和特殊节假日可用性未录入。",
+          "reason": "索要具体业务属性；未录入不能提供实际过敏原清单。"
+        }
+      ],
+      "source": {
+        "path": "data/c1-support-intent-development.json",
+        "caseId": "c1-session-fixed-019:1",
+        "originalInputHash": "273a5fbdb02e2fd9c9945b8de4fdfaa3b23f939458619955c53900fb9aa8e44b",
+        "change": "Exact query/candidates/expected replay; only wraps expected with source id."
+      },
+      "inputHash": "273a5fbdb02e2fd9c9945b8de4fdfaa3b23f939458619955c53900fb9aa8e44b"
+    },
+    {
+      "id": "conditions-011",
+      "group": "regression",
+      "query": "请核对该订单 的双人午餐团购券：现有商品资料有没有记录过敏原明细？只问资料覆盖，不要求你列出成分。\n已核实订单商品：双人午餐团购券。\n已核实订单状态：paid；状态对应条件：未核销退款。\n已核实本单券数：共1张，未核销1张、已核销0张、已过期0张、已退款0张（按券状态字段计数）。\n有效期事实（截至2026-10-05T00:00:00.000Z）：未核销券：日期已过期0张、未到期1张、截止时间未知0张。",
+      "scope": {
+        "shopId": "shop-demo-1",
+        "productId": "product-demo-1"
+      },
+      "candidates": [
+        {
+          "id": "KB-PRODUCT-LUNCH",
+          "shopId": "shop-demo-1",
+          "productId": "product-demo-1",
+          "title": "双人午餐套餐说明",
+          "body": "【演示规则】双人午餐团购券标价79.80元，一张券对应两人午餐套餐，核销一次即视为整张券已使用。每张券具体截止时间以订单返回的 expiresAt 为准，不能从标价推断实付金额。菜品明细、过敏原和特殊节假日可用性未录入。",
+          "tags": [
+            "午餐",
+            "双人",
+            "套餐",
+            "价格",
+            "两人",
+            "核销",
+            "有效期"
+          ],
+          "status": "active",
+          "score": 0.7297883002359287,
+          "rank": 1
+        }
+      ],
+      "expectedByCandidate": [
+        {
+          "id": "KB-PRODUCT-LUNCH",
+          "category": "boundary_answer",
+          "acceptableCategories": [
+            "boundary_answer",
+            "direct_fact"
+          ],
+          "supported": true,
+          "evidenceQuote": "菜品明细、过敏原和特殊节假日可用性未录入。",
+          "reason": "询问文档是否记载；明确未录入足以回答文档覆盖为否，不推断实际过敏原。"
+        }
+      ],
+      "source": {
+        "path": "data/c1-support-intent-development.json",
+        "caseId": "c1-session-fixed-023:1",
+        "originalInputHash": "052d3865ecd9e75b0b92bbb2cf47c28a6a2fc0a3bf3b375ac6021935140d9c01",
+        "change": "Exact query/candidates/expected replay; only wraps expected with source id."
+      },
+      "inputHash": "052d3865ecd9e75b0b92bbb2cf47c28a6a2fc0a3bf3b375ac6021935140d9c01"
+    },
+    {
+      "id": "conditions-012",
+      "group": "regression",
+      "query": "这张券星期天也按刚才的规则使用吗？\n上轮已完成取证的问题（仅用于理解本轮指代）：该订单 对应的常规午餐套餐，普通周末能用吗？\n已核实订单商品：双人午餐团购券。",
+      "scope": {
+        "shopId": "shop-demo-1",
+        "productId": "product-demo-1"
+      },
+      "candidates": [
+        {
+          "id": "KB-SHOP-DEMO-1",
+          "shopId": "shop-demo-1",
+          "productId": null,
+          "title": "演示门店使用与预约说明",
+          "body": "【演示规则】云味餐厅演示店为虚构餐饮门店，演示地址为虚拟市演示路1号。常规午餐与晚餐套餐允许普通周末使用，到店前需用户自行与商家确认接待情况；助手目前不能预约、外呼、查询实时库存或安排接待。法定节假日、特殊活动和私享套餐使用限制没有录入，遇到这些问题应明确规则缺失并建议向商家核实。",
+          "tags": [
+            "门店",
+            "地址",
+            "周末",
+            "预约",
+            "营业",
+            "套餐",
+            "接待",
+            "节假日",
+            "五一",
+            "十一",
+            "私享"
+          ],
+          "status": "active",
+          "rank": 1,
+          "score": 1
+        }
+      ],
+      "expectedByCandidate": [
+        {
+          "id": "KB-SHOP-DEMO-1",
+          "category": "direct_fact",
+          "supported": true,
+          "evidenceQuote": "常规午餐与晚餐套餐允许普通周末使用，到店前需用户自行与商家确认接待情况",
+          "reason": "逐字重放已曝光失败的有效query；可信前文限定普通周末，可按原规则条件解释词义关系，仍须保留自行确认接待和特殊日期例外，不证明任何具体日期可用。"
+        }
+      ],
+      "source": {
+        "path": "data/c1-support-intent-development.json",
+        "caseId": "c1-language-005",
+        "originalInputHash": "b377081099b3d008a247d428f92a95a607be479e5af2ea0408f20fb87451078c",
+        "change": "Exact query/candidates/expected replay; only wraps expected with source id."
+      },
+      "inputHash": "b377081099b3d008a247d428f92a95a607be479e5af2ea0408f20fb87451078c"
+    }
+  ]
+}

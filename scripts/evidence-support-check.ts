@@ -7,7 +7,8 @@ import { applyEvidenceSupport, createEvidenceSupportClient, EvidenceSupportError
   evidenceSupportTypedV2Prompt, evidenceSupportTypedV2PromptHash, evidenceSupportTypedV2PromptVersion,
   evidenceSupportTypedV3Prompt, evidenceSupportTypedV3PromptHash, evidenceSupportTypedV3PromptVersion,
   evidenceSupportTypedV4Prompt, evidenceSupportTypedV4PromptHash, evidenceSupportTypedV4PromptVersion,
-  evidenceSupportTypedV6Prompt, evidenceSupportTypedV6PromptHash, evidenceSupportTypedV6PromptVersion, resolveEvidenceSupportModel, type EvidenceSupportDecision } from "../src/evidence-support.ts";
+  evidenceSupportTypedV6Prompt, evidenceSupportTypedV6PromptHash, evidenceSupportTypedV6PromptVersion,
+  evidenceSupportTypedV7Prompt, evidenceSupportTypedV7PromptHash, evidenceSupportTypedV7PromptVersion, resolveEvidenceSupportModel, type EvidenceSupportDecision } from "../src/evidence-support.ts";
 import { contentHash } from "../src/bailian.ts";
 
 const documents = [
@@ -150,9 +151,15 @@ assert.equal(evidenceSupportTypedV6PromptVersion, "fact-support-typed-v6");
 assert.equal(contentHash(evidenceSupportTypedV6Prompt), evidenceSupportTypedV6PromptHash);
 assert.equal(evidenceSupportTypedV6PromptHash, "889596997b27deccf91339f46b7a3825aa239a50fbcde92ce5109b67a77f19fa");
 assert.ok(evidenceSupportTypedV6Prompt.endsWith(`\n\n${evidenceSupportTypedPrompt}`), "v6 adds only the preceding intent contract; the complete v5 text is unchanged");
+assert.equal(evidenceSupportTypedV7PromptVersion, "fact-support-typed-v7");
+assert.equal(contentHash(evidenceSupportTypedV7Prompt), evidenceSupportTypedV7PromptHash);
+assert.equal(evidenceSupportTypedV7PromptHash, "c2d8e1f3de93d86ef658a0d691fe753138efcab7240c9a13f20f499d41937a9c");
+assert.ok(evidenceSupportTypedV7Prompt.endsWith(`\n\n${evidenceSupportTypedV6Prompt}`), "v7 adds only the preceding condition contract; the complete v6 text is unchanged");
 for (const baseline of [
-  { validationVersion: "typed-batch-v1" as const, settingsHash: "c6b0ce7cd17c90c0e7f8ed2c1da11612c0a4c6cd8a33a0773a34b251c770eb0f", requestHash: "feef836bbb63fe1b0507d4d19e59c5e0dd297c8e0ac9edcb618c22d8729619dd" },
-  { validationVersion: undefined, settingsHash: "0aab2fd06b0438d5bb793b2da8724f57bd85deb7301da0f5b33be58f162450ec", requestHash: "77b4140e5ca414f4b299b3415843bc7aead7c53871f66942762c46b9d7121a5e" },
+  { validationVersion: "typed-batch-v1" as const, settingsHash: "c6b0ce7cd17c90c0e7f8ed2c1da11612c0a4c6cd8a33a0773a34b251c770eb0f", requestHash: "feef836bbb63fe1b0507d4d19e59c5e0dd297c8e0ac9edcb618c22d8729619dd",
+    v6SettingsHash: "1aa40fbf62572d84c5ca7a84c00dbdd37f3b6f7e1fd9371f23733d3a8fa9d89c", v6RequestHash: "5f3ca43d5f339edae57ba3fe31877e44498fc60ae2107db74699cf065cdcad4b" },
+  { validationVersion: undefined, settingsHash: "0aab2fd06b0438d5bb793b2da8724f57bd85deb7301da0f5b33be58f162450ec", requestHash: "77b4140e5ca414f4b299b3415843bc7aead7c53871f66942762c46b9d7121a5e",
+    v6SettingsHash: "3e448092f85c781a4ef2b6fc75f94a71cf00d1f66058b7d88c0d448ed6f9a4d5", v6RequestHash: "dfa0b206f56a1d21b013b1547c230cc0fc186d0f656379e33ff147c5336b2b06" },
 ]) {
   let candidateCalls = 0;
   const defaultV5 = await createEvidenceSupportClient({ profile: "typed", validationVersion: baseline.validationVersion, timeoutMs: 1000,
@@ -169,14 +176,36 @@ for (const baseline of [
     } } });
   assert.equal(candidate.settings.promptVersion, evidenceSupportTypedV6PromptVersion);
   assert.equal(candidate.settings.promptHash, evidenceSupportTypedV6PromptHash);
+  assert.equal(contentHash(candidate.settings), baseline.v6SettingsHash);
   assert.deepEqual({ ...candidate.settings, promptVersion: defaultV5.settings.promptVersion, promptHash: defaultV5.settings.promptHash }, defaultV5.settings,
     "v6 changes only prompt identity/content, never parser, serialization, model or retry settings");
   const verification = await verifyEvidenceSupport({ query, scope, candidates, client: candidate });
   assert.equal(candidateCalls, 1); assert.notEqual(verification.requestHash, baseline.requestHash);
+  assert.equal(verification.requestHash, baseline.v6RequestHash);
   assert.equal(validateEvidenceSupportVerification(verification, { ...bound, settings: candidate.settings }), true);
   assert.equal(validateEvidenceSupportVerification(verification, { ...bound, settings: defaultV5.settings }), false);
   assert.equal(validateEvidenceSupportVerification(typedChecked, { ...bound, settings: candidate.settings }), false);
   assert.equal(applyEvidenceSupport({ prepared, verification, query, scope, documents, settings: defaultV5.settings }).status, "unavailable");
+  let v7Calls = 0;
+  const v7 = await createEvidenceSupportClient({ profile: "typed", typedPromptVersion: evidenceSupportTypedV7PromptVersion,
+    validationVersion: baseline.validationVersion, timeoutMs: 1000, runtime: { model, complete: async (context, options) => {
+      v7Calls++; assert.equal(context.systemPrompt, evidenceSupportTypedV7Prompt);
+      assert.deepEqual(context.tools, []); assert.equal(options.maxRetries, 0);
+      assert.deepEqual(JSON.parse(String(context.messages[0]!.content)), { query, documents: candidates.map(({ id, title, tags, body }) => ({ id, title, tags, body })) });
+      return message({ decisions: typedRows });
+    } } });
+  assert.equal(v7.settings.promptVersion, evidenceSupportTypedV7PromptVersion);
+  assert.equal(v7.settings.promptHash, evidenceSupportTypedV7PromptHash);
+  assert.deepEqual({ ...v7.settings, promptVersion: candidate.settings.promptVersion, promptHash: candidate.settings.promptHash }, candidate.settings,
+    "v7 changes only prompt identity/content, never parser, serialization, model or retry settings");
+  const verifiedV7 = await verifyEvidenceSupport({ query, scope, candidates, client: v7 });
+  assert.equal(v7Calls, 1); assert.notEqual(verifiedV7.requestHash, baseline.requestHash); assert.notEqual(verifiedV7.requestHash, verification.requestHash);
+  assert.equal(validateEvidenceSupportVerification(verifiedV7, { ...bound, settings: v7.settings }), true);
+  for (const old of [{ settings: candidate.settings, verified: verification }, { settings: defaultV5.settings, verified: typedChecked }]) {
+    assert.equal(validateEvidenceSupportVerification(verifiedV7, { ...bound, settings: old.settings }), false);
+    assert.equal(validateEvidenceSupportVerification(old.verified, { ...bound, settings: v7.settings }), false);
+    assert.equal(applyEvidenceSupport({ prepared, verification: verifiedV7, query, scope, documents, settings: old.settings }).status, "unavailable");
+  }
 }
 // Historical prompt and parser selections are independent; neither may silently reuse a new prompt with old hashes.
 let replayCalls = 0;
@@ -216,8 +245,10 @@ for (const legacy of [
 }
 for (const options of [{ profile: "binary", typedPromptVersion: evidenceSupportTypedV3PromptVersion },
   { profile: "binary", typedPromptVersion: evidenceSupportTypedV6PromptVersion },
+  { profile: "binary", typedPromptVersion: evidenceSupportTypedV7PromptVersion },
+  { typedPromptVersion: evidenceSupportTypedV7PromptVersion },
   { profile: "typed", typedPromptVersion: "fact-support-typed-invalid" },
-  { profile: "typed", typedPromptVersion: "fact-support-typed-v7" },
+  { profile: "typed", typedPromptVersion: "fact-support-typed-v8" },
   { profile: "typed", typedPromptVersion: null }] as const) {
   await assert.rejects(createEvidenceSupportClient({ ...options, typedPromptVersion: options.typedPromptVersion as typeof evidenceSupportTypedV3PromptVersion,
     runtime: { model, complete: async () => { throw Error("must not run"); } } }), /提示词版本无效/);

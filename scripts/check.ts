@@ -54,6 +54,9 @@ const { checkC1ReferenceEvidence } = await import("./c1-reference-evidence-check
 await checkC1ReferenceEvidence();
 const { checkReferenceProbe } = await import("./c1-reference-selection-live.ts");
 await checkReferenceProbe();
+const { checkSupportIntentDevelopment } = await import("./c1-support-intent-development.ts");
+await checkSupportIntentDevelopment("intent");
+await checkSupportIntentDevelopment("conditions");
 const { checkC1BusinessEvidenceAudit } = await import("./c1-business-evidence-check.ts");
 await checkC1BusinessEvidenceAudit();
 const { loadC1SupportDevelopment } = await import("./c1-support-check.ts");
