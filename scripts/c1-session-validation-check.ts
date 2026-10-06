@@ -15,7 +15,7 @@ import { amountChoiceTtlMs, compareRemainingAmount, createAmountReference, remem
 import type { SupportHostReceipt } from "../src/support-session.ts";
 import type { SupportCall, SupportKnowledgeContext, SupportResult, TrustedPolicyTopic } from "../src/support-controller.ts";
 import { applyKnowledgeApplicabilityGate, finishKnowledgeApplicabilityAcceptance, knowledgeApplicabilitySettings, type KnowledgeTrace } from "../src/knowledge-service.ts";
-import { buildKnowledgeApplicabilityContext, gateKnowledgeApplicability, knowledgeApplicabilitySourceHash, validateKnowledgeApplicabilitySnapshot,
+import { buildKnowledgeApplicabilityContext, gateKnowledgeApplicability, knowledgeApplicabilitySourceHash, revalidateKnowledgeApplicabilitySnapshot, validateKnowledgeApplicabilitySnapshot,
   type KnowledgeApplicabilityMode, type KnowledgeApplicabilitySnapshot } from "../src/knowledge-applicability.ts";
 import { rankLexical, scopeDocuments, serializeRetrievalDocument, type RetrievalDocument, type RetrievalScope } from "../src/retrieval-ranking.ts";
 import type { SessionTurnActual } from "./c1-session-live.ts";
@@ -264,11 +264,11 @@ function prepareKnowledgeEvidence(actual: C1ValidationActual, call: SupportCall,
     assert.equal(trace.applicability?.gate, undefined); assert.equal(trace.settings?.applicability, undefined);
     return { prepared, gate: undefined, evidenceQuery };
   }
-  assert.equal(mode, "declared"); assert.equal(trace.mode, "m4-support");
+  assert.ok(mode === "declared" || mode === "declared-v2"); assert.equal(trace.mode, "m4-support");
   const snapshot = configuration.applicabilitySnapshot;
   assert.ok(snapshot, "Declared mode requires an externally frozen metadata snapshot");
-  const { sha256, ...manifest } = snapshot;
-  const frozen = validateKnowledgeApplicabilitySnapshot(manifest, sha256);
+  const frozen = revalidateKnowledgeApplicabilitySnapshot(snapshot);
+  assert.equal(frozen.version, mode === "declared-v2" ? 2 : 1, "The frozen metadata must match the explicit applicability mode");
   let trustedContext = binding?.applicability ?? null;
   assert.equal(context.protocol, "v2.2", "Declared validation requires the frozen current host protocol");
   if (!binding && context.protocol === "v2.2") {
@@ -447,7 +447,7 @@ export function scoreC1ValidationTurn(turn: C1ValidationTurn, actual: C1Validati
     } catch { return []; }
   });
   const applicabilityDecisions = applicabilityGates.flatMap(gate => gate.decisions);
-  const applicabilityDeclared = (configuration.applicability ?? "model_only") === "declared";
+  const applicabilityDeclared = (configuration.applicability ?? "model_only") !== "model_only";
   const applicabilityIntegrityPassed = evidenceProofPassed && (!applicabilityDeclared || applicabilityGates.length === traces.length && applicabilityGates.every(gate => gate.integrity));
   const visible = new Set(scopeDocuments(corpus, e.scope).map(doc => doc.id));
   const scopeViolations = accepted.filter(id => !visible.has(id));
@@ -501,7 +501,7 @@ export function scoreC1ValidationTurn(turn: C1ValidationTurn, actual: C1Validati
     applicabilityUnknownIds: applicabilityDecisions.filter(row => row.status === "unknown").map(row => row.id),
     applicabilityUncheckedIds: applicabilityDecisions.filter(row => row.status === "not_checked").map(row => row.id),
     applicabilityNoneDeclaredIds: applicabilityDecisions.filter(row => row.status === "none_declared").map(row => row.id),
-    applicabilityDeclared, applicabilityRecorded: traces.some(trace => trace.applicability?.mode === "declared"),
+    applicabilityDeclared, applicabilityRecorded: traces.some(trace => trace.applicability && trace.applicability.mode !== "model_only"),
     validDecisionCount: validDecisions.length, validUnsupportedIds: validDecisions.filter(row => !row.supported).map(row => row.id),
     unavailable, correctlyRejected: e.knowledge === "rejected" && knowledge, rawHasGold: raw.some(id => gold.includes(id)),
     rawRecall: gold.length ? actual?.execution === "completed" ? gold.filter(id => raw.includes(id)).length / gold.length : 0 : null,
@@ -800,7 +800,7 @@ export function checkC1ValidationScoring() {
     ...(index === 0 ? { atLeastOneCouponInStates: ["unused"] } : index === 1 ? { minimumCouponCount: 2 } : {}),
     basis: index < 2 ? [{ field: index === 0 ? "atLeastOneCouponInStates" : "minimumCouponCount", quote: entry.body }] : [], reviewNote: "Synthetic prerequisite only" })) });
   const declaredConfiguration: C1ValidationKnowledgeConfiguration = { applicability: "declared", applicabilitySnapshot: declaredSnapshot };
-  function declaredActual(freshOrder: Order, documents: RetrievalDocument[]): C1ValidationActual {
+  function declaredActual(freshOrder: Order, documents: RetrievalDocument[], declaration = declaredSnapshot, applicability: KnowledgeApplicabilityMode = "declared"): C1ValidationActual {
     const value = structuredClone(actual), knowledgeCall = value.calls[0]!, t = knowledgeCall.knowledge!.trace, ctx = knowledgeCall.knowledge!.context;
     const r = value.result!, currentScope = { shopId: freshOrder.shop.id, productId: freshOrder.items[0]!.productId };
     r.action = { protocol: "v2.2", kind: "refund_eligibility", question: turn.question, questionContext: { kind: "standalone" }, orderRef: { kind: "explicit", orderId: freshOrder.id } };
@@ -813,10 +813,10 @@ export function checkC1ValidationScoring() {
     t.sourceHashes = { before: contentHash(visibleDocs), after: contentHash(visibleDocs) };
     t.rawRanking = visibleDocs.map((entry, index) => ({ id: entry.id, score: .9 - index * .1 }));
     const prepared = acceptEvidence({ query: t.query, scope: currentScope, documents: visibleDocs, ranking: t.rawRanking, config: { mode: "support", threshold: .5 } });
-    const gate = gateKnowledgeApplicability({ snapshot: declaredSnapshot, context: ctx.applicability!, scope: currentScope, candidates: prepared.pendingSupport! });
+    const gate = gateKnowledgeApplicability({ snapshot: declaration, context: ctx.applicability!, scope: currentScope, candidates: prepared.pendingSupport! });
     const filtered = applyKnowledgeApplicabilityGate(prepared, gate), { candidates: _candidates, ...audit } = gate;
-    t.applicability = { mode: "declared", gate: audit };
-    t.settings = { serialization: "json-title-tags-body-v1", support: settings, applicability: knowledgeApplicabilitySettings(declaredSnapshot) };
+    t.applicability = { mode: applicability, gate: audit };
+    t.settings = { serialization: "json-title-tags-body-v1", support: settings, applicability: knowledgeApplicabilitySettings(declaration) };
     if (filtered.pendingSupport!.length) {
       const supportInput = { query: t.query, scope: currentScope, candidates: filtered.pendingSupport!, settings };
       const value = filtered.pendingSupport!.map(entry => ({ id: entry.id, supported: true, category: "direct_fact" as const, quote: entry.body, reason: "Synthetic supported fact" }));
@@ -843,6 +843,17 @@ export function checkC1ValidationScoring() {
   assert.deepEqual(scoreDeclared(declaredValue).validUnsupportedIds, [], "Host exclusion is not a model's valid negative");
   assert.equal(scoreDeclared(declaredValue, declaredTurn, [doc, multiDoc], { applicability: "declared" }).evidenceProofPassed, false, "A self-reported snapshot is not authority");
   assert.equal(scoreDeclared(declaredValue, declaredTurn, [doc, multiDoc], {}).evidenceProofPassed, false, "Frozen mode must match actual mode");
+  const { sha256: _declaredHash, ...declaredManifest } = declaredSnapshot;
+  const declaredSnapshotV2 = validateKnowledgeApplicabilitySnapshot({ ...declaredManifest, version: 2,
+    productCatalog: [{ shopId: order.shop.id, productId: order.items[0]!.productId, productName: order.items[0]!.productName,
+      categories: ["synthetic_rule_fixture"], reviewNote: "Author-reviewed synthetic scorer fixture, not an external SKU guarantee." }] });
+  const declaredV2Value = declaredActual(order, [doc, multiDoc], declaredSnapshotV2, "declared-v2");
+  const declaredV2Configuration: C1ValidationKnowledgeConfiguration = { applicability: "declared-v2", applicabilitySnapshot: declaredSnapshotV2 };
+  const declaredV2Score = scoreDeclared(declaredV2Value, declaredTurn, [doc, multiDoc], declaredV2Configuration);
+  assert.equal(declaredV2Score.passed, true); assert.equal(declaredV2Score.applicabilityDeclared, true); assert.equal(declaredV2Score.applicabilityRecorded, true);
+  assert.equal(scoreDeclared(declaredV2Value, declaredTurn, [doc, multiDoc], { ...declaredV2Configuration, applicability: "declared" }).evidenceProofPassed, false);
+  assert.equal(scoreDeclared(declaredV2Value, declaredTurn, [doc, multiDoc], { ...declaredV2Configuration, applicabilitySnapshot: declaredSnapshot }).evidenceProofPassed, false,
+    "v2 mode cannot use a v1 external metadata snapshot");
   for (const mutate of [
     (value: C1ValidationActual) => { value.calls[1]!.knowledge!.trace.applicability!.gate!.decisions.find(row => row.id === multiDoc.id)!.status = "matched"; },
     (value: C1ValidationActual) => { value.calls[1]!.knowledge!.trace.applicability!.gate!.snapshotHash = "0".repeat(64); },

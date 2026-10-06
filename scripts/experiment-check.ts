@@ -46,13 +46,21 @@ assert.deepEqual(resolveExperimentConfig(JSON.parse(await readFile("configs/expe
 assert.equal(readKnowledgeParameters({}).knowledgeSupportModel, "configured");
 assert.equal(readKnowledgeParameters({}).knowledgeApplicability, "model_only");
 assert.equal(readKnowledgeParameters({ KNOWLEDGE_MODE: "m4-support", KNOWLEDGE_APPLICABILITY: "declared" }).knowledgeApplicability, "declared");
+assert.equal(readKnowledgeParameters({ KNOWLEDGE_MODE: "m4-support", KNOWLEDGE_APPLICABILITY: "declared-v2" }).knowledgeApplicability, "declared-v2");
 for (const KNOWLEDGE_APPLICABILITY of ["typo", "0", "DECLARED"]) assert.throws(() => readKnowledgeParameters({ KNOWLEDGE_MODE: "m4-support", KNOWLEDGE_APPLICABILITY }), /knowledgeApplicability/);
 assert.throws(() => readKnowledgeParameters({ KNOWLEDGE_APPLICABILITY: "declared" }), /仅适用于/);
+assert.throws(() => readKnowledgeParameters({ KNOWLEDGE_APPLICABILITY: "declared-v2" }), /仅适用于/);
 const applicabilityAB = catalog.presets.find(preset => preset.id === "support-knowledge-applicability-ab")!.config;
 if (applicabilityAB.kind !== "support") throw new Error("applicability preset kind");
 assert.deepEqual(applicabilityAB.variants.map(v => v.parameters.knowledgeApplicability), ["model_only", "declared"]);
 assert.deepEqual(resolveExperimentConfig(JSON.parse(await readFile("configs/experiments/support-knowledge-applicability-ab.json", "utf8"))), applicabilityAB);
 const declaredParameters = applicabilityAB.variants[1]!.parameters;
+const categoryAB = catalog.presets.find(preset => preset.id === "support-knowledge-category-ab")!.config;
+if (categoryAB.kind !== "support") throw new Error("category preset kind");
+assert.deepEqual(categoryAB.variants.map(v => v.parameters.knowledgeApplicability), ["declared", "declared-v2"]);
+assert.deepEqual(categoryAB.variants.map(v => ({ ...v.parameters, knowledgeApplicability: "same" }))[0],
+  categoryAB.variants.map(v => ({ ...v.parameters, knowledgeApplicability: "same" }))[1], "Category A/B changes only the applicability contract");
+assert.ok(catalog.fields.support.find(field => field.key === "knowledgeApplicability")!.options!.some(option => option.value === "declared-v2"));
 const queryAB = catalog.presets.find(preset => preset.id === "support-knowledge-query-ab")!.config;
 if (queryAB.kind !== "support") throw new Error("query preset kind");
 assert.deepEqual(queryAB.variants.map(v => v.parameters.knowledgeQueryMode), ["combined", "separated"]);
@@ -87,7 +95,7 @@ for (const knowledgeSupportPrompt of ["typo", "V6", null, undefined]) assert.thr
 for (const parameters of [{ knowledgeSupportPrompt: "v6" as const }, { knowledgeMode: "m4-support" as const, knowledgeSupportPrompt: "v6" as const }])
   assert.throws(() => resolveSupportRunParameters("controller", parameters), /knowledgeSupportPrompt v6 仅适用于/);
 assert.throws(() => resolveSupportRunParameters("atomic", { knowledgeMode: "m4-support", knowledgeSupport: "typed", knowledgeSupportPrompt: "v6" }), /atomic/);
-for (const config of [queryAB, promptAB]) for (const variant of config.variants) {
+for (const config of [queryAB, promptAB, categoryAB]) for (const variant of config.variants) {
   let actual: Parameters<typeof runSupportV2Live>[0] | undefined;
   await assert.rejects(executeExperiment({ config: { ...config, allowRemote: true }, variant, jobId: "query-check", repetition: 1,
     batch: { id: "query-check", repetition: 1, plannedRepetitions: 1 } }, {
@@ -111,6 +119,11 @@ assert.equal(auditSupportKnowledgeCall(auditCall, declaredParameters).passed, fa
 auditTrace.applicability!.gate.integrity = true;
 assert.equal(auditSupportKnowledgeCall(auditCall, declaredParameters).passed, true);
 assert.equal(auditSupportKnowledgeCall(auditCall, declaredParameters).supportPrompt, "not_called", "configured prompt is not proof that a provider ran");
+const versionTwoAudit = structuredClone(auditCall), versionTwoParameters = { ...declaredParameters, knowledgeApplicability: "declared-v2" as const };
+versionTwoAudit.knowledge.trace.applicability!.mode = "declared-v2";
+assert.equal(auditSupportKnowledgeCall(versionTwoAudit, versionTwoParameters).passed, false, "v2 mode cannot relabel a v1 gate");
+versionTwoAudit.knowledge.trace.applicability!.gate!.version = "declared-order-preconditions-v2";
+assert.equal(auditSupportKnowledgeCall(versionTwoAudit, versionTwoParameters).passed, true);
 const promptModel = { provider: "deepseek", id: "deepseek-v4-pro", api: "openai-completions", baseUrl: "https://api.deepseek.com", maxTokens: 2048,
   cost: { input: .1, output: .2, cacheRead: .01, cacheWrite: 0 } };
 for (const knowledgeSupportPrompt of ["v5", "v6"] as const) {

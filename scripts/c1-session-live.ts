@@ -77,7 +77,7 @@ function parseArgs(args: string[]) {
       options.suite = value;
     } else if (args[index] === "--applicability") {
       assert.equal(options.applicability, undefined, "Duplicate --applicability");
-      const value = args[++index]; assert.ok(value === "model_only" || value === "declared", "--applicability needs model_only or declared");
+      const value = args[++index]; assert.ok(value === "model_only" || value === "declared" || value === "declared-v2", "--applicability needs model_only, declared or declared-v2");
       options.applicability = value;
     } else assert.fail(`Unknown argument: ${args[index]}`);
   }
@@ -191,8 +191,9 @@ function supportIntegrity(trace: KnowledgeTrace | undefined): SupportIntegrity {
     || validation.status !== "complete" && invalidIds.size === 0
     || verification?.value.some(item => invalidIds.has(item.id)))) status = "unknown";
   const valid = verification?.value.filter(item => !invalidIds.has(item.id)) ?? [];
-  const applicability: SupportIntegrity["applicability"] = trace?.applicability?.mode !== "declared" ? "not_enabled"
-    : !trace.applicability.gate ? "unknown" : trace.applicability.gate.integrity ? "complete" : "incomplete";
+  const applicability: SupportIntegrity["applicability"] = !trace?.applicability || trace.applicability.mode === "model_only" ? "not_enabled"
+    : !trace.applicability.gate ? "unknown" : trace.applicability.gate.integrity && trace.applicability.gate.version === (trace.applicability.mode === "declared-v2"
+      ? "declared-order-preconditions-v2" : "declared-order-preconditions-v1") ? "complete" : "incomplete";
   return { status, applicability, invalidDecisions: structuredClone(validation?.invalidDecisions ?? []),
     validDecisionCount: valid.length,
     // These are syntactically valid negative decisions, not automatically correct
@@ -291,6 +292,7 @@ export async function checkC1SessionRunner(caseId?: string, applicability: Suppo
   assert.throws(() => selectPlan(data, "unknown"));
   assert.deepEqual(parseArgs(["--live", "--case", "session-appointment-topic"]), { live: true, caseId: "session-appointment-topic" });
   assert.deepEqual(parseArgs(["--applicability", "declared"]), { live: false, applicability: "declared" });
+  assert.deepEqual(parseArgs(["--applicability", "declared-v2"]), { live: false, applicability: "declared-v2" });
   assert.deepEqual(parseArgs(["--suite", "product-clarification", "--applicability", "declared"]), { live: false, suite: "product-clarification", applicability: "declared" });
   for (const args of [["--suite"], ["--suite", "validation"], ["--suite", "development", "--suite", "product-clarification"]]) assert.throws(() => parseArgs(args));
   for (const args of [["--applicability"], ["--applicability", "typo"], ["--applicability", "declared", "--applicability", "model_only"]]) assert.throws(() => parseArgs(args));
@@ -429,7 +431,7 @@ export async function runC1SessionDevelopment(caseId?: string, applicability: Su
   resolveSupportRunParameters("controller", { knowledgeMode: "m4-support", knowledgeApplicability: applicability });
   const { data, source, context, datasetPath, sourcePath } = await loadC1SessionDevelopment(suite);
   const plan = selectPlan(data, caseId);
-  const snapshotFiles = [...new Set([...codeFiles, datasetPath, sourcePath, ...Object.keys(source.baseFiles)])];
+  const snapshotFiles = [...new Set([...codeFiles, ...(applicability === "declared-v2" ? ["data/knowledge-applicability-v2.json"] : []), datasetPath, sourcePath, ...Object.keys(source.baseFiles)])];
   const runId = randomUUID(), startedAt = new Date().toISOString(), codeBefore = await hashes(snapshotFiles);
   const directory = new URL(".runtime/c1-session/", root); await mkdir(directory, { recursive: true });
   const path = new URL(`live-${suite}-${runId}.json`, directory);

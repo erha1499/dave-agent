@@ -6,7 +6,7 @@ import { applyEvidenceSupport, createEvidenceSupportClient, EvidenceSupportError
   evidenceSupportTypedV6Prompt, evidenceSupportTypedV6PromptVersion,
   type EvidenceSupportAttempt, type EvidenceSupportClient, type EvidenceSupportModel, type EvidenceSupportProfile, type EvidenceSupportFailure, type EvidenceSupportSettings, type EvidenceSupportVerification } from "./evidence-support.ts";
 import { rankLexical, scopeDocuments, serializeRetrievalDocument, type RetrievalScope } from "./retrieval-ranking.ts";
-import { gateKnowledgeApplicability, knowledgeApplicabilityVersion, loadKnowledgeApplicabilitySnapshot, validateKnowledgeApplicabilitySnapshot,
+import { gateKnowledgeApplicability, knowledgeApplicabilityVersion, loadKnowledgeApplicabilitySnapshot, revalidateKnowledgeApplicabilitySnapshot,
   type KnowledgeApplicabilityContext, type KnowledgeApplicabilityMode, type KnowledgeApplicabilityResult,
   type KnowledgeApplicabilitySnapshot } from "./knowledge-applicability.ts";
 
@@ -51,7 +51,8 @@ export type KnowledgeServiceOptions = { mode?: KnowledgeMode; threshold?: number
   clients?: { rerank?: Pick<BailianClient, "settings" | "rerank">; support?: EvidenceSupportClient } };
 
 export function knowledgeApplicabilitySettings(snapshot: KnowledgeApplicabilitySnapshot) {
-  return { version: knowledgeApplicabilityVersion(snapshot), snapshotHash: snapshot.sha256, serialization: snapshot.serialization };
+  return { version: knowledgeApplicabilityVersion(snapshot), snapshotHash: snapshot.sha256, serialization: snapshot.serialization,
+    ...(snapshot.version === 2 ? { sourceSha256: snapshot.sourceSha256 ?? null } : {}) };
 }
 
 // Shared with the offline scorer. Filtering applies only to the score gate's original Top5.
@@ -88,7 +89,7 @@ export function createKnowledgeService(store: Pick<CouponStore, "readKnowledgeDo
   const queryMode = options.queryMode ?? "combined";
   if (!["combined", "separated"].includes(queryMode) || queryMode === "separated" && mode !== "m4-support") throw new Error("查询分离仅适用于 m4-support 知识检索。");
   const applicability = options.applicability ?? "model_only";
-  if (!["model_only", "declared"].includes(applicability) || applicability === "declared" && mode !== "m4-support") throw new Error("声明前提门控仅适用于 m4-support 知识检索。");
+  if (!["model_only", "declared", "declared-v2"].includes(applicability) || applicability !== "model_only" && mode !== "m4-support") throw new Error("声明前提门控仅适用于 m4-support 知识检索。");
   if (mode === "lexical" && supportModel !== "configured") throw new Error("固定支持判别模型仅适用于 m4-support 知识检索。");
   const selectedModel = resolveEvidenceSupportModel(supportModel);
   const modelMatches = (client: EvidenceSupportClient) => client.settings.provider === selectedModel.provider && client.settings.model === selectedModel.model;
@@ -101,10 +102,14 @@ export function createKnowledgeService(store: Pick<CouponStore, "readKnowledgeDo
   let rerankClient = options.clients?.rerank, supportClient = options.clients?.support;
   let supportLoading: Promise<EvidenceSupportClient> | undefined;
   let applicabilityLoading: Promise<KnowledgeApplicabilitySnapshot> | undefined;
-  const loadApplicability = () => applicabilityLoading ??= options.applicabilitySnapshot ? Promise.resolve().then(() => {
-    const { sha256, ...manifest } = options.applicabilitySnapshot!;
-    return validateKnowledgeApplicabilitySnapshot(manifest, sha256);
-  }) : loadKnowledgeApplicabilitySnapshot();
+  const loadApplicability = () => applicabilityLoading ??= Promise.resolve().then(async () => {
+    let snapshot: KnowledgeApplicabilitySnapshot;
+    if (options.applicabilitySnapshot) {
+      snapshot = revalidateKnowledgeApplicabilitySnapshot(options.applicabilitySnapshot);
+    } else snapshot = await loadKnowledgeApplicabilitySnapshot(applicability === "declared-v2" ? 2 : 1);
+    if (snapshot.version !== (applicability === "declared-v2" ? 2 : 1)) throw new Error("声明前提模式与快照版本不匹配。");
+    return snapshot;
+  });
   return { async search(input) {
     // The host builds both inputs. Shortening retrieval never removes facts
     // from support verification, nor adds an LLM rewrite stage.
@@ -181,7 +186,7 @@ export function createKnowledgeService(store: Pick<CouponStore, "readKnowledgeDo
       trace.acceptance = acceptEvidence({ config: mode === "lexical" ? { mode: "off" } : { mode: "support", threshold },
         query: retrievalQuery, documents: before, scope: trace.scope, ranking: trace.rawRanking });
       let applicabilityGate: KnowledgeApplicabilityResult | undefined;
-      if (applicability === "declared") {
+      if (applicability !== "model_only") {
         enter("applicability");
         try {
           const snapshot = await wait(loadApplicability);

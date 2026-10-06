@@ -81,7 +81,7 @@ export async function checkC1ProductCategory() {
       assert.equal(shopId ?? null, order?.shop.id ?? null); assert.equal(productId ?? null, order?.items[0]!.productId ?? null);
       assert.equal(authorized.length, order ? 1 : 0, "Order-bound knowledge runs only after this turn's authorized read");
       return structuredClone(documents);
-    } }, { mode: "m4-support", timeoutMs: 1000, applicability: "declared", applicabilitySnapshot: changes.snapshot ?? snapshot,
+    } }, { mode: "m4-support", timeoutMs: 1000, applicability: (changes.snapshot ?? snapshot).version === 2 ? "declared-v2" : "declared", applicabilitySnapshot: changes.snapshot ?? snapshot,
       supportProfile: "typed", clients: { rerank, support } });
     const controller = new SupportController({ store: { async getOrder(who, id) {
       if (!order || id !== order.id || who.appId !== identity.appId || who.senderId !== identity.senderId) throw new OrderAccessError("Synthetic fixture ownership denied");

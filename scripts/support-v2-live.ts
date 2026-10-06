@@ -99,8 +99,9 @@ export function auditSupportKnowledgeCall(call: Pick<EvalSpan, "id" | "input" | 
     && trace?.query === queries.retrieval && trace.originalQuery === context?.originalQuery
     && input?.query === context?.effectiveQuery && input?.retrievalQuery === (context?.retrievalQuery ?? context?.effectiveQuery)
     ? "complete" : "incomplete";
-  const applicability = expectedDatabaseError ? "not_evaluated" : parameters.knowledgeApplicability !== "declared" ? "not_enabled"
-    : trace?.applicability?.gate?.integrity === true ? "complete" : "incomplete";
+  const applicability = expectedDatabaseError ? "not_evaluated" : parameters.knowledgeApplicability === "model_only" ? "not_enabled"
+    : trace?.applicability?.gate?.integrity === true && trace.applicability.gate.version === (parameters.knowledgeApplicability === "declared-v2"
+      ? "declared-order-preconditions-v2" : "declared-order-preconditions-v1") ? "complete" : "incomplete";
   const expectedPrompt = parameters.knowledgeSupport === "binary" ? { version: evidenceSupportPromptVersion, hash: hash(evidenceSupportPrompt) }
     : parameters.knowledgeSupportPrompt === "v6" ? { version: evidenceSupportTypedV6PromptVersion, hash: evidenceSupportTypedV6PromptHash }
       : { version: evidenceSupportTypedPromptVersion, hash: hash(evidenceSupportTypedPrompt) };
@@ -250,7 +251,7 @@ export async function runSupportV2Live({ architecture, label, batch, parameters,
       model: { provider: session!.model!.provider, id: session!.model!.id, maxTokens: session!.model!.maxTokens, thinking: session!.thinkingLevel, temperature: null },
       files: ["scripts/support-v2-live.ts", datasetPath, "data/support-v2-development.json", "scripts/merchant-test-fixture.ts", "src/support-evaluation.ts", "src/support-controller.ts", "src/support-action.ts", "src/support-context-action.ts", "src/support-session.ts", "src/support-parameters.ts",
         "src/support-context.ts", "src/support-reference-selection.ts", "src/support-evidence-context.ts", "prompts/customer-service-v2.md", "skills/shop-support-v2/SKILL.md",
-        "src/knowledge-service.ts", "src/knowledge-applicability.ts", "data/knowledge-applicability.json", "src/knowledge-evaluation.ts", "src/bailian.ts", "src/evidence-support.ts", "src/evidence-acceptance.ts", "src/retrieval-ranking.ts",
+        "src/knowledge-service.ts", "src/knowledge-applicability.ts", "data/knowledge-applicability.json", ...(resolved.knowledgeApplicability === "declared-v2" ? ["data/knowledge-applicability-v2.json"] : []), "src/knowledge-evaluation.ts", "src/bailian.ts", "src/evidence-support.ts", "src/evidence-acceptance.ts", "src/retrieval-ranking.ts",
         "src/agent.ts", "src/qq-agent.ts", "src/coupon-store.ts", "src/knowledge-retrieval.ts", "src/refunds.ts", "src/refund-entry.ts", "src/after-sales.ts", "src/after-sales-entry.ts", "src/merchant-notifications.ts", "src/reply.ts", "src/reply-from-tools.ts"],
       business: { knowledge, shops, products, identityBindings, scenarios: initialOrders.map(order => ({ source: order.source, status: order.status, amounts: order.amounts,
         shop: order.shop, items: order.items.map(({ productId, productName, quantity, unitPriceCents, totalCents }) => ({ productId, productName, quantity, unitPriceCents, totalCents })),

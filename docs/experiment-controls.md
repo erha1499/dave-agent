@@ -36,7 +36,7 @@
 | `knowledgeSupport` | `binary` / `typed`，默认 `binary` | binary 保持 A1 的二元判断；typed 区分事实/规则、明确边界问题、仅信息缺失和无关证据。typed 仅适用于 Controller + m4-support，非法组合启动前拒绝。实际 Prompt 版本写入 trace，类别不代表已获业务授权。 |
 | `knowledgeSupportModel` | `configured` / `deepseek-v4-pro`，默认 `configured` | 仅 Controller + m4-support 可固定支持判别模型；configured 跟随业务模型配置，固定 Pro 要求 DeepSeek provider。业务 Agent 的模型不因此改变；实际执行模型以 `trace.settings.support` 为准。 |
 | `knowledgeSupportPrompt` | `v5` / `v6`，默认 `v5` | v6 仅 Controller + m4-support + typed，增加先确定用户所问命题的合同；选择只影响 typed，binary 继续使用 `fact-support-v1`。实际支持调用须核对版本和内容哈希，未发生调用只记录配置。 |
-| `knowledgeApplicability` | `model_only` / `declared`，默认 `model_only` | 仅 Controller + m4-support 可启用 declared：在原分数 / Top5 后，用本轮订单事实检查规则已声明的必要前提，再交模型判断。通过不代表整篇规则适用或已获退款批准；不增加模型阶段。 |
+| `knowledgeApplicability` | `model_only` / `declared` / `declared-v2`，默认 `model_only` | 声明模式仅 Controller + m4-support：在原分数 / Top5 后，用本轮可信事实检查必要前提，再交模型判断。`declared` 固定 v1 数量/状态规则，`declared-v2` 追加审阅的合成商品类别目录，未知类别不按名称猜测。匹配不证明全部适用或获批，不增加模型阶段。 |
 | `knowledgeQueryMode` | `combined` / `separated`，默认 `combined` | 仅 Controller + m4-support 可启用 separated：排序使用原问、可信前文、商品与简短订单状态；支持判别仍使用完整券数、按券状态关联的日期和原问。两者均由宿主构造，不增加模型改写阶段。 |
 | `knowledgeThreshold` | 0–1，默认 0.71 | 仅 m4-support 的相关性预筛；分数不是概率。变更后属于新实验配置。 |
 | `knowledgeTimeoutMs` | 1000–60000，默认 15000 毫秒 | Controller 单次知识查询的总等待上限，含读取、重排、支持判别与来源复检；零自动重试。 |
@@ -66,7 +66,16 @@ node --env-file-if-exists=.env scripts/support-v2-live.ts --live --architecture 
 
 独立重评新业务报告时，`scripts/c1-business-evidence-check.ts --file <报告路径> --support-settings=<冻结配置路径>` 必须提供执行前保存的完整 `EvidenceSupportSettings` JSON；不能从待评分报告自取配置充当独立依据。旧报告未记录该参数时保留原评分合同。Session 验证执行器则直接使用冻结 manifest 中的支持配置，交叉版本、缺失标记及自洽但被改写的配置均不能通过。
 
-`declared` 使用独立的 [`data/knowledge-applicability.json`](../data/knowledge-applicability.json)，未修改既有语料和 gold。每个服务实例在首次使用时加载一次不可变快照；文件变更需新建服务 / 重启进程生效。快照哈希、文档原文 / scope / 状态哈希、依据引文和本轮事实哈希分别留痕。当前只有“最少券数”和“至少存在某种券状态”两类必要前提；一般 / 假设规则咨询不套用当前订单条件。没有声明的前提不等于已经证明，缺失事实也不等于不符合。原始排名不重排、不补位，因此第六名有效证据仍可能未被接收；这属于本候选的召回取舍。
+`declared` 使用独立的 [`data/knowledge-applicability.json`](../data/knowledge-applicability.json)，保持 v1 数量和券状态声明。`declared-v2` 实际加载新增 [`data/knowledge-applicability-v2.json`](../data/knowledge-applicability-v2.json)：完整审阅现有8篇来源，只给门店常规套餐规则追加类别前提，并按 seed 的精确门店/商品 ID 定义午餐、晚餐合成类别。目录是作者新增的模拟业务定义，不能称为外部商家认证，也不能按同名商品外推。旧语料、v1字节及gold不覆盖，模式与快照版本错配在支持判别前拒绝。
+
+每个服务实例在首次使用时加载一次不可变快照；文件变更需新建服务 / 重启进程生效。v2规范内容哈希与原始文件SHA分列，文档全文 / scope / 状态、依据引文和本轮事实分别绑定。一般 / 假设规则咨询不套用当前订单条件；当前商品需要类别而目录缺失时阻断该来源。没有声明的前提不等于已经证明，缺失事实也不等于不符合。原始排名不重排、不补位，因此第六名有效证据仍可能未被接收；这属于本候选的召回取舍。
+
+`support-knowledge-category-ab` 只比较 `declared` / `declared-v2`，共同使用 Controller、m4-support、Pro typed v6、0.5阈值及 separated。该预设是通用业务开发入口；[六场景Session开发合同](./c1-category-session-development.md)使用单独的冻结探针和总预算，不把通用预设运行当成此批成绩。当前支持模型的完整query尚未直接附审阅类别事实；门控matched不能代替语义通过，候选未准入。
+
+```sh
+# 参数预览，不连接数据库或模型。
+node scripts/experiment.ts --preset support-knowledge-category-ab --dry-run
+```
 
 工作台的“已声明必要前提 A/B”预设比较 model_only 与 declared，只有当前运行使用的参数才代表实际生效。C1 开发 Session 可用 `node --env-file-if-exists=.env scripts/c1-session-live.ts --live --applicability declared` 运行一次完整开发批次；命令会产生真实模型请求，保留新运行的完整分母和费用。旧报告不重算。
 

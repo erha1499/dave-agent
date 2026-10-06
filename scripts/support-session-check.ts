@@ -40,8 +40,12 @@ for (const env of [{ KNOWLEDGE_MODE: "typo" }, { KNOWLEDGE_THRESHOLD: "NaN" }, {
 assert.throws(() => resolveSupportRunParameters("atomic", { knowledgeMode: "m4-support" }), /atomic 仅支持 lexical/);
 for (const knowledgeSupport of ["binary", "typed"] as const) assert.equal(resolveSupportRunParameters("controller",
   { knowledgeMode: "m4-support", knowledgeSupport, knowledgeApplicability: "declared" }).knowledgeApplicability, "declared");
+for (const knowledgeSupport of ["binary", "typed"] as const) assert.equal(resolveSupportRunParameters("controller",
+  { knowledgeMode: "m4-support", knowledgeSupport, knowledgeApplicability: "declared-v2" }).knowledgeApplicability, "declared-v2");
 assert.throws(() => resolveSupportRunParameters("controller", { knowledgeApplicability: "declared" }), /仅适用于/);
 assert.throws(() => resolveSupportRunParameters("atomic", { knowledgeMode: "m4-support", knowledgeApplicability: "declared" }), /atomic/);
+assert.throws(() => resolveSupportRunParameters("controller", { knowledgeApplicability: "declared-v2" }), /仅适用于/);
+assert.throws(() => resolveSupportRunParameters("atomic", { knowledgeMode: "m4-support", knowledgeApplicability: "declared-v2" }), /atomic/);
 assert.equal(resolveSupportRunParameters("controller", { knowledgeMode: "m4-support" }).knowledgeMode, "m4-support");
 assert.equal(resolveSupportRunParameters("controller", { knowledgeMode: "m4-support", knowledgeSupport: "typed" }).knowledgeSupport, "typed");
 assert.throws(() => resolveSupportRunParameters("unknown" as "atomic"), /业务架构/);

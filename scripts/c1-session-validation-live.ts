@@ -54,12 +54,14 @@ export type StoreRead = { requestId: string; identity: QQIdentity; orderId: stri
 
 // Counters sit at fetch(), so automatic retries and failed HTTP requests count too.
 // Prices only aggregate reported usage; an unknown request never becomes zero cost.
-export function createC1ValidationGuard(fetcher: typeof fetch = fetch, now = Date.now, requestedLimits: C1ValidationLimits = c1ValidationLimits) {
+export function createC1ValidationGuard(fetcher: typeof fetch = fetch, now = Date.now, requestedLimits: C1ValidationLimits = c1ValidationLimits,
+  operationStop: "global" | "per-operation" = "global") {
   const limits = structuredClone(requestedLimits);
   assert.ok(operations.every(operation => Number.isSafeInteger(limits.requests[operation]) && limits.requests[operation] >= 0)
     && operations.some(operation => limits.requests[operation] > 0), "Request limits must be nonnegative safe integers with an enabled operation");
   assert.ok([limits.deadlineMs, limits.turnTimeoutMs].every(value => Number.isSafeInteger(value) && value > 0), "Time limits must be positive safe integers");
   assert.ok([limits.estimatedUsd, limits.estimatedCny].every(value => Number.isFinite(value) && value > 0), "Cost limits must be positive and finite");
+  assert.ok(["global", "per-operation"].includes(operationStop), "Invalid operation limit strategy");
   const started = now(), requests: Request[] = [];
   let active: Active | undefined, stopReason: string | null = null, sealed = false;
   const usage = () => Object.fromEntries(operations.map(operation => {
@@ -75,7 +77,7 @@ export function createC1ValidationGuard(fetcher: typeof fetch = fetch, now = Dat
     if (now() - started >= limits.deadlineMs) stopReason = "run_deadline";
     else if (costs.agent.knownEstimatedCost + costs.support.knownEstimatedCost >= limits.estimatedUsd) stopReason = "usd_soft_stop";
     else if (costs.rerank.knownEstimatedCost >= limits.estimatedCny) stopReason = "cny_soft_stop";
-    else if (operations.some(operation => limits.requests[operation] > 0 && costs[operation].requests >= limits.requests[operation])) stopReason = "operation_request_limit";
+    else if (operationStop === "global" && operations.some(operation => limits.requests[operation] > 0 && costs[operation].requests >= limits.requests[operation])) stopReason = "operation_request_limit";
     return stopReason;
   };
   return { requests, usage, stopped, remainingMs: () => Math.max(0, limits.deadlineMs - (now() - started)),
@@ -94,6 +96,7 @@ export function createC1ValidationGuard(fetcher: typeof fetch = fetch, now = Dat
       signal.throwIfAborted();
       const reason = stopped(); if (reason) throw new Error(`Validation stopped before HTTP: ${reason}`);
       if (limits.requests[operation] === 0) throw new Error(`Validation stopped before HTTP: operation_disabled:${operation}`);
+      if (requests.filter(request => request.operation === operation).length >= limits.requests[operation]) throw new Error(`Validation stopped before HTTP: operation_request_limit:${operation}`);
       const request: Request = { operation, caseId: current.caseId, turn: current.turn, requestId: current.requestId,
         startedAt: new Date(now()).toISOString(), httpStatus: null, error: null, totalTokens: null, estimatedCost: null,
         currency: operation === "rerank" ? "CNY" : "USD", usageRecorded: false };
@@ -178,7 +181,7 @@ export async function loadC1ValidationExecution(planPath: string, manifestPath: 
   assert.equal(rate, origin.hostname === "dashscope.aliyuncs.com" || origin.hostname.endsWith(".cn-beijing.maas.aliyuncs.com") ? .5 : null,
     "Rerank estimate must match the production region pricing contract");
   const required = [...await c1ValidationCodeFiles(), setupPath];
-  if (parameters.knowledgeApplicability === "declared") required.push("data/knowledge-applicability.json");
+  if (parameters.knowledgeApplicability !== "model_only") required.push(parameters.knowledgeApplicability === "declared-v2" ? "data/knowledge-applicability-v2.json" : "data/knowledge-applicability.json");
   for (const path of required) assert.ok(manifest.sourceHashes[path], `Missing frozen source: ${path}`);
   assert.equal(manifest.dataset.path, planPath);
   const sourceBytes = await bytesFor(Object.keys(manifest.sourceHashes));
@@ -194,7 +197,7 @@ export async function loadC1ValidationExecution(planPath: string, manifestPath: 
     for (const turn of plan.cases.find(value => value.id === fixture.caseId)!.turns) if (turn.stateChange) store.change(turn.stateChange);
     store.orders.clear();
   }
-  if (parameters.knowledgeApplicability === "declared") assert.deepEqual(setup.applicabilitySnapshot, await loadKnowledgeApplicabilitySnapshot());
+  if (parameters.knowledgeApplicability !== "model_only") assert.deepEqual(setup.applicabilitySnapshot, await loadKnowledgeApplicabilitySnapshot(parameters.knowledgeApplicability === "declared-v2" ? 2 : 1));
   else assert.equal(setup.applicabilitySnapshot, undefined);
   return { plan, setup, manifest, snapshotFiles: [...new Set([...Object.keys(manifest.sourceHashes), planPath, manifestPath, setupPath])],
     before: hashes({ ...sourceBytes, ...input }) };

@@ -6,7 +6,7 @@ export type SupportExperimentParameters = {
   knowledgeSupport: "binary" | "typed";
   knowledgeSupportModel: "configured" | "deepseek-v4-pro";
   knowledgeSupportPrompt: "v5" | "v6";
-  knowledgeApplicability: "model_only" | "declared";
+  knowledgeApplicability: "model_only" | "declared" | "declared-v2";
   knowledgeQueryMode: "combined" | "separated";
   knowledgeThreshold: number;
   knowledgeTimeoutMs: number;
@@ -36,8 +36,8 @@ export function resolveSupportParameters(input: Partial<SupportExperimentParamet
   if (parameters.knowledgeSupportPrompt === "v6" && (parameters.knowledgeMode !== "m4-support" || parameters.knowledgeSupport !== "typed")) throw new Error("knowledgeSupportPrompt v6 仅适用于 m4-support + typed。");
   if (!["configured", "deepseek-v4-pro"].includes(parameters.knowledgeSupportModel)) throw new Error("knowledgeSupportModel 仅支持 configured 或 deepseek-v4-pro。");
   if (parameters.knowledgeMode === "lexical" && parameters.knowledgeSupportModel !== "configured") throw new Error("knowledgeSupportModel deepseek-v4-pro 仅适用于 m4-support。");
-  if (!["model_only", "declared"].includes(parameters.knowledgeApplicability)) throw new Error("knowledgeApplicability 仅支持 model_only 或 declared。");
-  if (parameters.knowledgeMode !== "m4-support" && parameters.knowledgeApplicability === "declared") throw new Error("knowledgeApplicability declared 仅适用于 m4-support。");
+  if (!["model_only", "declared", "declared-v2"].includes(parameters.knowledgeApplicability)) throw new Error("knowledgeApplicability 仅支持 model_only、declared 或 declared-v2。");
+  if (parameters.knowledgeMode !== "m4-support" && parameters.knowledgeApplicability !== "model_only") throw new Error(`knowledgeApplicability ${parameters.knowledgeApplicability} 仅适用于 m4-support。`);
   if (!["combined", "separated"].includes(parameters.knowledgeQueryMode)) throw new Error("knowledgeQueryMode 仅支持 combined 或 separated。");
   if (parameters.knowledgeQueryMode === "separated" && parameters.knowledgeMode !== "m4-support") throw new Error("knowledgeQueryMode separated 仅适用于 m4-support。");
   if (!Number.isFinite(parameters.knowledgeThreshold) || parameters.knowledgeThreshold < 0 || parameters.knowledgeThreshold > 1) {

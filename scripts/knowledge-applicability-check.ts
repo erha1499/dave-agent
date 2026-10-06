@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { buildKnowledgeApplicabilityContext, gateKnowledgeApplicability, knowledgeApplicabilitySourceHash,
   loadKnowledgeApplicabilitySnapshot, validateKnowledgeApplicabilitySnapshot,
-  type KnowledgeApplicabilityContext, type KnowledgeApplicabilitySnapshot } from "../src/knowledge-applicability.ts";
+  type KnowledgeApplicabilityContext, type KnowledgeApplicabilityRule, type KnowledgeApplicabilitySnapshot } from "../src/knowledge-applicability.ts";
 import type { RetrievalDocument } from "../src/retrieval-ranking.ts";
 import type { EvidenceSupportCandidate } from "../src/evidence-acceptance.ts";
 
@@ -187,4 +187,48 @@ for (const location of ["root", "rule", "catalog", "categories"] as const) for (
   assert.throws(() => validateKnowledgeApplicabilitySnapshot(changed), `v2 rejects ${location} ${hidden} data outside its hash`);
 }
 assert.equal(snapshot.version, 1); assert.equal(single.version, "declared-order-preconditions-v1", "Historical metadata and gate version remain unchanged");
-console.log("Knowledge applicability checks passed: 8 unchanged v1 sources; v2 declared product categories, OR matching, unknown/mismatch, frozen content binding and strict JSON; identity/scope/inventory, no-refill and rule-only guards; 0 API calls.");
+
+// Explicit online-data v2 candidate: category assignments are the author's synthetic
+// business definition, while exact SKU identity and every source retain old bytes.
+const onlineV2Bytes = await readFile(new URL("data/knowledge-applicability-v2.json", root));
+const onlineV2Manifest = JSON.parse(onlineV2Bytes.toString());
+const onlineV2 = await loadKnowledgeApplicabilitySnapshot(2);
+assert.equal(onlineV2.version, 2);
+if (onlineV2.version !== 2) throw new Error("Explicit v2 loader did not return reviewed categories.");
+assert.equal(onlineV2.sha256, hash(JSON.stringify(onlineV2Manifest)));
+assert.equal(onlineV2.sourceSha256, hash(onlineV2Bytes), "v2 canonical content and raw-file provenance are distinct");
+assert.notEqual(onlineV2.sha256, onlineV2.sourceSha256);
+assert.equal(onlineV2.documents.length, 8);
+assert.deepEqual(onlineV2.documents.map(rule => rule.sourceId), snapshot.documents.map(rule => rule.sourceId));
+for (const document of documents) {
+  const reviewedRule: KnowledgeApplicabilityRule = onlineV2.documents.find(entry => entry.sourceId === document.id)!;
+  assert.equal(reviewedRule.sourceHash, knowledgeApplicabilitySourceHash(document));
+  assert.deepEqual(reviewedRule.scope, { shopId: document.shopId, productId: document.productId ?? null });
+  for (const basis of reviewedRule.basis) assert.ok(document.body.includes(basis.quote), `${document.id}: literal v2 basis`);
+  if (document.id !== "KB-SHOP-DEMO-1") assert.deepEqual(reviewedRule, snapshot.documents.find(entry => entry.sourceId === document.id),
+    "All seven non-shop declarations remain byte-equivalent JSON data");
+}
+const reviewedShop = onlineV2.documents.find(rule => rule.sourceId === "KB-SHOP-DEMO-1")!;
+assert.deepEqual(reviewedShop.requiredProductCategories, ["regular_lunch", "regular_dinner"]);
+assert.deepEqual(reviewedShop.basis, [{ field: "requiredProductCategories", quote: "常规午餐与晚餐套餐允许普通周末使用" }]);
+const priorShop = snapshot.documents.find(rule => rule.sourceId === reviewedShop.sourceId)!;
+const { requiredProductCategories: _newCategories, reviewNote: _newReview, basis: _newBasis, ...reviewedShopBinding } = reviewedShop;
+const { reviewNote: _oldReview, basis: _oldBasis, ...priorShopBinding } = priorShop;
+assert.deepEqual(reviewedShopBinding, priorShopBinding, "Adding a necessary category never rewrites shop source/scope or prior predicates");
+assert.deepEqual(onlineV2.productCatalog.map(({ shopId, productId, productName, categories }) => ({ shopId, productId, productName, categories })), [
+  { shopId: "shop-demo-1", productId: "product-demo-1", productName: "双人午餐团购券", categories: ["regular_lunch"] },
+  { shopId: "shop-demo-1", productId: "product-demo-2", productName: "单人晚餐团购券", categories: ["regular_dinner"] },
+]);
+const v1FileBytes = await readFile(new URL("data/knowledge-applicability.json", root));
+for (const product of onlineV2.productCatalog) {
+  assert.ok(seedBytes.toString().includes(`('${product.productId}', '${product.shopId}', '${product.productName}',`),
+    "Catalog identity is exactly present in the immutable seed, without a name-similarity lookup");
+  assert.ok(product.reviewNote.includes("作者赋类") && product.reviewNote.includes("没有精确SKU") && product.reviewNote.includes("不是按名称相似度推断"));
+  for (const bytes of [seedBytes, onlineBytes, v1FileBytes]) assert.ok(product.reviewNote.includes(hash(bytes)), "Review note binds every provenance file");
+}
+assert.ok(!onlineV2.productCatalog.some(product => product.productId === "product-demo-3"), "Unreviewed private SKU remains unknown, not an invented known mismatch");
+assert.ok(Object.isFrozen(onlineV2.productCatalog) && Object.isFrozen(onlineV2.productCatalog[0]!.categories));
+const defaultAgain = await loadKnowledgeApplicabilitySnapshot();
+assert.equal(defaultAgain.version, 1); assert.equal(defaultAgain.sha256, hash(v1FileBytes));
+assert.deepEqual(defaultAgain.documents, snapshot.documents, "Explicit v2 reads do not change the installed historical default");
+console.log("Knowledge applicability checks passed: 8 unchanged v1 sources; opted-in v2 reviews 8 sources and 2 exact seed products with author-assigned categories; unknown/mismatch, content binding, strict JSON, identity/scope/inventory, no-refill and rule-only guards; 0 API calls.");

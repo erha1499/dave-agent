@@ -4,7 +4,7 @@ import type { CouponStore } from "./coupon-store.ts";
 import type { EvidenceSupportCandidate } from "./evidence-acceptance.ts";
 import { scopeDocuments, type RetrievalDocument, type RetrievalScope } from "./retrieval-ranking.ts";
 
-export type KnowledgeApplicabilityMode = "model_only" | "declared";
+export type KnowledgeApplicabilityMode = "model_only" | "declared" | "declared-v2";
 const states = ["unused", "redeemed", "expired", "refunded"] as const;
 type CouponState = typeof states[number];
 type Scope = { shopId: string | null; productId: string | null };
@@ -49,7 +49,7 @@ export type KnowledgeApplicabilityRule = {
 export type KnowledgeApplicabilityProduct = { shopId: string; productId: string; productName: string; categories: string[]; reviewNote: string };
 type KnowledgeApplicabilityManifest = { serialization: "knowledge-document-v1"; documents: KnowledgeApplicabilityRule[] }
   & ({ version: 1 } | { version: 2; productCatalog: KnowledgeApplicabilityProduct[] });
-export type KnowledgeApplicabilitySnapshot = KnowledgeApplicabilityManifest & { sha256: string };
+export type KnowledgeApplicabilitySnapshot = KnowledgeApplicabilityManifest & { sha256: string; sourceSha256?: string };
 export const knowledgeApplicabilityVersion = (snapshot: KnowledgeApplicabilitySnapshot) => snapshot.version === 2
   ? "declared-order-preconditions-v2" as const : "declared-order-preconditions-v1" as const;
 
@@ -65,13 +65,14 @@ function freeze<T>(value: T): T {
   return value;
 }
 
-export function validateKnowledgeApplicabilitySnapshot(value: unknown, sourceSha256?: string): KnowledgeApplicabilitySnapshot {
+export function validateKnowledgeApplicabilitySnapshot(value: unknown, sourceSha256?: string, rawSourceSha256?: string): KnowledgeApplicabilitySnapshot {
   function fail(): never { throw new Error("知识适用前提文件无效，未启用声明门控。"); }
   if (!object(value) || !keys(value, ["version", "serialization", "documents", ...(value.version === 2 ? ["productCatalog"] : [])])
     || value.version !== 1 && value.version !== 2
     || value.serialization !== "knowledge-document-v1" || !Array.isArray(value.documents)
     || !value.documents.length || value.documents.length > 200 || sourceSha256 !== undefined && !sha(sourceSha256)) fail();
   if (value.version === 2 && !plainJson(value)) fail();
+  if (rawSourceSha256 !== undefined && (value.version !== 2 || !sha(rawSourceSha256))) fail();
   const categoriesValid = (categories: unknown): categories is string[] => Array.isArray(categories) && categories.length >= 1 && categories.length <= 20
     && new Set(categories).size === categories.length && categories.every(identifier);
   if (value.version === 2) {
@@ -107,14 +108,21 @@ export function validateKnowledgeApplicabilitySnapshot(value: unknown, sourceSha
   const manifest = structuredClone(value) as KnowledgeApplicabilityManifest, canonicalHash = hash(JSON.stringify(value));
   // v1 retains historical raw-file hashes; v2 binds the full declaration and product catalog to its JSON content.
   if (value.version === 2 && sourceSha256 !== undefined && sourceSha256 !== canonicalHash) fail();
-  return freeze({ ...manifest, sha256: sourceSha256 ?? canonicalHash });
+  return freeze({ ...manifest, sha256: sourceSha256 ?? canonicalHash, ...(rawSourceSha256 === undefined ? {} : { sourceSha256: rawSourceSha256 }) });
+}
+
+export function revalidateKnowledgeApplicabilitySnapshot(snapshot: KnowledgeApplicabilitySnapshot): KnowledgeApplicabilitySnapshot {
+  if (snapshot.version === 2 && !plainJson(snapshot)) throw new Error("知识适用前提文件无效，未启用声明门控。");
+  const { sha256, sourceSha256, ...manifest } = snapshot;
+  return validateKnowledgeApplicabilitySnapshot(manifest, sha256, sourceSha256);
 }
 
 // Call only for the declared candidate. No corpus/seed mutation or model/API dependency.
-export async function loadKnowledgeApplicabilitySnapshot(): Promise<KnowledgeApplicabilitySnapshot> {
-  const bytes = await readFile(new URL("../data/knowledge-applicability.json", import.meta.url));
-  const snapshot = validateKnowledgeApplicabilitySnapshot(JSON.parse(bytes.toString()), hash(bytes));
-  if (snapshot.documents.length !== 8) throw new Error("在线适用前提必须完整审阅现有 8 篇规则。");
+export async function loadKnowledgeApplicabilitySnapshot(version: 1 | 2 = 1): Promise<KnowledgeApplicabilitySnapshot> {
+  if (version !== 1 && version !== 2) throw new Error("知识适用前提版本仅支持 1 或 2。");
+  const bytes = await readFile(new URL(version === 2 ? "../data/knowledge-applicability-v2.json" : "../data/knowledge-applicability.json", import.meta.url));
+  const snapshot = validateKnowledgeApplicabilitySnapshot(JSON.parse(bytes.toString()), version === 1 ? hash(bytes) : undefined, version === 2 ? hash(bytes) : undefined);
+  if (snapshot.version !== version || snapshot.documents.length !== 8) throw new Error("在线适用前提必须按所选版本完整审阅现有 8 篇规则。");
   return snapshot;
 }
 
@@ -199,8 +207,7 @@ export function gateKnowledgeApplicability(input: { snapshot: KnowledgeApplicabi
   // Source mismatch is configuration/integrity failure, never a correct semantic rejection.
   try {
     if (input.snapshot.version === 2) {
-      const { sha256, ...manifest } = input.snapshot;
-      validateKnowledgeApplicabilitySnapshot(manifest, sha256);
+      revalidateKnowledgeApplicabilitySnapshot(input.snapshot);
     }
     for (const rule of input.snapshot.documents) metadata.set(rule.sourceId, rule);
     if (input.candidates.length > 5 || new Set(input.candidates.map(candidate => candidate.rank)).size !== input.candidates.length

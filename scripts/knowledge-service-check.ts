@@ -13,7 +13,7 @@ import type { RetrievalDocument } from "../src/retrieval-ranking.ts";
 import { knowledgeProviderSpans } from "../src/knowledge-evaluation.ts";
 import { summarizeEvaluation, type EvalSpan } from "../src/evaluation.ts";
 import { analyzeSupportSpans } from "../src/support-evaluation.ts";
-import { buildKnowledgeApplicabilityContext, knowledgeApplicabilitySourceHash, validateKnowledgeApplicabilitySnapshot } from "../src/knowledge-applicability.ts";
+import { buildKnowledgeApplicabilityContext, knowledgeApplicabilitySourceHash, loadKnowledgeApplicabilitySnapshot, validateKnowledgeApplicabilitySnapshot } from "../src/knowledge-applicability.ts";
 
 const docs: RetrievalDocument[] = [
   { id: "A", title: "退款规则", body: "未使用的券可申请退款。", tags: ["退款"], shopId: null, productId: null, status: "active" },
@@ -410,6 +410,30 @@ assert.equal(modelOnly.trace.status, "accepted"); assert.equal(modelOnly.documen
 assert.deepEqual(modelOnly.trace.applicability, { mode: "model_only" }); assert.equal(modelOnly.trace.settings!.applicability, undefined);
 assert.equal(contentHash(modelOnly.trace.rawRanking), contentHash(declared.trace.rawRanking));
 assert.throws(() => createKnowledgeService(gateStore, { applicability: "declared" }));
+assert.throws(() => createKnowledgeService(gateStore, { applicability: "declared-v2" }));
+const { sha256: _v1Hash, ...gateManifest } = gateSnapshot;
+const gateSnapshotV2 = validateKnowledgeApplicabilitySnapshot({ ...gateManifest, version: 2,
+  productCatalog: [{ shopId: scope.shopId, productId: scope.productId, productName: "Synthetic catalog fixture", categories: ["test_category"], reviewNote: "Author-reviewed fixture category; no name inference." }] });
+const declaredV2 = await createKnowledgeService(gateStore, { ...declaredOptions, applicability: "declared-v2", applicabilitySnapshot: gateSnapshotV2 })
+  .search({ query, scope, applicabilityContext: gateContext });
+assert.equal(declaredV2.trace.applicability!.mode, "declared-v2"); assert.equal(declaredV2.trace.applicability!.gate!.version, "declared-order-preconditions-v2");
+assert.equal(declaredV2.trace.settings!.applicability!.sourceSha256, null, "An injected manifest without file bytes does not invent raw-file provenance");
+for (const [applicability, applicabilitySnapshot] of [["declared", gateSnapshotV2], ["declared-v2", gateSnapshot]] as const) {
+  const mismatchedVersion = await createKnowledgeService(gateStore, { ...declaredOptions, applicability, applicabilitySnapshot }).search({ query, scope, applicabilityContext: gateContext });
+  assert.equal(mismatchedVersion.trace.status, "unavailable"); assert.equal(mismatchedVersion.trace.reason, "metadata_binding_invalid");
+  assert.ok(!mismatchedVersion.trace.calls.some(call => call.operation === "support"), "A version mismatch must fail before support verification");
+}
+const hiddenDeclaration = structuredClone(gateSnapshotV2); Object.defineProperty(hiddenDeclaration, "allowUserClaim", { value: true });
+const hiddenResult = await createKnowledgeService(gateStore, { ...declaredOptions, applicability: "declared-v2", applicabilitySnapshot: hiddenDeclaration }).search({ query, scope });
+assert.equal(hiddenResult.trace.reason, "metadata_binding_invalid"); assert.ok(!hiddenResult.trace.calls.some(call => call.operation === "support"));
+gateRows = [];
+const loadedV2 = await createKnowledgeService(gateStore, { ...declaredOptions, applicability: "declared-v2", applicabilitySnapshot: undefined }).search({ query, scope });
+const actualV2 = await loadKnowledgeApplicabilitySnapshot(2);
+assert.equal(loadedV2.trace.settings!.applicability!.version, "declared-order-preconditions-v2");
+assert.equal(loadedV2.trace.settings!.applicability!.snapshotHash, actualV2.sha256);
+assert.equal(loadedV2.trace.settings!.applicability!.sourceSha256, actualV2.sourceSha256, "The opt-in selector actually loads and freezes the v2 file");
+assert.equal(loadedV2.trace.status, "rejected"); assert.deepEqual(loadedV2.trace.calls, []);
+gateRows = structuredClone(gateDocs);
 
 // The actual provider requests must diverge only at ranking; fact verification
 // and its hash still bind the complete host evidence, including dates/counts.

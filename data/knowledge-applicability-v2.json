@@ -1,0 +1,146 @@
+{
+  "version": 2,
+  "serialization": "knowledge-document-v1",
+  "documents": [
+    {
+      "sourceId": "KB-REFUND-UNUSED",
+      "scope": {
+        "shopId": null,
+        "productId": null
+      },
+      "sourceHash": "6a5f9cbdffe64ed0bb59c8772892022811ade454afbf911c216f5aa5981a314c",
+      "atLeastOneCouponInStates": [
+        "unused"
+      ],
+      "basis": [
+        {
+          "field": "atLeastOneCouponInStates",
+          "quote": "已支付、未核销且尚未过期的团购券可以申请退款。"
+        }
+      ],
+      "reviewNote": "仅声明当前订单至少存在未核销状态券这一必要条件；状态不是有效期，unused且expiresAt已过期仍可出现。支付、日期、具体券、金额和申请资格仍未被本门控证明。"
+    },
+    {
+      "sourceId": "KB-REFUND-REDEEMED",
+      "scope": {
+        "shopId": null,
+        "productId": null
+      },
+      "sourceHash": "595a4a3440a1a39164346563825db1c004492622071436bf6b123cc1ec93cd5c",
+      "atLeastOneCouponInStates": [
+        "redeemed"
+      ],
+      "basis": [
+        {
+          "field": "atLeastOneCouponInStates",
+          "quote": "已经核销的团购券不适用未核销自动退款规则，需由商家核实实际消费与售后原因后决定。"
+        }
+      ],
+      "reviewNote": "仅证明当前订单存在已核销券；不证明用户所指具体券就是它，不代表商家核实、批准或拒绝退款。"
+    },
+    {
+      "sourceId": "KB-REFUND-EXPIRED",
+      "scope": {
+        "shopId": null,
+        "productId": null
+      },
+      "sourceHash": "5c44c33ada0ae0242549a401b5b3c0545a8bc33a144c8dd6f808efffaf66e637",
+      "atLeastOneCouponInStates": [
+        "unused",
+        "expired"
+      ],
+      "basis": [
+        {
+          "field": "atLeastOneCouponInStates",
+          "quote": "已过期但未核销的券需要商家确认能否退款、延期以及金额。"
+        }
+      ],
+      "reviewNote": "未核销且过期的必要状态投影：原始status可为expired，也可仍为unused而expiresAt已过期。此处不检查时间，不把unused推断为未过期，也不把匹配推断为已过期；日期与商家确认仍由后续原文及事实判断。"
+    },
+    {
+      "sourceId": "KB-REFUND-PARTIAL",
+      "scope": {
+        "shopId": null,
+        "productId": null
+      },
+      "sourceHash": "655d41cbdce64f81cf75065ca25bd354658bd18f26a39d716d4c5d33d75249e5",
+      "minimumCouponCount": 2,
+      "basis": [
+        {
+          "field": "minimumCouponCount",
+          "quote": "同一订单有多张券时必须逐券核对。"
+        }
+      ],
+      "reviewNote": "多张只声明同订单券总数至少2；正文没有要求一定已核销一张，因此不凭标题或tags加该限制。不证明逐券资格、分摊金额或退款批准。"
+    },
+    {
+      "sourceId": "KB-REFUND-PAYMENT",
+      "scope": {
+        "shopId": null,
+        "productId": null
+      },
+      "sourceHash": "82a07decf07014e3579d13aac72b4760878292336afca620ef245b41a17bb69e",
+      "basis": [],
+      "reviewNote": "none_declared：本轮审阅未声明可独立执行的订单券数量/券状态必要前提；不是规则全面适用。本文其他范围、支付历史、商品、日期、未知事实或操作限制仍由原文与现有宿主/支持判别处理。"
+    },
+    {
+      "sourceId": "KB-SHOP-DEMO-1",
+      "scope": {
+        "shopId": "shop-demo-1",
+        "productId": null
+      },
+      "sourceHash": "19f2e70c05fc908845741ec17e78e9d686aa7ce34ad1c2df73e66d5acf0a0cb0",
+      "basis": [
+        {
+          "field": "requiredProductCategories",
+          "quote": "常规午餐与晚餐套餐允许普通周末使用"
+        }
+      ],
+      "reviewNote": "原文逐字声明普通周末规则的适用范围为常规午餐或晚餐套餐；这里仅新增至少满足一个类别的必要前提。regular_lunch和regular_dinner是作者为本项目合成业务维护的分类名，商品到类别的关系来自本文件作者声明，不冒称原文已有精确SKU分类映射或外部商家认证。其余订单券数量/券状态、来源哈希及scope沿用v1审阅；类别匹配不证明特定日期、节假日、实时接待、预约、库存、申请资格或任何资金权限。",
+      "requiredProductCategories": [
+        "regular_lunch",
+        "regular_dinner"
+      ]
+    },
+    {
+      "sourceId": "KB-PRODUCT-LUNCH",
+      "scope": {
+        "shopId": "shop-demo-1",
+        "productId": "product-demo-1"
+      },
+      "sourceHash": "63f35348e326895d5b51da7f4e1151ff2776228875c6de0293122e59c921c64d",
+      "basis": [],
+      "reviewNote": "none_declared：本轮审阅未声明可独立执行的订单券数量/券状态必要前提；不是规则全面适用。本文其他范围、支付历史、商品、日期、未知事实或操作限制仍由原文与现有宿主/支持判别处理。"
+    },
+    {
+      "sourceId": "KB-PRODUCT-DINNER",
+      "scope": {
+        "shopId": "shop-demo-1",
+        "productId": "product-demo-2"
+      },
+      "sourceHash": "1e69587d266e6b6ca51b8963075fa4776b64de2a996225f24afc6cdc1a95f251",
+      "basis": [],
+      "reviewNote": "none_declared：本轮审阅未声明可独立执行的订单券数量/券状态必要前提；不是规则全面适用。本文其他范围、支付历史、商品、日期、未知事实或操作限制仍由原文与现有宿主/支持判别处理。"
+    }
+  ],
+  "productCatalog": [
+    {
+      "shopId": "shop-demo-1",
+      "productId": "product-demo-1",
+      "productName": "双人午餐团购券",
+      "categories": [
+        "regular_lunch"
+      ],
+      "reviewNote": "作者赋类：将合成商品“双人午餐团购券”定义为regular_lunch。身份shopId/productId/productName逐字核对db/02-seed.sql，文件SHA-256 82c7143840ac30d166207dcf92c227b3368b98af899412a4f669f04bfb976560；商品原始知识来自data/acceptance-online.json，文件SHA-256 5f97b7f4e77cd1695a38ef9b0c42e53f52f40f7ae869a39fcdcdae5ae8971b72；八篇规则既有声明来自data/knowledge-applicability.json，文件SHA-256 c3af34125bf0e2d693a82bd3729aef1cf05be314a4ae60d7332c8b8c9c98eb4e。seed和知识原文没有精确SKU到这些新类别标签的既有映射；本项是版本化的作者合成业务定义，不是按名称相似度推断、用户文本声明、模型结论或外部商家认证，也不构成预约、接待或退款批准。"
+    },
+    {
+      "shopId": "shop-demo-1",
+      "productId": "product-demo-2",
+      "productName": "单人晚餐团购券",
+      "categories": [
+        "regular_dinner"
+      ],
+      "reviewNote": "作者赋类：将合成商品“单人晚餐团购券”定义为regular_dinner。身份shopId/productId/productName逐字核对db/02-seed.sql，文件SHA-256 82c7143840ac30d166207dcf92c227b3368b98af899412a4f669f04bfb976560；商品原始知识来自data/acceptance-online.json，文件SHA-256 5f97b7f4e77cd1695a38ef9b0c42e53f52f40f7ae869a39fcdcdae5ae8971b72；八篇规则既有声明来自data/knowledge-applicability.json，文件SHA-256 c3af34125bf0e2d693a82bd3729aef1cf05be314a4ae60d7332c8b8c9c98eb4e。seed和知识原文没有精确SKU到这些新类别标签的既有映射；本项是版本化的作者合成业务定义，不是按名称相似度推断、用户文本声明、模型结论或外部商家认证，也不构成预约、接待或退款批准。"
+    }
+  ]
+}

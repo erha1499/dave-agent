@@ -8,8 +8,8 @@ import { applyEvidenceSupport, evidenceSupportInputHash, evidenceSupportRequestH
   evidenceSupportTypedPromptVersion, evidenceSupportTypedV6PromptVersion, evidenceSupportTypedPrompt, evidenceSupportTypedV6Prompt,
   validateEvidenceSupportVerification, type EvidenceSupportSettings, type EvidenceSupportVerification } from "../src/evidence-support.ts";
 import type { EvalRunDetail, EvalSpan, EvalTurn } from "../src/evaluation.ts";
-import { buildKnowledgeApplicabilityContext, gateKnowledgeApplicability, knowledgeApplicabilitySourceHash,
-  validateKnowledgeApplicabilitySnapshot, type KnowledgeApplicabilitySnapshot } from "../src/knowledge-applicability.ts";
+import { buildKnowledgeApplicabilityContext, gateKnowledgeApplicability, knowledgeApplicabilitySourceHash, loadKnowledgeApplicabilitySnapshot, revalidateKnowledgeApplicabilitySnapshot,
+  validateKnowledgeApplicabilitySnapshot, type KnowledgeApplicabilityMode, type KnowledgeApplicabilitySnapshot } from "../src/knowledge-applicability.ts";
 import { applyKnowledgeApplicabilityGate, finishKnowledgeApplicabilityAcceptance, knowledgeApplicabilitySettings, type KnowledgeTrace } from "../src/knowledge-service.ts";
 import { scopeDocuments, serializeRetrievalDocument, type RetrievalDocument } from "../src/retrieval-ranking.ts";
 import { buildSupportEvidenceBinding, evidenceBindingVersion } from "../src/support-evidence-context.ts";
@@ -134,7 +134,7 @@ function trustedContext(turn: EvalTurn, call: EvalSpan, contract: Contract, expe
   return purpose === "user_policy" ? null : buildKnowledgeApplicabilityContext({ order, requestId: call.parentSpanId!, purpose: purpose! });
 }
 
-function recordedEvidence(turn: EvalTurn, call: EvalSpan, contract: Contract, corpus: RetrievalDocument[], mode: "model_only" | "declared",
+function recordedEvidence(turn: EvalTurn, call: EvalSpan, contract: Contract, corpus: RetrievalDocument[], mode: KnowledgeApplicabilityMode,
   registry: KnowledgeApplicabilitySnapshot | undefined, configuration: Record<string, unknown>, expectedEvidenceBindingVersion?: EvidenceBindingVersion,
   expectedSupportSettings?: EvidenceSupportSettings) {
   const { trace, context } = call.knowledge!;
@@ -177,7 +177,7 @@ function recordedEvidence(turn: EvalTurn, call: EvalSpan, contract: Contract, co
   }
   let prepared = acceptEvidence({ query: trace.query, scope: trace.scope, documents, ranking: trace.rawRanking, config: { mode: "support", threshold: trace.threshold! } });
   let gate;
-  if (mode === "declared") {
+  if (mode !== "model_only") {
     assert.ok(registry, "Declared audit requires the exact independently frozen registry");
     const fresh = trustedContext(turn, call, contract, expectedEvidenceBindingVersion, configuration.knowledgeQueryMode as QueryMode | undefined);
     assert.deepEqual(context.applicability ?? null, fresh);
@@ -215,7 +215,7 @@ function recordedEvidence(turn: EvalTurn, call: EvalSpan, contract: Contract, co
   });
   assert.deepEqual(call.output, output); assert.deepEqual(trace.sources, output.map(doc => ({ sourceId: doc.sourceId, version: contentHash(doc) })));
   assert.equal(contentHash(trace.rawRanking), originalRanking, "Gate/replay must not rewrite the raw ranking");
-  return { gate: mode === "declared" ? gate!.integrity ? "complete" as const : "incomplete" as const
+  return { gate: mode !== "model_only" ? gate!.integrity ? "complete" as const : "incomplete" as const
     : trace.applicability ? "not_enabled" as const : "not_recorded" as const, support: "complete" as const };
 }
 
@@ -229,7 +229,7 @@ export function auditC1BusinessEvidence(artifact: EvalRunDetail, artifactHash: s
   attempt(() => assert.equal(artifact.run.suiteId, "support-business-live-development-v2"));
   attempt(() => assert.equal(artifact.run.status, "completed"));
   const mode = configuration.knowledgeApplicability ?? "model_only";
-  attempt(() => assert.ok(mode === "model_only" || mode === "declared"));
+  attempt(() => assert.ok(mode === "model_only" || mode === "declared" || mode === "declared-v2"));
   const queryMode = expectedQueryMode ?? configuration.knowledgeQueryMode as QueryMode | undefined;
   attempt(() => assert.ok(queryMode === undefined || queryMode === "combined" || queryMode === "separated"));
   if (expectedQueryMode !== undefined) attempt(() => assert.equal(configuration.knowledgeQueryMode, expectedQueryMode, "Run query mode differs from the independently frozen candidate"));
@@ -240,10 +240,13 @@ export function auditC1BusinessEvidence(artifact: EvalRunDetail, artifactHash: s
       selectedPrompt === "v6" ? evidenceSupportTypedV6PromptVersion : evidenceSupportTypedPromptVersion);
     assert.equal(configuration.knowledgeSupportPrompt, selectedPrompt, "Frozen prompt selection cannot be omitted or downgraded");
   });
-  if (mode === "declared") attempt(() => {
+  if (mode !== "model_only") attempt(() => {
     assert.ok(registry, "Missing frozen declaration registry");
-    assert.equal(object(object(snapshot.content.implementation).files)[registryPath], registry.sha256, "Registry must match the run's frozen sidecar hash");
-    const { sha256, ...manifest } = registry; validateKnowledgeApplicabilitySnapshot(manifest, sha256);
+    assert.equal(registry.version, mode === "declared-v2" ? 2 : 1, "Declaration version must match the selected mode");
+    const selectedPath = mode === "declared-v2" ? "data/knowledge-applicability-v2.json" : registryPath;
+    const sourceHash = registry.version === 2 ? registry.sourceSha256 : registry.sha256; assert.ok(sourceHash, "Freeze the raw declaration file hash separately from canonical content");
+    assert.equal(object(object(snapshot.content.implementation).files)[selectedPath], sourceHash, "Registry must match the run's frozen sidecar file hash");
+    revalidateKnowledgeApplicabilitySnapshot(registry);
   });
   let corpus: RetrievalDocument[] = []; attempt(() => { corpus = corpusFromSnapshot(business); });
   const all = artifact.cases.flatMap(item => item.turns.map(turn => ({ caseId: item.id, turn })));
@@ -266,8 +269,8 @@ export function auditC1BusinessEvidence(artifact: EvalRunDetail, artifactHash: s
       assert.equal(object(declared[0]).knowledge, contract.kind === "empty" ? "empty" : contract.kind === "database_error" ? "error" : "normal",
         "Only the frozen explicit fixture may inject an empty corpus or database fault"); });
     check("trusted_context", () => { assert.ok(call?.knowledge && turn); trustedContext(turn, call, contract, expectedEvidenceBindingVersion, queryMode); });
-    check("recorded_evidence", () => { assert.ok(call?.knowledge && turn); proof = recordedEvidence(turn, call, contract, corpus, mode as "model_only" | "declared", registry, configuration, expectedEvidenceBindingVersion, expectedSupportSettings); });
-    check("applicability", () => { assert.ok(proof); if (mode === "declared" && contract.kind !== "database_error") assert.equal(proof.gate, "complete"); });
+    check("recorded_evidence", () => { assert.ok(call?.knowledge && turn); proof = recordedEvidence(turn, call, contract, corpus, mode as KnowledgeApplicabilityMode, registry, configuration, expectedEvidenceBindingVersion, expectedSupportSettings); });
+    check("applicability", () => { assert.ok(proof); if (mode !== "model_only" && contract.kind !== "database_error") assert.equal(proof.gate, "complete"); });
     const expected = contract.kind === "evidence" ? ["KB-REFUND-UNUSED"] : [];
     const accepted = Array.isArray(call?.output) ? call.output.map(doc => object(doc).sourceId) : [];
     check("semantic_contract", () => { assert.ok(call?.knowledge); assert.deepEqual([...accepted].sort(), expected);
@@ -576,8 +579,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     assert.ok(args.length === 2 && args[0] === "--file", "Use --check or --file <synthetic-run-artifact.json> [--evidence-binding=order-evidence-binding-v2] [--query-mode=combined|separated] [--support-settings=<frozen-settings.json>]");
     const bytes = await readFile(args[1]!), artifact = JSON.parse(bytes.toString()) as EvalRunDetail;
     const mode = object(artifact.run.snapshot.content.settings).knowledgeApplicability;
-    const registryBytes = mode === "declared" ? await readFile(new URL(`../${registryPath}`, import.meta.url)) : undefined;
-    const registry = registryBytes ? validateKnowledgeApplicabilitySnapshot(JSON.parse(registryBytes.toString()), contentHash(registryBytes)) : undefined;
+    const registry = mode === "declared" || mode === "declared-v2" ? await loadKnowledgeApplicabilitySnapshot(mode === "declared-v2" ? 2 : 1) : undefined;
     const expectedSupportSettings = settingsPath === undefined ? undefined : object(JSON.parse(await readFile(settingsPath, "utf8"))) as EvidenceSupportSettings;
     const result = auditC1BusinessEvidence(artifact, contentHash(bytes), registry, expectedEvidenceBindingVersion, expectedQueryMode, expectedSupportSettings);
     console.log(JSON.stringify({ ...result, checkerHash: contentHash(await readFile(fileURLToPath(import.meta.url))) }, null, 2));

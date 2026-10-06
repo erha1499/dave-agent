@@ -220,7 +220,7 @@ export async function runC1ContextCheck(live = false, split: C1Split = "original
   resolveEvidenceSupportModel(knowledgeSupportModel);
   const data = await loadC1ContextDataset(split), adapter = await loadActionAdapter(), clients = live ? undefined : await mockClients(knowledgeSupport, knowledgeSupportModel), runId = randomUUID();
   const rows: Row[] = [];
-  const codeFiles = ["scripts/c1-context-check.ts", "src/support-controller.ts", "src/support-context.ts", "src/support-reference-selection.ts", "src/support-evidence-context.ts", "src/support-context-action.ts", "src/knowledge-service.ts", "src/knowledge-applicability.ts", "data/knowledge-applicability.json", "src/support-parameters.ts", "src/evidence-support.ts", "src/evidence-acceptance.ts", "src/retrieval-ranking.ts", "src/bailian.ts"];
+  const codeFiles = ["scripts/c1-context-check.ts", "src/support-controller.ts", "src/support-context.ts", "src/support-reference-selection.ts", "src/support-evidence-context.ts", "src/support-context-action.ts", "src/knowledge-service.ts", "src/knowledge-applicability.ts", "data/knowledge-applicability.json", ...(knowledgeApplicability === "declared-v2" ? ["data/knowledge-applicability-v2.json"] : []), "src/support-parameters.ts", "src/evidence-support.ts", "src/evidence-acceptance.ts", "src/retrieval-ranking.ts", "src/bailian.ts"];
   const codeHashes = async () => Object.fromEntries(await Promise.all(codeFiles.map(async file => [file, hash(await readFile(new URL(file, root)))])));
   const codeBefore = await codeHashes();
   for (const test of data.dataset.cases) {
@@ -333,7 +333,8 @@ export async function runC1ContextCheck(live = false, split: C1Split = "original
         }
         if (row.traces.some(trace => trace.status === "unavailable")) throw new Error("Knowledge service unavailable; see sanitized traces");
         if (row.traces.some(trace => trace.applicability?.mode !== knowledgeApplicability
-          || knowledgeApplicability === "declared" && trace.applicability?.gate?.integrity !== true)) {
+          || knowledgeApplicability !== "model_only" && (trace.applicability?.gate?.integrity !== true
+            || trace.applicability.gate.version !== (knowledgeApplicability === "declared-v2" ? "declared-order-preconditions-v2" : "declared-order-preconditions-v1")))) {
           throw new Error("Knowledge applicability audit incomplete; retained accepted evidence is not a complete judgment");
         }
         if (variant.expected.resolution === "clarify" || supplied.contract === "unsupported_refund_limit") {
@@ -449,7 +450,7 @@ export async function runC1ContextCheck(live = false, split: C1Split = "original
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  assert.ok(process.argv.slice(2).every(arg => arg === "--live" || arg === "--schema-only" || /^--split=(original|development|validation-v2|validation-v3)$/.test(arg) || /^--applicability=(model_only|declared)$/.test(arg) || /^--knowledge-support=(binary|typed)$/.test(arg) || /^--knowledge-support-model=(configured|deepseek-v4-pro)$/.test(arg) || /^--threshold=(?:0(?:\.\d+)?|1(?:\.0+)?)$/.test(arg)), "Use --live, --schema-only, --split=original|development|validation-v2|validation-v3, --threshold=0..1, --knowledge-support=binary|typed, --knowledge-support-model=configured|deepseek-v4-pro, --applicability=model_only|declared only");
+  assert.ok(process.argv.slice(2).every(arg => arg === "--live" || arg === "--schema-only" || /^--split=(original|development|validation-v2|validation-v3)$/.test(arg) || /^--applicability=(model_only|declared|declared-v2)$/.test(arg) || /^--knowledge-support=(binary|typed)$/.test(arg) || /^--knowledge-support-model=(configured|deepseek-v4-pro)$/.test(arg) || /^--threshold=(?:0(?:\.\d+)?|1(?:\.0+)?)$/.test(arg)), "Use --live, --schema-only, --split=original|development|validation-v2|validation-v3, --threshold=0..1, --knowledge-support=binary|typed, --knowledge-support-model=configured|deepseek-v4-pro, --applicability=model_only|declared|declared-v2 only");
   const split = (process.argv.find(arg => arg.startsWith("--split="))?.slice(8) ?? "original") as C1Split;
   const threshold = Number(process.argv.find(arg => arg.startsWith("--threshold="))?.slice(12) ?? ".71");
   assert.ok(process.argv.filter(arg => arg.startsWith("--threshold=")).length <= 1, "Only one threshold is allowed");
