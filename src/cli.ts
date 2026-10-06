@@ -17,6 +17,14 @@ import { ConversationStateStore } from "./conversation-state.ts";
 import { createKnowledgeService } from "./knowledge-service.ts";
 import { readKnowledgeParameters, resolveSupportRunParameters } from "./support-parameters.ts";
 
+export function parseCliInput(text: string): { kind: "exit" } | { kind: "empty" } | { kind: "message"; text: string } {
+  const command = text.trim();
+  if (command === "/exit") return { kind: "exit" };
+  if (!command) return { kind: "empty" };
+  // Trimming is only for local controls; business confirmation sees actual input.
+  return { kind: "message", text };
+}
+
 export async function runCliPrompt(
   session: AgentSession, text: string, write: (text: string) => Promise<void>,
   afterDeliver?: (reply: Reply) => Promise<void>,
@@ -77,9 +85,10 @@ async function main() {
     console.log(`团购券客服演示（${senderId}）：券单 COUPON-1001${afterSales ? "；模拟协商 COUPON-2001 / 2002 / 2003" : "，只读咨询"}；输入 /exit 退出。全部是模拟数据。`);
     try {
       while (true) {
-        const text = (await input.question("你：")).trim();
-        if (text === "/exit") break;
-        if (!text) continue;
+        const line = parseCliInput(await input.question("你："));
+        if (line.kind === "exit") break;
+        if (line.kind === "empty") continue;
+        const { text } = line;
         try {
           const confirmation = (refunds ? await confirmRefundReply(refunds, identity, sourceKey, text) : undefined)
             ?? (afterSales ? await confirmMerchantReply(afterSales, identity, sourceKey, text) : undefined);

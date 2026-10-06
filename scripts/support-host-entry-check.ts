@@ -2,10 +2,42 @@ import assert from "node:assert/strict";
 import { fauxAssistantMessage, fauxProvider } from "@earendil-works/pi-ai";
 import type { QQBotInboundMessage } from "@tencent-connect/qqbot-nodejs";
 import { createModelRuntime } from "../src/agent.ts";
-import { runCliPrompt } from "../src/cli.ts";
+import { parseCliInput, runCliPrompt } from "../src/cli.ts";
 import type { CouponStore } from "../src/coupon-store.ts";
+import type { RefundStore } from "../src/refunds.ts";
+import type { AfterSalesStore } from "../src/after-sales.ts";
+import { confirmRefundReply } from "../src/refund-entry.ts";
+import { confirmMerchantReply } from "../src/after-sales-entry.ts";
 import { QQAgent } from "../src/qq-agent.ts";
 import { createSupportSession, getSupportHostReceipt } from "../src/support-session.ts";
+
+// Exercise the CLI classification before both real confirmation parsers. Unicode
+// padding must never become a valid confirmation through entry-point trimming.
+assert.deepEqual(parseCliInput(" \t/exit \t"), { kind: "exit" });
+assert.deepEqual(parseCliInput(" \t\u00a0"), { kind: "empty" });
+let confirmed = 0;
+const refunds = { async confirm() { confirmed++; return {}; } } as unknown as RefundStore;
+const merchant = { async request() { confirmed++; return {}; } } as unknown as AfterSalesStore;
+const inputIdentity = { appId: "cli-input-app", senderId: "cli-input-user" };
+for (const command of ["确认退款 00000000-0000-4000-8000-000000000001", "确认联系商家 COUPON-2001 原因：行程变化"]) {
+  for (const padding of ["\u00a0", "\ufeff", "\u200b", "\n"]) {
+    for (const raw of [padding + command, command + padding]) {
+      const line = parseCliInput(raw); assert.equal(line.kind, "message");
+      if (line.kind !== "message") throw new Error("confirmation unexpectedly became a control command");
+      await confirmRefundReply(refunds, inputIdentity, "source", line.text);
+      await confirmMerchantReply(merchant, inputIdentity, "source", line.text);
+      assert.equal(confirmed, 0, "CLI must not normalize malformed user text into business authorization");
+    }
+  }
+}
+for (const command of ["确认退款 00000000-0000-4000-8000-000000000001", "确认联系商家 COUPON-2001 原因：行程变化"]) {
+  const line = parseCliInput(` \t${command}\t `); assert.equal(line.kind, "message");
+  if (line.kind !== "message") throw new Error("confirmation unexpectedly became a control command");
+  await confirmRefundReply(refunds, inputIdentity, "source", line.text);
+  await confirmMerchantReply(merchant, inputIdentity, "source", line.text);
+}
+assert.equal(confirmed, 2, "confirmation parsers retain ASCII horizontal-padding compatibility");
+console.log("[support-host-entry] CLI preserves raw business input; Unicode/newline wrappers never authorize, ASCII padding remains compatible PASS");
 
 // A deterministic host command must still be delivered after Pi retains a
 // previous provider error. Both real entry paths use the same Session wrapper.
