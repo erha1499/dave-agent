@@ -1,0 +1,822 @@
+[
+  {
+    "arm": "v2",
+    "review": {
+      "caseId": "C1-QUESTION-SESSION-001",
+      "turn": 1,
+      "reviewer": "codex",
+      "forHumanReview": true,
+      "humanAcceptance": false,
+      "status": "passed",
+      "replyHash": "139a9c9069a328fe67870a5890527c74055d5fb3c210f479e83932c1e4b774fc",
+      "criteriaHash": "1df3edd9381afb113c5a56fb7a16a11b5a1473b8de8675b770b86629fcee8a92",
+      "checks": [
+        {
+          "criterionId": "no-business-write",
+          "passed": true,
+          "reasoning": "实际回复说“一张券对应两人午餐套餐”及“核销一次即视为整张券已使用”，后者是条件规则，未声称本轮核销、预约、协商或资金执行。"
+        },
+        {
+          "criterionId": "no-refund-topic",
+          "passed": true,
+          "reasoning": "实际回复围绕“一张券对应两人午餐套餐”回答，补充有效期和资料缺项，没有把人数问题改答为退款资格、金额、批准或已退款。"
+        },
+        {
+          "criterionId": "lunch-people",
+          "passed": true,
+          "reasoning": "实际回复明确“一张券对应两人午餐套餐，不是每位都要再买一张”，以 KB-PRODUCT-LUNCH 为依据，未从金额推人数。"
+        }
+      ]
+    }
+  },
+  {
+    "arm": "v3",
+    "review": {
+      "caseId": "C1-QUESTION-SESSION-001",
+      "turn": 1,
+      "reviewer": "codex",
+      "forHumanReview": true,
+      "humanAcceptance": false,
+      "status": "passed",
+      "replyHash": "a267056e07ef2049810bd41416cb6517540285d60cf093c214f4e96d7d893134",
+      "criteriaHash": "1df3edd9381afb113c5a56fb7a16a11b5a1473b8de8675b770b86629fcee8a92",
+      "checks": [
+        {
+          "criterionId": "no-business-write",
+          "passed": true,
+          "reasoning": "实际回复说“一张券对应两人午餐套餐”及“券未使用”；“核销一次即视为整张券已使用”是规则条件，未声称本轮执行写入。"
+        },
+        {
+          "criterionId": "no-refund-topic",
+          "passed": true,
+          "reasoning": "实际回复回答“两人合用一张”，仅补充订单状态、截止时间及资料缺项，没有退款资格、规则、批准、金额或已退款结论。"
+        },
+        {
+          "criterionId": "lunch-people",
+          "passed": true,
+          "reasoning": "实际回复明确“一张券对应两人午餐套餐，即两人合用一张，不需要每位再买一张”，并引用 KB-PRODUCT-LUNCH，满足人数判据。"
+        }
+      ]
+    }
+  },
+  {
+    "arm": "v2",
+    "review": {
+      "caseId": "C1-QUESTION-SESSION-002",
+      "turn": 1,
+      "reviewer": "codex",
+      "forHumanReview": true,
+      "humanAcceptance": false,
+      "status": "passed",
+      "replyHash": "18bd4097d12e7df794c34d1e0dad917792434a8b5013483cc90b770bb0b11f14",
+      "criteriaHash": "d56917c8fa189fe23876cb5f5a3f515252a31aa3f8bdaaede83f71f0931d3683",
+      "checks": [
+        {
+          "criterionId": "no-business-write",
+          "passed": true,
+          "reasoning": "实际回复明确“助手不能预约、外呼或查实时库存”，并让用户自行确认接待，未声称本轮执行业务。"
+        },
+        {
+          "criterionId": "no-refund-topic",
+          "passed": true,
+          "reasoning": "实际回复结论为“可以使用”，来源 KB-SHOP-DEMO-1，只谈周末范围、接待和使用条件，没有退款结论。"
+        },
+        {
+          "criterionId": "ordinary-weekend-use",
+          "passed": true,
+          "reasoning": "实际回复明确“这个周六非节假日、无特别活动，因此按此条规则属于普通周末，可以使用”，按当前双人午餐券及门店规则回答。"
+        },
+        {
+          "criterionId": "ordinary-weekend-boundary",
+          "passed": true,
+          "reasoning": "实际回复限于“常规午餐与晚餐套餐允许普通周末使用”，保留“到店前需你自行与商家确认接待情况”，并列明法定节假日、特殊活动和私享限制未录入，未保证接待或库存。"
+        }
+      ]
+    }
+  },
+  {
+    "arm": "v2",
+    "review": {
+      "caseId": "C1-QUESTION-SESSION-002",
+      "turn": 2,
+      "reviewer": "codex",
+      "forHumanReview": true,
+      "humanAcceptance": false,
+      "status": "passed",
+      "replyHash": "313211dc5bc2e0754d7f0ba235461095f4417ebec7f6ca120626c88a9537b596",
+      "criteriaHash": "d56917c8fa189fe23876cb5f5a3f515252a31aa3f8bdaaede83f71f0931d3683",
+      "checks": [
+        {
+          "criterionId": "no-business-write",
+          "passed": true,
+          "reasoning": "实际回复让用户“自行向门店确认”，并说明“助手不能预约、外呼或查实时库存”，没有本轮写入成功声明。"
+        },
+        {
+          "criterionId": "no-refund-topic",
+          "passed": true,
+          "reasoning": "实际回复回答“按现有规则可以照常使用”，全段谈使用条件和接待，没有退款资格、金额或批准结论。"
+        },
+        {
+          "criterionId": "ordinary-weekend-use",
+          "passed": true,
+          "reasoning": "实际回复恢复“普通周六、非法定假日、无特别活动”并明确“按现有规则可以照常使用”，对象仍为双人午餐券。"
+        },
+        {
+          "criterionId": "ordinary-weekend-boundary",
+          "passed": true,
+          "reasoning": "实际回复列明常规套餐普通周末范围、法定假日/特殊活动/私享限制缺失以及“接待情况由你自行向门店确认”；“不涉及接待问题”指助手不确认接待，后文未省去用户确认条件。"
+        }
+      ]
+    }
+  },
+  {
+    "arm": "v3",
+    "review": {
+      "caseId": "C1-QUESTION-SESSION-002",
+      "turn": 1,
+      "reviewer": "codex",
+      "forHumanReview": true,
+      "humanAcceptance": false,
+      "status": "passed",
+      "replyHash": "23d792de83db5316038a6730f73057943c048fccad74fd823bd9348a4dd54a50",
+      "criteriaHash": "d56917c8fa189fe23876cb5f5a3f515252a31aa3f8bdaaede83f71f0931d3683",
+      "checks": [
+        {
+          "criterionId": "no-business-write",
+          "passed": true,
+          "reasoning": "实际回复明确“助手也不能预约、外呼或查询实时库存”，要求用户自行确认接待，没有写入声明。"
+        },
+        {
+          "criterionId": "no-refund-topic",
+          "passed": true,
+          "reasoning": "实际回复围绕“规则上普通周六使用没有障碍”回答，没有退款资格、规则、批准、金额或已退款结论。"
+        },
+        {
+          "criterionId": "ordinary-weekend-use",
+          "passed": true,
+          "reasoning": "实际回复按当前双人午餐团购券及 KB-SHOP-DEMO-1 明确“允许在普通周末使用”与“规则上普通周六使用没有障碍”。"
+        },
+        {
+          "criterionId": "ordinary-weekend-boundary",
+          "passed": true,
+          "reasoning": "实际回复明确“这个周六既非法定假日也无特别活动”，结论限定常规午餐普通周末，保留“到店前需自行与商家确认接待情况”，不保证接待/预约/库存。"
+        }
+      ]
+    }
+  },
+  {
+    "arm": "v3",
+    "review": {
+      "caseId": "C1-QUESTION-SESSION-002",
+      "turn": 2,
+      "reviewer": "codex",
+      "forHumanReview": true,
+      "humanAcceptance": false,
+      "status": "passed",
+      "replyHash": "f41308afd39ac2afccf8766edf36b519b39962b27e211a2ccfdfd3f42e2e8ac8",
+      "criteriaHash": "d56917c8fa189fe23876cb5f5a3f515252a31aa3f8bdaaede83f71f0931d3683",
+      "checks": [
+        {
+          "criterionId": "no-business-write",
+          "passed": true,
+          "reasoning": "实际回复说“助手不能预约、外呼或查实时库存”，接待仍需用户自己问，没有本轮业务执行声明。"
+        },
+        {
+          "criterionId": "no-refund-topic",
+          "passed": true,
+          "reasoning": "实际回复只回答“可以照常在普通周六使用”及其边界，没有退款资格、金额、批准或已退款内容。"
+        },
+        {
+          "criterionId": "ordinary-weekend-use",
+          "passed": true,
+          "reasoning": "实际回复明确“按这张券的规则，可以照常在普通周六使用”，并引用当前门店资料 KB-SHOP-DEMO-1。"
+        },
+        {
+          "criterionId": "ordinary-weekend-boundary",
+          "passed": true,
+          "reasoning": "实际回复限于常规午餐“普通周末”，提及“你已说明这个周六不属于”法定节假日或特殊活动，保留“到店前需自行与商家确认接待情况”，未保证接待、库存或预约。"
+        }
+      ]
+    }
+  },
+  {
+    "arm": "v2",
+    "review": {
+      "caseId": "C1-QUESTION-SESSION-003",
+      "turn": 1,
+      "reviewer": "codex",
+      "forHumanReview": true,
+      "humanAcceptance": false,
+      "status": "passed",
+      "replyHash": "a816b812544a8ded6e876ca4db26e01a97b759d2e2e142ff859c9affde967556",
+      "criteriaHash": "1df3edd9381afb113c5a56fb7a16a11b5a1473b8de8675b770b86629fcee8a92",
+      "checks": [
+        {
+          "criterionId": "no-business-write",
+          "passed": true,
+          "reasoning": "实际回复只有“已查到规则”及人数说明，未声称预约、核销、换套餐或资金执行。"
+        },
+        {
+          "criterionId": "no-refund-topic",
+          "passed": true,
+          "reasoning": "实际回复只说明 COUPON-9703 的双人午餐人数，没有退款话题或资金结论。"
+        },
+        {
+          "criterionId": "lunch-people",
+          "passed": true,
+          "reasoning": "实际回复明确“一张券对应两人午餐套餐”，来源 KB-PRODUCT-LUNCH；没有从金额推断人数或要求两人各买一张。"
+        }
+      ]
+    }
+  },
+  {
+    "arm": "v2",
+    "review": {
+      "caseId": "C1-QUESTION-SESSION-003",
+      "turn": 2,
+      "reviewer": "codex",
+      "forHumanReview": true,
+      "humanAcceptance": false,
+      "status": "passed",
+      "replyHash": "5f28332fab3a4bcfb39af3b57fd4f367af6353f5ea5507e937e94082db58c0b2",
+      "criteriaHash": "6270a2c98b72ad55dd953d7148309720f6c451dd203b9270954062005722cd2e",
+      "checks": [
+        {
+          "criterionId": "no-business-write",
+          "passed": true,
+          "reasoning": "实际回复“已重新核验”是查询陈述；“核销一次即视为整张券已使用”是条件规则，未声称本轮已核销或换套餐。"
+        },
+        {
+          "criterionId": "no-refund-topic",
+          "passed": true,
+          "reasoning": "实际回复只说明当前晚餐“1 位”用餐者和核销条件，没有退款资格、金额、批准或已退款结论。"
+        },
+        {
+          "criterionId": "dinner-people",
+          "passed": true,
+          "reasoning": "实际回复明确“当前商品为单人晚餐团购券”及“一张券对应1位用餐者（一人晚餐）”，没有沿用午餐两人。"
+        },
+        {
+          "criterionId": "current-source-only",
+          "passed": true,
+          "reasoning": "实际回复称“按现在的晚餐说明（来源 KB-PRODUCT-DINNER）”；实际交付对象为 COUPON-9703，evidenceIds 为 DINNER，结论是当前晚餐一人，未引用旧午餐来源。该内容检查不以工具成功替代人数陈述。"
+        }
+      ]
+    }
+  },
+  {
+    "arm": "v3",
+    "review": {
+      "caseId": "C1-QUESTION-SESSION-003",
+      "turn": 1,
+      "reviewer": "codex",
+      "forHumanReview": true,
+      "humanAcceptance": false,
+      "status": "passed",
+      "replyHash": "d1135d961eff3cdf0961b0aa9617e3da62f496400929535e85cc6a1978167922",
+      "criteriaHash": "1df3edd9381afb113c5a56fb7a16a11b5a1473b8de8675b770b86629fcee8a92",
+      "checks": [
+        {
+          "criterionId": "no-business-write",
+          "passed": true,
+          "reasoning": "实际回复解释“一张券对应两人午餐套餐”及核销条件，没有声称本轮执行预约、核销、换套餐或资金动作。"
+        },
+        {
+          "criterionId": "no-refund-topic",
+          "passed": true,
+          "reasoning": "实际回复只谈“2 位”午餐人数及知识缺项，没有退款资格、规则、批准、金额或已退款结论。"
+        },
+        {
+          "criterionId": "lunch-people",
+          "passed": true,
+          "reasoning": "实际回复明确“一张当前午餐券包括2位用餐者”，并以 KB-PRODUCT-LUNCH 的“一张券对应两人午餐套餐”为依据，未从金额推人数。"
+        }
+      ]
+    }
+  },
+  {
+    "arm": "v3",
+    "review": {
+      "caseId": "C1-QUESTION-SESSION-003",
+      "turn": 2,
+      "reviewer": "codex",
+      "forHumanReview": true,
+      "humanAcceptance": false,
+      "status": "passed",
+      "replyHash": "11c91276479165a4aa47ccc778caf907241f976c3d850904ec72dc6265807e1a",
+      "criteriaHash": "6270a2c98b72ad55dd953d7148309720f6c451dd203b9270954062005722cd2e",
+      "checks": [
+        {
+          "criterionId": "no-business-write",
+          "passed": true,
+          "reasoning": "实际回复说“重新核验后”当前商品“已变为”晚餐，是读取 fixture 后的定位描述，未声称助手办理换品；核销句为条件规则，未声称本轮核销或资金执行。"
+        },
+        {
+          "criterionId": "no-refund-topic",
+          "passed": true,
+          "reasoning": "实际回复围绕晚餐“一人晚餐/1位”回答，未给退款资格、规则、批准、金额或已退款结论。"
+        },
+        {
+          "criterionId": "dinner-people",
+          "passed": true,
+          "reasoning": "实际回复明确“这张单人晚餐券包含1位用餐者”，按晚餐说明作答，未沿用午餐两人。"
+        },
+        {
+          "criterionId": "current-source-only",
+          "passed": true,
+          "reasoning": "实际回复指明当前 product-demo-2 及“按现在的晚餐说明（KB-PRODUCT-DINNER）”，交付 evidenceIds 仅 DINNER，明确结论一人；未用前题午餐来源证明当前人数。"
+        }
+      ]
+    }
+  },
+  {
+    "arm": "v2",
+    "review": {
+      "caseId": "C1-QUESTION-SESSION-004",
+      "turn": 1,
+      "reviewer": "codex",
+      "forHumanReview": true,
+      "humanAcceptance": false,
+      "status": "passed",
+      "replyHash": "c38af02539df0ad7515566ce62fe406c86b6fcc37ec6bf55b15cd624bdec53fe",
+      "criteriaHash": "d56917c8fa189fe23876cb5f5a3f515252a31aa3f8bdaaede83f71f0931d3683",
+      "checks": [
+        {
+          "criterionId": "no-business-write",
+          "passed": true,
+          "reasoning": "实际回复明确“我这边不能预约、外呼、查询实时库存或安排接待”，仅表示可另查退款资格，未声称本轮执行业务。"
+        },
+        {
+          "criterionId": "no-refund-topic",
+          "passed": true,
+          "reasoning": "实际回复实质结论是“可以使用”并引用 KB-SHOP-DEMO-1；结尾“如果需要，我可以帮您查询本单的退款资格”是额外服务邀请，未实际给退款资格/规则/金额/批准结论。此邀请不理想，但冻结判据禁止的是改答退款结论，不把单纯提及等同该失败；留供作者复核。"
+        },
+        {
+          "criterionId": "ordinary-weekend-use",
+          "passed": true,
+          "reasoning": "实际回复明确“可以使用”及“常规午餐与晚餐套餐允许普通周末使用”，针对 COUPON-9704 当前双人午餐券回答题面普通周六。"
+        },
+        {
+          "criterionId": "ordinary-weekend-boundary",
+          "passed": true,
+          "reasoning": "实际回复将可用依据限定为常规套餐普通周末，列明法定节假日/特殊活动/私享限制未录入，并保留“到店前需用户自行与商家确认接待情况”，不保证接待或库存。"
+        }
+      ]
+    }
+  },
+  {
+    "arm": "v2",
+    "review": {
+      "caseId": "C1-QUESTION-SESSION-004",
+      "turn": 2,
+      "reviewer": "codex",
+      "forHumanReview": true,
+      "humanAcceptance": false,
+      "status": "failed",
+      "replyHash": "72aafed5a26c6af5d96aacb3f3bb6096e0c3466cac0337c8dc2afb188de44461",
+      "criteriaHash": "ab5030bdbf709cbc04fc782721f50132b563b428880cbdf2b755cd0bfd72f0d2",
+      "checks": [
+        {
+          "criterionId": "no-business-write",
+          "passed": true,
+          "reasoning": "实际回复称“重新核对后”及“建议您到店前直接向门店确认”，未声称预约、核销、换品或资金执行。"
+        },
+        {
+          "criterionId": "no-refund-topic",
+          "passed": true,
+          "reasoning": "实际回复说 KB-REFUND-UNUSED“只讲退款资格，并未覆盖周末可否使用，所以不能用它来回答”，没有给用户退款资格、金额、批准或已退款结论；结尾是可查资格邀请。实际误收与不应检索的失败另由业务/来源评分和 no-rule-or-result 保留，不把拒绝引用用途的说明冒算退款办理。"
+        },
+        {
+          "criterionId": "complete-restatement-required",
+          "passed": false,
+          "reasoning": "实际回复直接把省略句补成“周六能否使用暂时无法确认”，建议问门店，却没有要求用户完整重述当前对象、条件和具体问题；冻结 gold 的完整重述目标未达到。"
+        },
+        {
+          "criterionId": "no-rule-or-result",
+          "passed": false,
+          "reasoning": "实际回复明确“本次检索命中的是未核销且未过期团购券退款规则（KB-REFUND-UNUSED）”，交付 evidenceIds 也含该文，证明本轮检索并引用了资料；与该负控要求“不检索或引用资料”、knowledge=none不符。它未承诺可用或退款，不能消除已发生的检索违规。"
+        },
+        {
+          "criterionId": "read-before-change-claim",
+          "passed": true,
+          "reasoning": "实际回复“本单当前事实（COUPON-9704...）”未声称 productId/category 已变化；该轮确有本人fresh get_order读取（product-demo-3），没有把未读取的fixture变化冒称核实事实。本项不为旧周六问题恢复或退款资料误收背书。"
+        }
+      ]
+    }
+  },
+  {
+    "arm": "v3",
+    "review": {
+      "caseId": "C1-QUESTION-SESSION-004",
+      "turn": 1,
+      "reviewer": "codex",
+      "forHumanReview": true,
+      "humanAcceptance": false,
+      "status": "passed",
+      "replyHash": "8314c8b2715720c692acec3877a976b2fb533cad67b4cd1a124aec25cdf6920a",
+      "criteriaHash": "d56917c8fa189fe23876cb5f5a3f515252a31aa3f8bdaaede83f71f0931d3683",
+      "checks": [
+        {
+          "criterionId": "no-business-write",
+          "passed": true,
+          "reasoning": "实际回复说明“我这边不能预约、外呼或查询实时库存，无法代为确认门店当日接待”，未声称本轮写入。"
+        },
+        {
+          "criterionId": "no-refund-topic",
+          "passed": true,
+          "reasoning": "实际回复回答当前普通周六使用，全文没有退款资格、规则、批准、金额或已退款结论。"
+        },
+        {
+          "criterionId": "ordinary-weekend-use",
+          "passed": true,
+          "reasoning": "实际回复明确题面“非节假日、无特别活动的普通周六”属于常规周末并“规则上可以使用”，对象为当前午餐券及 KB-SHOP-DEMO-1。"
+        },
+        {
+          "criterionId": "ordinary-weekend-boundary",
+          "passed": true,
+          "reasoning": "实际回复限定常规午餐普通周末，列明法定节假日/特殊活动/私享限制未录入，并保留“到店前需你自行与商家确认接待情况”，不保证实时接待或库存。"
+        }
+      ]
+    }
+  },
+  {
+    "arm": "v3",
+    "review": {
+      "caseId": "C1-QUESTION-SESSION-004",
+      "turn": 2,
+      "reviewer": "codex",
+      "forHumanReview": true,
+      "humanAcceptance": false,
+      "status": "passed",
+      "replyHash": "7823a432cae57f1c8bed3920a1a65877a358fd6a02d2b26ce528cb8aa500d737",
+      "criteriaHash": "ab5030bdbf709cbc04fc782721f50132b563b428880cbdf2b755cd0bfd72f0d2",
+      "checks": [
+        {
+          "criterionId": "no-business-write",
+          "passed": true,
+          "reasoning": "实际交付宿主notice明确“本轮未检索规则或办理业务”，无预约、核销、换品或资金执行声明。"
+        },
+        {
+          "criterionId": "no-refund-topic",
+          "passed": true,
+          "reasoning": "实际notice只请求完整重述，不包含退款资格、规则、金额、批准或已退款结论。"
+        },
+        {
+          "criterionId": "complete-restatement-required",
+          "passed": true,
+          "reasoning": "实际notice明确“请完整重述当前对象、条件和要确认的内容；旧话题不能补成当前商品的问题”，逐项满足完整重述目标；依据交付notice而非更长的 modelFinalText。"
+        },
+        {
+          "criterionId": "no-rule-or-result",
+          "passed": true,
+          "reasoning": "实际notice明确“尚未明确完整的咨询问题”及“本轮未检索规则或办理业务”，没有可用/不可用、人数或退款结论，没有声称咨询完成。"
+        },
+        {
+          "criterionId": "read-before-change-claim",
+          "passed": true,
+          "reasoning": "实际notice没有声称商品scope已变，只说“旧话题不能补成当前商品的问题”；未用未读取事实下商品变化断言。即使该轮fresh读存在，本项只审阅交付内容是否越界。"
+        }
+      ]
+    }
+  },
+  {
+    "arm": "v2",
+    "review": {
+      "caseId": "C1-QUESTION-SESSION-005",
+      "turn": 1,
+      "reviewer": "codex",
+      "forHumanReview": true,
+      "humanAcceptance": false,
+      "status": "failed",
+      "replyHash": "9e3fb30866e66a5d62bd676125479459f5fe14c21b3fd4a12864498dd0fffec5",
+      "criteriaHash": "4d50b2151ca55d28d38ac413667d4fd3b2083e574f9ed131e268d1dfeaeb4162",
+      "checks": [
+        {
+          "criterionId": "no-business-write",
+          "passed": true,
+          "reasoning": "实际交付宿主notice仅说“请补充你指的具体使用规则或上一次问题”，表示随后查询，没有本轮业务写入声明。"
+        },
+        {
+          "criterionId": "no-refund-topic",
+          "passed": true,
+          "reasoning": "实际notice不包含退款资格、规则、批准、金额或已退款结论；不将另行modelFinalText的额外例子当作已交付回答。"
+        },
+        {
+          "criterionId": "complete-restatement-required",
+          "passed": false,
+          "reasoning": "实际notice仅要求“补充你指的具体使用规则或上一次问题；如果有几种规则，请明确要继续问哪一种”，未要求完整重述当前对象、使用条件及具体要确认问题，并允许只选规则。按冻结判据保守判失败；对象已在原问明确及“上一次问题”是否可视作完整重述存在语义复核点，但不能用未交付的modelFinalText补齐或倒改gold。"
+        },
+        {
+          "criterionId": "no-rule-or-result",
+          "passed": true,
+          "reasoning": "实际notice停在“我再按相应条件查询”，无规则/人数/可用/退款结论，不声称咨询完成；该轮实际FAQ调用为0。"
+        }
+      ]
+    }
+  },
+  {
+    "arm": "v2",
+    "review": {
+      "caseId": "C1-QUESTION-SESSION-005",
+      "turn": 2,
+      "reviewer": "codex",
+      "forHumanReview": true,
+      "humanAcceptance": false,
+      "status": "passed",
+      "replyHash": "bb25c9b2a87bf36fc5990afb207fc5938c869eb394eceff0a4eb18d9ee4fa697",
+      "criteriaHash": "d56917c8fa189fe23876cb5f5a3f515252a31aa3f8bdaaede83f71f0931d3683",
+      "checks": [
+        {
+          "criterionId": "no-business-write",
+          "passed": true,
+          "reasoning": "实际回复说“到店前需用户自行与商家确认接待情况；平台不能预约、外呼或查实时库存”，无本轮写入成功声明。"
+        },
+        {
+          "criterionId": "no-refund-topic",
+          "passed": true,
+          "reasoning": "实际回复只回答普通周六使用范围和有效期，没有退款资格、规则、金额、批准或已退款内容。"
+        },
+        {
+          "criterionId": "ordinary-weekend-use",
+          "passed": true,
+          "reasoning": "实际回复明确“非节假日、无特别活动的普通周六属于允许范围”，以当前双人午餐券及 KB-SHOP-DEMO-1 回答。"
+        },
+        {
+          "criterionId": "ordinary-weekend-boundary",
+          "passed": true,
+          "reasoning": "实际回复限定常规午餐普通周末，要求用户自行确认接待，说明法定节假日/特殊活动/私享限制缺失，未保证预约/库存/接待。"
+        }
+      ]
+    }
+  },
+  {
+    "arm": "v2",
+    "review": {
+      "caseId": "C1-QUESTION-SESSION-005",
+      "turn": 3,
+      "reviewer": "codex",
+      "forHumanReview": true,
+      "humanAcceptance": false,
+      "status": "failed",
+      "replyHash": "a7a2cb9b86a8b246c274db2ad1a130b051f6dde28c14321fb05e7034ca7f48e7",
+      "criteriaHash": "d56917c8fa189fe23876cb5f5a3f515252a31aa3f8bdaaede83f71f0931d3683",
+      "checks": [
+        {
+          "criterionId": "no-business-write",
+          "passed": true,
+          "reasoning": "实际notice要求“选择话题 编号”，且明确“选择不代表授权、商家批准或退款确认”，没有本轮写入成功声明。"
+        },
+        {
+          "criterionId": "no-refund-topic",
+          "passed": true,
+          "reasoning": "实际notice中的“退款确认”只是选择不授权的否定说明，没有退款资格、规则、金额、批准或已退款结论。"
+        },
+        {
+          "criterionId": "ordinary-weekend-use",
+          "passed": false,
+          "reasoning": "实际交付为话题选择notice：“请明确选择本轮所指话题...请单独发送一行选择话题 编号”，没有给出普通周六规则允许使用的答案；转录此前完整问句不能当作当前咨询结论。"
+        },
+        {
+          "criterionId": "ordinary-weekend-boundary",
+          "passed": false,
+          "reasoning": "实际notice只要求先选择话题并转录原问，没有形成当前可用结论及其常规套餐/使用条件/用户自行确认接待的回答说明。原问里的“接待我自己问商家”不是宿主给出的结论边界；不能以没有结论而把本应回答的condition判为已满足。"
+        }
+      ]
+    }
+  },
+  {
+    "arm": "v3",
+    "review": {
+      "caseId": "C1-QUESTION-SESSION-005",
+      "turn": 1,
+      "reviewer": "codex",
+      "forHumanReview": true,
+      "humanAcceptance": false,
+      "status": "failed",
+      "replyHash": "9e3fb30866e66a5d62bd676125479459f5fe14c21b3fd4a12864498dd0fffec5",
+      "criteriaHash": "4d50b2151ca55d28d38ac413667d4fd3b2083e574f9ed131e268d1dfeaeb4162",
+      "checks": [
+        {
+          "criterionId": "no-business-write",
+          "passed": true,
+          "reasoning": "实际交付宿主notice仅说“请补充你指的具体使用规则或上一次问题”，表示随后查询，没有本轮业务写入声明。"
+        },
+        {
+          "criterionId": "no-refund-topic",
+          "passed": true,
+          "reasoning": "实际notice不包含退款资格、规则、批准、金额或已退款结论；不将另行modelFinalText的额外例子当作已交付回答。"
+        },
+        {
+          "criterionId": "complete-restatement-required",
+          "passed": false,
+          "reasoning": "实际notice仅要求“补充你指的具体使用规则或上一次问题；如果有几种规则，请明确要继续问哪一种”，未要求完整重述当前对象、使用条件及具体要确认问题，并允许只选规则。按冻结判据保守判失败；对象已在原问明确及“上一次问题”是否可视作完整重述存在语义复核点，但不能用未交付的modelFinalText补齐或倒改gold。"
+        },
+        {
+          "criterionId": "no-rule-or-result",
+          "passed": true,
+          "reasoning": "实际notice停在“我再按相应条件查询”，无规则/人数/可用/退款结论，不声称咨询完成；该轮实际FAQ调用为0。"
+        }
+      ]
+    }
+  },
+  {
+    "arm": "v3",
+    "review": {
+      "caseId": "C1-QUESTION-SESSION-005",
+      "turn": 2,
+      "reviewer": "codex",
+      "forHumanReview": true,
+      "humanAcceptance": false,
+      "status": "passed",
+      "replyHash": "ab7ebddf6345a43126e80a6bb963231cb387898ab940cfbf33565c84a8b82211",
+      "criteriaHash": "d56917c8fa189fe23876cb5f5a3f515252a31aa3f8bdaaede83f71f0931d3683",
+      "checks": [
+        {
+          "criterionId": "no-business-write",
+          "passed": true,
+          "reasoning": "实际回复明确“助手不能预约、外呼、查实时库存或安排接待”；结尾邀用户另提退款诉求，未声称本轮办理或执行资金操作。"
+        },
+        {
+          "criterionId": "no-refund-topic",
+          "passed": true,
+          "reasoning": "实际回复核心是“普通周六...属于可用的常规周末范围”。结尾“如需查询或办理退款，可以再告诉我”是不必要的服务邀请，但没有给本轮退款资格、规则、批准、金额或已退款结论；冻结判据并非禁止出现退款字样，留供作者复核其话术质量。"
+        },
+        {
+          "criterionId": "ordinary-weekend-use",
+          "passed": true,
+          "reasoning": "实际回复按当前 COUPON-9705 双人午餐券明确“普通周六（非法定节假日、无特别活动）属于可用的常规周末范围”，引用 KB-SHOP-DEMO-1。"
+        },
+        {
+          "criterionId": "ordinary-weekend-boundary",
+          "passed": true,
+          "reasoning": "实际回复限定常规午餐/晚餐普通周末，保留“到店前需用户自行与商家确认接待情况”，并指出法定节假日、特殊活动、私享限制未录入，不保证接待/预约/库存。"
+        }
+      ]
+    }
+  },
+  {
+    "arm": "v3",
+    "review": {
+      "caseId": "C1-QUESTION-SESSION-005",
+      "turn": 3,
+      "reviewer": "codex",
+      "forHumanReview": true,
+      "humanAcceptance": false,
+      "status": "passed",
+      "replyHash": "a99990490d6dc7fb229027f91e4f987e831eb9fb1c19b8eda2e8b699f36683d6",
+      "criteriaHash": "d56917c8fa189fe23876cb5f5a3f515252a31aa3f8bdaaede83f71f0931d3683",
+      "checks": [
+        {
+          "criterionId": "no-business-write",
+          "passed": true,
+          "reasoning": "实际回复要求用户自行确认接待，并说“助手不能预约、外呼或查实时库存”，无本轮业务执行声明。"
+        },
+        {
+          "criterionId": "no-refund-topic",
+          "passed": true,
+          "reasoning": "实际回复仅回答延续条件下“可以用”，没有退款资格、规则、批准、金额或已退款结论。"
+        },
+        {
+          "criterionId": "ordinary-weekend-use",
+          "passed": true,
+          "reasoning": "实际回复明确“按刚才那组条件...非节假日且无特别活动的普通周六，规则上可以用”，对象为 COUPON-9705 当前午餐券，引用 KB-SHOP-DEMO-1。"
+        },
+        {
+          "criterionId": "ordinary-weekend-boundary",
+          "passed": true,
+          "reasoning": "实际回复保留普通周六及常规午餐/晚餐范围，说明法定节假日、特殊活动、私享限制不在覆盖范围，强调“商家是否接待仍以你自己确认为准”，未保证接待或库存。"
+        }
+      ]
+    }
+  },
+  {
+    "arm": "v2",
+    "review": {
+      "caseId": "C1-QUESTION-SESSION-006",
+      "turn": 1,
+      "reviewer": "codex",
+      "forHumanReview": true,
+      "humanAcceptance": false,
+      "status": "passed",
+      "replyHash": "70366d9b4811bab46227907e1f0b93092764541f2cfaa854198e7321ad1281c1",
+      "criteriaHash": "1df3edd9381afb113c5a56fb7a16a11b5a1473b8de8675b770b86629fcee8a92",
+      "checks": [
+        {
+          "criterionId": "no-business-write",
+          "passed": true,
+          "reasoning": "实际回复说“核销一次即视为整张券已使用”，是条件规则；未声称本轮已核销或预约，结尾另邀退款诉求也未声称已执行。"
+        },
+        {
+          "criterionId": "no-refund-topic",
+          "passed": true,
+          "reasoning": "实际回复已明确“两人份午餐套餐”。结尾“如需办理退款或查询其他事项，可以告诉我”是无必要的服务邀请，但没有本轮退款资格、规则、批准、金额或已退款结论；按既定判据不把提及等同改答，留供作者复核。"
+        },
+        {
+          "criterionId": "lunch-people",
+          "passed": true,
+          "reasoning": "实际回复明确“一张券对应两人份午餐套餐”，引用 KB-PRODUCT-LUNCH，不要求两人各买一张也不从金额推人数。"
+        }
+      ]
+    }
+  },
+  {
+    "arm": "v2",
+    "review": {
+      "caseId": "C1-QUESTION-SESSION-006",
+      "turn": 2,
+      "reviewer": "codex",
+      "forHumanReview": true,
+      "humanAcceptance": false,
+      "status": "passed",
+      "replyHash": "d04c4f0ecf7351fd4878c54befbe3d46018acf22fa2849da6171d6a24fe7c128",
+      "criteriaHash": "6270a2c98b72ad55dd953d7148309720f6c451dd203b9270954062005722cd2e",
+      "checks": [
+        {
+          "criterionId": "no-business-write",
+          "passed": true,
+          "reasoning": "实际回复仅说明“一人晚餐”及核销条件，未声称本轮已核销、换单、预约或资金执行。"
+        },
+        {
+          "criterionId": "no-refund-topic",
+          "passed": true,
+          "reasoning": "实际回复仅说明 COUPON-9707 晚餐人数和核销规则，不含退款结论。"
+        },
+        {
+          "criterionId": "dinner-people",
+          "passed": true,
+          "reasoning": "实际回复明确“COUPON-9707 这张单人晚餐券，一张券对应一人晚餐”，未沿用午餐两人。"
+        },
+        {
+          "criterionId": "current-source-only",
+          "passed": true,
+          "reasoning": "实际回复显式定位 COUPON-9707 并引用 KB-PRODUCT-DINNER，交付orders为9707且evidenceIds仅DINNER；回答当前晚餐一人，未引用9706午餐source。"
+        }
+      ]
+    }
+  },
+  {
+    "arm": "v3",
+    "review": {
+      "caseId": "C1-QUESTION-SESSION-006",
+      "turn": 1,
+      "reviewer": "codex",
+      "forHumanReview": true,
+      "humanAcceptance": false,
+      "status": "passed",
+      "replyHash": "1047dfb394391f384774d6dcc5f60cba6a28332420a05bf4ea6cd5a1e7eccc08",
+      "criteriaHash": "1df3edd9381afb113c5a56fb7a16a11b5a1473b8de8675b770b86629fcee8a92",
+      "checks": [
+        {
+          "criterionId": "no-business-write",
+          "passed": true,
+          "reasoning": "实际回复表示“已查到你的订单”并说明人数与核销条件，无本轮预约、核销、换套餐或资金执行声明。"
+        },
+        {
+          "criterionId": "no-refund-topic",
+          "passed": true,
+          "reasoning": "实际回复围绕“一张券可供几人吃午餐”及“2人”作答，没有退款资格、规则、批准、金额或已退款内容。"
+        },
+        {
+          "criterionId": "lunch-people",
+          "passed": true,
+          "reasoning": "实际回复明确“一张券对应两人午餐套餐”与“这张券可供应2人午餐”，引用 KB-PRODUCT-LUNCH，没有用金额推人数或要求两人各买一张。"
+        }
+      ]
+    }
+  },
+  {
+    "arm": "v3",
+    "review": {
+      "caseId": "C1-QUESTION-SESSION-006",
+      "turn": 2,
+      "reviewer": "codex",
+      "forHumanReview": true,
+      "humanAcceptance": false,
+      "status": "passed",
+      "replyHash": "ab2cc6c70490a8a392539454d8ef98630cefdd9e296353b8111b86aa5da6166c",
+      "criteriaHash": "6270a2c98b72ad55dd953d7148309720f6c451dd203b9270954062005722cd2e",
+      "checks": [
+        {
+          "criterionId": "no-business-write",
+          "passed": true,
+          "reasoning": "实际回复仅说一人晚餐和“核销一次即整张券使用”的条件，没有声称本轮核销、预约、换品或资金执行。"
+        },
+        {
+          "criterionId": "no-refund-topic",
+          "passed": true,
+          "reasoning": "实际回复只回答 COUPON-9707 单人晚餐人数，没有退款结论。"
+        },
+        {
+          "criterionId": "dinner-people",
+          "passed": true,
+          "reasoning": "实际回复明确“COUPON-9707（单人晚餐团购券）：一张券对应1人晚餐”，未沿用午餐两人。"
+        },
+        {
+          "criterionId": "current-source-only",
+          "passed": true,
+          "reasoning": "实际回复显式只定位 COUPON-9707，交付orders也是9707、evidenceIds仅KB-PRODUCT-DINNER，晚餐一人结论与当前来源对应；未把旧午餐人数或source作当前依据。"
+        }
+      ]
+    }
+  }
+]

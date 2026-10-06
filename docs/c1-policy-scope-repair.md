@@ -182,7 +182,7 @@ npm run validate
 
 独立审阅已复现并修复三类缺口：额外请求被拦截时错误清空首请求已知费用；参考评分器未镜像安全清除旧话题及完整重述后解除待澄清；普通SDK工具输出可被整体替换而未与宿主结果配对。现逐项保留负控，工具实际动作、成功位、回复、解析出处和业务投影均与宿主匹配，普通返回及范围错误都不把完整解析trace送入模型。被拦额外请求的特有事件尚无通用C1原始记录字段，独立评分对这种不完整录制保守拒绝；客户端专属检查仍证明只有1次HTTP及首账本未丢。
 
-首次全量通过后发现的SDK输出证明缺项已另做必要修复，再次全量通过；日志分别留在忽略目录`.runtime/c1-question-client-engineering-validate.log`及`.runtime/c1-question-client-engineering-validate-final.log`。本片未修改题集gold、历史成绩、线上规则、数据库或前端；本机已有`package.json`、锁文件和`.idea/`改动保留且不纳入本片。真实解析质量、额外请求净收益、v3线上执行runner/付费manifest及QQ/工作台激活仍未交付。
+首次全量通过后发现的SDK输出证明缺项已另做必要修复，再次全量通过；日志分别留在忽略目录`.runtime/c1-question-client-engineering-validate.log`及`.runtime/c1-question-client-engineering-validate-final.log`。本片未修改题集gold、历史成绩、线上规则、数据库或前端；本机已有`package.json`、锁文件和`.idea/`改动保留且不纳入本片。截至本工程切片完成时，真实解析质量、额外请求净收益及v3真实执行runner/付费manifest仍待后续；QQ/工作台激活未交付。新题实现与实际结果见以下切片。
 
 ### 新题Session对照合同（实施前，2026-10-06）
 
@@ -220,3 +220,34 @@ node --env-file-if-exists=.env scripts/c1-question-session-development.ts --live
 ```
 
 最终`npm run validate`退出0，包含新runner与既有业务、QQ离线及前端接口回归。全量日志保留于忽略目录`.runtime/c1-question-session-engineering-validate.log`；费用上限与失败停止按前述预定合同执行。工程审阅未调用远程模型，未认领v3效果或C1准入；真实结果需另据新manifest与执行记录判定。
+
+
+### 新题真实结果与预算收尾（2026-10-06）
+
+运行`78131547-63d2-474a-9aa8-9c85cd7025e7`完整执行24/24轮、两臂各12轮，122.887秒，0失败/未执行。执行器及新题先提交`a02c3c0`并通过全量validate，随后在`6c0d73b`提交[唯一新manifest](../data/c1-question-session-development-manifest.json)，冻结58份源码/规则/题集及实际依赖。manifest SHA-256为`34e35f0eefc4313e4b650bc0fae6860e32ecc762b8db72f74d5610d6d9f0c28d`。单次执行锁、源/依赖前后、实际配置、原生wire/SDK/费用与12个隔离store清理全部通过；`runIntegrityPassed=true`，没有provider/SDK自动重试、未知费用或SQL/QQ请求。
+
+| 指标（完整分母） | v2 | 整套v3候选 |
+| --- | ---: | ---: |
+| 实际执行 | 12/12 | 12/12 |
+| 工程与知识均通过 | 10/12 | 12/12 |
+| 实际回复判据 / 严格完整业务 | 9/12 / 9/12 | 11/12 / 11/12 |
+| 全部轮次严格通过的场景 | 4/6 | 5/6 |
+| 额外资料接收 / ready正例误澄清 | 1 / 1 | 0 / 0 |
+| Agent / rerank / support / question HTTP | 27 / 10 / 10 / 0 | 29 / 10 / 10 / 11 |
+| 全轮P50 / P95（ms，含失败） | 4064 / 7239 | 5391 / 7393 |
+| 已知估算USD / CNY | 0.022433004 / 0.006142 | 0.025492296 / 0.0060325 |
+| 每个严格通过轮次估算USD / CNY | 0.002492556 / 0.000682444 | 0.002317481 / 0.000548409 |
+
+共107次真实HTTP：Agent56、rerank20、support20、question11；全部200、真实用量已记录。总计USD0.0479253、CNY0.0121745，分别按冻结费率估算，不是账单，不相加或兑换。主Agent步骤摘要仍为Agent-only，表中费用按全部四角色实际请求重新汇总。额外8次Agent相对每轮两次的初始结构分别是7次工具协议错误修复和1次v2只读范围修复，均在既定预算内并保留，不能称0修复。解析实际11次：005首轮Agent直接发clarify而没有触发解析；不能声称每个用户轮都多一次调用。
+
+独立审阅24条实际交付回复、92项冻结判据，reviewer为codex、forHumanReview=true、humanAcceptance=false。评分使用[答复审阅](../data/c1-question-session-development-answer-reviews.json)与实际replyHash/criteriaHash重算，并经另一只读任务复核；不把modelFinalText或工具成功代替宿主实际回复。严格保留以下失败：
+
+- v2 004第2轮：未知商品下当前省略问题被扩展为退款规则，接收并显示`KB-REFUND-UNUSED`，未要求完整重述。实际文案又说明退款资料不能回答周末，故这是错误检索/接收及未澄清，不能描述成已给错误退款资格或资金结论。v3原生解析判为needs_clarification，FAQ0并清除旧话题，实际提示明确当前对象/条件/目标完整重述，阻断误收。
+- v2 005第3轮：第二轮完整重述取证成功后仍遗留policy待澄清，随后合法续问被要求选择已有话题，没有可用结论或接待边界。v3在独立证明通过后解除待澄清，第三轮实际previous解析与重新授权取证成立。
+- 两臂005第1轮：实际相同宿主notice为“补充具体使用规则或上一次问题”，未明确要求当前对象、条件和目标的完整重述。按冻结判据保守失败，记录语言歧义；模型另说得更全不能补实际交付。这是共同回复模板缺口，工程安全澄清和无FAQ状态仍成立，已经发生的前序依赖与原gold不回改。
+
+v3有界候选推进条件成立：完整执行与来源/费用可信、省略负控0误收、完整正例无新增误澄清、严格业务11大于9。但本次是由已知失败类型设计的非盲小样本，比较中性查询、原问解析与澄清恢复整套方案，不能归因于单一模型，也不能推导生产效果、稳定P95或完整C1/O4/O5/QQ准入。v3每轮用时更高、USD总额增加，当前单批成功轮摊销较低不代表稳定成本优势；缓存、网络和执行顺序影响仍未单独控制。
+
+[公开结果](../data/c1-question-session-development-results.json)保留24合成输入、实际交付/模型文本区别、评分、请求计数及用量、解析决定、配置和来源hash。完整原始artifact和原生请求/SSE留在忽略目录`.runtime/c1-question-session-development/78131547-63d2-474a-9aa8-9c85cd7025e7.json`，公开摘要不含完整raw审计，不能单独重建全部HTTP证明；须核对结果中artifact SHA及执行前版本。原始CLI输出和工程日志分别为`.runtime/c1-question-session-development-live.log`与`.runtime/c1-question-session-engineering-validate.log`。本文结果段在执行结束后添加，当前文档hash变化不改变冻结历史，也不得重新freeze同题追分。
+
+本次预算关闭，默认模型及atomic + lexical、memory/id、QQ/工作台均不切换。先修共享完整重述提示并用0远程工程检查核对，保留本次9/12与11/12原始分数；然后补稳定闭环的演示、源码讲解和取舍材料。后续有界候选验证须有新问题及合同，不因为本轮仍有失败或预算剩余就追加调用。
