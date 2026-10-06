@@ -1,0 +1,442 @@
+{
+  "version": 1,
+  "suiteId": "c1-product-category-development-v1",
+  "stage": "exposed-development-engineering-product-category-gate",
+  "sources": [
+    {
+      "path": "data/c1-support-environment-development.json",
+      "sha256": "e9840fdb76647ad91d5c21db53fe2a27550f8444e9926c31eec92a9a6a727113",
+      "bytes": 33525
+    }
+  ],
+  "syntheticBoundary": "Original synthetic engineering fixture only. These orders are read through an identity-checking in-memory store test double, not SQL or a commercial system. productCatalog is an author-reviewed synthetic declaration joined only by freshly authorized shopId/productId. Name, user text, model output and historical references are not category authority. The unknown original SKU remains uncatalogued. No prompt, old dataset/gold or online seed is changed; no C1 admission or live-model effect claim follows.",
+  "identity": {
+    "appId": "CATEGORY_DEVELOPMENT",
+    "senderId": "OWNER"
+  },
+  "groupOpenid": "CATEGORY_GROUP",
+  "documents": [
+    {
+      "id": "ENV-CONDITION-CATEGORY",
+      "title": "自由场次观影套餐使用规则",
+      "body": "【原创合成诊断规则，非线上演示政策】自由场次观影套餐允许在普通周六、周日预约使用；法定节假日和特别影展场次除外，例外场次须另行确认。预约成功后按对应场次核销，未预约不保证有座位。",
+      "tags": [
+        "观影",
+        "自由场次套餐",
+        "周末"
+      ],
+      "shopId": null,
+      "productId": null,
+      "status": "active",
+      "rank": 1,
+      "score": 0.83
+    },
+    {
+      "id": "ENV-CONDITION-PRODUCT",
+      "title": "海棠晚场双人观影券类别与时段",
+      "body": "【原创合成诊断规则，非线上演示政策】海棠晚场双人观影券属于自由场次观影套餐，可在普通周六、周日预约使用。法定节假日和特别影展场次不适用普通周末规则，须另行确认；完成预约才保留座位。",
+      "tags": [
+        "海棠晚场双人观影券",
+        "商品类别",
+        "周末"
+      ],
+      "shopId": null,
+      "productId": null,
+      "status": "active",
+      "rank": 2,
+      "score": 0.79
+    },
+    {
+      "id": "ENV-CONDITION-PARKING",
+      "title": "影城停车优惠券说明",
+      "body": "【原创合成诊断规则，非线上演示政策】影城停车优惠券只能抵扣当次停车费用，一张券可抵扣2小时。停车券不能用于购买电影票或保留观影座位。",
+      "tags": [
+        "停车",
+        "抵扣",
+        "优惠券"
+      ],
+      "shopId": null,
+      "productId": null,
+      "status": "active",
+      "rank": 2,
+      "score": 0.79
+    },
+    {
+      "id": "CATEGORY-UNIVERSAL-BOOKING",
+      "title": "影城观影券预约办理步骤",
+      "body": "【原创合成开发规则，非线上演示政策】影城观影券的预约办理步骤统一为：在影城预约入口选择可供预约的场次，提交券号并核验预约资格，收到系统返回的预约编号后才算预约成功。适用场次和剩余座位仍须核验；这些办理步骤不证明某种套餐类别、某场次可用、当前券已符合资格或预约已经成功。",
+      "tags": [
+        "观影券",
+        "预约办理",
+        "预约编号"
+      ],
+      "shopId": "shop-env-cinema",
+      "productId": null,
+      "status": "active",
+      "rank": 1,
+      "score": 0.83
+    }
+  ],
+  "snapshot": {
+    "version": 2,
+    "serialization": "knowledge-document-v1",
+    "documents": [
+      {
+        "sourceId": "ENV-CONDITION-CATEGORY",
+        "scope": {
+          "shopId": null,
+          "productId": null
+        },
+        "sourceHash": "719536bb643d2f9ff4bb1702d7f984f5165c4bd2175735998050cd8a20a72a35",
+        "requiredProductCategories": [
+          "free_screening"
+        ],
+        "basis": [
+          {
+            "field": "requiredProductCategories",
+            "quote": "自由场次观影套餐允许在普通周六、周日预约使用"
+          }
+        ],
+        "reviewNote": "原文明确限定自由场次观影套餐。仅声明必要商品类别，不证明节假日、特别影展、预约、库存或当前可用性。"
+      },
+      {
+        "sourceId": "ENV-CONDITION-PRODUCT",
+        "scope": {
+          "shopId": null,
+          "productId": null
+        },
+        "sourceHash": "c607762b8dca435481f9b90eaab355d6b700d25ddc8cd9639f9b569aabdd8932",
+        "basis": [],
+        "reviewNote": "保留原开发原文和全shape；原篇只按海棠商品名称说明，未在本片审阅目录中绑定精确productId。仅用于rule_only完整来源检查，不作为newregular实例商品映射证明。"
+      },
+      {
+        "sourceId": "ENV-CONDITION-PARKING",
+        "scope": {
+          "shopId": null,
+          "productId": null
+        },
+        "sourceHash": "fb3d1fb57d6fc6628208c15f3fa1673b2fe966be5ac324c747999838d5cb1095",
+        "basis": [],
+        "reviewNote": "保留原开发停车券文档。它没有本片声明的观影商品类别前提，但不回答观影券使用资格；none_declared仅表示继续支持判别，不能视为已接受答案。"
+      },
+      {
+        "sourceId": "CATEGORY-UNIVERSAL-BOOKING",
+        "scope": {
+          "shopId": "shop-env-cinema",
+          "productId": null
+        },
+        "sourceHash": "e9978e5328bdfddff4b606073bb417f1bf954acf07ca12d5b4586def0acb94ed",
+        "basis": [],
+        "reviewNote": "原创通用预约办理流程。这里只声明未附加商品类别前提；仅在用户询问办理步骤时作为正控，不作为当前使用资格或套餐归属证据。"
+      }
+    ],
+    "productCatalog": [
+      {
+        "shopId": "shop-env-cinema",
+        "productId": "product-env-regular",
+        "productName": "常规双人观影体验券",
+        "categories": [
+          "free_screening"
+        ],
+        "reviewNote": "作者为本工程检查声明的合成SKU类别。通过精确shopId和productId关联，不依据名称；与限定SKU同名不等于同一分类。"
+      },
+      {
+        "shopId": "shop-env-cinema",
+        "productId": "product-env-limited",
+        "productName": "常规双人观影体验券",
+        "categories": [
+          "private_screening"
+        ],
+        "reviewNote": "作者为本工程检查声明的另一个合成SKU类别。名称与regular相同，身份和类别不同；不把名称当作分类事实。"
+      }
+    ]
+  },
+  "snapshotHash": "ef8dcd8d3d311d42e4cd9bc95425640cee814b57c069a91d9d6616d158a0f3b6",
+  "orders": [
+    {
+      "source": "demo-database",
+      "id": "COUPON-9101",
+      "status": "paid",
+      "asOf": "2026-10-06T08:00:00.000Z",
+      "amounts": {
+        "totalCents": 7980,
+        "paidCents": 7980,
+        "refundedCents": 0
+      },
+      "createdAt": "2026-10-01T00:00:00.000Z",
+      "paidAt": "2026-10-01T00:00:00.000Z",
+      "shop": {
+        "id": "shop-env-cinema",
+        "name": "合成观影体验门店",
+        "merchantName": "合成观影体验商家",
+        "address": "合成地址"
+      },
+      "items": [
+        {
+          "id": "COUPON-9101-item",
+          "productId": "product-env-regular",
+          "productName": "常规双人观影体验券",
+          "quantity": 1,
+          "unitPriceCents": 7980,
+          "totalCents": 7980
+        }
+      ],
+      "coupons": [
+        {
+          "id": "COUPON-9101-coupon",
+          "orderItemId": "COUPON-9101-item",
+          "status": "unused",
+          "expiresAt": "2027-01-01T00:00:00.000Z",
+          "redeemedAt": null,
+          "redeemedShopId": null
+        }
+      ],
+      "payments": [
+        {
+          "status": "succeeded",
+          "amountCents": 7980,
+          "paidAt": "2026-10-01T00:00:00.000Z"
+        }
+      ],
+      "refunds": []
+    },
+    {
+      "source": "demo-database",
+      "id": "COUPON-9102",
+      "status": "paid",
+      "asOf": "2026-10-06T08:00:00.000Z",
+      "amounts": {
+        "totalCents": 7980,
+        "paidCents": 7980,
+        "refundedCents": 0
+      },
+      "createdAt": "2026-10-01T00:00:00.000Z",
+      "paidAt": "2026-10-01T00:00:00.000Z",
+      "shop": {
+        "id": "shop-env-cinema",
+        "name": "合成观影体验门店",
+        "merchantName": "合成观影体验商家",
+        "address": "合成地址"
+      },
+      "items": [
+        {
+          "id": "COUPON-9102-item",
+          "productId": "product-env-limited",
+          "productName": "常规双人观影体验券",
+          "quantity": 1,
+          "unitPriceCents": 7980,
+          "totalCents": 7980
+        }
+      ],
+      "coupons": [
+        {
+          "id": "COUPON-9102-coupon",
+          "orderItemId": "COUPON-9102-item",
+          "status": "unused",
+          "expiresAt": "2027-01-01T00:00:00.000Z",
+          "redeemedAt": null,
+          "redeemedShopId": null
+        }
+      ],
+      "payments": [
+        {
+          "status": "succeeded",
+          "amountCents": 7980,
+          "paidAt": "2026-10-01T00:00:00.000Z"
+        }
+      ],
+      "refunds": []
+    },
+    {
+      "source": "demo-database",
+      "id": "COUPON-9103",
+      "status": "paid",
+      "asOf": "2026-10-06T08:00:00.000Z",
+      "amounts": {
+        "totalCents": 7980,
+        "paidCents": 7980,
+        "refundedCents": 0
+      },
+      "createdAt": "2026-10-01T00:00:00.000Z",
+      "paidAt": "2026-10-01T00:00:00.000Z",
+      "shop": {
+        "id": "shop-env-cinema",
+        "name": "合成观影体验门店",
+        "merchantName": "合成观影体验商家",
+        "address": "合成地址"
+      },
+      "items": [
+        {
+          "id": "COUPON-9103-item",
+          "productId": "product-env-haitang",
+          "productName": "海棠晚场双人观影券",
+          "quantity": 1,
+          "unitPriceCents": 7980,
+          "totalCents": 7980
+        }
+      ],
+      "coupons": [
+        {
+          "id": "COUPON-9103-coupon",
+          "orderItemId": "COUPON-9103-item",
+          "status": "unused",
+          "expiresAt": "2027-01-01T00:00:00.000Z",
+          "redeemedAt": null,
+          "redeemedShopId": null
+        }
+      ],
+      "payments": [
+        {
+          "status": "succeeded",
+          "amountCents": 7980,
+          "paidAt": "2026-10-01T00:00:00.000Z"
+        }
+      ],
+      "refunds": []
+    }
+  ],
+  "measurement": {
+    "plannedCases": 6,
+    "plannedCandidateDecisions": 9,
+    "realHttp": 0,
+    "realSql": 0,
+    "realQQ": 0,
+    "scope": "Production helper and KnowledgeService engineering integration with deterministic clients; source, scope, identity and SKU category gate only, not model semantics, final business permission or C1 admission."
+  },
+  "cases": [
+    {
+      "id": "category-001",
+      "group": "matched",
+      "query": "COUPON-9101 这张券是否符合自由场次观影套餐的类别前提？假设是普通周六且不遇节假日或特别影展，只解释必要条件，不声称已预约或有座位。",
+      "orderId": "COUPON-9101",
+      "evidenceTarget": "current_order",
+      "candidateIds": [
+        "ENV-CONDITION-CATEGORY"
+      ],
+      "expectedByCandidate": [
+        {
+          "id": "ENV-CONDITION-CATEGORY",
+          "status": "matched",
+          "kept": true
+        }
+      ],
+      "boundary": "Fresh owned SKU is catalogued as free_screening. Matching proves this declared necessary category only.",
+      "inputHash": "85997f7c43bbc778c4f6779d40fa10c9a9d022fe68834b2962d65cbc12efcb16"
+    },
+    {
+      "id": "category-002",
+      "group": "mismatched",
+      "query": "COUPON-9102 这张券能按自由场次观影套餐的普通周六预约规则解释吗？不要仅凭商品名称相同确定类别。",
+      "orderId": "COUPON-9102",
+      "evidenceTarget": "current_order",
+      "candidateIds": [
+        "ENV-CONDITION-CATEGORY"
+      ],
+      "expectedByCandidate": [
+        {
+          "id": "ENV-CONDITION-CATEGORY",
+          "status": "mismatched",
+          "kept": false
+        }
+      ],
+      "boundary": "Fresh owned SKU has the same productName as regular but an exact different productId and private_screening declaration.",
+      "inputHash": "4e3074b39019c5847042bb216080775c8ba7d02734ccdb3fb3927505e56708e9"
+    },
+    {
+      "id": "category-003",
+      "group": "unknown",
+      "query": "COUPON-9103 这张券属于自由场次观影套餐，并可按其普通周六预约规则使用吗？不询问具体日期或声称已经预约。",
+      "orderId": "COUPON-9103",
+      "evidenceTarget": "current_order",
+      "candidateIds": [
+        "ENV-CONDITION-CATEGORY",
+        "ENV-CONDITION-PARKING"
+      ],
+      "expectedByCandidate": [
+        {
+          "id": "ENV-CONDITION-CATEGORY",
+          "status": "unknown",
+          "kept": false
+        },
+        {
+          "id": "ENV-CONDITION-PARKING",
+          "status": "none_declared",
+          "kept": true
+        }
+      ],
+      "boundary": "product-env-haitang deliberately remains absent from catalog; original candidate environment-009 source shapes are retained. Parking can proceed to semantic verification but cannot answer this question.",
+      "inputHash": "409d46359d378317bd17c399f32fd48f74c12e7dc66e67cf32a966315b87d312"
+    },
+    {
+      "id": "category-004",
+      "group": "rule_only_bound",
+      "query": "COUPON-9103 我只想了解自由场次观影套餐在普通周六的预约规则，不判断当前券属于该类，也不判断某天是否为节假日。",
+      "orderId": "COUPON-9103",
+      "evidenceTarget": "rule_only",
+      "basis": "自由场次观影套餐在普通周六的预约规则",
+      "candidateIds": [
+        "ENV-CONDITION-CATEGORY",
+        "ENV-CONDITION-PRODUCT"
+      ],
+      "expectedByCandidate": [
+        {
+          "id": "ENV-CONDITION-CATEGORY",
+          "status": "not_checked",
+          "kept": true
+        },
+        {
+          "id": "ENV-CONDITION-PRODUCT",
+          "status": "not_checked",
+          "kept": true
+        }
+      ],
+      "boundary": "Even after a fresh owned order read, an explicit rule_only hypothesis has no current-order applicability context. Both original source declarations must still bind correctly.",
+      "inputHash": "053aa85085b09398d2af41ffd710aa07f7177fcf63ab240a31c72023fc425356"
+    },
+    {
+      "id": "category-005",
+      "group": "rule_only_unbound",
+      "query": "假设是自由场次观影套餐，并且是普通周六、不遇法定节假日或特别影展，预约使用有哪些条件？这里只咨询一般规则，不判断具体商品或订单。",
+      "orderId": null,
+      "evidenceTarget": "rule_only",
+      "basis": "自由场次观影套餐，并且是普通周六、不遇法定节假日或特别影展",
+      "candidateIds": [
+        "ENV-CONDITION-CATEGORY",
+        "ENV-CONDITION-PARKING"
+      ],
+      "expectedByCandidate": [
+        {
+          "id": "ENV-CONDITION-CATEGORY",
+          "status": "not_checked",
+          "kept": true
+        },
+        {
+          "id": "ENV-CONDITION-PARKING",
+          "status": "not_checked",
+          "kept": true
+        }
+      ],
+      "boundary": "General policy explanation must not invent an instance to filter rules. This no-order case requires no getOrder call, and every supplied source still needs its actual metadata binding.",
+      "inputHash": "3a261cf35d7271fda29d8328aa8bc487ff051f9c278ba5a597b74dbeabf47ad5"
+    },
+    {
+      "id": "category-006",
+      "group": "universal_process",
+      "query": "COUPON-9103 当前券办理预约时要经过哪些步骤，收到什么才算预约成功？只问办理流程，不判断商品类别、场次可用性、当前资格或是否已经预约。",
+      "orderId": "COUPON-9103",
+      "evidenceTarget": "current_order",
+      "candidateIds": [
+        "CATEGORY-UNIVERSAL-BOOKING"
+      ],
+      "expectedByCandidate": [
+        {
+          "id": "CATEGORY-UNIVERSAL-BOOKING",
+          "status": "none_declared",
+          "kept": true
+        }
+      ],
+      "boundary": "Unknown product category must not suppress a documented universal booking-process answer; this positive control cannot prove current use eligibility.",
+      "inputHash": "7cc6eab579da4e681befc7da0907d5bfa9d4163a2a742452c9350fe34cd148c9"
+    }
+  ]
+}

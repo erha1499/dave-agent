@@ -16,6 +16,22 @@ const text = (value: unknown): value is string => typeof value === "string" && !
 const identifier = (value: unknown): value is string => typeof value === "string" && /^[A-Za-z0-9_-]{1,128}$/.test(value);
 const sha = (value: unknown): value is string => typeof value === "string" && /^[a-f0-9]{64}$/.test(value);
 const keys = (value: Record<string, unknown>, allowed: readonly string[]) => Object.keys(value).every(key => allowed.includes(key));
+// v2 hashes JSON data: hidden fields, accessors and nonplain objects must not carry unbound declarations.
+function plainJson(value: unknown, depth = 0): boolean {
+  if (value === null || typeof value === "string" || typeof value === "boolean") return true;
+  if (typeof value === "number") return Number.isFinite(value);
+  if (depth > 8 || !value || typeof value !== "object") return false;
+  const array = Array.isArray(value), names = Reflect.ownKeys(value);
+  if (Object.getPrototypeOf(value) !== (array ? Array.prototype : Object.prototype)
+    || array && names.length !== value.length + 1) return false;
+  return names.every(name => {
+    if (typeof name !== "string") return false;
+    const property = Object.getOwnPropertyDescriptor(value, name)!;
+    if (array && name === "length") return true;
+    return property.enumerable && "value" in property && (!array || /^(0|[1-9][0-9]*)$/.test(name) && Number(name) < value.length)
+      && plainJson(property.value, depth + 1);
+  });
+}
 const timestamp = (value: unknown): value is string => typeof value === "string" && Number.isFinite(Date.parse(value))
   && new Date(value).toISOString() === value;
 const scopeEqual = (a: Scope, b: RetrievalScope) => a.shopId === (b.shopId ?? null) && a.productId === (b.productId ?? null);
@@ -26,12 +42,16 @@ const scopeValid = (value: unknown): value is Scope => object(value) && keys(val
 export type KnowledgeApplicabilityRule = {
   sourceId: string; scope: Scope; sourceHash: string;
   minimumCouponCount?: number; atLeastOneCouponInStates?: CouponState[];
-  basis: Array<{ field: "minimumCouponCount" | "atLeastOneCouponInStates"; quote: string }>;
+  requiredProductCategories?: string[];
+  basis: Array<{ field: "minimumCouponCount" | "atLeastOneCouponInStates" | "requiredProductCategories"; quote: string }>;
   reviewNote: string;
 };
-export type KnowledgeApplicabilitySnapshot = {
-  version: 1; serialization: "knowledge-document-v1"; documents: KnowledgeApplicabilityRule[]; sha256: string;
-};
+export type KnowledgeApplicabilityProduct = { shopId: string; productId: string; productName: string; categories: string[]; reviewNote: string };
+type KnowledgeApplicabilityManifest = { serialization: "knowledge-document-v1"; documents: KnowledgeApplicabilityRule[] }
+  & ({ version: 1 } | { version: 2; productCatalog: KnowledgeApplicabilityProduct[] });
+export type KnowledgeApplicabilitySnapshot = KnowledgeApplicabilityManifest & { sha256: string };
+export const knowledgeApplicabilityVersion = (snapshot: KnowledgeApplicabilitySnapshot) => snapshot.version === 2
+  ? "declared-order-preconditions-v2" as const : "declared-order-preconditions-v1" as const;
 
 // Separate from model serialization and old corpus hashes. Missing defaults have one representation.
 export function knowledgeApplicabilitySourceHash(document: RetrievalDocument): string {
@@ -47,12 +67,28 @@ function freeze<T>(value: T): T {
 
 export function validateKnowledgeApplicabilitySnapshot(value: unknown, sourceSha256?: string): KnowledgeApplicabilitySnapshot {
   function fail(): never { throw new Error("知识适用前提文件无效，未启用声明门控。"); }
-  if (!object(value) || !keys(value, ["version", "serialization", "documents"]) || value.version !== 1
+  if (!object(value) || !keys(value, ["version", "serialization", "documents", ...(value.version === 2 ? ["productCatalog"] : [])])
+    || value.version !== 1 && value.version !== 2
     || value.serialization !== "knowledge-document-v1" || !Array.isArray(value.documents)
     || !value.documents.length || value.documents.length > 200 || sourceSha256 !== undefined && !sha(sourceSha256)) fail();
+  if (value.version === 2 && !plainJson(value)) fail();
+  const categoriesValid = (categories: unknown): categories is string[] => Array.isArray(categories) && categories.length >= 1 && categories.length <= 20
+    && new Set(categories).size === categories.length && categories.every(identifier);
+  if (value.version === 2) {
+    if (!Array.isArray(value.productCatalog) || !value.productCatalog.length || value.productCatalog.length > 200) fail();
+    const products = new Set<string>();
+    for (const product of value.productCatalog) {
+      if (!object(product) || !keys(product, ["shopId", "productId", "productName", "categories", "reviewNote"])
+        || !identifier(product.shopId) || !identifier(product.productId) || !text(product.productName) || product.productName.length > 256
+        || !categoriesValid(product.categories) || !text(product.reviewNote) || product.reviewNote.length > 4096) fail();
+      const key = `${product.shopId}:${product.productId}`;
+      if (products.has(key)) fail(); products.add(key);
+    }
+  }
   const ids = new Set<string>();
   for (const raw of value.documents) {
-    if (!object(raw) || !keys(raw, ["sourceId", "scope", "sourceHash", "minimumCouponCount", "atLeastOneCouponInStates", "basis", "reviewNote"])
+    if (!object(raw) || !keys(raw, ["sourceId", "scope", "sourceHash", "minimumCouponCount", "atLeastOneCouponInStates", "basis", "reviewNote",
+      ...(value.version === 2 ? ["requiredProductCategories"] : [])])
       || !identifier(raw.sourceId) || ids.has(raw.sourceId) || !scopeValid(raw.scope) || !sha(raw.sourceHash)
       || !text(raw.reviewNote) || !Array.isArray(raw.basis)) fail();
     ids.add(raw.sourceId);
@@ -61,13 +97,17 @@ export function validateKnowledgeApplicabilitySnapshot(value: unknown, sourceSha
     if (raw.atLeastOneCouponInStates !== undefined && (!Array.isArray(raw.atLeastOneCouponInStates)
       || !raw.atLeastOneCouponInStates.length || new Set(raw.atLeastOneCouponInStates).size !== raw.atLeastOneCouponInStates.length
       || raw.atLeastOneCouponInStates.some((state: unknown) => typeof state !== "string" || !states.includes(state as CouponState)))) fail();
-    const fields = ["minimumCouponCount", "atLeastOneCouponInStates"].filter(field => raw[field] !== undefined);
+    if (raw.requiredProductCategories !== undefined && !categoriesValid(raw.requiredProductCategories)) fail();
+    const fields = ["minimumCouponCount", "atLeastOneCouponInStates", ...(value.version === 2 ? ["requiredProductCategories"] : [])]
+      .filter(field => raw[field] !== undefined);
     if (raw.basis.length !== fields.length || new Set(raw.basis.map((row: unknown) => object(row) ? row.field : null)).size !== fields.length) fail();
     for (const basis of raw.basis) if (!object(basis) || !keys(basis, ["field", "quote"])
       || !fields.includes(String(basis.field)) || !text(basis.quote)) fail();
   }
-  const manifest = structuredClone(value) as Omit<KnowledgeApplicabilitySnapshot, "sha256">;
-  return freeze({ ...manifest, sha256: sourceSha256 ?? hash(JSON.stringify(value)) });
+  const manifest = structuredClone(value) as KnowledgeApplicabilityManifest, canonicalHash = hash(JSON.stringify(value));
+  // v1 retains historical raw-file hashes; v2 binds the full declaration and product catalog to its JSON content.
+  if (value.version === 2 && sourceSha256 !== undefined && sourceSha256 !== canonicalHash) fail();
+  return freeze({ ...manifest, sha256: sourceSha256 ?? canonicalHash });
 }
 
 // Call only for the declared candidate. No corpus/seed mutation or model/API dependency.
@@ -141,7 +181,7 @@ function validContext(context: KnowledgeApplicabilityContext, scope: RetrievalSc
 export type KnowledgeApplicabilityDecision = { id: string; rank: number;
   status: "matched" | "mismatched" | "unknown" | "not_checked" | "none_declared"; reason: string };
 export type KnowledgeApplicabilityResult = {
-  version: "declared-order-preconditions-v1"; snapshotHash: string; contextHash: string | null;
+  version: ReturnType<typeof knowledgeApplicabilityVersion>; snapshotHash: string; contextHash: string | null;
   status: "ready" | "unavailable"; integrity: boolean; reason: null | "metadata_binding_invalid" | "facts_unknown";
   decisions: KnowledgeApplicabilityDecision[]; candidates: EvidenceSupportCandidate[];
 };
@@ -149,22 +189,27 @@ export type KnowledgeApplicabilityResult = {
 // Run after the original score/Top5 preparation. Do not refill, rewrite, or renumber raw candidates.
 export function gateKnowledgeApplicability(input: { snapshot: KnowledgeApplicabilitySnapshot; context: KnowledgeApplicabilityContext | null;
   scope: RetrievalScope; candidates: readonly EvidenceSupportCandidate[] }): KnowledgeApplicabilityResult {
-  const result: KnowledgeApplicabilityResult = { version: "declared-order-preconditions-v1", snapshotHash: input.snapshot.sha256,
+  const result: KnowledgeApplicabilityResult = { version: knowledgeApplicabilityVersion(input.snapshot), snapshotHash: input.snapshot.sha256,
     contextHash: input.context?.factsHash ?? null, status: "ready", integrity: true, reason: null, decisions: [], candidates: [] };
   const decide = (candidate: EvidenceSupportCandidate, status: KnowledgeApplicabilityDecision["status"], reason: string) => {
     result.decisions.push({ id: candidate.id, rank: candidate.rank, status, reason });
     if (["matched", "not_checked", "none_declared"].includes(status)) result.candidates.push(candidate);
   };
-  const metadata = new Map(input.snapshot.documents.map(rule => [rule.sourceId, rule]));
+  const metadata = new Map<string, KnowledgeApplicabilityRule>();
   // Source mismatch is configuration/integrity failure, never a correct semantic rejection.
   try {
+    if (input.snapshot.version === 2) {
+      const { sha256, ...manifest } = input.snapshot;
+      validateKnowledgeApplicabilitySnapshot(manifest, sha256);
+    }
+    for (const rule of input.snapshot.documents) metadata.set(rule.sourceId, rule);
     if (input.candidates.length > 5 || new Set(input.candidates.map(candidate => candidate.rank)).size !== input.candidates.length
       || input.candidates.some(candidate => !Number.isSafeInteger(candidate.rank) || candidate.rank < 1
         || typeof candidate.score !== "number" || !Number.isFinite(candidate.score) || candidate.score < 0 || candidate.score > 1)) throw new Error();
     if (scopeDocuments(input.candidates, input.scope).length !== input.candidates.length) throw new Error();
     for (const candidate of input.candidates) {
       const rule = metadata.get(candidate.id);
-      if (!rule && !input.context) continue; // Reference/general sources have no online declaration.
+      if (!rule && !input.context && input.snapshot.version === 1) continue; // Retain the historical v1 reference-source exemption only.
       if (!rule || !scopeEqual(rule.scope, { shopId: candidate.shopId, productId: candidate.productId })
         || rule.sourceHash !== knowledgeApplicabilitySourceHash(candidate)
         || rule.basis.some(basis => !candidate.body.includes(basis.quote))) throw new Error();
@@ -180,15 +225,22 @@ export function gateKnowledgeApplicability(input: { snapshot: KnowledgeApplicabi
   }
   const known = validContext(input.context, input.scope);
   if (!known) { result.integrity = false; result.reason = "facts_unknown"; }
+  // The reviewed synthetic catalog proves only the author's declared category, never a name-based inference or permission.
+  const product = input.snapshot.version === 2 && known ? input.snapshot.productCatalog.find(product =>
+    product.shopId === input.context!.scope.shopId && product.productId === input.context!.scope.productId) : undefined;
   for (const candidate of input.candidates) {
     const rule = metadata.get(candidate.id)!;
-    if (rule.minimumCouponCount === undefined && rule.atLeastOneCouponInStates === undefined) {
+    if (rule.minimumCouponCount === undefined && rule.atLeastOneCouponInStates === undefined && rule.requiredProductCategories === undefined) {
       decide(candidate, "none_declared", "no_declared_quantity_or_state_precondition");
     } else if (!known) decide(candidate, "unknown", "facts_unknown");
     else if (rule.minimumCouponCount !== undefined && input.context.facts!.couponCount < rule.minimumCouponCount) {
       decide(candidate, "mismatched", "minimum_coupon_count");
     } else if (rule.atLeastOneCouponInStates && !rule.atLeastOneCouponInStates.some(state => input.context!.facts!.couponStates[state] > 0)) {
       decide(candidate, "mismatched", "coupon_state_absent");
+    } else if (rule.requiredProductCategories && !product) {
+      decide(candidate, "unknown", "product_category_unknown");
+    } else if (rule.requiredProductCategories && !rule.requiredProductCategories.some(category => product!.categories.includes(category))) {
+      decide(candidate, "mismatched", "product_category_mismatch");
     } else decide(candidate, "matched", "declared_necessary_preconditions_only");
   }
   return result;

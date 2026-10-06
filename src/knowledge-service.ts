@@ -6,7 +6,7 @@ import { applyEvidenceSupport, createEvidenceSupportClient, EvidenceSupportError
   evidenceSupportTypedV6Prompt, evidenceSupportTypedV6PromptVersion,
   type EvidenceSupportAttempt, type EvidenceSupportClient, type EvidenceSupportModel, type EvidenceSupportProfile, type EvidenceSupportFailure, type EvidenceSupportSettings, type EvidenceSupportVerification } from "./evidence-support.ts";
 import { rankLexical, scopeDocuments, serializeRetrievalDocument, type RetrievalScope } from "./retrieval-ranking.ts";
-import { gateKnowledgeApplicability, loadKnowledgeApplicabilitySnapshot, validateKnowledgeApplicabilitySnapshot,
+import { gateKnowledgeApplicability, knowledgeApplicabilityVersion, loadKnowledgeApplicabilitySnapshot, validateKnowledgeApplicabilitySnapshot,
   type KnowledgeApplicabilityContext, type KnowledgeApplicabilityMode, type KnowledgeApplicabilityResult,
   type KnowledgeApplicabilitySnapshot } from "./knowledge-applicability.ts";
 
@@ -51,7 +51,7 @@ export type KnowledgeServiceOptions = { mode?: KnowledgeMode; threshold?: number
   clients?: { rerank?: Pick<BailianClient, "settings" | "rerank">; support?: EvidenceSupportClient } };
 
 export function knowledgeApplicabilitySettings(snapshot: KnowledgeApplicabilitySnapshot) {
-  return { version: "declared-order-preconditions-v1" as const, snapshotHash: snapshot.sha256, serialization: snapshot.serialization };
+  return { version: knowledgeApplicabilityVersion(snapshot), snapshotHash: snapshot.sha256, serialization: snapshot.serialization };
 }
 
 // Shared with the offline scorer. Filtering applies only to the score gate's original Top5.

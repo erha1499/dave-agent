@@ -1,0 +1,1055 @@
+{
+  "version": 1,
+  "runId": "15530398-7c9f-49d6-a040-1e5fc4f47f3f",
+  "sourceCommit": "a31221a",
+  "stage": "exposed-development-fixed-input-candidate-environment-diagnostic",
+  "scope": "Real fixed-input support classification; no retrieval, Agent, SQL, QQ, business actions or final reply evaluation.",
+  "rawPath": ".runtime/c1-support-environment-development/15530398-7c9f-49d6-a040-1e5fc4f47f3f.json",
+  "rawSha256": "c4f087de9e0786ad0990d9b70672037eb6ae91b6291f63b776786c4a9e93b1c9",
+  "datasetSha256": "e9840fdb76647ad91d5c21db53fe2a27550f8444e9926c31eec92a9a6a727113",
+  "manifestSha256": "b2a585e3b81dae6b6e57f96d853ef9d0eeeb3a912325234bb95a1cf1c622cf43",
+  "startedAt": "2026-10-06T06:57:13.372Z",
+  "finishedAt": "2026-10-06T06:57:35.511Z",
+  "wallMs": 22139,
+  "integrityPassed": true,
+  "codeStable": true,
+  "recordingComplete": true,
+  "executionComplete": true,
+  "usageComplete": true,
+  "stopReason": null,
+  "actualSettings": {
+    "fact-support-typed-v7": {
+      "provider": "deepseek",
+      "model": "deepseek-v4-pro",
+      "api": "openai-completions",
+      "endpoint": "https://api.deepseek.com",
+      "timeoutMs": 60000,
+      "temperature": 0,
+      "maxTokens": 2048,
+      "maxRetries": 0,
+      "promptVersion": "fact-support-typed-v7",
+      "promptHash": "c2d8e1f3de93d86ef658a0d691fe753138efcab7240c9a13f20f499d41937a9c",
+      "serialization": "json-query-id-title-tags-body-v1",
+      "serializationHash": "1d16c5e3ef4647c120fe6ddce72417c9ec618ee41dc77faa447ec214e5749c4a",
+      "pricing": {
+        "currency": "USD",
+        "estimated": true,
+        "source": "Pi model catalog",
+        "rates": {
+          "input": 1.32,
+          "output": 3.96,
+          "cacheRead": 0.044,
+          "cacheWrite": 0
+        }
+      },
+      "profile": "typed",
+      "validationVersion": "typed-candidate-isolation-v1"
+    }
+  },
+  "summary": {
+    "fact-support-typed-v7": {
+      "exactInputs": {
+        "planned": 12,
+        "completed": 12,
+        "passed": 9,
+        "failed": 3,
+        "errors": 0,
+        "notRun": 0
+      },
+      "candidates": {
+        "planned": 18,
+        "positivePlanned": 6,
+        "negativePlanned": 12,
+        "positiveEvaluated": 6,
+        "negativeEvaluated": 12,
+        "passed": 15,
+        "falseAccepted": 3,
+        "falseRejected": 0,
+        "invalid": 0,
+        "missing": 0
+      },
+      "http": {
+        "requests": 12,
+        "unknownCosts": 0,
+        "knownEstimatedUsd": 0.010375728,
+        "estimatedUsd": 0.010375728,
+        "totalTokens": 25790
+      },
+      "latency": {
+        "observed": 12,
+        "p50Ms": 1717.1127500000002,
+        "p95Ms": 2451.3973750000005
+      },
+      "targetDecisions": [
+        {
+          "id": "environment-001",
+          "group": "channel",
+          "environment": "single",
+          "targetCandidateId": "ENV-CHANNEL-GENERAL",
+          "execution": "completed",
+          "state": "valid",
+          "passed": false,
+          "category": "direct_fact",
+          "supported": true
+        },
+        {
+          "id": "environment-002",
+          "group": "channel",
+          "environment": "with_specific",
+          "targetCandidateId": "ENV-CHANNEL-GENERAL",
+          "execution": "completed",
+          "state": "valid",
+          "passed": true,
+          "category": "limitation_only",
+          "supported": false
+        },
+        {
+          "id": "environment-003",
+          "group": "channel",
+          "environment": "with_unrelated",
+          "targetCandidateId": "ENV-CHANNEL-GENERAL",
+          "execution": "completed",
+          "state": "valid",
+          "passed": false,
+          "category": "direct_fact",
+          "supported": true
+        },
+        {
+          "id": "environment-004",
+          "group": "actor",
+          "environment": "single",
+          "targetCandidateId": "ENV-ACTOR-MERCHANT",
+          "execution": "completed",
+          "state": "valid",
+          "passed": true,
+          "category": "limitation_only",
+          "supported": false
+        },
+        {
+          "id": "environment-005",
+          "group": "actor",
+          "environment": "with_specific",
+          "targetCandidateId": "ENV-ACTOR-MERCHANT",
+          "execution": "completed",
+          "state": "valid",
+          "passed": true,
+          "category": "limitation_only",
+          "supported": false
+        },
+        {
+          "id": "environment-006",
+          "group": "actor",
+          "environment": "with_unrelated",
+          "targetCandidateId": "ENV-ACTOR-MERCHANT",
+          "execution": "completed",
+          "state": "valid",
+          "passed": true,
+          "category": "limitation_only",
+          "supported": false
+        },
+        {
+          "id": "environment-007",
+          "group": "condition",
+          "environment": "single",
+          "targetCandidateId": "ENV-CONDITION-CATEGORY",
+          "execution": "completed",
+          "state": "valid",
+          "passed": true,
+          "category": "limitation_only",
+          "supported": false
+        },
+        {
+          "id": "environment-008",
+          "group": "condition",
+          "environment": "with_specific",
+          "targetCandidateId": "ENV-CONDITION-CATEGORY",
+          "execution": "completed",
+          "state": "valid",
+          "passed": true,
+          "category": "limitation_only",
+          "supported": false
+        },
+        {
+          "id": "environment-009",
+          "group": "condition",
+          "environment": "with_unrelated",
+          "targetCandidateId": "ENV-CONDITION-CATEGORY",
+          "execution": "completed",
+          "state": "valid",
+          "passed": false,
+          "category": "direct_fact",
+          "supported": true
+        }
+      ]
+    }
+  },
+  "costsAndIndependentScore": {
+    "fact-support-typed-v7": {
+      "exact": 9,
+      "classified": 15,
+      "falseAccepted": 3,
+      "falseRejected": 0,
+      "categoryOnly": 0,
+      "positive": 6,
+      "negative": 12,
+      "inputTokens": 1718,
+      "outputTokens": 1800,
+      "cacheReadTokens": 22272,
+      "cacheWriteTokens": 0,
+      "totalTokens": 25790,
+      "costUsd": 0.010375727999999999
+    }
+  },
+  "usage": {
+    "agent": {
+      "requests": 0,
+      "unknownCosts": 0,
+      "knownEstimatedCost": 0,
+      "estimatedCost": 0,
+      "totalTokens": 0
+    },
+    "rerank": {
+      "requests": 0,
+      "unknownCosts": 0,
+      "knownEstimatedCost": 0,
+      "estimatedCost": 0,
+      "totalTokens": 0
+    },
+    "support": {
+      "requests": 12,
+      "unknownCosts": 0,
+      "knownEstimatedCost": 0.010375728,
+      "estimatedCost": 0.010375728,
+      "totalTokens": 25790
+    }
+  },
+  "diagnostic": {
+    "groups": [
+      {
+        "group": "channel",
+        "targetCandidateId": "ENV-CHANNEL-GENERAL",
+        "plannedEnvironments": 3,
+        "evaluatedEnvironments": 3,
+        "observedCategories": [
+          {
+            "environment": "single",
+            "category": "direct_fact",
+            "supported": true,
+            "passed": false
+          },
+          {
+            "environment": "with_specific",
+            "category": "limitation_only",
+            "supported": false,
+            "passed": true
+          },
+          {
+            "environment": "with_unrelated",
+            "category": "direct_fact",
+            "supported": true,
+            "passed": false
+          }
+        ],
+        "classificationVaries": true
+      },
+      {
+        "group": "actor",
+        "targetCandidateId": "ENV-ACTOR-MERCHANT",
+        "plannedEnvironments": 3,
+        "evaluatedEnvironments": 3,
+        "observedCategories": [
+          {
+            "environment": "single",
+            "category": "limitation_only",
+            "supported": false,
+            "passed": true
+          },
+          {
+            "environment": "with_specific",
+            "category": "limitation_only",
+            "supported": false,
+            "passed": true
+          },
+          {
+            "environment": "with_unrelated",
+            "category": "limitation_only",
+            "supported": false,
+            "passed": true
+          }
+        ],
+        "classificationVaries": false
+      },
+      {
+        "group": "condition",
+        "targetCandidateId": "ENV-CONDITION-CATEGORY",
+        "plannedEnvironments": 3,
+        "evaluatedEnvironments": 3,
+        "observedCategories": [
+          {
+            "environment": "single",
+            "category": "limitation_only",
+            "supported": false,
+            "passed": true
+          },
+          {
+            "environment": "with_specific",
+            "category": "limitation_only",
+            "supported": false,
+            "passed": true
+          },
+          {
+            "environment": "with_unrelated",
+            "category": "direct_fact",
+            "supported": true,
+            "passed": false
+          }
+        ],
+        "classificationVaries": true
+      }
+    ],
+    "positiveControls": [
+      {
+        "id": "environment-010",
+        "passed": true
+      },
+      {
+        "id": "environment-011",
+        "passed": true
+      },
+      {
+        "id": "environment-012",
+        "passed": true
+      }
+    ],
+    "promotionAssessed": false,
+    "decision": "Single-run candidate-environment diagnosis only; no prompt or defaults changed. Preserve all three false acceptances. Observed environment-dependent classification is not proof of an internal mechanism or production error rate. No repeat of this manifest and no C1 admission claim."
+  },
+  "rows": [
+    {
+      "id": "environment-001",
+      "group": "channel",
+      "environment": "single",
+      "targetCandidateId": "ENV-CHANNEL-GENERAL",
+      "version": "fact-support-typed-v7",
+      "execution": "completed",
+      "passed": false,
+      "inputHash": "f318c3e0af126281e37add52c9757d7a87f6ce16dbde6c564fac3dbadeadcb8a",
+      "verificationHash": "383277f639cf08139f461da33773355a9c63181d5a8951323f6ea684226e19c1",
+      "requestHash": "908d719c98f0e84475b770a3c1f7c2ef507c4fb8d8493a043ff02f7151d2a7ae",
+      "verificationInputHash": "313b33de15f78b69d6efffb91b0f8bfd599511147bd714a8468ce979e88f2bfe",
+      "candidateResults": [
+        {
+          "id": "ENV-CHANNEL-GENERAL",
+          "passed": false,
+          "expectedCategory": "limitation_only",
+          "expectedSupported": false,
+          "actualCategory": "direct_fact",
+          "actualSupported": true
+        }
+      ],
+      "decisions": [
+        {
+          "id": "ENV-CHANNEL-GENERAL",
+          "category": "direct_fact",
+          "quote": "团购券退款审核通过后，退款会退回原支付账户。一般预计2至5个工作日到账；各支付渠道采用自己的清算安排，具体时限以该渠道的退款规则为准。",
+          "reason": "原文直接给出团购券退款审核通过并发起后一般2至5个工作日到账，并保留各渠道以自身规则为准的条件，可回答所问一般时限。",
+          "supported": true
+        }
+      ],
+      "validation": {
+        "status": "complete",
+        "outputHash": "9f3b9a9d3ec1466100884fd6cefd1d2711a1c06abbb2820a29252e0106f3bca3",
+        "invalidDecisions": []
+      },
+      "attempts": [
+        {
+          "operation": "support",
+          "provider": "deepseek",
+          "model": "deepseek-v4-pro",
+          "attempt": 1,
+          "durationMs": 1662.45625,
+          "outcome": "ok",
+          "totalTokens": 2047,
+          "inputTokens": 145,
+          "outputTokens": 110,
+          "cacheReadTokens": 1792,
+          "cacheWriteTokens": 0,
+          "costUsd": 0.000705848
+        }
+      ]
+    },
+    {
+      "id": "environment-002",
+      "group": "channel",
+      "environment": "with_specific",
+      "targetCandidateId": "ENV-CHANNEL-GENERAL",
+      "version": "fact-support-typed-v7",
+      "execution": "completed",
+      "passed": true,
+      "inputHash": "9008a0cb0ff955c08828faa6a8cc09029eff404f6a8a548b326ec229502c540b",
+      "verificationHash": "e1393b39e6d10c4643239ef732fba9e226d340124d34e41abc030be2b2422407",
+      "requestHash": "05d0179d6bb846b3c7d7778d4abea12e63572698546650319daca99388f3b72f",
+      "verificationInputHash": "b37a30f262fd050086b89334886e049c7f19695408b3d9563d59c2300b15df67",
+      "candidateResults": [
+        {
+          "id": "ENV-CHANNEL-GENERAL",
+          "passed": true,
+          "expectedCategory": "limitation_only",
+          "expectedSupported": false,
+          "actualCategory": "limitation_only",
+          "actualSupported": false
+        },
+        {
+          "id": "ENV-CHANNEL-CEDAR",
+          "passed": true,
+          "expectedCategory": "direct_fact",
+          "expectedSupported": true,
+          "actualCategory": "direct_fact",
+          "actualSupported": true
+        }
+      ],
+      "decisions": [
+        {
+          "id": "ENV-CHANNEL-GENERAL",
+          "category": "limitation_only",
+          "quote": "团购券退款审核通过后，退款会退回原支付账户。一般预计2至5个工作日到账；各支付渠道采用自己的清算安排，具体时限以该渠道的退款规则为准。",
+          "reason": "原文给出一般2至5个工作日，但明确具体时限以各渠道规则为准，未直接回答杉木钱包渠道的到账时限。",
+          "supported": false
+        },
+        {
+          "id": "ENV-CHANNEL-CEDAR",
+          "category": "direct_fact",
+          "quote": "使用杉木钱包支付的团购券，退款审核通过并发起后，通常3至6个工作日到账。",
+          "reason": "原文直接给出杉木钱包支付的团购券退款审核通过并发起后的通常到账时限为3至6个工作日。",
+          "supported": true
+        }
+      ],
+      "validation": {
+        "status": "complete",
+        "outputHash": "938cae837e287a4486d45049f10631f7163cf51f7bab74004dbc0a6cfa7aea68",
+        "invalidDecisions": []
+      },
+      "attempts": [
+        {
+          "operation": "support",
+          "provider": "deepseek",
+          "model": "deepseek-v4-pro",
+          "attempt": 1,
+          "durationMs": 2451.3973750000005,
+          "outcome": "ok",
+          "totalTokens": 2254,
+          "inputTokens": 120,
+          "outputTokens": 214,
+          "cacheReadTokens": 1920,
+          "cacheWriteTokens": 0,
+          "costUsd": 0.00109032
+        }
+      ]
+    },
+    {
+      "id": "environment-003",
+      "group": "channel",
+      "environment": "with_unrelated",
+      "targetCandidateId": "ENV-CHANNEL-GENERAL",
+      "version": "fact-support-typed-v7",
+      "execution": "completed",
+      "passed": false,
+      "inputHash": "38f85760031df86738c4ac179f890697b7840d3b5c21a802af51bb3445f3a3a6",
+      "verificationHash": "08f655d6b886120766c4f9ddf283162e95759d67357edf4a336fa57626089a35",
+      "requestHash": "60baa85c4ece594b16b4b498e38bbdae9777ef57e94b4444a2d137c920178bc5",
+      "verificationInputHash": "79a4257f06a80d6189057d6d8337bdaa23029082d61b48d4d2ac5a85b0c4fc70",
+      "candidateResults": [
+        {
+          "id": "ENV-CHANNEL-GENERAL",
+          "passed": false,
+          "expectedCategory": "limitation_only",
+          "expectedSupported": false,
+          "actualCategory": "direct_fact",
+          "actualSupported": true
+        },
+        {
+          "id": "ENV-CHANNEL-INVOICE",
+          "passed": true,
+          "expectedCategory": "unrelated",
+          "expectedSupported": false,
+          "actualCategory": "unrelated",
+          "actualSupported": false
+        }
+      ],
+      "decisions": [
+        {
+          "id": "ENV-CHANNEL-GENERAL",
+          "category": "direct_fact",
+          "quote": "团购券退款审核通过后，退款会退回原支付账户。一般预计2至5个工作日到账；各支付渠道采用自己的清算安排，具体时限以该渠道的退款规则为准。",
+          "reason": "原文直接给出退款审核通过并发起后的一般到账时限为2至5个工作日，并保留渠道差异条件，可回答所问。",
+          "supported": true
+        },
+        {
+          "id": "ENV-CHANNEL-INVOICE",
+          "category": "unrelated",
+          "quote": null,
+          "reason": "原文仅涉及电子发票获取，与退款到账时限无关。",
+          "supported": false
+        }
+      ],
+      "validation": {
+        "status": "complete",
+        "outputHash": "56721ab4ff3bf39ab931525ddea46bbbebe103596453750ee4a7e08753b28256",
+        "invalidDecisions": []
+      },
+      "attempts": [
+        {
+          "operation": "support",
+          "provider": "deepseek",
+          "model": "deepseek-v4-pro",
+          "attempt": 1,
+          "durationMs": 2144.229166,
+          "outcome": "ok",
+          "totalTokens": 2189,
+          "inputTokens": 94,
+          "outputTokens": 175,
+          "cacheReadTokens": 1920,
+          "cacheWriteTokens": 0,
+          "costUsd": 0.00090156
+        }
+      ]
+    },
+    {
+      "id": "environment-004",
+      "group": "actor",
+      "environment": "single",
+      "targetCandidateId": "ENV-ACTOR-MERCHANT",
+      "version": "fact-support-typed-v7",
+      "execution": "completed",
+      "passed": true,
+      "inputHash": "d75e9d3b8ec275c20731d2ce2f0a67f7334b3a6a7b08f7cca145cfe6bc32fb36",
+      "verificationHash": "6c6035d7051e5b51e6b421ff966bbeede3ca636d01f1dcd1961991308067246f",
+      "requestHash": "90e86c2dcf86e2544d85e87f62b5168ba7d0fce6a8b226b8b8a79304cb067a2d",
+      "verificationInputHash": "b9a7fd5a187c81fd0a86c23312511ba8d60c2bf7b7dcd878fabd5e38c5df61e0",
+      "candidateResults": [
+        {
+          "id": "ENV-ACTOR-MERCHANT",
+          "passed": true,
+          "expectedCategory": "limitation_only",
+          "expectedSupported": false,
+          "actualCategory": "limitation_only",
+          "actualSupported": false
+        }
+      ],
+      "decisions": [
+        {
+          "id": "ENV-ACTOR-MERCHANT",
+          "category": "limitation_only",
+          "quote": "顾客对已核销记录提出异议时，可请求门店核对现场消费记录。店长同意协商后，由门店填写意见并提交核销异常处理材料。客服可以展示门店提交的意见和材料提交进度。",
+          "reason": "原文仅说明门店可提交材料及客服展示进度，未规定平台是否免于审核或直接恢复未核销，无法回答所问处理权限规则。",
+          "supported": false
+        }
+      ],
+      "validation": {
+        "status": "complete",
+        "outputHash": "f4f7477ea4ea2a3a3fce3f8a27cdfac0e679ed7e131241282388de40e622d8d7",
+        "invalidDecisions": []
+      },
+      "attempts": [
+        {
+          "operation": "support",
+          "provider": "deepseek",
+          "model": "deepseek-v4-pro",
+          "attempt": 1,
+          "durationMs": 1707.0701669999999,
+          "outcome": "ok",
+          "totalTokens": 2067,
+          "inputTokens": 165,
+          "outputTokens": 110,
+          "cacheReadTokens": 1792,
+          "cacheWriteTokens": 0,
+          "costUsd": 0.000732248
+        }
+      ]
+    },
+    {
+      "id": "environment-005",
+      "group": "actor",
+      "environment": "with_specific",
+      "targetCandidateId": "ENV-ACTOR-MERCHANT",
+      "version": "fact-support-typed-v7",
+      "execution": "completed",
+      "passed": true,
+      "inputHash": "b848727ffaac645f3fa8ae932255c82a69f42abbaec4fdfd0bce1b4cc79a0011",
+      "verificationHash": "f58d03fda496b865ec47cfcf12ce65a1f0acf8b7f2efeaa88b50d226ecc8c9eb",
+      "requestHash": "4c55d02115b8023d7b0d05aa7ba4a29dfbf13dc4213d92303ecb8996f929ca1a",
+      "verificationInputHash": "551f6ba4a8e84f83e2a89b91053a00a9e3d9daf55e17a543cc1e168d6e0ee137",
+      "candidateResults": [
+        {
+          "id": "ENV-ACTOR-MERCHANT",
+          "passed": true,
+          "expectedCategory": "limitation_only",
+          "expectedSupported": false,
+          "actualCategory": "limitation_only",
+          "actualSupported": false
+        },
+        {
+          "id": "ENV-ACTOR-PLATFORM",
+          "passed": true,
+          "expectedCategory": "direct_fact",
+          "expectedSupported": true,
+          "actualCategory": "direct_fact",
+          "actualSupported": true
+        }
+      ],
+      "decisions": [
+        {
+          "id": "ENV-ACTOR-MERCHANT",
+          "category": "limitation_only",
+          "quote": "店长同意协商后，由门店填写意见并提交核销异常处理材料。客服可以展示门店提交的意见和材料提交进度。",
+          "reason": "原文仅说明门店同意后提交材料及客服展示进度，未涉及平台是否免于审核，不能回答所问处理权限规则。",
+          "supported": false
+        },
+        {
+          "id": "ENV-ACTOR-PLATFORM",
+          "category": "direct_fact",
+          "quote": "对已核销团购券进行状态纠错，须由平台核验核销记录及门店证明，并作出纠错审批。门店同意仅用于提交协商材料，不能替代平台审核。",
+          "reason": "原文明确平台必须审核，门店同意不能替代，直接回答所问规则。",
+          "supported": true
+        }
+      ],
+      "validation": {
+        "status": "complete",
+        "outputHash": "eb96dc7f88446321678dcf5ec4b2c5b946bbe788ed0bdabe86b5d872122c7840",
+        "invalidDecisions": []
+      },
+      "attempts": [
+        {
+          "operation": "support",
+          "provider": "deepseek",
+          "model": "deepseek-v4-pro",
+          "attempt": 1,
+          "durationMs": 1887.4274170000008,
+          "outcome": "ok",
+          "totalTokens": 2282,
+          "inputTokens": 155,
+          "outputTokens": 207,
+          "cacheReadTokens": 1920,
+          "cacheWriteTokens": 0,
+          "costUsd": 0.0011088
+        }
+      ]
+    },
+    {
+      "id": "environment-006",
+      "group": "actor",
+      "environment": "with_unrelated",
+      "targetCandidateId": "ENV-ACTOR-MERCHANT",
+      "version": "fact-support-typed-v7",
+      "execution": "completed",
+      "passed": true,
+      "inputHash": "88a1666203bd6c3f5513c5910144ab549ef41b78ea71a3fab59877d7fdae86aa",
+      "verificationHash": "ce4091ee794b172cd95c099a0a163384277ee9f22823a4b770b4bc2e814dd42d",
+      "requestHash": "7cdde950895f7aa96eee5626d7f4cb3cba561e820e5f73bb9d8942943ac0ee70",
+      "verificationInputHash": "7b2ecb91061f836a312a915b088fa94572e45cd40775b4eebb83b33def042bc2",
+      "candidateResults": [
+        {
+          "id": "ENV-ACTOR-MERCHANT",
+          "passed": true,
+          "expectedCategory": "limitation_only",
+          "expectedSupported": false,
+          "actualCategory": "limitation_only",
+          "actualSupported": false
+        },
+        {
+          "id": "ENV-ACTOR-INVOICE",
+          "passed": true,
+          "expectedCategory": "unrelated",
+          "expectedSupported": false,
+          "actualCategory": "unrelated",
+          "actualSupported": false
+        }
+      ],
+      "decisions": [
+        {
+          "id": "ENV-ACTOR-MERCHANT",
+          "category": "limitation_only",
+          "quote": "店长同意协商后，由门店填写意见并提交核销异常处理材料。客服可以展示门店提交的意见和材料提交进度。",
+          "reason": "原文仅说明门店提交材料及客服展示进度，未规定平台是否免于审核或直接恢复未核销，不能回答所问处理权限规则。",
+          "supported": false
+        },
+        {
+          "id": "ENV-ACTOR-INVOICE",
+          "category": "unrelated",
+          "quote": null,
+          "reason": "原文涉及开票主体变更核验，与已核销券争议处理权限无关。",
+          "supported": false
+        }
+      ],
+      "validation": {
+        "status": "complete",
+        "outputHash": "0ad976e7f9d5eb4af9e39ef5df960810a104ce65d9e16173c1d329edcbff471a",
+        "invalidDecisions": []
+      },
+      "attempts": [
+        {
+          "operation": "support",
+          "provider": "deepseek",
+          "model": "deepseek-v4-pro",
+          "attempt": 1,
+          "durationMs": 1797.0401250000014,
+          "outcome": "ok",
+          "totalTokens": 2203,
+          "inputTokens": 115,
+          "outputTokens": 168,
+          "cacheReadTokens": 1920,
+          "cacheWriteTokens": 0,
+          "costUsd": 0.00090156
+        }
+      ]
+    },
+    {
+      "id": "environment-007",
+      "group": "condition",
+      "environment": "single",
+      "targetCandidateId": "ENV-CONDITION-CATEGORY",
+      "version": "fact-support-typed-v7",
+      "execution": "completed",
+      "passed": true,
+      "inputHash": "472fbd82ff9a588d223f7da49da52a1287eabd8ad31326bae764f9d5ef7fcebe",
+      "verificationHash": "43faaeb35ce20e720ebfa2472924be1bf9c368e2cb5837fff8e3d99f85fc4695",
+      "requestHash": "9edd65507f9970a67b23a70be9262d53e0e15cad24f15c4f4c909732e8d35b69",
+      "verificationInputHash": "b08b761c70f97f80e884d1d3cb201cecccb7c88e7db45ad459de5df9eb2cacad",
+      "candidateResults": [
+        {
+          "id": "ENV-CONDITION-CATEGORY",
+          "passed": true,
+          "expectedCategory": "limitation_only",
+          "expectedSupported": false,
+          "actualCategory": "limitation_only",
+          "actualSupported": false
+        }
+      ],
+      "decisions": [
+        {
+          "id": "ENV-CONDITION-CATEGORY",
+          "category": "limitation_only",
+          "quote": "自由场次观影套餐允许在普通周六、周日预约使用；法定节假日和特别影展场次除外，例外场次须另行确认。",
+          "reason": "原文给出自由场次套餐的周六预约规则，但未确认当前商品是否属于该套餐类别，无法回答所问商品是否适用。",
+          "supported": false
+        }
+      ],
+      "validation": {
+        "status": "complete",
+        "outputHash": "6047891ccbabdecfd00a3847509147427f3c2bb42ef5a25c4b73d0f57f646c48",
+        "invalidDecisions": []
+      },
+      "attempts": [
+        {
+          "operation": "support",
+          "provider": "deepseek",
+          "model": "deepseek-v4-pro",
+          "attempt": 1,
+          "durationMs": 1717.1127500000002,
+          "outcome": "ok",
+          "totalTokens": 2077,
+          "inputTokens": 175,
+          "outputTokens": 110,
+          "cacheReadTokens": 1792,
+          "cacheWriteTokens": 0,
+          "costUsd": 0.000745448
+        }
+      ]
+    },
+    {
+      "id": "environment-008",
+      "group": "condition",
+      "environment": "with_specific",
+      "targetCandidateId": "ENV-CONDITION-CATEGORY",
+      "version": "fact-support-typed-v7",
+      "execution": "completed",
+      "passed": true,
+      "inputHash": "5439680c5212ed161eec4db5ce2801b0f51ca7751ddce58eb0dca89ff133d6ac",
+      "verificationHash": "cc940820e99111069d3e09364822f0cfdc4f057f63927c61dca7f2d75798462d",
+      "requestHash": "e86e70becc25e7e42e69f12b82991826629f5ab833a603f0116fbe64c5bbd0b5",
+      "verificationInputHash": "6f65428513cccd3b9b6b1b1530311582037c3cfa2cfd43703428cecc5ca46b21",
+      "candidateResults": [
+        {
+          "id": "ENV-CONDITION-CATEGORY",
+          "passed": true,
+          "expectedCategory": "limitation_only",
+          "expectedSupported": false,
+          "actualCategory": "limitation_only",
+          "actualSupported": false
+        },
+        {
+          "id": "ENV-CONDITION-PRODUCT",
+          "passed": true,
+          "expectedCategory": "direct_fact",
+          "expectedSupported": true,
+          "actualCategory": "direct_fact",
+          "actualSupported": true
+        }
+      ],
+      "decisions": [
+        {
+          "id": "ENV-CONDITION-CATEGORY",
+          "category": "limitation_only",
+          "quote": "自由场次观影套餐允许在普通周六、周日预约使用；法定节假日和特别影展场次除外，例外场次须另行确认。预约成功后按对应场次核销，未预约不保证有座位。",
+          "reason": "原文给出自由场次套餐的一般规则，但未确认当前商品是否属于该套餐，不能直接回答所问商品类别及适用规则。",
+          "supported": false
+        },
+        {
+          "id": "ENV-CONDITION-PRODUCT",
+          "category": "direct_fact",
+          "quote": "海棠晚场双人观影券属于自由场次观影套餐，可在普通周六、周日预约使用。法定节假日和特别影展场次不适用普通周末规则，须另行确认；完成预约才保留座位。",
+          "reason": "原文明确该商品属于自由场次观影套餐，并给出普通周六预约规则，直接回答所问。",
+          "supported": true
+        }
+      ],
+      "validation": {
+        "status": "complete",
+        "outputHash": "4021955923eccab29d07cf6b001857f80e084d52b4f349c5971d4c28ab67d042",
+        "invalidDecisions": []
+      },
+      "attempts": [
+        {
+          "operation": "support",
+          "provider": "deepseek",
+          "model": "deepseek-v4-pro",
+          "attempt": 1,
+          "durationMs": 2347.0095,
+          "outcome": "ok",
+          "totalTokens": 2302,
+          "inputTokens": 148,
+          "outputTokens": 234,
+          "cacheReadTokens": 1920,
+          "cacheWriteTokens": 0,
+          "costUsd": 0.0012064800000000002
+        }
+      ]
+    },
+    {
+      "id": "environment-009",
+      "group": "condition",
+      "environment": "with_unrelated",
+      "targetCandidateId": "ENV-CONDITION-CATEGORY",
+      "version": "fact-support-typed-v7",
+      "execution": "completed",
+      "passed": false,
+      "inputHash": "f4516d3a99a996ec2efb7249e8294b02abf8bc41ec9892776955ec4d86668824",
+      "verificationHash": "32e8f043e99d396c27c087bf8a4e73fe14df591634814422143a9b3a04d636ae",
+      "requestHash": "03f69318b18b174aabde55c75908c6c34ed3b5ee78e5787771aa42c55968d640",
+      "verificationInputHash": "24630f31c61ddee091d81eeed17e10bf25af8ac9e2b380a4d507deb538c2c8fd",
+      "candidateResults": [
+        {
+          "id": "ENV-CONDITION-CATEGORY",
+          "passed": false,
+          "expectedCategory": "limitation_only",
+          "expectedSupported": false,
+          "actualCategory": "direct_fact",
+          "actualSupported": true
+        },
+        {
+          "id": "ENV-CONDITION-PARKING",
+          "passed": true,
+          "expectedCategory": "unrelated",
+          "expectedSupported": false,
+          "actualCategory": "unrelated",
+          "actualSupported": false
+        }
+      ],
+      "decisions": [
+        {
+          "id": "ENV-CONDITION-CATEGORY",
+          "category": "direct_fact",
+          "quote": "自由场次观影套餐允许在普通周六、周日预约使用；法定节假日和特别影展场次除外，例外场次须另行确认。",
+          "reason": "原文明确自由场次观影套餐的普通周六预约规则，并保留法定节假日等例外，可条件式回答所问规则。",
+          "supported": true
+        },
+        {
+          "id": "ENV-CONDITION-PARKING",
+          "category": "unrelated",
+          "quote": null,
+          "reason": "原文仅涉及停车优惠券，与观影套餐类别及预约规则无关。",
+          "supported": false
+        }
+      ],
+      "validation": {
+        "status": "complete",
+        "outputHash": "61d01e260adc04974d6f4539a0943c796dbd3ef5101153f86519a605359b77c1",
+        "invalidDecisions": []
+      },
+      "attempts": [
+        {
+          "operation": "support",
+          "provider": "deepseek",
+          "model": "deepseek-v4-pro",
+          "attempt": 1,
+          "durationMs": 1887.029375,
+          "outcome": "ok",
+          "totalTokens": 2205,
+          "inputTokens": 123,
+          "outputTokens": 162,
+          "cacheReadTokens": 1920,
+          "cacheWriteTokens": 0,
+          "costUsd": 0.00088836
+        }
+      ]
+    },
+    {
+      "id": "environment-010",
+      "group": "regression",
+      "environment": "positive_control",
+      "targetCandidateId": "ENV-POSITIVE-WEEKDAY",
+      "version": "fact-support-typed-v7",
+      "execution": "completed",
+      "passed": true,
+      "inputHash": "94b02890722e906e06c352e863b782d2280d08145495fd520d9d17d2da195779",
+      "verificationHash": "1480a1915e0ad25f18c66c0430d939f3efc90a4ab5935ad5e1bf454824f38113",
+      "requestHash": "8e1fcee1c26257d219238fc94851ce39478afff0231d9395e26557eca9e20c23",
+      "verificationInputHash": "8ee31d30b31a8b6899ec253ec01d7f1cc9699a22e2e5b95a3dd830accdc28daf",
+      "candidateResults": [
+        {
+          "id": "ENV-POSITIVE-WEEKDAY",
+          "passed": true,
+          "expectedCategory": "direct_fact",
+          "expectedSupported": true,
+          "actualCategory": "direct_fact",
+          "actualSupported": true
+        }
+      ],
+      "decisions": [
+        {
+          "id": "ENV-POSITIVE-WEEKDAY",
+          "category": "direct_fact",
+          "quote": "常规日场体验券在普通工作日周一至周五均可预约使用。法定节假日或场馆公布的封场活动除外，须另行核实对应日期；完成预约才保证席位。",
+          "reason": "原文明确常规日场体验券在普通工作日周一至周五可预约使用，并保留法定节假日、封场活动及完成预约的例外条件，直接回答假设问题。",
+          "supported": true
+        }
+      ],
+      "validation": {
+        "status": "complete",
+        "outputHash": "5e9765db8163c3d22306b639ac7de89b8752fc1c9f8cbfb16907bbac6974628e",
+        "invalidDecisions": []
+      },
+      "attempts": [
+        {
+          "operation": "support",
+          "provider": "deepseek",
+          "model": "deepseek-v4-pro",
+          "attempt": 1,
+          "durationMs": 1579.0004169999993,
+          "outcome": "ok",
+          "totalTokens": 2048,
+          "inputTokens": 153,
+          "outputTokens": 103,
+          "cacheReadTokens": 1792,
+          "cacheWriteTokens": 0,
+          "costUsd": 0.0006886879999999999
+        }
+      ]
+    },
+    {
+      "id": "environment-011",
+      "group": "regression",
+      "environment": "positive_control",
+      "targetCandidateId": "ENV-POSITIVE-APPROVAL",
+      "version": "fact-support-typed-v7",
+      "execution": "completed",
+      "passed": true,
+      "inputHash": "2834944b8fc6bc8f51add689ff9a3b7334c88ff8c028b33a7683545e90d8b9c7",
+      "verificationHash": "b365cfd05ec8d52b789cdd4258b56c08aa73e9777e3c9c624f3b02f2645ca0a3",
+      "requestHash": "ac615f440d05db7dabaeddf4363a6d20fd631d44e34ee2c7052dd3dd4249d355",
+      "verificationInputHash": "b53cfff8273924d9e56c973a6927f39cf1d725772ac7e9cab70986a9416c6bf1",
+      "candidateResults": [
+        {
+          "id": "ENV-POSITIVE-APPROVAL",
+          "passed": true,
+          "expectedCategory": "direct_fact",
+          "expectedSupported": true,
+          "actualCategory": "direct_fact",
+          "actualSupported": true
+        }
+      ],
+      "decisions": [
+        {
+          "id": "ENV-POSITIVE-APPROVAL",
+          "category": "direct_fact",
+          "quote": "对预约时间已过但未使用的体验券，顾客可提交超期处理申请。门店先核对未使用记录并确认是否接受改期以及新的预约时间，平台随后审核材料并记录结果。经批准后才可重新预约，政策本身不证明某次申请已批准。",
+          "reason": "原文明确给出超期改期的审批步骤：门店先核对并确认，平台随后审核记录，经批准后可重新预约，直接回答流程问题。",
+          "supported": true
+        }
+      ],
+      "validation": {
+        "status": "complete",
+        "outputHash": "941ec04775958cf234830f8a99aa17913e8cba2c70aaa07821c22e6d3be1a01c",
+        "invalidDecisions": []
+      },
+      "attempts": [
+        {
+          "operation": "support",
+          "provider": "deepseek",
+          "model": "deepseek-v4-pro",
+          "attempt": 1,
+          "durationMs": 1496.347958000002,
+          "outcome": "ok",
+          "totalTokens": 2080,
+          "inputTokens": 165,
+          "outputTokens": 123,
+          "cacheReadTokens": 1792,
+          "cacheWriteTokens": 0,
+          "costUsd": 0.000783728
+        }
+      ]
+    },
+    {
+      "id": "environment-012",
+      "group": "regression",
+      "environment": "positive_control",
+      "targetCandidateId": "ENV-POSITIVE-METADATA",
+      "version": "fact-support-typed-v7",
+      "execution": "completed",
+      "passed": true,
+      "inputHash": "433709f7e302e5f7ca60e7311fba53c103cfc395519658dc283b8fff44e45fac",
+      "verificationHash": "fa852f8df37e66d34d7f2d631ef22f5a320b0890598772f201394a67364891eb",
+      "requestHash": "3a4c5f3fac1a172876aa2e4f40b164be76d5fdcf28c3c033eba33eed539f427a",
+      "verificationInputHash": "b1792e64e135c70c7ef1a08341218fda5adb4c3cc2833b4e022a4c079b4f4b1e",
+      "candidateResults": [
+        {
+          "id": "ENV-POSITIVE-METADATA",
+          "passed": true,
+          "expectedCategory": "boundary_answer",
+          "expectedSupported": true,
+          "actualCategory": "boundary_answer",
+          "actualSupported": true
+        }
+      ],
+      "decisions": [
+        {
+          "id": "ENV-POSITIVE-METADATA",
+          "category": "boundary_answer",
+          "quote": "当前资料未登记影片的字幕语言和无障碍服务项目",
+          "reason": "用户明确询问资料是否登记字幕语言，原文直接说明未登记，属于文档覆盖范围的否定回答。",
+          "supported": true
+        }
+      ],
+      "validation": {
+        "status": "complete",
+        "outputHash": "94fe026d4a68688dd265ae921215fb464ea253469f3d935b86ac68e33150bf4d",
+        "invalidDecisions": []
+      },
+      "attempts": [
+        {
+          "operation": "support",
+          "provider": "deepseek",
+          "model": "deepseek-v4-pro",
+          "attempt": 1,
+          "durationMs": 1426.5262079999993,
+          "outcome": "ok",
+          "totalTokens": 2036,
+          "inputTokens": 160,
+          "outputTokens": 84,
+          "cacheReadTokens": 1792,
+          "cacheWriteTokens": 0,
+          "costUsd": 0.000622688
+        }
+      ]
+    }
+  ]
+}

@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { buildKnowledgeApplicabilityContext, gateKnowledgeApplicability, knowledgeApplicabilitySourceHash,
   loadKnowledgeApplicabilitySnapshot, validateKnowledgeApplicabilitySnapshot,
-  type KnowledgeApplicabilityContext } from "../src/knowledge-applicability.ts";
+  type KnowledgeApplicabilityContext, type KnowledgeApplicabilitySnapshot } from "../src/knowledge-applicability.ts";
 import type { RetrievalDocument } from "../src/retrieval-ranking.ts";
 import type { EvidenceSupportCandidate } from "../src/evidence-acceptance.ts";
 
@@ -122,4 +122,69 @@ assert.throws(() => validateKnowledgeApplicabilitySnapshot(brokenShape));
 const brokenBasis = structuredClone(brokenQuote); brokenBasis.documents[0].basis = [];
 assert.throws(() => validateKnowledgeApplicabilitySnapshot(brokenBasis));
 assert.equal(gate([{ ...unused, rank: 0 }]).status, "unavailable");
-console.log("Knowledge applicability checks passed: 8 unchanged sources, explicit necessary predicates, unknown/identity/scope/inventory guards, no-refill ranks, generic/reference and binding failures; 0 API calls.");
+
+const categorySource: EvidenceSupportCandidate = { id: "synthetic-category-rule", title: "原创合成类别规则",
+  body: "常规午餐与晚餐套餐可在普通周六、周日使用，包场套餐需重新确认使用范围。", tags: ["合成类别"], shopId: null, productId: null, rank: 1, score: .9 };
+const categoryManifest = { version: 2, serialization: "knowledge-document-v1", documents: [{ sourceId: categorySource.id,
+  sourceHash: knowledgeApplicabilitySourceHash(categorySource), scope: { shopId: null, productId: null }, requiredProductCategories: ["regular_lunch", "regular_dinner"],
+  basis: [{ field: "requiredProductCategories", quote: "常规午餐与晚餐套餐可在普通周六、周日使用" }], reviewNote: "作者声明的两类合成套餐前提，不证明外部商品类别或实例使用许可。" }],
+  productCatalog: [{ shopId: scope.shopId, productId: scope.productId, productName: "作者命名的合成商品", categories: ["regular_lunch"], reviewNote: "按合成商品ID审阅，名称不参与推断。" },
+    { shopId: scope.shopId, productId: "product-demo-2", productName: "作者命名的合成包场商品", categories: ["private"], reviewNote: "合成受限类别。" }] };
+const categorySnapshot = validateKnowledgeApplicabilitySnapshot(categoryManifest);
+assert.equal(categorySnapshot.version, 2); assert.equal(categorySnapshot.sha256, hash(JSON.stringify(categoryManifest)));
+assert.ok(categorySnapshot.version === 2 && Object.isFrozen(categorySnapshot.productCatalog) && Object.isFrozen(categorySnapshot.productCatalog[0]!.categories));
+const categoryGate = (context = build(), value: KnowledgeApplicabilitySnapshot = categorySnapshot, source = categorySource, currentScope = context.scope) =>
+  gateKnowledgeApplicability({ snapshot: value, context, scope: currentScope, candidates: [source] });
+const matchedCategory = categoryGate();
+assert.equal(matchedCategory.version, "declared-order-preconditions-v2"); assert.equal(matchedCategory.decisions[0]!.status, "matched");
+assert.equal(matchedCategory.candidates[0], categorySource, "One matching declared category suffices, with no candidate or rank rewrite");
+const anotherProduct = order(); anotherProduct.items[0]!.productId = "product-demo-2";
+anotherProduct.items[0]!.productName = "常规午餐套餐"; anotherProduct.id = "COUPON-1002";
+const mismatchedCategory = categoryGate(build(anotherProduct));
+assert.equal(mismatchedCategory.decisions[0]!.status, "mismatched"); assert.equal(mismatchedCategory.decisions[0]!.reason, "product_category_mismatch");
+assert.equal(mismatchedCategory.candidates.length, 0); assert.equal(mismatchedCategory.integrity, true);
+anotherProduct.items[0]!.productId = "product-demo-unknown";
+const unknownCategory = categoryGate(build(anotherProduct));
+assert.equal(unknownCategory.decisions[0]!.status, "unknown"); assert.equal(unknownCategory.decisions[0]!.reason, "product_category_unknown");
+assert.equal(unknownCategory.candidates.length, 0); assert.equal(unknownCategory.status, "ready"); assert.equal(unknownCategory.integrity, true);
+assert.equal(unknownCategory.reason, null, "A valid catalog with an unknown product is not metadata corruption or a proven mismatch");
+const anotherShop = order(); anotherShop.shop.id = "other-shop";
+assert.equal(categoryGate(build(anotherShop)).decisions[0]!.reason, "product_category_unknown", "Lookup binds both authorized shop and product ID");
+assert.equal(categoryGate(build(missing)).decisions[0]!.reason, "facts_unknown");
+const ruleOnlyCategory = gateKnowledgeApplicability({ snapshot: categorySnapshot, context: null, scope: {}, candidates: [categorySource] });
+assert.equal(ruleOnlyCategory.decisions[0]!.status, "not_checked"); assert.deepEqual(ruleOnlyCategory.candidates, [categorySource]);
+const anotherDeclaredSource = { ...categorySource, id: "synthetic-other-source" };
+const missingCategoryMetadata = validateKnowledgeApplicabilitySnapshot({ ...categoryManifest, documents: [{ sourceId: anotherDeclaredSource.id,
+  scope: { shopId: null, productId: null }, sourceHash: knowledgeApplicabilitySourceHash(anotherDeclaredSource), basis: [], reviewNote: "另一篇完整审阅的合成来源。" }] });
+assert.notEqual(missingCategoryMetadata.sha256, categorySnapshot.sha256, "Missing-metadata test uses a valid newly bound snapshot");
+const missingRuleOnlyMetadata = gateKnowledgeApplicability({ snapshot: missingCategoryMetadata, context: null, scope: {}, candidates: [categorySource] });
+assert.equal(missingRuleOnlyMetadata.status, "unavailable"); assert.equal(missingRuleOnlyMetadata.integrity, false);
+assert.equal(missingRuleOnlyMetadata.reason, "metadata_binding_invalid"); assert.deepEqual(missingRuleOnlyMetadata.candidates, []);
+assert.equal(gate([reference], null).decisions[0]!.status, "not_checked", "v1 reference-source rule-only exemption remains compatible");
+const categoryTampered = structuredClone(categorySnapshot);
+assert.ok(categoryTampered.version === 2); categoryTampered.productCatalog[0]!.categories = ["private"];
+assert.equal(categoryGate(build(), categoryTampered).reason, "metadata_binding_invalid", "Changed catalog cannot reuse the old snapshot hash");
+const categoryUnknownField = structuredClone(categoryManifest) as Record<string, unknown>; categoryUnknownField.allowUserClaim = true;
+assert.throws(() => validateKnowledgeApplicabilitySnapshot(categoryUnknownField));
+const duplicateProduct = structuredClone(categoryManifest); duplicateProduct.productCatalog.push(duplicateProduct.productCatalog[0]!);
+assert.throws(() => validateKnowledgeApplicabilitySnapshot(duplicateProduct));
+const duplicateCategory = structuredClone(categoryManifest); duplicateCategory.productCatalog[0]!.categories = ["regular_lunch", "regular_lunch"];
+assert.throws(() => validateKnowledgeApplicabilitySnapshot(duplicateCategory));
+const emptyCategories = structuredClone(categoryManifest); emptyCategories.documents[0]!.requiredProductCategories = [];
+assert.throws(() => validateKnowledgeApplicabilitySnapshot(emptyCategories));
+const categoryNoBasis = structuredClone(categoryManifest); categoryNoBasis.documents[0]!.basis = [];
+assert.throws(() => validateKnowledgeApplicabilitySnapshot(categoryNoBasis));
+const categoryNoQuote = structuredClone(categoryManifest); categoryNoQuote.documents[0]!.basis[0]!.quote = "原文未写的商品类别";
+assert.equal(categoryGate(build(), validateKnowledgeApplicabilitySnapshot(categoryNoQuote)).reason, "metadata_binding_invalid");
+assert.throws(() => validateKnowledgeApplicabilitySnapshot(categoryManifest, "0".repeat(64)), "v2 canonical content and declared hash must bind");
+const versionOneCategory = { ...categoryManifest, version: 1 };
+assert.throws(() => validateKnowledgeApplicabilitySnapshot(versionOneCategory), "v2 declarations cannot hide under historical v1");
+for (const location of ["root", "rule", "catalog", "categories"] as const) for (const hidden of ["symbol", "nonenumerable", "prototype"] as const) {
+  const changed = structuredClone(categoryManifest), object = location === "root" ? changed : location === "rule" ? changed.documents[0]!
+    : location === "catalog" ? changed.productCatalog[0]! : changed.productCatalog[0]!.categories;
+  if (hidden === "prototype") Object.setPrototypeOf(object, { allowUserClaim: true });
+  else Object.defineProperty(object, hidden === "symbol" ? Symbol("allowUserClaim") : "allowUserClaim", { value: true, enumerable: hidden === "symbol" });
+  assert.throws(() => validateKnowledgeApplicabilitySnapshot(changed), `v2 rejects ${location} ${hidden} data outside its hash`);
+}
+assert.equal(snapshot.version, 1); assert.equal(single.version, "declared-order-preconditions-v1", "Historical metadata and gate version remain unchanged");
+console.log("Knowledge applicability checks passed: 8 unchanged v1 sources; v2 declared product categories, OR matching, unknown/mismatch, frozen content binding and strict JSON; identity/scope/inventory, no-refill and rule-only guards; 0 API calls.");
