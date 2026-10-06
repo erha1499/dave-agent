@@ -5,6 +5,7 @@ import { fauxAssistantMessage, fauxProvider, fauxToolCall, type FauxResponseStep
 import { createModelRuntime } from "../src/agent.ts";
 import { merchantSourceKey, type AfterSalesStore } from "../src/after-sales.ts";
 import type { CouponStore, QQIdentity } from "../src/coupon-store.ts";
+import type { SupportContextPort, SupportContextSnapshot } from "../src/conversation-state.ts";
 import type { RefundStore } from "../src/refunds.ts";
 import type { ContextOrderRef, ContextSupportAction } from "../src/support-context-action.ts";
 import type { SupportCall, TrustedPolicyTopic } from "../src/support-controller.ts";
@@ -12,6 +13,7 @@ import type { TrustedReferenceChoices } from "../src/support-reference-selection
 import { cancelSupportTurn, createSupportSession, getSupportHostReceipt, getSupportResult, prepareSupportPrompt, supportReply } from "../src/support-session.ts";
 
 type Host = { kind?: string; orderId?: string | null; alternativeOrderId?: string | null; policyTopic?: TrustedPolicyTopic | null;
+  itemPaidUnit?: { requestId: string; orderId: string; paidCents: number } | null;
   policyChoices?: TrustedReferenceChoices; orderChoices?: TrustedReferenceChoices; pendingReferenceKind?: "order" | "policy" | null };
 const hostReference = (context: TranscriptContext): Host => context.messages.flatMap(message => typeof message.content === "string" ? [message.content]
   : message.content.filter(part => part.type === "text").map(part => part.text))
@@ -37,13 +39,13 @@ function makeOrder(id: string): Awaited<ReturnType<CouponStore["getOrder"]>> {
 export async function checkSupportReferenceSession() {
   const runtime = await createModelRuntime(), faux = fauxProvider(); runtime.registerNativeProvider(faux.provider);
   let sequence = 0;
-  async function harness(label: string, who: QQIdentity = identity, group = groupOpenid) {
+  async function harness(label: string, who: QQIdentity = identity, group = groupOpenid, context?: SupportContextPort, readOrder = makeOrder) {
     const reads: Array<{ identity: QQIdentity; id: string }> = [], queries: string[] = [], calls: SupportCall[] = [], focusWrites: Array<string | undefined> = [];
     let writes = 0, failReads = false, focus: string | undefined;
     const store = { async getOrder(actor: QQIdentity, id: string) {
       assert.deepEqual(actor, who); reads.push({ identity: structuredClone(actor), id });
       if (failReads) throw new Error("synthetic failed order lookup");
-      assert.ok([a, b, c].includes(id)); return makeOrder(id);
+      assert.ok([a, b, c].includes(id)); return readOrder(id);
     }, async searchKnowledge(query: string, shopId?: string, productId?: string) {
       queries.push(query);
       return [{ source: "demo-knowledge", sourceId: "RF005", title: "合成咨询规则", body: "微信与银行卡按各自渠道时限处理；套餐有效期内可按规则使用，具体条件以本次查询为准。",
@@ -53,7 +55,8 @@ export async function checkSupportReferenceSession() {
     const session = await createSupportSession(who, store, runtime, faux.getModel(), {
       sourceKey: merchantSourceKey(who, group), store: { prepare: unexpectedWrite, getTask: async () => null } as unknown as AfterSalesStore,
       refunds: { prepare: unexpectedWrite, get: async () => null } as unknown as RefundStore,
-    }, { groupOpenid: group, focus: { read: async () => focus, write: async value => { focusWrites.push(value); focus = value; } } });
+    }, { groupOpenid: group, ...(context ? { context } : {
+      focus: { read: async () => focus, write: async (value: string | undefined) => { focusWrites.push(value); focus = value; } } }) });
     const snapshot = () => ({ reads: reads.length, queries: queries.length, writes, providerCalls: faux.state.callCount, focusWrites: focusWrites.length });
     async function run(question: string, action?: ContextSupportAction | ((host: Host) => ContextSupportAction),
       options: { images?: Array<{ type: "image"; mimeType: string; data: string }>; failure?: boolean } = {}) {
@@ -279,6 +282,71 @@ export async function checkSupportReferenceSession() {
       cancelSupportTurn(h.session); assert.equal((await h.select(commandAgain)).receipt?.outcome, "rejected");
       assertNoBusinessWrite(h);
     } finally { h.session.dispose(); }
+  }
+  // A restored, explicit amount selection is independent of an unavailable order
+  // focus. Only the user's same-order request may retain that selected source.
+  {
+    const partialOrder = (id: string) => {
+      const order = makeOrder(id); order.status = "partially_redeemed";
+      order.amounts.totalCents = order.amounts.paidCents = 15960;
+      order.items[0]!.quantity = 2; order.items[0]!.totalCents = 15960; order.payments[0]!.amountCents = 15960;
+      order.coupons.push({ ...order.coupons[0]!, id: `${id}-used`, status: "redeemed", redeemedAt: order.asOf, redeemedShopId: order.shop.id });
+      return order;
+    };
+    const memoryPort = (initial: SupportContextSnapshot = { revision: 0, customerId: "synthetic", bindingId: "1" }) => {
+      let saved = structuredClone(initial);
+      return { async read() { return structuredClone(saved); }, async write(expected, value) {
+        assert.equal(expected.revision, saved.revision); assert.equal(expected.bindingId, saved.bindingId);
+        saved = { ...saved, revision: saved.revision + 1, value: structuredClone(value) }; return structuredClone(saved);
+      } } satisfies SupportContextPort;
+    };
+    const port = memoryPort(), first = await harness("amount-source", identity, groupOpenid, port, partialOrder);
+    let sourceId: string, command: string, saved: SupportContextSnapshot, unselected: SupportContextSnapshot;
+    try {
+      const source = await first.queryOrder(a); sourceId = source.requestId; await first.queryOrder(b);
+      const shown = await first.run("请列出历史实付基准让我选择", { protocol: "v2.2", kind: "clarify", field: "amount_basis", reason: "ambiguous" });
+      const candidate = shown.result?.evidence.amountChoices?.candidates.find(row => row.reference.requestId === sourceId);
+      assert.ok(candidate); command = `选择金额基准 ${candidate.token}`;
+      assert.ok(replyText(shown).split("\n").includes(command));
+      unselected = await port.read();
+      assert.equal((await first.select(command)).receipt?.selectedRequestId, sourceId);
+      saved = await port.read(); assert.equal(saved.value?.requiresRestatement, true);
+      assert.ok(saved.value?.version === 3 && saved.value.amountChoices?.selectedRequestId === sourceId);
+      assertNoBusinessWrite(first);
+    } finally { first.session.dispose(); }
+    const restored = await harness("amount-restored", identity, groupOpenid, memoryPort(saved), partialOrder);
+    try {
+      const comparison = await restored.run(`比较 ${a} 唯一未使用券的实付和刚才选中的基准`, host => {
+        assert.ok(host.itemPaidUnit, "The actual host must retain the user's selected same-order amount source");
+        return { protocol: "v2.2", kind: "paid_amount_compare", orderRef: explicit(a), amountRef: { requestId: host.itemPaidUnit.requestId } };
+      });
+      assert.equal(comparison.host?.orderId, null, "Restatement-required order focus must remain unavailable");
+      assert.equal(comparison.result?.outcome, "ready", "An actual same-order selected amount remains usable after focus loss");
+      assert.equal(comparison.host?.itemPaidUnit?.requestId, sourceId);
+      assert.equal(comparison.result?.evidence.amountComparison?.referenceRequestId, sourceId);
+      assert.equal(comparison.result?.evidence.amountComparison?.refundApproved, false);
+      assert.deepEqual(restored.reads, [{ identity, id: a }]); assertNoBusinessWrite(restored);
+    } finally { restored.session.dispose(); }
+    const originalNow = Date.now;
+    for (const scenario of ["other-order", "unselected", "expired", "other-route"] as const) {
+      let next: Awaited<ReturnType<typeof harness>> | undefined;
+      try {
+        if (scenario === "expired") {
+          assert.ok(saved.value?.version === 3 && saved.value.amountChoices);
+          const expiredAt = Math.max(...saved.value.amountChoices.candidates.map(row => row.expiresAt)) + 1;
+          Date.now = () => expiredAt;
+        }
+        next = await harness(`amount-${scenario}`, identity, scenario === "other-route" ? "OTHER_GROUP" : groupOpenid,
+          scenario === "other-route" ? memoryPort() : memoryPort(scenario === "unselected" ? unselected : saved), partialOrder);
+        if (scenario === "other-route") assert.equal((await next.select(command)).receipt?.outcome, "rejected");
+        const target = scenario === "other-order" ? b : a;
+        const comparison = await next.run(`比较 ${target} 的实付和之前基准`, { protocol: "v2.2", kind: "paid_amount_compare",
+          orderRef: explicit(target), amountRef: { requestId: sourceId } });
+        assert.equal(comparison.host?.itemPaidUnit, null); assert.equal(comparison.result?.outcome, "clarification");
+        assert.equal(comparison.result?.evidence.amountComparison, undefined);
+        assert.equal(next.reads.length, 0); assertNoBusinessWrite(next);
+      } finally { next?.session.dispose(); Date.now = originalNow; }
+    }
   }
   console.log("[support-reference-session] actual Pi/faux continuation, presentation-bound selection, pending preservation, fresh-order recovery and rejection paths PASS (0 API, 0 DB)");
 }

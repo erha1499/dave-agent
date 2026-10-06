@@ -11,7 +11,7 @@ import { createConfiguredModelRuntime, createModelRuntime } from "../src/agent.t
 import { AfterSalesStore, MerchantBusinessError, merchantSourceKey, readAfterSalesDatabaseConfig } from "../src/after-sales.ts";
 import { confirmMerchantReply } from "../src/after-sales-entry.ts";
 import { contentHash } from "../src/bailian.ts";
-import { ConversationStateStore } from "../src/conversation-state.ts";
+import { ConversationStateStore, type SupportContextPort, type SupportContextSnapshot, type SupportContextValue } from "../src/conversation-state.ts";
 import { CouponStore, OrderAccessError, readDatabaseConfig } from "../src/coupon-store.ts";
 import { captureEvaluationTurn } from "../src/eval-capture.ts";
 import { createKnowledgeService } from "../src/knowledge-service.ts";
@@ -22,24 +22,32 @@ import { confirmRefundReply, markRefundReplyPresented } from "../src/refund-entr
 import type { Reply, RenderedReply } from "../src/reply.ts";
 import { getModelSupportActionParameters, taskReferenceContractVersion, type TaskReferenceMode } from "../src/support-context-action.ts";
 import { currentReferenceChoices, rememberReferenceChoice } from "../src/support-reference-selection.ts";
+import { currentAmountChoices, rememberAmountChoice } from "../src/support-context.ts";
 import { currentTaskChoices, refreshTaskChoices } from "../src/support-task-context.ts";
 import { cancelSupportTurn, createSupportSession, getSupportHostReceipt, getSupportResult } from "../src/support-session.ts";
 import { createC1ValidationGuard, readC1ValidationDependencies, withinTurnDeadline } from "./c1-session-validation-live.ts";
 import { createMerchantFixture } from "./merchant-test-fixture.ts";
 import { o4RecoveryTurns, o4RecoveryText, scoreO4RecoveryTurn, fauxO4RecoveryAction } from "./o4-recovery-probe-contract.ts";
 import { rotationTurns, freshRotationTurns, rotationText, scoreRotationTurn, fauxRotationAction, type RotationWording } from "./o4-rotation-probe-contract.ts";
+import { rotationMixTurns, rotationMixText, scoreRotationMixTurn, fauxRotationMixAction,
+  type RotationMixTurn, type RotationMixMapping } from "./o4-rotation-mix-contract.ts";
 
 const root = new URL("../", import.meta.url), directory = new URL(".runtime/o4-recovery-probe/", root);
 export const o4RecoveryLimits = { requests: { agent: 120, rerank: 0, support: 0 }, deadlineMs: 600_000,
   turnTimeoutMs: 45_000, estimatedUsd: .35, estimatedCny: .01 };
 export const o4RotationLimits = { requests: { agent: 240, rerank: 0, support: 0 }, deadlineMs: 900_000,
   turnTimeoutMs: 45_000, estimatedUsd: .70, estimatedCny: .01 };
-type SuiteName = "recovery20" | "rotation40" | "rotation40fresh";
-type ProbeTurn = typeof o4RecoveryTurns[number] | typeof rotationTurns[number];
-const isRotationSuite = (value: string) => value === "rotation40" || value === "rotation40fresh";
+// The shared guard needs an enabled counter. This single-slot fuse is never a
+// remote allowance: the mix transport below rejects every attempted HTTP call.
+const o4MixLimits = { requests: { agent: 0, rerank: 0, support: 0 }, deadlineMs: 900_000,
+  turnTimeoutMs: 45_000, estimatedUsd: .01, estimatedCny: .01 };
+type SuiteName = "recovery20" | "rotation40" | "rotation40fresh" | "rotation80mix";
+type ProbeTurn = typeof o4RecoveryTurns[number] | typeof rotationTurns[number] | RotationMixTurn;
+const isRotationSuite = (value: string) => value === "rotation40" || value === "rotation40fresh" || value === "rotation80mix";
 const validSuite = (value: string): value is SuiteName => value === "recovery20" || isRotationSuite(value);
 function taskReferenceSettings(suite: SuiteName, mode: TaskReferenceMode) {
   assert.ok(mode === "id" || mode === "current", "--task-reference must be id or current");
+  assert.ok(suite !== "rotation80mix" || mode === "id", "rotation80mix only supports the default id task protocol");
   assert.ok(mode === "id" || isRotationSuite(suite), "current task references are limited to rotation40 or rotation40fresh");
   return { taskReferenceMode: mode, taskReferenceContractVersion,
     taskReferenceSchemaHash: contentHash(getModelSupportActionParameters(mode)) };
@@ -47,6 +55,11 @@ function taskReferenceSettings(suite: SuiteName, mode: TaskReferenceMode) {
 function suiteDefinition(name: SuiteName, taskReferenceMode: TaskReferenceMode = "id") {
   assert.ok(validSuite(name));
   taskReferenceSettings(name, taskReferenceMode);
+  if (name === "rotation80mix") return { name, wording: "mix-v1" as const, turns: rotationMixTurns, limits: o4MixLimits,
+    contractPath: "scripts/o4-rotation-mix-contract.ts",
+    text: (turn: ProbeTurn, mapping: Mapping) => rotationMixText(turn as RotationMixTurn, mapping as RotationMixMapping),
+    score: (actual: Row, history: Row[], mode: Mode, mapping: Mapping) => scoreRotationMixTurn(actual, history, mode, mapping as RotationMixMapping),
+    fauxAction: (id: number, mode: Mode, mapping: Mapping, host?: Record<string, unknown>) => fauxRotationMixAction(id, mode, mapping as RotationMixMapping, host) };
   const wording: RotationWording = name === "rotation40fresh" ? "fresh-v1" : "original";
   return isRotationSuite(name)
     ? { name, wording, turns: name === "rotation40fresh" ? freshRotationTurns : rotationTurns, limits: o4RotationLimits, contractPath: "scripts/o4-rotation-probe-contract.ts",
@@ -61,7 +74,7 @@ function wordingSettings(suite: ReturnType<typeof suiteDefinition>) {
     wordingHash: contentHash(suite.turns.map(({ id, kind, text }) => ({ id, kind, text }))) };
 }
 type Mode = "memory" | "mysql";
-type Mapping = Parameters<typeof scoreO4RecoveryTurn>[3] & { taskB?: string };
+type Mapping = Parameters<typeof scoreO4RecoveryTurn>[3] & { taskB?: string; orders: { A: string; B: string; F: string; C?: string } };
 type Actual = Parameters<typeof scoreO4RecoveryTurn>[0];
 type Call = Actual["calls"][number];
 type Snapshot = Actual["dbBefore"] & { payments: Record<string, unknown>[]; coupons: Record<string, unknown>[]; items: Record<string, unknown>[] };
@@ -72,13 +85,47 @@ type Row = Actual & { mode: Mode; reason: string | null; startedAt: number; fini
   score: ReturnType<typeof scoreO4RecoveryTurn> | null; requests: ReturnType<typeof createC1ValidationGuard>["requests"];
   sends: Send[]; controllerCalls: unknown[]; steps: ReturnType<ReturnType<typeof captureEvaluationTurn>["finish"]>["steps"];
   sdkRetryEvents: Array<{ type: string; attempt: number }>; hostReferences: unknown[]; transcript: unknown[];
-  contextBefore: unknown; contextAfter: unknown; selectionMaterial?: unknown; rawSends: unknown[];
-  generationBefore: number; factoryEvents: FactoryEvent[]; };
+  contextBefore: SupportContextSnapshot | null; contextAfter: SupportContextSnapshot | null; selectionMaterial?: unknown; rawSends: unknown[];
+  generationBefore: number; factoryEvents: FactoryEvent[];
+  contextIO?: ContextIO[]; knowledgeReads?: KnowledgeRead[];
+  knowledgeDatabaseBefore?: Record<string, unknown>[]; knowledgeDatabaseAfter?: Record<string, unknown>[];
+  fixtureEvents?: Array<{ kind: "reprice_C"; dbBefore: Snapshot; dbAfter: Snapshot }>;
+  businessClock?: { before: number; after: number }; clockEvent?: { kind: "expire_amount_A"; before: number; after: number;
+    expiredRequestId: string; survivorRequestId: string; expiredAt: number; survivorExpiresAt: number };
+};
+type ContextIO = { operation: "read" | "write"; requestId: string; generation: number;
+  phase: "read" | "initial_block" | "final_publish"; injected: boolean; forwarded: boolean; status: "ok" | "error";
+  expected?: SupportContextSnapshot; proposed?: SupportContextValue; result?: SupportContextSnapshot; startedAt: number; finishedAt: number };
+type KnowledgeRead = { requestId: string; shopId?: string; productId?: string;
+  documents: Awaited<ReturnType<CouponStore["readKnowledgeDocuments"]>>; hash: string; startedAt: number; finishedAt: number };
+// Only Session I/O is wrapped. Independent audit reads use the original port and
+// cannot consume the single declared failure before the production path reaches it.
+function observedContextPort(port: SupportContextPort, owner: () => Row | undefined, generation: () => number,
+  fault: (row: Row) => "read" | "final_publish" | undefined, wallNow = Date.now): SupportContextPort {
+  const injected = new Set<string>();
+  async function perform(operation: "read" | "write", expected?: SupportContextSnapshot, proposed?: SupportContextValue) {
+    const row = owner(); assert.ok(row?.requestId, "Session context I/O requires a real ingress");
+    const phase = operation === "read" ? "read" : proposed?.version === 1 && !proposed.focus && proposed.requiresRestatement ? "initial_block" : "final_publish";
+    const shouldFail = fault(row) === phase && !injected.has(row.requestId);
+    const event: ContextIO = { operation, requestId: row.requestId, generation: generation(), phase,
+      injected: shouldFail, forwarded: false, status: "error", startedAt: wallNow(), finishedAt: 0,
+      ...(expected ? { expected: structuredClone(expected) } : {}), ...(proposed ? { proposed: structuredClone(proposed) } : {}) };
+    (row.contextIO ??= []).push(event);
+    try {
+      if (shouldFail) { injected.add(row.requestId); throw new Error("synthetic_context_unavailable"); }
+      event.forwarded = true;
+      const result = operation === "read" ? await port.read() : await port.write(expected!, proposed!);
+      event.status = "ok"; event.result = structuredClone(result); return result;
+    } finally { event.finishedAt = wallNow(); }
+  }
+  return { read: () => perform("read"), write: (expected, value) => perform("write", expected, value) };
+}
 const blankDb = (): Snapshot => ({ orders: [], merchantTasks: [], refundOperations: [], refunds: [], notifications: [], payments: [], coupons: [], items: [] });
 const json = (v: unknown) => JSON.stringify(v, null, 2) + "\n";
 const hashFiles = async (paths: string[]) => Object.fromEntries(await Promise.all(paths.map(async path => [path, contentHash(await readFile(new URL(path, root)))])));
-async function sourceFiles() {
+async function sourceFiles(suiteName: SuiteName = "recovery20") {
   return [...new Set(["scripts/o4-recovery-probe-live.ts", "scripts/o4-recovery-probe-contract.ts", "scripts/o4-rotation-probe-contract.ts", "scripts/o4-task-reference-wording.ts", "scripts/merchant-test-fixture.ts",
+    "scripts/o4-rotation-mix-contract.ts",
     "scripts/c1-session-validation-live.ts", "scripts/c1-session-validation-check.ts", "scripts/c1-session-live.ts",
     "prompts/customer-service-v2.md", "skills/shop-support-v2/SKILL.md",
     ...(await readdir(new URL("src/", root))).filter(n => n.endsWith(".ts")).map(n => `src/${n}`),
@@ -87,6 +134,7 @@ async function sourceFiles() {
 const snapshotModel = (model: Awaited<ReturnType<typeof createConfiguredModelRuntime>>["model"]) => ({ provider: model.provider,
   id: model.id, api: model.api, baseUrl: model.baseUrl, maxTokens: Math.min(2048, model.maxTokens), cost: model.cost });
 async function configuration(execution: "live" | "faux", suiteName: SuiteName, taskReferenceMode: TaskReferenceMode) {
+  assert.ok(suiteName !== "rotation80mix" || execution === "faux", "rotation80mix is a zero-remote faux-only engineering suite");
   const suite = suiteDefinition(suiteName, taskReferenceMode);
   const runtime = await createModelRuntime(), model = runtime.getModel("deepseek", "deepseek-flash"); assert.ok(model);
   return { execution, suite: suiteName, ...taskReferenceSettings(suiteName, taskReferenceMode), ...wordingSettings(suite), architecture: "controller", knowledgeMode: "lexical", repairBudget: 1, model: snapshotModel(model), thinking: "disabled",
@@ -94,29 +142,33 @@ async function configuration(execution: "live" | "faux", suiteName: SuiteName, t
     dependencySnapshot: await readC1ValidationDependencies(), pricing: { estimated: true, source: "Pi model catalog, not an actual invoice" },
     planned: { modes: ["memory", "mysql"], userTurnsPerMode: suite.turns.length, totalUserTurns: suite.turns.length * 2,
       notificationsPerMode: suite.turns.filter(turn => turn.before === "notifyA").length,
-      laterScenarios: suiteName === "recovery20" ? "40/80 not run in this artifact" : "80 not run in this artifact" }, fixture: { delayMs: 5000, pendingHoldMs: 180000, testOnlyWaitingWindow: true } };
+      laterScenarios: suiteName === "recovery20" ? "40/80 not run in this artifact" : suiteName === "rotation80mix" ? "80 engineering only; no live model evaluation" : "80 not run in this artifact" },
+    ...(suiteName === "rotation80mix" ? { remoteRequestsAllowed: 0, qqRemoteRequestsAllowed: 0,
+      mixContractVersion: "rotation80mix-v1", faultInjection: "session-port-once-before-delegate",
+      effectiveNetworkPolicy: "reject_before_fetch", internalGuardAgentFuse: 1, businessClockStrategy: "fixed_business_instant" } : {}),
+    fixture: { delayMs: 5000, pendingHoldMs: 180000, testOnlyWaitingWindow: true } };
 }
 type Configuration = Awaited<ReturnType<typeof configuration>>;
-type Manifest = { version: 4; suite: SuiteName; contractPath: string; stage: "exposed-development"; frozenAt: string; contractHash: string;
+type Manifest = { version: 4 | 5; suite: SuiteName; contractPath: string; stage: "exposed-development"; frozenAt: string; contractHash: string;
   sourceHashes: Record<string, string>; configuration: Configuration; configurationHash: string };
 export async function freezeO4RecoveryProbe(path: string, execution: "live" | "faux" = "live", suiteName: SuiteName = "recovery20", taskReferenceMode: TaskReferenceMode = "id") {
   const suite = suiteDefinition(suiteName, taskReferenceMode), config = await configuration(execution, suiteName, taskReferenceMode);
-  const manifest: Manifest = { version: 4, suite: suiteName, contractPath: suite.contractPath, stage: "exposed-development", frozenAt: new Date().toISOString(),
-    contractHash: contentHash(suite.turns), sourceHashes: await hashFiles(await sourceFiles()), configuration: config, configurationHash: contentHash(config) };
+  const manifest: Manifest = { version: suiteName === "rotation80mix" ? 5 : 4, suite: suiteName, contractPath: suite.contractPath, stage: "exposed-development", frozenAt: new Date().toISOString(),
+    contractHash: contentHash(suite.turns), sourceHashes: await hashFiles(await sourceFiles(suiteName)), configuration: config, configurationHash: contentHash(config) };
   await mkdir(directory, { recursive: true }); await writeFile(new URL(path, root), json(manifest), { flag: "wx" });
   console.log(json({ manifest: path, execution, taskReferenceMode, ...wordingSettings(suite), planned: config.planned, databaseCalls: 0, providerRequests: 0 }));
 }
 export async function inspectO4RecoveryProbe(path: string, suiteName: SuiteName = "recovery20", taskReferenceMode: TaskReferenceMode = "id") {
   const suite = suiteDefinition(suiteName, taskReferenceMode);
   const bytes = await readFile(new URL(path, root)), manifest = JSON.parse(bytes.toString()) as Manifest;
-  assert.equal(manifest.version, 4, "Historical v1/v2/v3 manifests must be reproduced with their original commit; hashes, wording and task-reference semantics are never rebased");
+  assert.equal(manifest.version, suiteName === "rotation80mix" ? 5 : 4, "Historical manifests must be reproduced with their original commit; hashes and semantics are never rebased");
   assert.equal(manifest.suite, suiteName);
   assert.equal(manifest.contractPath, suite.contractPath); assert.equal(manifest.stage, "exposed-development");
   assert.ok(["live", "faux"].includes(manifest.configuration.execution)); assert.equal(manifest.contractHash, contentHash(suite.turns));
   assert.equal(manifest.configurationHash, contentHash(manifest.configuration));
   assert.deepEqual(manifest.configuration, await configuration(manifest.configuration.execution, suiteName, taskReferenceMode));
-  assert.deepEqual(Object.keys(manifest.sourceHashes).sort(), await sourceFiles());
-  assert.deepEqual(manifest.sourceHashes, await hashFiles(await sourceFiles()));
+  assert.deepEqual(Object.keys(manifest.sourceHashes).sort(), await sourceFiles(suiteName));
+  assert.deepEqual(manifest.sourceHashes, await hashFiles(await sourceFiles(suiteName)));
   return { manifest, manifestHash: contentHash(bytes) };
 }
 function plannedRows(suiteName: SuiteName = "recovery20"): Row[] {
@@ -124,7 +176,8 @@ function plannedRows(suiteName: SuiteName = "recovery20"): Row[] {
     requestId: "", messageId: "", text: "", generation: 0, modelRequests: 0, modelActions: [], renderedText: "", calls: [],
     dbBefore: blankDb(), dbAfter: blankDb(), reason: "not_started", startedAt: 0, finishedAt: 0, score: null,
     requests: [], sends: [], controllerCalls: [], steps: [], sdkRetryEvents: [], hostReferences: [], transcript: [],
-    contextBefore: null, contextAfter: null, rawSends: [], generationBefore: 0, factoryEvents: [] })));
+    contextBefore: null, contextAfter: null, rawSends: [], generationBefore: 0, factoryEvents: [],
+    ...(suiteName === "rotation80mix" ? { contextIO: [], knowledgeReads: [], fixtureEvents: [] } : {}) })));
 }
 function hostReferences(context: Pick<TranscriptContext, "messages">): unknown[] {
   return context.messages.flatMap(m => typeof m.content === "string" ? [m.content] : m.content.filter(p => p.type === "text").map(p => p.text))
@@ -144,9 +197,42 @@ function commandTarget(turn: ProbeTurn): "A" | "B" {
 function commandFromPrior(turn: ProbeTurn, prior: Row[], mapping: Mapping, suiteName: SuiteName = "recovery20") {
   if (turn.kind === "user") return { text: suiteDefinition(suiteName).text(turn, mapping), material: undefined };
   assert.ok(turn.fromTurn && turn.fromTurn < turn.id);
-  const shown = prior.find(r => r.id === turn.fromTurn), target = commandTarget(turn);
+  const shown = prior.find(r => r.id === turn.fromTurn);
   const binding = { sourceKey: mapping.sourceKey, groupOpenid: mapping.groupOpenid };
   assert.ok(shown?.score?.passed && shown.requestId, "The declared source must actually complete before a host command");
+  if (["policy_selection", "old_policy_selection", "amount_selection", "old_amount_selection"].includes(turn.kind)) {
+    assert.ok("referenceSourceTurn" in turn && typeof turn.referenceSourceTurn === "number");
+    const source = prior.find(row => row.id === turn.referenceSourceTurn);
+    assert.ok(source?.requestId && source.result?.evidence.requestId === source.requestId && source.result.outcome === "ready");
+    const old = turn.kind.startsWith("old_"), policy = turn.kind.includes("policy"), receipt = shown.hostReceipt;
+    if (policy) {
+      const presented = receipt?.version === "reference-selection-v1" && receipt.choices.kind === "policy" ? receipt.choices
+        : shown.result?.referencePresentation === "policy" ? shown.result.evidence.policyChoices : undefined;
+      const choices = old ? presented : currentReferenceChoices(presented, binding);
+      assert.ok(choices?.sourceKey === binding.sourceKey && choices.groupOpenid === binding.groupOpenid);
+      const chosen = choices.candidates.find(row => row.reference.kind === "policy" && row.reference.topic.requestId === source.requestId);
+      assert.ok(chosen?.reference.kind === "policy" && equal(chosen.reference.topic, source.result.verifiedPolicyTopic));
+      assert.ok(source.sends.length && source.calls.some(call => call.name === "search_faq" && !call.isError), "Policy choice requires real retrieved and delivered source evidence");
+      const command = `选择话题 ${chosen.token}`;
+      assert.ok(shown.sends.some(sent => sent.renderedText.split("\n").includes(command)));
+      return { text: command, material: { kind: turn.kind, sourceTurn: source.id, sourceRequestId: source.requestId,
+        presentationRequestId: shown.requestId, token: chosen.token, command } };
+    }
+    const presented = receipt?.version === "amount-selection-v1" ? receipt.choices : shown.result?.evidence.amountChoices;
+    const choices = old ? presented : currentAmountChoices(presented, binding);
+    assert.ok(choices?.sourceKey === binding.sourceKey && choices.groupOpenid === binding.groupOpenid);
+    const chosen = choices.candidates.find(row => row.reference.requestId === source.requestId);
+    assert.ok(chosen && equal(chosen.reference, source.result.verifiedAmountReference));
+    assert.ok(source.result.evidence.order?.id === chosen.reference.orderId && source.reply?.kind === "order"
+      && source.sends.some(sent => sent.reply.kind === "order" && sent.reply.orders.some(order => order.id === chosen.reference.orderId))
+      && source.calls.some(call => call.name === "get_order" && !call.isError && equal(call.input.identity, mapping.identity)
+        && equal(call.output, source.result!.evidence.order)), "Amount choice requires an actual order card and authorized fresh amount source");
+    const command = `选择金额基准 ${chosen.token}`;
+    assert.ok(shown.sends.some(sent => sent.renderedText.split("\n").includes(command)));
+    return { text: command, material: { kind: turn.kind, sourceTurn: source.id, sourceRequestId: source.requestId,
+      presentationRequestId: shown.requestId, token: chosen.token, command } };
+  }
+  const target = commandTarget(turn);
   if (turn.kind === "merchant_confirmation") {
     assert.equal(shown.reply?.kind, "merchant_confirmation"); assert.ok(shown.reply?.kind === "merchant_confirmation");
     const command = shown.reply.confirmationText;
@@ -187,7 +273,7 @@ function commandFromPrior(turn: ProbeTurn, prior: Row[], mapping: Mapping, suite
     token: chosen.token, taskId, reference: structuredClone(chosen.reference) } };
 }
 function inbound(content: string, mapping: Mapping, id: string): QQBotInboundMessage {
-  const timestamp = new Date().toISOString(); return { kind: "group", rawEventType: "GROUP_AT_MESSAGE_CREATE", senderId: mapping.identity.senderId,
+  const timestamp = new Date(Date.now()).toISOString(); return { kind: "group", rawEventType: "GROUP_AT_MESSAGE_CREATE", senderId: mapping.identity.senderId,
     groupOpenid: mapping.groupOpenid, messageId: id, content, timestamp,
     replyTarget: { scope: "group", targetId: mapping.groupOpenid, msgId: id },
     raw: { id, content, timestamp, group_openid: mapping.groupOpenid, author: { member_openid: mapping.identity.senderId } } };
@@ -214,7 +300,48 @@ async function databaseSnapshot(read: Pool, refund: Pool, mapping: Mapping): Pro
   ]); return { orders, merchantTasks, refundOperations, refunds, notifications, payments, coupons, items };
 }
 
+function changeMixFixture(mapping: Mapping, before: Snapshot, kind: "setup" | "reprice_C") {
+  const id = mapping.orders.C; assert.ok(id && /^COUPON-\d{4}$/.test(id));
+  const payment = before.payments.find(row => row.order_id === id), item = before.items.find(row => row.order_id === id);
+  assert.ok(payment && /^mcheck-[a-f0-9]{20}-payment-\d{4}$/.test(String(payment.id)) && String(payment.id).endsWith(id.slice(-4)));
+  assert.ok(item && /^mcheck-[a-f0-9]{20}-item-\d{4}$/.test(String(item.id)));
+  assert.equal(String(payment.id).split("-payment-")[0], String(item.id).split("-item-")[0]);
+  assert.equal(before.refunds.filter(row => row.order_id === id).length, 0);
+  assert.equal(before.refundOperations.filter(row => row.order_id === id).length, 0);
+  assert.equal(before.merchantTasks.filter(row => row.order_id === id).length, 0);
+  const scope = `id='${id}' AND EXISTS (SELECT 1 FROM payments p WHERE p.order_id='${id}' AND p.id='${payment.id}')`;
+  const cents = kind === "setup" ? 7980 : 6543;
+  const sql = `START TRANSACTION;
+UPDATE orders SET ${kind === "setup" ? "status='partially_redeemed'," : ""} total_cents=${cents * 2},paid_cents=${cents * 2} WHERE ${scope};
+UPDATE order_items SET quantity=2,unit_price_cents=${cents},total_cents=${cents * 2} WHERE id='${item.id}' AND order_id='${id}';
+UPDATE payments SET amount_cents=${cents * 2} WHERE id='${payment.id}' AND order_id='${id}';
+${kind === "setup" ? `INSERT INTO coupons (id,order_item_id,status,expires_at,redeemed_at,redeemed_shop_id)
+SELECT CONCAT(c.id,'-used'),c.order_item_id,'redeemed',c.expires_at,UTC_TIMESTAMP(3),i.shop_id
+FROM coupons c JOIN order_items i ON i.id=c.order_item_id WHERE i.id='${item.id}' AND i.order_id='${id}' AND c.status='unused';` : ""}
+COMMIT;`;
+  const output = spawnSync("docker", ["compose", "exec", "-T", "mysql", "sh", "-c",
+    'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql -uroot -N -B --default-character-set=utf8mb4 dave_agent'],
+  { cwd: fileURLToPath(root), input: sql, encoding: "utf8", timeout: 15000 });
+  if (output.error || output.status !== 0) throw new Error("mix_fixture_mutation_failed");
+}
+function verifyMixReprice(before: Snapshot, after: Snapshot, orderId: string) {
+  const expected = structuredClone(before);
+  for (const row of expected.orders) if (row.id === orderId) { row.total_cents = 13086; row.paid_cents = 13086; }
+  for (const row of expected.items) if (row.order_id === orderId) { row.quantity = 2; row.unit_price_cents = 6543; row.total_cents = 13086; }
+  for (const row of expected.payments) if (row.order_id === orderId) row.amount_cents = 13086;
+  assert.deepEqual(after, expected, "The declared C repricing may change only its order/item/payment paid facts");
+}
+async function knowledgeDatabaseSnapshot(pool: Pool, state: Snapshot) {
+  const shops = [...new Set(state.items.map(row => String(row.shop_id)))], products = [...new Set(state.items.map(row => String(row.product_id)))];
+  assert.ok(shops.length && products.length);
+  const [documents] = await pool.execute<RowDataPacket[]>({ sql: `SELECT * FROM knowledge_documents
+    WHERE (shop_id IS NULL OR shop_id IN (${shops.map(() => "?").join(",")}))
+    AND (product_id IS NULL OR product_id IN (${products.map(() => "?").join(",")})) ORDER BY id`, timeout: 5000 }, [...shops, ...products]);
+  return structuredClone(documents);
+}
+
 export async function runO4RecoveryProbe(path: string, execution: "live" | "faux", suiteName: SuiteName = "recovery20", taskReferenceMode: TaskReferenceMode = "id") {
+  assert.ok(suiteName !== "rotation80mix" || execution === "faux", "rotation80mix cannot make remote model calls");
   const suite = suiteDefinition(suiteName, taskReferenceMode);
   const { manifest, manifestHash } = await inspectO4RecoveryProbe(path, suiteName, taskReferenceMode); assert.equal(manifest.configuration.execution, execution);
   for (const config of [readDatabaseConfig(), readAfterSalesDatabaseConfig(), readRefundDatabaseConfig()]) {
@@ -223,20 +350,22 @@ export async function runO4RecoveryProbe(path: string, execution: "live" | "faux
   }
   await mkdir(directory, { recursive: true }); const runId = randomUUID(), target = new URL(`${runId}.json`, directory);
   await writeFile(new URL(`${manifestHash}.attempt.json`, directory), json({ runId, manifestHash, execution, startedAt: new Date().toISOString() }), { flag: "wx" });
+  const actualNow = Date.now, mix = suiteName === "rotation80mix";
   const rows = plannedRows(suiteName); let active: Row | undefined, activeEvent: Extract<NonNullable<Actual["beforeEvent"]>, { kind: "notifyA" }> | undefined;
   let capture: ReturnType<typeof captureEvaluationTurn> | undefined, cursor = 0;
   const wire: unknown[] = [];
   const guard = createC1ValidationGuard(async (url, init) => {
+    assert.notEqual(suiteName, "rotation80mix", "rotation80mix_remote_transport_disabled");
     const body = JSON.parse(String(init?.body)); wire.push({ requestId: active?.requestId ?? "host-event", model: body.model,
       thinking: body.thinking, toolChoice: body.tool_choice, maxTokens: body.max_tokens, stream: body.stream });
     assert.equal(body.thinking?.type, "disabled"); assert.ok(body.max_tokens <= 2048);
     return fetch(url, init);
-  }, Date.now, suite.limits);
+  }, actualNow, mix ? { ...suite.limits, requests: { ...suite.limits.requests, agent: 1 } } : suite.limits);
   const arms: Array<{ mode: Mode; mapping?: Mapping; startedAt: string; finishedAt: string | null; initial?: Snapshot; final?: Snapshot;
     failure?: string; cleanup: { attempted: boolean; remaining?: Snapshot; contextRemaining?: number; passed: boolean };
     pendingWindowExtensions: Array<{ beforeInput: number; orderId: string; milliseconds: number }>; contextSnapshots: unknown[];
     factoryEvents: FactoryEvent[]; }> = [];
-  const artifact = { version: 4, suite: suiteName, stage: "exposed-development", runId, execution, manifest, manifestHash,
+  const artifact = { version: manifest.version, suite: suiteName, stage: "exposed-development", runId, execution, manifest, manifestHash,
     startedAt: new Date().toISOString(), finishedAt: null as string | null, rows, arms, requests: guard.requests, wire,
     usage: guard.usage(), actualSettings: null as unknown, sourceHashes: { before: manifest.sourceHashes, after: {} as Record<string, string> },
     localPackageHashes: { before: await hashFiles(["package.json", "package-lock.json"]), after: {} as Record<string, string> },
@@ -267,6 +396,8 @@ export async function runO4RecoveryProbe(path: string, execution: "live" | "faux
     assert.deepEqual(actualWording, { wording: manifest.configuration.wording,
       wordingVersion: manifest.configuration.wordingVersion, wordingHash: manifest.configuration.wordingHash });
     artifact.actualSettings = { ...actualTaskReference, ...actualWording, model: snapshotModel(model), configuredModel: manifest.configuration.model, knowledgeMode: "lexical",
+      ...(mix ? { remoteRequestsAllowed: 0, qqRemoteRequestsAllowed: 0, effectiveNetworkPolicy: "reject_before_fetch", internalGuardAgentFuse: 1,
+        businessClockStrategy: "fixed_business_instant", elapsedClock: "original-Date.now" } : {}),
       thinking: "disabled", repairBudget: 1, providerRetries: 0, sessionAutomaticRetries: 2, transport: execution === "live" ? "remote" : "Pi faux provider; no remote model" };
     const original = runtime.streamSimple.bind(runtime);
     runtime.streamSimple = (selected, transcript, options) => {
@@ -282,25 +413,36 @@ export async function runO4RecoveryProbe(path: string, execution: "live" | "faux
         cleanup: { attempted: false, passed: false }, pendingWindowExtensions: [], contextSnapshots: [], factoryEvents: [] }; arms.push(arm);
       let fixture: Awaited<ReturnType<typeof createMerchantFixture>> | undefined, foreign: typeof fixture;
       let business: CouponStore | undefined, merchant: AfterSalesStore | undefined, refunds: RefundStore | undefined,
-        contexts: ConversationStateStore | undefined, read: Pool | undefined, refundRead: Pool | undefined, agent: QQAgent | undefined,
+        contexts: ConversationStateStore | undefined, read: Pool | undefined, refundRead: Pool | undefined, knowledgeRead: Pool | undefined, agent: QQAgent | undefined,
         session: Session | undefined, mapping: Mapping | undefined;
       let generation = 0; const logs: string[] = [];
       try {
-        fixture = await createMerchantFixture(["approve", "approve"], { delayMs: 5000 });
+        Date.now = actualNow;
+        fixture = await createMerchantFixture(mix ? ["approve", "approve", "approve"] : ["approve", "approve"], { delayMs: 5000 });
         foreign = await createMerchantFixture(["approve"], { delayMs: 5000, senderId: "TEST_USER2" });
         const groupOpenid = `O4_PROBE_${runId.replaceAll("-", "")}_${mode}`, identity = fixture.identity;
-        mapping = { identity, groupOpenid, sourceKey: merchantSourceKey(identity, groupOpenid), orders: { A: fixture.orders[0]!, B: fixture.orders[1]!, F: foreign.orders[0]! } };
+        mapping = { identity, groupOpenid, sourceKey: merchantSourceKey(identity, groupOpenid), orders: { A: fixture.orders[0]!, B: fixture.orders[1]!, F: foreign.orders[0]!, ...(mix ? { C: fixture.orders[2]! } : {}) } };
         arm.mapping = mapping; read = createPool(readAfterSalesDatabaseConfig()); refundRead = createPool(readRefundDatabaseConfig());
         business = new CouponStore(createPool(readDatabaseConfig())); merchant = new AfterSalesStore(createPool(readAfterSalesDatabaseConfig()));
         refunds = new RefundStore(createPool(readRefundDatabaseConfig())); contexts = new ConversationStateStore(createPool(readAfterSalesDatabaseConfig()));
         await Promise.all([business.ping(), merchant.ping(), refunds.ping(), contexts.ping()]);
         const port = contexts.bind(identity, groupOpenid), state = () => databaseSnapshot(read!, refundRead!, mapping!);
-        arm.initial = await state(); assert.equal(arm.initial.orders.length, 3); assert.equal(arm.initial.merchantTasks.length, 0);
+        if (mix) { knowledgeRead = createPool(readDatabaseConfig()); changeMixFixture(mapping, await state(), "setup"); }
+        arm.initial = await state(); assert.equal(arm.initial.orders.length, mix ? 4 : 3); assert.equal(arm.initial.merchantTasks.length, 0);
+        const sessionPort = mix ? observedContextPort(port, () => active, () => generation,
+          row => rotationMixTurns.find(turn => turn.id === row.id)?.contextFault, actualNow) : port;
         const methodNames: Record<string, string> = { getOrder: "get_order", prepare: "prepare_merchant_request", getTask: "get_merchant_request",
           request: "request_merchant", listTaskReferences: "list_task_references", get: "get_refund", confirm: "confirm_refund", markPresented: "mark_refund_presented" };
         function trace<T extends object>(service: T, refund = false): T {
           return new Proxy(service, { get(target, key) {
             const value = Reflect.get(target, key); if (typeof value !== "function") return value;
+            if (mix && key === "readKnowledgeDocuments") return async (...args: [string?, string?]) => {
+              const owner = active; assert.ok(owner?.requestId);
+              const startedAt = actualNow(), documents = await value.apply(target, args);
+              (owner.knowledgeReads ??= []).push({ requestId: owner.requestId, shopId: args[0], productId: args[1],
+                documents: structuredClone(documents), hash: contentHash(documents), startedAt, finishedAt: actualNow() });
+              return documents;
+            };
             if (key === "listNotifications") return async (...args: unknown[]) => {
               const all = await value.apply(target, args), scoped = all.filter((item: { sourceKey: string; groupOpenid: string }) => item.sourceKey === mapping!.sourceKey && item.groupOpenid === groupOpenid);
               arm.contextSnapshots.push({ kind: "notification_scope_filter", actualCount: all.length, scopedCount: scoped.length }); return scoped;
@@ -344,7 +486,7 @@ export async function runO4RecoveryProbe(path: string, execution: "live" | "faux
         } };
         const makeAgent = () => { const agentInstanceId = randomUUID(); return new QQAgent(async message => {
           session = await createSupportSession(identity, store, runtime, model, { sourceKey: mapping!.sourceKey, store: sales, refunds: refundStore }, {
-            groupOpenid, repairBudget: 1, knowledge, taskReferenceMode, ...(mode === "mysql" ? { context: port } : {}),
+            groupOpenid, repairBudget: 1, knowledge, taskReferenceMode, ...(mode === "mysql" ? { context: sessionPort } : {}),
             onCall: call => { if (active && call.parentSpanId === active.requestId) active.controllerCalls.push(structuredClone(call)); },
           });
           generation++;
@@ -404,6 +546,24 @@ export async function runO4RecoveryProbe(path: string, execution: "live" | "faux
               const previousGeneration = generation; await agent.close(); agent = makeAgent(); session = undefined;
               row.beforeEvent = { kind: "restart", previousGeneration, nextGeneration: 0 };
             }
+            if (turn.before === "reprice_C") {
+              assert.ok(mix); const dbBefore = await state(); changeMixFixture(mapping, dbBefore, "reprice_C");
+              const dbAfter = await state(); row.fixtureEvents!.push({ kind: "reprice_C", dbBefore, dbAfter });
+              verifyMixReprice(dbBefore, dbAfter, mapping.orders.C!);
+            }
+            if (turn.before === "expire_amount_A") {
+              assert.ok(mix);
+              const selected = prior.find(row => row.id === 69)?.hostReceipt;
+              const choices = selected?.version === "amount-selection-v1" ? selected.choices : undefined;
+              const a = choices?.candidates.find(value => value.reference.requestId === prior.find(row => row.id === 63)?.requestId);
+              const c = choices?.candidates.find(value => value.reference.requestId === prior.find(row => row.id === 67)?.requestId);
+              assert.ok(a && c && selected?.selectedRequestId === a.reference.requestId && a.expiresAt + 1 < c.expiresAt,
+                "Expiry must remove the actually selected A source while leaving the newer actual C source valid");
+              const before = Date.now(), after = Math.max(before, a.expiresAt + 1); assert.ok(after < c.expiresAt);
+              Date.now = () => after;
+              row.clockEvent = { kind: "expire_amount_A", before, after, expiredRequestId: a.reference.requestId,
+                survivorRequestId: c.reference.requestId, expiredAt: a.expiresAt, survivorExpiresAt: c.expiresAt };
+            }
             if (turn.before === "notifyA") {
               const dbBefore = await state(); activeEvent = { kind: "notifyA", modelRequests: 0, calls: [], sends: [], dbBefore, dbAfter: blankDb() };
               row.beforeEvent = activeEvent;
@@ -413,12 +573,18 @@ export async function runO4RecoveryProbe(path: string, execution: "live" | "faux
               activeEvent.dbAfter = await state(); activeEvent = undefined;
             }
             row.dbBefore = await state(); row.contextBefore = mode === "mysql" ? await port.read() : null;
-            row.requestId = `${runId}:${mode}:${turn.id}`; row.messageId = row.requestId; row.startedAt = Date.now(); row.generationBefore = generation;
+            if (mix) { row.knowledgeDatabaseBefore = await knowledgeDatabaseSnapshot(knowledgeRead!, row.dbBefore as Snapshot);
+              row.businessClock = { before: Date.now(), after: 0 }; }
+            row.requestId = `${runId}:${mode}:${turn.id}`; row.messageId = row.requestId; row.startedAt = actualNow(); row.generationBefore = generation;
             const abort = new AbortController(); guard.setActive({ caseId: mode, turn: turn.id, requestId: row.requestId, signal: abort.signal });
             active = row; cursor = guard.requests.length; const requestStart = cursor; capture = captureEvaluationTurn(`${model.provider}/${model.id}`);
             if (faux) {
-              const action = suite.fauxAction(turn.id, mode, mapping);
-              faux.setResponses(action ? [() => fauxAssistantMessage(fauxToolCall("support_action", { action }), { stopReason: "toolUse" }),
+              const expectedHost = turn.kind !== "user" || mix && mode === "mysql" && "contextFault" in turn && turn.contextFault === "read";
+              faux.setResponses(!expectedHost ? [() => {
+                const host = active?.hostReferences.at(-1) as Record<string, unknown> | undefined;
+                const action = mix ? fauxRotationMixAction(turn.id, mode, mapping as RotationMixMapping, host)
+                  : suite.fauxAction(turn.id, mode, mapping!);
+                assert.ok(action); return fauxAssistantMessage(fauxToolCall("support_action", { action }), { stopReason: "toolUse" }); },
                 () => fauxAssistantMessage("已按本轮实际工具结果处理；这是工程替身回复，不代表真实模型质量。")] : []);
             }
             try { await withinTurnDeadline(agent.handle(inbound(row.text, mapping, row.messageId)), Math.min(suite.limits.turnTimeoutMs, guard.remainingMs()), () => {
@@ -436,7 +602,8 @@ export async function runO4RecoveryProbe(path: string, execution: "live" | "faux
             }
             if (row.sends[0]) { row.reply = structuredClone(row.sends[0].reply); row.renderedText = row.sends[0].renderedText; }
             active = undefined;
-            row.dbAfter = await state(); row.contextAfter = mode === "mysql" ? await port.read() : null; row.finishedAt = Date.now();
+            row.dbAfter = await state(); row.contextAfter = mode === "mysql" ? await port.read() : null; row.finishedAt = actualNow();
+            if (mix) { row.knowledgeDatabaseAfter = await knowledgeDatabaseSnapshot(knowledgeRead!, row.dbAfter as Snapshot); row.businessClock!.after = Date.now(); }
             if (row.beforeEvent?.kind === "restart") row.beforeEvent.nextGeneration = generation;
             if (turn.kind === "merchant_confirmation") {
               const target = commandTarget(turn), task = row.dbAfter.merchantTasks.find(v => v.order_id === mapping!.orders[target] && v.source_key === mapping!.sourceKey);
@@ -451,13 +618,16 @@ export async function runO4RecoveryProbe(path: string, execution: "live" | "faux
             if (row.error) { artifact.stopReason = row.error; break; }
           } catch (error) { diagnose("turn_setup_or_evidence", error, mode, turn.id); active = undefined; activeEvent = undefined;
             row.factoryEvents = structuredClone(arm.factoryEvents.slice(factoryStart));
-            row.status = "failed"; row.reason = "turn_setup_or_evidence_failure"; row.finishedAt = Date.now(); await save(); }
+            row.status = "failed"; row.reason = "turn_setup_or_evidence_failure"; row.finishedAt = actualNow(); await save(); }
         }
         arm.final = await state();
-        assert.ok(["orders", "payments", "coupons", "items", "refunds", "refundOperations"].every(key => equal((arm.initial as unknown as Record<string, unknown>)[key], (arm.final as unknown as Record<string, unknown>)[key])), "Unexpected immutable fixture facts changed");
+        const repriced = rows.find(row => row.mode === mode && row.fixtureEvents?.some(event => event.kind === "reprice_C"))?.fixtureEvents?.[0];
+        const baseline = repriced?.dbAfter ?? arm.initial;
+        assert.ok(["orders", "payments", "coupons", "items", "refunds", "refundOperations"].every(key => equal((baseline as unknown as Record<string, unknown>)[key], (arm.final as unknown as Record<string, unknown>)[key])), "Unexpected immutable fixture facts changed");
         arm.contextSnapshots.push({ kind: "end", snapshot: await port.read(), logs });
       } catch (error) { diagnose("arm_setup_or_runtime", error, mode); arm.failure = "arm_setup_or_runtime_failure"; }
       finally {
+        Date.now = actualNow;
         active = undefined; activeEvent = undefined; capture = undefined;
         try { await agent?.close(); } catch (error) { diagnose("qq_close", error, mode); arm.failure ??= "qq_close_failure"; }
         arm.cleanup.attempted = true;
@@ -471,13 +641,14 @@ export async function runO4RecoveryProbe(path: string, execution: "live" | "faux
             arm.cleanup.passed = Object.values(arm.cleanup.remaining).every(v => Array.isArray(v) && v.length === 0) && arm.cleanup.contextRemaining === 0;
           }
         } catch (error) { diagnose("fixture_cleanup", error, mode); arm.failure ??= "fixture_cleanup_failed"; }
-        await Promise.allSettled([business?.close(), merchant?.close(), refunds?.close(), contexts?.close(), read?.end(), refundRead?.end()]);
+        await Promise.allSettled([business?.close(), merchant?.close(), refunds?.close(), contexts?.close(), read?.end(), refundRead?.end(), knowledgeRead?.end()]);
         arm.finishedAt = new Date().toISOString(); await save();
       }
       if (artifact.stopReason === "safety_contract_failed" || arm.failure) break;
     }
   } catch (error) { diagnose("runner_setup_or_runtime", error); artifact.failure = "runner_setup_or_runtime_failure"; }
   finally {
+    Date.now = actualNow;
     active = undefined; activeEvent = undefined; guard.seal(); restore?.();
     for (const row of rows) if (row.reason === "not_started") row.reason = artifact.stopReason ?? guard.stopped() ?? "run_stopped_before_input";
     artifact.stopReason ??= guard.stopped(); artifact.finishedAt = new Date().toISOString();
@@ -489,28 +660,39 @@ export async function runO4RecoveryProbe(path: string, execution: "live" | "faux
     artifact.executionComplete = rows.every(r => r.status === "completed");
     artifact.usageComplete = execution === "live" && guard.requests.every(r => r.totalTokens !== null && r.estimatedCost !== null);
     artifact.runIntegrityPassed = artifact.recordingComplete && artifact.codeStable && artifact.packagesStable && artifact.dependenciesStable
-      && arms.length === 2 && arms.every(arm => !arm.failure && arm.cleanup.passed) && !artifact.failure;
+      && arms.length === 2 && arms.every(arm => !arm.failure && arm.cleanup.passed) && !artifact.failure
+      && (!mix || guard.requests.length === 0);
     artifact.summary = Object.fromEntries((["memory", "mysql"] as const).map(mode => {
       const selected = rows.filter(r => r.mode === mode); return [mode, { planned: suite.turns.length, completed: selected.filter(r => r.status === "completed").length,
         passed: selected.filter(r => r.score?.passed).length, failed: selected.filter(r => r.status === "failed" || r.status === "completed" && !r.score?.passed).length,
         skipped: selected.filter(r => r.status === "skipped").length, recoveryApplicable: selected.filter(r => r.score?.recoveryApplicable).length,
         recoveryPassed: selected.filter(r => r.score?.recoveryPassed).length,
-        recoveryByContract: Object.fromEntries(["task", "focus", "safe_restatement"].map(kind => {
+        recoveryByContract: Object.fromEntries((mix ? ["task", "focus", "safe_restatement", "policy", "amount"] : ["task", "focus", "safe_restatement"]).map(kind => {
           const matching = selected.filter(r => suite.turns.find(t => t.id === r.id)!.expected[mode].recovery === kind);
           return [kind, { planned: matching.length, passed: matching.filter(r => r.score?.passed).length,
             note: kind === "safe_restatement" ? "Safe lack of a locator is not successful focus recovery" : "Bound current re-read required" }];
         })), firstActionPassed: selected.filter(r => r.score?.firstActionPassed).length,
         finalActionPassed: selected.filter(r => r.score?.finalActionPassed).length,
         repaired: selected.filter(r => r.score?.repairRequired).length,
-        commandsByKind: Object.fromEntries(["merchant_confirmation", "order_selection", "task_selection", "old_task_selection"].map(kind => {
+        commandsByKind: Object.fromEntries((mix ? ["merchant_confirmation", "order_selection", "task_selection", "old_task_selection", "policy_selection", "amount_selection", "old_amount_selection"]
+          : ["merchant_confirmation", "order_selection", "task_selection", "old_task_selection"]).map(kind => {
           const matching = selected.filter(row => suite.turns.find(turn => turn.id === row.id)!.kind === kind);
           return [kind, { planned: matching.length, executed: matching.filter(row => row.status !== "skipped").length,
             passed: matching.filter(row => row.score?.passed).length }];
         })),
         sessionFactories: arms.find(arm => arm.mode === mode)?.factoryEvents.length ?? 0,
         automaticRotations: (() => { const events = arms.find(arm => arm.mode === mode)?.factoryEvents ?? [];
-          return events.length - new Set(events.map(event => event.agentInstanceId)).size; })(),
+          const recovery = mix ? selected.filter(row => row.factoryEvents.length && selected.some(previous => previous.id === row.id - 1
+            && previous.contextIO?.some(event => event.injected && event.operation === "read" && !event.forwarded)
+            && previous.modelRequests === 0)).reduce((n, row) => n + row.factoryEvents.length, 0) : 0;
+          return events.length - new Set(events.map(event => event.agentInstanceId)).size - recovery; })(),
+        ...(mix ? { failureRebuilds: selected.filter(row => row.factoryEvents.length && selected.some(previous => previous.id === row.id - 1
+          && previous.contextIO?.some(event => event.injected && event.operation === "read" && !event.forwarded)
+          && previous.modelRequests === 0)).length } : {}),
         modelRequests: selected.reduce((n, r) => n + r.modelRequests, 0),
+        ...(mix ? { contextFaults: selected.flatMap(row => row.contextIO ?? []).filter(event => event.injected).map(event => ({ requestId: event.requestId, phase: event.phase, forwarded: event.forwarded })),
+          knowledgeReads: selected.reduce((sum, row) => sum + (row.knowledgeReads?.length ?? 0), 0),
+          clockEvents: selected.flatMap(row => row.clockEvent ? [row.clockEvent] : []), remoteRequestsAllowed: 0 } : {}),
         http: (() => { const requests = guard.requests.filter(r => r.caseId === mode), known = requests.filter(r => r.estimatedCost !== null);
           return { requests: requests.length, unknownCosts: requests.length - known.length,
             knownEstimatedUsd: known.reduce((n, r) => n + r.estimatedCost!, 0),
@@ -678,13 +860,76 @@ export async function checkO4RecoveryProbe() {
   assert.equal(rows.filter(r => r.status === "skipped").length, 40);
   assert.equal(rotationRows.filter(r => r.status === "skipped").length, 80);
   assert.equal(freshRows.filter(r => r.status === "skipped").length, 80);
-  console.log("O4 probe runner checks passed: original/fresh 40/80 planned rows and wording-bound scoring, explicit id/current schema snapshots, actual order/task/confirmation display binding, stale-token replay and redisplay, disabled remote stages and unknown-cost accounting; no database/network.");
+  const mixRows = plannedRows("rotation80mix"), mixSuite = suiteDefinition("rotation80mix"), mixConfig = await configuration("faux", "rotation80mix", "id");
+  assert.equal(mixRows.length, 160); assert.equal(mixRows.filter(row => row.status === "skipped").length, 160);
+  assert.deepEqual(mixSuite.turns.slice(0, 40), rotationTurns, "The new suite must preserve the original forty-turn prefix");
+  assert.equal(mixConfig.planned.totalUserTurns, 160); assert.deepEqual(mixConfig.limits.requests, { agent: 0, rerank: 0, support: 0 });
+  assert.equal(mixConfig.remoteRequestsAllowed, 0); assert.equal(mixConfig.effectiveNetworkPolicy, "reject_before_fetch");
+  await assert.rejects(configuration("live", "rotation80mix", "id"));
+  await assert.rejects(freezeO4RecoveryProbe("never-created.json", "live", "rotation80mix"));
+  await assert.rejects(runO4RecoveryProbe("not-read.json", "live", "rotation80mix"));
+  assert.throws(() => parseCli(["--suite", "rotation80mix", "--live", "x"]));
+  assert.throws(() => parseCli(["--suite", "rotation80mix", "--freeze", "x"]));
+  assert.throws(() => parseCli(["--suite", "rotation80mix", "--task-reference", "current", "--check"]));
+  assert.equal(parseCli(["--suite", "rotation80mix", "--freeze-faux", "x"]).suite, "rotation80mix");
+  assert.ok((await sourceFiles("rotation80mix")).includes("scripts/o4-rotation-mix-contract.ts"));
+  const mixMapping: RotationMixMapping = { ...mapping, orders: { ...mapping.orders, C: "COUPON-2104" } };
+  assert.match(commandFromPrior(rotationMixTurns[40]!, [], mixMapping, "rotation80mix").text, /COUPON-2104/);
+  const hostRequest = `actual-host-${randomUUID()}`;
+  const previous = fauxRotationMixAction(49, "mysql", mixMapping, { policyTopic: { requestId: hostRequest } });
+  assert.ok(previous?.kind === "policy" && previous.questionContext.kind === "previous"); assert.equal(previous.questionContext.requestId, hostRequest);
+  const compare = fauxRotationMixAction(67, "mysql", mixMapping, { itemPaidUnit: { requestId: hostRequest } });
+  assert.ok(compare?.kind === "paid_amount_compare"); assert.equal(compare.amountRef.requestId, hostRequest);
+  assert.throws(() => fauxRotationMixAction(49, "mysql", mixMapping, {}), "A fake action must not invent a missing host source ID");
+  let stored: SupportContextSnapshot = { revision: 0, customerId: "synthetic", bindingId: "1" }, auditReads = 0, realWrites = 0;
+  const rawPort: SupportContextPort = { async read() { auditReads++; return structuredClone(stored); }, async write(expected, value) {
+    assert.equal(expected.revision, stored.revision); realWrites++; stored = { ...stored, revision: stored.revision + 1, value: structuredClone(value) }; return structuredClone(stored); } };
+  let owner = { ...mixRows[76]!, requestId: "fault-read", generation: 4, contextIO: [] } as Row;
+  const port = observedContextPort(rawPort, () => owner, () => 4, row => row.id === 77 ? "read" : "final_publish");
+  await rawPort.read(); assert.equal(owner.contextIO?.length, 0, "Audit reads cannot consume the declared Session fault");
+  await assert.rejects(port.read()); assert.equal(auditReads, 1); await port.read(); assert.equal(auditReads, 2);
+  assert.equal(owner.contextIO?.filter(event => event.injected).length, 1);
+  assert.ok(owner.contextIO?.[0]?.status === "error" && owner.contextIO[0].forwarded === false);
+  owner = { ...mixRows[78]!, requestId: "fault-publish", generation: 5, contextIO: [] } as Row;
+  await port.write(stored, { version: 1, requiresRestatement: true }); assert.equal(realWrites, 1);
+  const beforePublish = structuredClone(stored);
+  await assert.rejects(port.write(stored, { version: 1, requiresRestatement: false, focus: { orderId: mixMapping.orders.C,
+    requestId: owner.requestId, selectedAt: now, expiresAt: now + 900000, source: "explicit" } }));
+  assert.deepEqual(stored, beforePublish); assert.equal(realWrites, 1);
+  assert.equal(owner.contextIO?.filter(event => event.injected).length, 1);
+  assert.equal(owner.contextIO?.[1]?.phase, "final_publish");
+  const amount = { ...binding, requestId: "actual50", orderId: mapping.orders.A, itemId: "item-a", productId: "product-demo-1",
+    field: "item_paid_unit" as const, paidCents: 7980, orderVersion: "a".repeat(64) };
+  const amountChoices = rememberAmountChoice(undefined, binding, amount)!;
+  const amountSource = structuredClone(candidateSource); amountSource.id = 50; amountSource.requestId = "actual50";
+  amountSource.result!.verifiedAmountReference = amount; amountSource.result!.evidence.requestId = "actual50";
+  amountSource.result!.evidence.order!.id = mapping.orders.A;
+  (amountSource.calls[0]!.output as { id: string }).id = mapping.orders.A; amountSource.calls[0]!.input.orderId = mapping.orders.A;
+  assert.ok(amountSource.reply?.kind === "order" && amountSource.sends[0]!.reply.kind === "order");
+  amountSource.reply.orders[0]!.id = mapping.orders.A; amountSource.sends[0]!.reply.orders[0]!.id = mapping.orders.A;
+  const amountToken = amountChoices.candidates[0]!.token;
+  const amountShown = { ...presentation, id: 52, requestId: "actual52", result: { evidence: { amountChoices } },
+    sends: [{ renderedText: `选择金额基准 ${amountToken}` }] } as unknown as Row;
+  assert.equal(commandFromPrior(rotationMixTurns[52]!, [amountSource, amountShown], mixMapping, "rotation80mix").text, `选择金额基准 ${amountToken}`);
+  const invisible = structuredClone(amountShown); invisible.sends[0]!.renderedText = "没有展示选择指令";
+  assert.throws(() => commandFromPrior(rotationMixTurns[52]!, [amountSource, invisible], mixMapping, "rotation80mix"));
+  const forged = structuredClone(amountShown); forged.result!.evidence.amountChoices!.candidates[0]!.reference.requestId = "invented";
+  assert.throws(() => commandFromPrior(rotationMixTurns[52]!, [amountSource, forged], mixMapping, "rotation80mix"));
+  const priceBefore = { ...blankDb(), orders: [{ id: mixMapping.orders.C, total_cents: 15960, paid_cents: 15960 }],
+    payments: [{ id: "own-payment", order_id: mixMapping.orders.C, amount_cents: 15960 }],
+    items: [{ id: "own-item", order_id: mixMapping.orders.C, quantity: 2, unit_price_cents: 7980, total_cents: 15960 }] };
+  const priceAfter = structuredClone(priceBefore); priceAfter.orders[0]!.total_cents = priceAfter.orders[0]!.paid_cents = 13086;
+  priceAfter.payments[0]!.amount_cents = 13086; priceAfter.items[0]!.unit_price_cents = 6543; priceAfter.items[0]!.total_cents = 13086;
+  verifyMixReprice(priceBefore, priceAfter, mixMapping.orders.C);
+  const unexpected = structuredClone(priceAfter); unexpected.payments[0]!.amount_cents++;
+  assert.throws(() => verifyMixReprice(priceBefore, unexpected, mixMapping.orders.C));
+  console.log("O4 probe runner checks passed: original/fresh 40/80 and mix160 planned rows, wording/schema bindings, displayed commands and actual host references, one-shot Session-port failures, isolated C repricing, mix remote-entry rejection; no database/network.");
 }
 function parseCli(input: string[]): { suite: SuiteName; taskReferenceMode: TaskReferenceMode; args: string[] } {
   const args = [...input]; let suite: SuiteName = "recovery20", taskReferenceMode: TaskReferenceMode = "id";
   const suiteIndex = args.indexOf("--suite");
   if (suiteIndex >= 0) {
-    const value = args[suiteIndex + 1]; assert.ok(value && validSuite(value), "--suite must be recovery20, rotation40 or rotation40fresh");
+    const value = args[suiteIndex + 1]; assert.ok(value && validSuite(value), "--suite must be recovery20, rotation40, rotation40fresh or rotation80mix");
     suite = value; args.splice(suiteIndex, 2); assert.ok(!args.includes("--suite"), "--suite may be provided only once");
   }
   const taskIndex = args.indexOf("--task-reference");
@@ -693,6 +938,7 @@ function parseCli(input: string[]): { suite: SuiteName; taskReferenceMode: TaskR
     taskReferenceMode = value; args.splice(taskIndex, 2); assert.ok(!args.includes("--task-reference"), "--task-reference may be provided only once");
   }
   taskReferenceSettings(suite, taskReferenceMode);
+  assert.ok(suite !== "rotation80mix" || !args.includes("--live") && !args.includes("--freeze"), "rotation80mix only permits --freeze-faux/--faux; real calls are not authorized");
   return { suite, taskReferenceMode, args };
 }
 if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
@@ -700,7 +946,7 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
   if (!args.length || args.length === 1 && args[0] === "--check") await checkO4RecoveryProbe();
   else {
     assert.ok(args.length === 2 && ["--freeze", "--freeze-faux", "--inspect", "--live", "--faux"].includes(args[0]!),
-      "Use [--suite recovery20|rotation40|rotation40fresh] [--task-reference id|current] --check|--freeze|--freeze-faux|--inspect|--live|--faux MANIFEST; current requires a rotation suite; --faux uses the real local database");
+      "Use [--suite recovery20|rotation40|rotation40fresh|rotation80mix] [--task-reference id|current] --check|--freeze|--freeze-faux|--inspect|--live|--faux MANIFEST; mix only permits id/faux; --faux uses the real local database");
     if (args[0] === "--freeze" || args[0] === "--freeze-faux") await freezeO4RecoveryProbe(args[1]!, args[0] === "--freeze" ? "live" : "faux", suite, taskReferenceMode);
     else if (args[0] === "--inspect") { const value = await inspectO4RecoveryProbe(args[1]!, suite, taskReferenceMode); console.log(json({ frozen: true, suite, taskReferenceMode, execution: value.manifest.configuration.execution, providerRequests: 0, databaseCalls: 0 })); }
     else {

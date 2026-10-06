@@ -543,7 +543,10 @@ export async function createSupportSession(
         state.focusOrderId = undefined;
         state.selectedOrderId = undefined;
         state.policyTopic = undefined;
-        if (state.amountChoices) state.amountChoices.selectedToken = undefined;
+        // A user-selected amount source names its own order independently of
+        // focus. Preserve it only for that explicit order; Controller reauthorizes.
+        if (state.amountChoices && (explicit.length !== 1 || !state.amountChoices.selectedToken
+          || resolveAmountReference(state.amountChoices, binding)?.orderId !== explicit[0])) state.amountChoices.selectedToken = undefined;
         if (explicit.length > 1) state.orderChoices = undefined;
         const writing = options.focus?.write(undefined);
         pendingFocusWrite = writing;
