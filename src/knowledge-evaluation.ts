@@ -19,7 +19,9 @@ export function knowledgeProviderSpans(parent: EvalSpan): EvalSpan[] {
     return call.attempts.map((attempt, index) => {
       const support = call.operation === "support" ? attempt as EvidenceSupportAttempt : null;
       const cnyRate = trace.pricing.rerankCnyPerMillionTokens;
-      const cost = support ? support.costUsd === null ? null : { currency: "USD" as const, amount: support.costUsd, source: "sdk_estimate" as const }
+      const cost = support ? trace.settings?.support?.pricing.currency === "CNY"
+        ? support.costCny == null ? null : { currency: "CNY" as const, amount: support.costCny, source: "price_estimate" as const }
+        : support.costUsd === null ? null : { currency: "USD" as const, amount: support.costUsd, source: "sdk_estimate" as const }
         : cnyRate === null || attempt.totalTokens === null ? null : { currency: "CNY" as const,
           amount: attempt.totalTokens * cnyRate / 1_000_000, source: "price_estimate" as const };
       return { ...base, id: `${parent.id}:knowledge:${callIndex}:${index + 1}`, durationMs: attempt.durationMs,

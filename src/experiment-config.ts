@@ -62,6 +62,10 @@ type Field = { key: string; label: string; type: "number" | "select"; min?: numb
   options?: Array<{ value: string; label: string }>; note?: string };
 export const experimentFields: Record<"support" | "retrieval", Field[]> = {
   support: [
+    { key: "agentModel", label: "业务 Agent 模型", type: "select", options: [
+      { value: "configured", label: "跟随已配置模型" }, { value: "deepseek-flash", label: "DeepSeek Flash" },
+      { value: "deepseek-v4-pro", label: "DeepSeek V4 Pro" }, { value: "qwen3.7-plus-2026-05-26", label: "Qwen3.7 Plus（2026-05-26）" }],
+    note: "仅作用于本次实验；configured 保持环境模型，不改变支持判别模型选择" },
     { key: "timeoutMs", label: "每轮超时（ms）", type: "number", min: 10000, max: 120000, step: 1000 },
     { key: "repairBudget", label: "动作修复次数", type: "number", min: 0, max: 2, step: 1, note: "仅 Controller；格式与只读范围修复共用，范围修复最多一次" },
     { key: "merchantEvents", label: "商家通知处理", type: "select", options: [
@@ -71,7 +75,9 @@ export const experimentFields: Record<"support" | "retrieval", Field[]> = {
     { key: "knowledgeSupport", label: "事实支持判别", type: "select", options: [
       { value: "binary", label: "二元基线 v1" }, { value: "typed", label: "分类候选（当前版本见运行快照）" }], note: "typed 仅用于 m4-support；区分直接事实、可答边界、仅有缺失说明和无关证据" },
     { key: "knowledgeSupportModel", label: "支持判别模型", type: "select", options: [
-      { value: "configured", label: "跟随已配置模型" }, { value: "deepseek-v4-pro", label: "DeepSeek V4 Pro" }], note: "仅 Controller + m4-support；Pro 只切换支持判别，业务 Agent 不变；要求当前 provider 为 DeepSeek" },
+      { value: "configured", label: "跟随已配置模型" }, { value: "deepseek-flash", label: "DeepSeek Flash" },
+      { value: "deepseek-v4-pro", label: "DeepSeek V4 Pro" }, { value: "qwen3.7-plus-2026-05-26", label: "Qwen3.7 Plus（2026-05-26）" }],
+    note: "仅 Controller + m4-support；只切换支持判别，业务 Agent 不变；configured 独立跟随环境模型" },
     { key: "knowledgeSupportPrompt", label: "分类判别 Prompt", type: "select", options: [
       { value: "v5", label: "v5 基线" }, { value: "v6", label: "v6 诉求合同" }], note: "默认 v5；v6 仅 Controller + m4-support + typed，强调先确定用户所问命题；binary 保持原二元 Prompt，未调用支持模型不算已验证版本" },
     { key: "knowledgeApplicability", label: "已声明必要前提", type: "select", options: [
@@ -96,6 +102,8 @@ export const experimentFields: Record<"support" | "retrieval", Field[]> = {
   ],
 };
 export function experimentCatalog() {
+  const judgeParameters: Partial<SupportExperimentParameters> = { agentModel: "deepseek-flash", knowledgeMode: "m4-support", knowledgeSupport: "typed",
+    knowledgeSupportPrompt: "v6", knowledgeApplicability: "declared-v2", knowledgeQueryMode: "separated", knowledgeThreshold: .5, knowledgeTimeoutMs: 60_000 };
   const preset = (id: string, name: string, kind: string, variants: unknown[], version: 1 | 2 = 1) => ({ id, name, config: resolveExperimentConfig({
     version, kind, label: name, repeat: 1, allowRemote: false, variants }) });
   return {
@@ -113,6 +121,10 @@ export function experimentCatalog() {
       preset("support-knowledge-model-ab", "事实支持模型 A/B", "support", [
         { id: "A", architecture: "controller", parameters: { knowledgeMode: "m4-support", knowledgeSupport: "typed", knowledgeSupportModel: "configured", knowledgeThreshold: .5 } },
         { id: "B", architecture: "controller", parameters: { knowledgeMode: "m4-support", knowledgeSupport: "typed", knowledgeSupportModel: "deepseek-v4-pro", knowledgeThreshold: .5 } },
+      ]),
+      preset("support-knowledge-qwen-ab", "固定 Flash：Pro / Qwen 判别候选", "support", [
+        { id: "A", architecture: "controller", parameters: { ...judgeParameters, knowledgeSupportModel: "deepseek-v4-pro" } },
+        { id: "B", architecture: "controller", parameters: { ...judgeParameters, knowledgeSupportModel: "qwen3.7-plus-2026-05-26" } },
       ]),
       preset("support-knowledge-applicability-ab", "已声明必要前提 A/B", "support", [
         { id: "A", architecture: "controller", parameters: { knowledgeMode: "m4-support", knowledgeSupport: "typed", knowledgeSupportModel: "deepseek-v4-pro", knowledgeThreshold: .5, knowledgeApplicability: "model_only" } },

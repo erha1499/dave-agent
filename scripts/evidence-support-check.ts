@@ -290,8 +290,8 @@ assert.deepEqual(resolveEvidenceSupportModel("configured", {}), { provider: "dee
 const configuredEnv = { MODEL_PROVIDER: "deepseek", MODEL_ID: "deepseek-flash", MODEL_API_KEY: "fake-never-sent" };
 assert.deepEqual(resolveEvidenceSupportModel("deepseek-v4-pro", configuredEnv), { provider: "deepseek", model: "deepseek-v4-pro" });
 assert.equal(configuredEnv.MODEL_ID, "deepseek-flash");
-assert.throws(() => resolveEvidenceSupportModel("deepseek-v4-pro", { MODEL_PROVIDER: "openai" }), /MODEL_PROVIDER/);
-await assert.rejects(createEvidenceSupportClient({ modelSelection: "deepseek-v4-pro", env: { MODEL_PROVIDER: "openai", MODEL_API_KEY: "fake-wrong-provider" } }), /MODEL_PROVIDER/);
+assert.deepEqual(resolveEvidenceSupportModel("deepseek-v4-pro", { MODEL_PROVIDER: "openai" }), { provider: "deepseek", model: "deepseek-v4-pro" });
+await assert.rejects(createEvidenceSupportClient({ modelSelection: "deepseek-v4-pro", env: { MODEL_PROVIDER: "openai", MODEL_API_KEY: "fake-wrong-provider" } }), /DEEPSEEK_API_KEY/);
 await assert.rejects(createEvidenceSupportClient({ modelSelection: "deepseek-v4-pro", env: {}, runtime: { model, complete: async () => { throw Error("must not run"); } } }), /模型不一致/);
 const selectedDefault = await createEvidenceSupportClient({ modelSelection: "configured", timeoutMs: 1000, env: { MODEL_PROVIDER: "deepseek", MODEL_ID: model.id }, runtime: { model, complete: async () => message({ decisions }) } });
 assert.deepEqual(selectedDefault.settings, client.settings, "configured selection preserves the A1 settings and prompt bytes");

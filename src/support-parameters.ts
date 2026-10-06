@@ -1,10 +1,13 @@
+import { modelSelections, type ModelSelection } from "./model-selection.ts";
+
 export type SupportExperimentParameters = {
   timeoutMs: number;
   repairBudget: number;
+  agentModel: ModelSelection;
   merchantEvents: "architecture" | "host" | "model";
   knowledgeMode: "lexical" | "m4-support";
   knowledgeSupport: "binary" | "typed";
-  knowledgeSupportModel: "configured" | "deepseek-v4-pro";
+  knowledgeSupportModel: ModelSelection;
   knowledgeSupportPrompt: "v5" | "v6";
   knowledgeApplicability: "model_only" | "declared" | "declared-v2";
   knowledgeQueryMode: "combined" | "separated";
@@ -14,10 +17,10 @@ export type SupportExperimentParameters = {
 
 export function resolveSupportParameters(input: Partial<SupportExperimentParameters> = {}): SupportExperimentParameters {
   if (!input || typeof input !== "object" || Array.isArray(input)
-    || Object.keys(input).some(key => !["timeoutMs", "repairBudget", "merchantEvents", "knowledgeMode", "knowledgeSupport", "knowledgeSupportModel", "knowledgeSupportPrompt", "knowledgeApplicability", "knowledgeQueryMode", "knowledgeThreshold", "knowledgeTimeoutMs"].includes(key))) {
-    throw new Error("业务实验参数仅支持 timeoutMs、repairBudget、merchantEvents、knowledgeMode、knowledgeSupport、knowledgeSupportModel、knowledgeSupportPrompt、knowledgeApplicability、knowledgeQueryMode、knowledgeThreshold、knowledgeTimeoutMs。");
+    || Object.keys(input).some(key => !["timeoutMs", "repairBudget", "agentModel", "merchantEvents", "knowledgeMode", "knowledgeSupport", "knowledgeSupportModel", "knowledgeSupportPrompt", "knowledgeApplicability", "knowledgeQueryMode", "knowledgeThreshold", "knowledgeTimeoutMs"].includes(key))) {
+    throw new Error("业务实验参数仅支持 timeoutMs、repairBudget、agentModel、merchantEvents、knowledgeMode、knowledgeSupport、knowledgeSupportModel、knowledgeSupportPrompt、knowledgeApplicability、knowledgeQueryMode、knowledgeThreshold、knowledgeTimeoutMs。");
   }
-  const parameters = { timeoutMs: 60_000, repairBudget: 1, merchantEvents: "architecture" as const,
+  const parameters = { timeoutMs: 60_000, repairBudget: 1, agentModel: "configured" as const, merchantEvents: "architecture" as const,
     knowledgeMode: "lexical" as const, knowledgeSupport: "binary" as const, knowledgeSupportModel: "configured" as const, knowledgeSupportPrompt: "v5" as const,
     knowledgeApplicability: "model_only" as const, knowledgeQueryMode: "combined" as const, knowledgeThreshold: .71, knowledgeTimeoutMs: 15_000, ...input };
   if (!Number.isInteger(parameters.timeoutMs) || parameters.timeoutMs < 10_000 || parameters.timeoutMs > 120_000) {
@@ -26,6 +29,7 @@ export function resolveSupportParameters(input: Partial<SupportExperimentParamet
   if (!Number.isInteger(parameters.repairBudget) || parameters.repairBudget < 0 || parameters.repairBudget > 2) {
     throw new Error("repairBudget 必须为 0..2 的整数。");
   }
+  if (!modelSelections.includes(parameters.agentModel)) throw new Error(`agentModel 仅支持 ${modelSelections.join("、")}。`);
   if (!["architecture", "host", "model"].includes(parameters.merchantEvents)) {
     throw new Error("merchantEvents 仅支持 architecture、host 或 model。");
   }
@@ -34,8 +38,8 @@ export function resolveSupportParameters(input: Partial<SupportExperimentParamet
   if (parameters.knowledgeMode === "lexical" && parameters.knowledgeSupport !== "binary") throw new Error("knowledgeSupport typed 仅适用于 m4-support。");
   if (!["v5", "v6"].includes(parameters.knowledgeSupportPrompt)) throw new Error("knowledgeSupportPrompt 仅支持 v5 或 v6。");
   if (parameters.knowledgeSupportPrompt === "v6" && (parameters.knowledgeMode !== "m4-support" || parameters.knowledgeSupport !== "typed")) throw new Error("knowledgeSupportPrompt v6 仅适用于 m4-support + typed。");
-  if (!["configured", "deepseek-v4-pro"].includes(parameters.knowledgeSupportModel)) throw new Error("knowledgeSupportModel 仅支持 configured 或 deepseek-v4-pro。");
-  if (parameters.knowledgeMode === "lexical" && parameters.knowledgeSupportModel !== "configured") throw new Error("knowledgeSupportModel deepseek-v4-pro 仅适用于 m4-support。");
+  if (!modelSelections.includes(parameters.knowledgeSupportModel)) throw new Error(`knowledgeSupportModel 仅支持 ${modelSelections.join("、")}。`);
+  if (parameters.knowledgeMode === "lexical" && parameters.knowledgeSupportModel !== "configured") throw new Error(`knowledgeSupportModel ${parameters.knowledgeSupportModel} 仅适用于 m4-support。`);
   if (!["model_only", "declared", "declared-v2"].includes(parameters.knowledgeApplicability)) throw new Error("knowledgeApplicability 仅支持 model_only、declared 或 declared-v2。");
   if (parameters.knowledgeMode !== "m4-support" && parameters.knowledgeApplicability !== "model_only") throw new Error(`knowledgeApplicability ${parameters.knowledgeApplicability} 仅适用于 m4-support。`);
   if (!["combined", "separated"].includes(parameters.knowledgeQueryMode)) throw new Error("knowledgeQueryMode 仅支持 combined 或 separated。");

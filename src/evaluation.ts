@@ -27,6 +27,7 @@ export type EvalBatch = { id: string; repetition: number; plannedRepetitions: nu
 export type EvalUsage = {
   input: number; output: number; cacheRead: number; cacheWrite: number; totalTokens: number;
   estimatedCostUsd: number | null;
+  estimatedCostCny?: number | null;
 };
 // v2 attribution is additive: old model/tool steps retain their original meaning.
 export type EvalSpan = {
@@ -88,6 +89,7 @@ export type EvalMetrics = {
   modelRequests: number; toolCalls: number; toolErrors: number; expectedDenials: number;
   usageRequests: number; totalTokens: number | null; inputTokens: number | null; outputTokens: number | null;
   cacheReadTokens: number | null; cacheWriteTokens: number | null; estimatedCostUsd: number | null;
+  estimatedCostCny?: number | null;
 };
 export type EvalRun = {
   id: string; suiteId: string; suiteName: string; kind: "model" | "engineering";
@@ -107,10 +109,11 @@ export function summarizeEvaluation(cases: EvalCase[]): EvalMetrics {
   const models = steps.filter(step => step.type === "model");
   const tools = steps.filter(step => step.type === "tool");
   const usage = models.flatMap(step => step.usage ? [step.usage] : []);
+  const cnyModels = models.filter(step => step.name.startsWith("bailian/") || step.usage?.estimatedCostCny !== undefined);
   const durations = turns.flatMap(turn => turn.durationMs === null ? [] : [turn.durationMs]).sort((a, b) => a - b);
   const count = (items: { status: EvalStatus }[], status: EvalStatus) => items.filter(item => item.status === status).length;
   const percentile = (p: number) => durations.length ? durations[Math.ceil(p * durations.length) - 1]! : null;
-  const sum = (key: Exclude<keyof EvalUsage, "estimatedCostUsd">) => usage.length ? usage.reduce((total, item) => total + item[key], 0) : null;
+  const sum = (key: Exclude<keyof EvalUsage, "estimatedCostUsd" | "estimatedCostCny">) => usage.length ? usage.reduce((total, item) => total + item[key], 0) : null;
   return {
     casesPassed: count(cases, "passed"), casesFailed: count(cases, "failed"), casesSkipped: count(cases, "skipped"),
     turnsPassed: count(turns, "passed"), turnsFailed: count(turns, "failed"), turnsSkipped: count(turns, "skipped"),
@@ -122,5 +125,7 @@ export function summarizeEvaluation(cases: EvalCase[]): EvalMetrics {
     cacheReadTokens: sum("cacheRead"), cacheWriteTokens: sum("cacheWrite"),
     estimatedCostUsd: usage.length && usage.every(item => item.estimatedCostUsd !== null)
       ? usage.reduce((total, item) => total + item.estimatedCostUsd!, 0) : null,
+    ...(cnyModels.length ? { estimatedCostCny: cnyModels.every(step => step.usage?.estimatedCostCny != null)
+      ? cnyModels.reduce((total, step) => total + step.usage!.estimatedCostCny!, 0) : null } : {}),
   };
 }

@@ -19,6 +19,7 @@ import {
 import type { CouponStore, QQIdentity } from "./coupon-store.ts";
 import type { AfterSalesStore } from "./after-sales.ts";
 import type { RefundStore } from "./refunds.ts";
+import { normalizeBailianGenerationBaseUrl, resolveModelSelection, type ModelSelection } from "./model-selection.ts";
 
 const projectDir = fileURLToPath(new URL("../", import.meta.url));
 const skillDir = fileURLToPath(new URL("../skills/shop-support", import.meta.url));
@@ -32,19 +33,36 @@ export function createModelRuntime() {
   });
 }
 
-export function readModelConfig(env: NodeJS.ProcessEnv = process.env) {
-  const provider = env.MODEL_PROVIDER?.trim() || "deepseek";
-  const modelId = env.MODEL_ID?.trim() || (provider === "deepseek" ? "deepseek-flash" : "gpt-4.1-mini");
-  const apiKey = env.MODEL_API_KEY?.trim() || (provider === "deepseek" ? env.DEEPSEEK_API_KEY?.trim() : undefined);
+export function readModelConfig(env: NodeJS.ProcessEnv = process.env, selection: ModelSelection = "configured") {
+  const { provider, modelId } = resolveModelSelection(selection, env);
+  if (provider === "bailian") {
+    if (modelId !== "qwen3.7-plus-2026-05-26") throw new Error("普通百炼生成仅支持固定 qwen3.7-plus-2026-05-26 快照。");
+    const apiKey = env.DASHSCOPE_API_KEY?.trim();
+    if (!apiKey) throw new Error("普通百炼生成请设置 DASHSCOPE_API_KEY；不能复用 MODEL_API_KEY 或 DeepSeek 凭据。");
+    normalizeBailianGenerationBaseUrl(env.DASHSCOPE_BASE_URL);
+    return { provider, modelId, apiKey };
+  }
+  const globalProvider = env.MODEL_PROVIDER?.trim() || "deepseek";
+  const apiKey = selection === "configured" ? env.MODEL_API_KEY?.trim() || (provider === "deepseek" ? env.DEEPSEEK_API_KEY?.trim() : undefined)
+    : env.DEEPSEEK_API_KEY?.trim() || (globalProvider === "deepseek" ? env.MODEL_API_KEY?.trim() : undefined);
   if (!apiKey) throw new Error(provider === "deepseek"
     ? "请设置 DEEPSEEK_API_KEY 或 MODEL_API_KEY；离线验证使用 npm run check。"
     : "请设置 MODEL_API_KEY；离线验证使用 npm run check。");
   return { provider, modelId, apiKey };
 }
 
-export async function createConfiguredModelRuntime(env: NodeJS.ProcessEnv = process.env) {
-  const { provider, modelId, apiKey } = readModelConfig(env);
+export async function createConfiguredModelRuntime(env: NodeJS.ProcessEnv = process.env, selection: ModelSelection = "configured") {
+  const { provider, modelId, apiKey } = readModelConfig(env, selection);
   const modelRuntime = await createModelRuntime();
+  if (provider === "bailian") modelRuntime.registerProvider(provider, {
+    api: "openai-completions", baseUrl: normalizeBailianGenerationBaseUrl(env.DASHSCOPE_BASE_URL), apiKey: "DASHSCOPE_API_KEY",
+    models: [{ id: modelId, name: "Qwen3.7 Plus 2026-05-26 (Bailian Beijing)", reasoning: true, input: ["text"],
+      contextWindow: 1_000_000, maxTokens: 131_072,
+      // Pi's catalog assumes USD; NaN preserves unknown USD in memory. Reviewed
+      // CNY rates and finite estimates live in model-selection.ts, not this cost.
+      cost: { input: NaN, output: NaN, cacheRead: NaN, cacheWrite: NaN },
+      compat: { thinkingFormat: "qwen", supportsReasoningEffort: false } }],
+  });
   const model = modelRuntime.getModel(provider, modelId);
   if (!model) throw new Error(`Pi 模型目录未找到 ${provider}/${modelId}。`);
   // Runtime credential overrides stay in process memory and never write an auth file.

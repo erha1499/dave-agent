@@ -54,6 +54,17 @@ node --env-file-if-exists=.env scripts/experiment.ts --preset support-knowledge-
 
 `support-knowledge-model-ab` 固定 Controller / m4-support / typed / 0.5，仅比较 configured 与 Pro。只有环境中的 configured 实际为 Flash 时，才构成 Flash/Pro 对照；界面允许预览、修改、下载和运行，非法组合可在原控件修复而不暗改参数。该预设不代表当前候选已准入。开发对照与费用见 [支持模型结果](./c1-support-model-results.md)。
 
+2026-10-06 新增 `agentModel` 与扩展 `knowledgeSupportModel`，两者分别支持 `configured`、`deepseek-flash`、`deepseek-v4-pro`、`qwen3.7-plus-2026-05-26`。`configured` 始终沿用原全局模型配置，两个角色各自的固定选择互不改写。固定 DeepSeek 使用 DeepSeek 独立凭据，不能借用另一全局 provider 的 `MODEL_API_KEY`；固定千问只使用 `DASHSCOPE_API_KEY` 和已审阅的北京普通百炼接口。完整接入、币种限制及选型依据见 [模型候选说明](./model-selection.md)。
+
+新预设 `support-knowledge-qwen-ab` 固定主 Agent 为 Flash，在相同 typed v6 / declared-v2 / separated / 0.5 / 60000ms 下仅改变判别模型 Pro / Qwen。预设默认 `allowRemote=false`，目前仅完成本地工程检查，尚无真实模型效果成绩。需要单独冻结新题与调用预算；不使用已结束的 C1 manifest 续跑千问或重算旧成绩。工作台后端目录已提供参数，前端跨检索模式切换的固定模型清理逻辑仍由 Kimi 后续适配；CLI/JSON 可完整复现。
+
+```sh
+# 仅配置预览，0 模型与数据库请求。
+node scripts/experiment.ts --preset support-knowledge-qwen-ab --dry-run
+```
+
+业务 live runner 新增 `--agent-model`；知识判别仍用 `--knowledge-support-model`。实际角色选择、Agent endpoint/价格、知识服务判别 settings 与源码均进入运行快照。百炼费用记录 CNY，USD 保持未知，不换汇；原始单价仅适用于北京输入不超过 256000 Token 的普通实时请求，缓存按全价保守估计，超档或用量缺失为未知。知识 trace 的 USD=0 表示该币种桶没有调用，不能据此声称百炼免费。旧 USD 记录保持原形状，身份、确认、幂等及默认配置不变。
+
 CLI / QQ 读取 `KNOWLEDGE_MODE`、`KNOWLEDGE_SUPPORT`、`KNOWLEDGE_SUPPORT_MODEL`、`KNOWLEDGE_SUPPORT_PROMPT`、`KNOWLEDGE_APPLICABILITY`、`KNOWLEDGE_QUERY_MODE`、`KNOWLEDGE_THRESHOLD`、`KNOWLEDGE_TIMEOUT_MS`；未配置仍为 lexical / binary / configured / v5 / model_only / combined。Controller 通过 `SUPPORT_ARCHITECTURE=controller` 显式选择。环境变量只在进程启动时读取；实验表单只控制本次评测，不修改环境文件或运行中的 QQ。确认、身份与金额边界不受上述开关影响。
 
 `support-knowledge-prompt-ab` 固定 Controller / m4-support / typed / Pro / 0.5 / declared / combined，仅比较 v5 与 v6，知识查询超时均为 60000 毫秒。v6 强调先确定原问命题：对象属性、组成或具体清单也是事实请求；资料缺失不能把该请求变成资料覆盖问题；原问明确询问覆盖、推断或核实去向时才按元边界判断，规则要求的核实流程仍可直接回答流程问题。没有新增模型层、类别或解析器，默认仍为 v5。

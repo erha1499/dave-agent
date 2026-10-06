@@ -6,7 +6,7 @@ import type { Pool } from "mysql2/promise";
 import { contentHash, createBailianClient } from "../src/bailian.ts";
 import { CouponStore } from "../src/coupon-store.ts";
 import { createEvidenceSupportClient, evidenceSupportInputHash, evidenceSupportTypedPromptVersion, evidenceSupportTypedV6Prompt,
-  evidenceSupportTypedV6PromptVersion, resolveEvidenceSupportModel } from "../src/evidence-support.ts";
+  evidenceSupportTypedV6PromptVersion, resolveEvidenceSupportModel, validateEvidenceSupportVerification } from "../src/evidence-support.ts";
 import { createKnowledgeService, type KnowledgeServiceOptions } from "../src/knowledge-service.ts";
 import { rankKnowledge } from "../src/knowledge-retrieval.ts";
 import type { RetrievalDocument } from "../src/retrieval-ranking.ts";
@@ -266,6 +266,76 @@ assert.equal(proResult.trace.status, "accepted"); assert.equal(proResult.trace.s
 assert.equal(proResult.trace.settings!.support!.model, "deepseek-v4-pro");
 assert.equal(proResult.trace.settings!.rerank!.rerankModel, good.trace.settings!.rerank!.rerankModel);
 assert.equal(proResult.trace.supportVerification!.attempts[0]!.model, "deepseek-v4-pro");
+
+// The lazy production factory must see the real global provider when selecting a fixed judge.
+// Rewriting it to DeepSeek could send an unrelated provider's MODEL_API_KEY to DeepSeek.
+const originalFetch = globalThis.fetch, savedModelEnv = { MODEL_PROVIDER: process.env.MODEL_PROVIDER,
+  MODEL_API_KEY: process.env.MODEL_API_KEY, DEEPSEEK_API_KEY: process.env.DEEPSEEK_API_KEY };
+let unexpectedSupportHttp = 0;
+globalThis.fetch = async () => { unexpectedSupportHttp++; throw new Error("Support HTTP is forbidden in this credential-boundary check"); };
+try {
+  process.env.MODEL_PROVIDER = "openai"; process.env.MODEL_API_KEY = "synthetic-other-provider-key"; delete process.env.DEEPSEEK_API_KEY;
+  const before = { reads, reranks, judges }, lazyStages: string[] = [];
+  const refusedJudge = await createKnowledgeService(store, { mode: "m4-support", timeoutMs: 1000, supportModel: "deepseek-v4-pro",
+    clients: { rerank } }).search({ query, scope, onStage: stage => lazyStages.push(stage) });
+  assert.deepEqual(lazyStages, ["read", "rerank", "support"], "Valid candidates reach the actual lazy support factory");
+  assert.equal(refusedJudge.trace.status, "unavailable"); assert.equal(refusedJudge.trace.reason, "provider_unavailable");
+  assert.deepEqual(refusedJudge.documents, []); assert.deepEqual(refusedJudge.trace.calls.map(call => call.operation), ["rerank"]);
+  assert.equal(refusedJudge.trace.settings?.support, undefined); assert.equal(refusedJudge.trace.supportVerification, undefined);
+  assert.deepEqual({ reads, reranks, judges }, { reads: before.reads + 1, reranks: before.reranks + 1, judges: before.judges });
+  assert.equal(unexpectedSupportHttp, 0, "Neither DeepSeek nor any fallback provider may receive the unrelated key");
+} finally {
+  globalThis.fetch = originalFetch;
+  for (const [key, value] of Object.entries(savedModelEnv)) if (value === undefined) delete process.env[key]; else process.env[key] = value;
+}
+
+// Production verifier/service accounting combines Bailian rerank and Qwen judge CNY.
+// The completion is synthetic; document acceptance here is an engineering check, not model quality.
+const qwenSelection = "qwen3.7-plus-2026-05-26", rerankCny = .00005, judgeCny = .00006;
+const qwenModel = { ...model, provider: "bailian", id: qwenSelection, baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+  cost: { input: NaN, output: NaN, cacheRead: NaN, cacheWrite: NaN } };
+let qwenUsageReported = true, qwenJudges = 0;
+const qwenClient = await createEvidenceSupportClient({ modelSelection: qwenSelection, profile: "typed", timeoutMs: 1000,
+  runtime: { model: qwenModel, complete: async (context, parameters): Promise<AssistantMessage> => {
+    qwenJudges++; assert.equal(parameters.maxRetries, 0); assert.deepEqual(context.tools, []);
+    const input = JSON.parse(String(context.messages[0]!.content)); assert.equal(input.query, query);
+    assert.deepEqual(input.documents.map((doc: { id: string }) => doc.id), ["A", "B"]);
+    return { role: "assistant", api: "openai-completions", provider: "bailian", model: qwenSelection, stopReason: "stop", timestamp: 0,
+      content: [{ type: "text", text: JSON.stringify({ decisions: input.documents.map((doc: { id: string; body: string }) => ({
+        id: doc.id, category: doc.id === "A" ? "direct_fact" : "limitation_only", quote: doc.body, reason: "合成分类用于费用集成检查",
+      })) }) }], usage: { input: qwenUsageReported ? 10 : 0, output: qwenUsageReported ? 5 : 0, cacheRead: 0, cacheWrite: 0,
+        totalTokens: qwenUsageReported ? 15 : 0, cost: { input: NaN, output: NaN, cacheRead: NaN, cacheWrite: NaN, total: NaN } } };
+  } } });
+globalThis.fetch = async () => { unexpectedSupportHttp++; throw new Error("Injected Qwen completion must not call HTTP"); };
+try {
+  const qwenService = createKnowledgeService(store, { ...options, supportProfile: "typed", supportModel: qwenSelection, clients: { rerank, support: qwenClient } });
+  for (const reported of [true, false]) {
+    qwenUsageReported = reported;
+    const result = await qwenService.search({ query, scope }), trace = result.trace, verification = trace.supportVerification!;
+    assert.equal(trace.status, "accepted"); assert.deepEqual(result.documents.map(doc => doc.sourceId), ["A"]);
+    assert.deepEqual(trace.calls.map(call => call.operation), ["rerank", "support"]);
+    assert.deepEqual(trace.usage, { rerankTokens: 100, supportTokens: reported ? 15 : null,
+      estimatedCny: reported ? rerankCny + judgeCny : null, estimatedUsd: 0, incompleteCalls: reported ? 0 : 1 });
+    assert.equal(trace.settings!.support!.provider, "bailian"); assert.equal(trace.settings!.support!.model, qwenSelection);
+    assert.equal(trace.settings!.support!.pricing.currency, "CNY"); assert.equal(trace.pricing.supportSource, "Alibaba Cloud Model Studio");
+    const proofInput = { query, scope, settings: qwenClient.settings, candidates: docs.slice(0, 2).map((doc, index) => ({ ...doc, score: scores[index]!, rank: index + 1 })) };
+    assert.equal(verification.inputHash, evidenceSupportInputHash(proofInput)); assert.ok(validateEvidenceSupportVerification(verification, proofInput));
+    assert.equal(verification.attempts[0]!.costUsd, null); assert.equal(verification.attempts[0]!.costCny, reported ? judgeCny : null);
+    const forged = structuredClone(verification); forged.attempts[0]!.costCny = reported ? judgeCny + 1 : 0;
+    assert.equal(validateEvidenceSupportVerification(forged, proofInput), false, "Stored CNY cost must rebuild from reported usage; missing usage cannot become free");
+    const parent = { ...faqSpan, knowledge: { ...faqSpan.knowledge!, trace } }, spans = knowledgeProviderSpans(parent);
+    assert.equal(spans.length, 2); assert.equal(parent.usage, undefined);
+    assert.deepEqual(spans.map(span => span.usage!.cost), [{ currency: "CNY", amount: rerankCny, source: "price_estimate" },
+      reported ? { currency: "CNY", amount: judgeCny, source: "price_estimate" } : null]);
+    if (reported) assert.equal(spans.reduce((sum, span) => sum + span.usage!.cost!.amount, 0), trace.usage.estimatedCny);
+    const providerAnalysis = analyzeSupportSpans([parent, ...spans]); assert.deepEqual(providerAnalysis.issues, []);
+    assert.equal(providerAnalysis.providers.reduce((sum, item) => sum + item.requests, 0), 2);
+    const judgeProvider = providerAnalysis.providers.find(item => item.model === qwenSelection)!;
+    assert.equal(judgeProvider.usageReported, reported ? 1 : 0); assert.equal(judgeProvider.knownTokens, reported ? 15 : null);
+    assert.deepEqual(judgeProvider.costs, reported ? [{ currency: "CNY", source: "price_estimate", reportedRequests: 1, knownAmount: judgeCny }] : []);
+  }
+  assert.equal(qwenJudges, 2); assert.equal(unexpectedSupportHttp, 0);
+} finally { globalThis.fetch = originalFetch; }
 
 // Actual Bailian input validation happens before its send hook: a local refusal is not a provider request.
 const oversized = [{ ...docs[0]!, body: "长".repeat(33_000) }];

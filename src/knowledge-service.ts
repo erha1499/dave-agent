@@ -35,7 +35,7 @@ export type KnowledgeTrace = {
   applicability?: { mode: KnowledgeApplicabilityMode; gate?: Omit<KnowledgeApplicabilityResult, "candidates"> };
   sourceHashes: { before: string | null; after: string | null }; durationMs: number; calls: KnowledgeCall[];
   usage: { rerankTokens: number | null; supportTokens: number | null; estimatedCny: number | null; estimatedUsd: number | null; incompleteCalls: number };
-  pricing: { estimated: true; rerankCnyPerMillionTokens: number | null; rerankAsOf: "2026-10-05"; supportSource: "Pi model catalog" };
+  pricing: { estimated: true; rerankCnyPerMillionTokens: number | null; rerankAsOf: "2026-10-05"; supportSource: EvidenceSupportSettings["pricing"]["source"] };
   settings?: { rerank?: BailianClient["settings"]; support?: EvidenceSupportSettings; serialization: "json-title-tags-body-v1";
     applicability?: ReturnType<typeof knowledgeApplicabilitySettings> };
   stages?: Array<{ name: KnowledgeStage; observedAt: string; durationMs: number }>;
@@ -205,7 +205,7 @@ export function createKnowledgeService(store: Pick<CouponStore, "readKnowledgeDo
         if (!supportClient) {
           supportLoading ??= createEvidenceSupportClient({ timeoutMs, profile: supportProfile, modelSelection: supportModel,
             ...(supportProfile === "typed" ? { typedPromptVersion } : {}),
-            env: { ...process.env, MODEL_PROVIDER: selectedModel.provider, MODEL_ID: selectedModel.model } }).catch(error => { supportLoading = undefined; throw error; });
+            env: process.env }).catch(error => { supportLoading = undefined; throw error; });
           supportClient = await wait(() => supportLoading!);
         }
         if (!modelMatches(supportClient) || !promptMatches(supportClient) || supportClient.settings.maxRetries !== 0 || (supportClient.settings.profile ?? "binary") !== supportProfile) throw new Error();
@@ -272,8 +272,15 @@ export function createKnowledgeService(store: Pick<CouponStore, "readKnowledgeDo
           ? tokens * trace.pricing.rerankCnyPerMillionTokens / 1_000_000 : null;
       } else {
         trace.usage.supportTokens = tokens;
-        trace.usage.estimatedUsd = calls.every(call => call.attempts.length === 1 && (call.attempts[0] as EvidenceSupportAttempt).costUsd !== null)
+        const cny = trace.settings?.support?.pricing.currency === "CNY";
+        trace.pricing.supportSource = trace.settings?.support?.pricing.source ?? "Pi model catalog";
+        trace.usage.estimatedUsd = cny ? 0 : calls.every(call => call.attempts.length === 1 && (call.attempts[0] as EvidenceSupportAttempt).costUsd !== null)
           ? calls.reduce((sum, call) => sum + (call.attempts[0] as EvidenceSupportAttempt).costUsd!, 0) : null;
+        if (cny) {
+          const supportCny = calls.every(call => call.attempts.length === 1 && (call.attempts[0] as EvidenceSupportAttempt).costCny != null)
+            ? calls.reduce((sum, call) => sum + (call.attempts[0] as EvidenceSupportAttempt).costCny!, 0) : null;
+          trace.usage.estimatedCny = supportCny === null || trace.usage.estimatedCny === null ? null : trace.usage.estimatedCny + supportCny;
+        }
       }
     }
     endStage(); trace.durationMs = performance.now() - started;

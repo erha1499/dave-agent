@@ -1,19 +1,18 @@
 import type { AssistantMessage, Context, ModelCost } from "@earendil-works/pi-ai";
+import { isDeepStrictEqual } from "node:util";
 import { createConfiguredModelRuntime } from "./agent.ts";
+import { estimateModelUsage, modelPricing, normalizeBailianGenerationBaseUrl, resolveModelSelection, type ModelSelection, type ModelPricing } from "./model-selection.ts";
 import { contentHash } from "./bailian.ts";
 import { acceptEvidence, type EvidenceAcceptanceResult, type EvidenceSupportCandidate } from "./evidence-acceptance.ts";
 import { scopeDocuments, type RetrievalDocument, type RetrievalScope } from "./retrieval-ranking.ts";
 
 export type { EvidenceSupportCandidate } from "./evidence-acceptance.ts";
 export type EvidenceSupportProfile = "binary" | "typed";
-export type EvidenceSupportModel = "configured" | "deepseek-v4-pro";
+export type EvidenceSupportModel = ModelSelection;
 // Resolve identity without reading credentials; a fixed model cannot redirect another provider's key.
 export function resolveEvidenceSupportModel(selection: EvidenceSupportModel = "configured", env: NodeJS.ProcessEnv = process.env) {
-  if (selection !== "configured" && selection !== "deepseek-v4-pro") throw new Error("支持判别模型仅支持 configured 或 deepseek-v4-pro。");
-  const provider = env.MODEL_PROVIDER?.trim() || "deepseek";
-  if (selection === "deepseek-v4-pro" && provider !== "deepseek") throw new Error("固定 Pro 支持判别模型要求 MODEL_PROVIDER 为 deepseek。");
-  return { provider, model: selection === "deepseek-v4-pro" ? selection
-    : env.MODEL_ID?.trim() || (provider === "deepseek" ? "deepseek-flash" : "gpt-4.1-mini") };
+  const { provider, modelId } = resolveModelSelection(selection, env);
+  return { provider, model: modelId };
 }
 export type EvidenceSupportCategory = "direct_fact" | "boundary_answer" | "limitation_only" | "unrelated";
 export const evidenceSupportValidationVersion = "typed-candidate-isolation-v1";
@@ -22,15 +21,25 @@ export type EvidenceSupportValidation = { status: "complete" | "partial" | "unav
 export type EvidenceSupportDecision = { id: string; supported: boolean; quote: string | null; reason: string; category?: EvidenceSupportCategory };
 export type EvidenceSupportAttempt = { operation: "support"; provider: string; model: string; attempt: 1; durationMs: number;
   outcome: "ok" | "timeout" | "provider_error" | "invalid_response"; totalTokens: number | null; inputTokens: number | null;
-  outputTokens: number | null; cacheReadTokens: number | null; cacheWriteTokens: number | null; costUsd: number | null };
+  outputTokens: number | null; cacheReadTokens: number | null; cacheWriteTokens: number | null; costUsd: number | null;
+  // Present only for ordinary Bailian; old USD records keep their exact shape.
+  costCny?: number | null };
 export type EvidenceSupportSettings = { provider: string; model: string; api: string; endpoint: string; timeoutMs: number;
   temperature: 0; maxTokens: number; maxRetries: 0; promptVersion: string; promptHash: string; serialization: string; serializationHash: string;
-  pricing: { currency: "USD"; estimated: true; source: "Pi model catalog"; rates: ModelCost }; profile?: "typed"; validationVersion?: typeof evidenceSupportValidationVersion };
+  pricing: ModelPricing; profile?: "typed"; validationVersion?: typeof evidenceSupportValidationVersion };
 export type EvidenceSupportResult = { value: EvidenceSupportDecision[]; requestHash: string; attempts: EvidenceSupportAttempt[]; validation?: EvidenceSupportValidation };
 export type EvidenceSupportVerification = EvidenceSupportResult & { inputHash: string };
 export type EvidenceSupportClient = { settings: EvidenceSupportSettings;
   verify(query: string, candidates: readonly EvidenceSupportCandidate[]): Promise<EvidenceSupportResult> };
 export type EvidenceSupportInput = { query: string; scope: RetrievalScope; candidates: readonly EvidenceSupportCandidate[]; settings: EvidenceSupportSettings };
+
+function validModelPricing(settings: EvidenceSupportSettings): boolean {
+  if (settings.provider !== "bailian") return settings.pricing.currency === "USD";
+  try {
+    return settings.api === "openai-completions" && settings.endpoint === normalizeBailianGenerationBaseUrl(settings.endpoint)
+      && isDeepStrictEqual(settings.pricing, modelPricing({ provider: settings.provider, id: settings.model, cost: settings.pricing.rates }));
+  } catch { return false; }
+}
 
 export const evidenceSupportPromptVersion = "fact-support-v1";
 export const evidenceSupportSerialization = "json-query-id-title-tags-body-v1";
@@ -167,7 +176,7 @@ export function validateEvidenceSupport(value: unknown, candidates: readonly Evi
 export function validateEvidenceSupportVerification(value: unknown, input: EvidenceSupportInput): value is EvidenceSupportVerification {
   const isolated = input.settings.validationVersion === evidenceSupportValidationVersion;
   if (input.settings.validationVersion !== undefined && (!isolated || input.settings.profile !== "typed")) return false;
-  if (!plain(value) || !keysExactly(value, ["value", "requestHash", "attempts", "inputHash", ...(isolated ? ["validation"] : [])])
+  if (!validModelPricing(input.settings) || !plain(value) || !keysExactly(value, ["value", "requestHash", "attempts", "inputHash", ...(isolated ? ["validation"] : [])])
     || value.inputHash !== evidenceSupportInputHash(input) || value.requestHash !== evidenceSupportRequestHash(input)
     || !Array.isArray(value.attempts) || value.attempts.length > 1) return false;
   let expectedOutcome = "ok";
@@ -186,11 +195,15 @@ export function validateEvidenceSupportVerification(value: unknown, input: Evide
     if (validation.status !== status || !validateEvidenceSupport(value.value, input.candidates.filter(doc => !invalidIds.has(doc.id)), "typed")) return false;
     if (status === "unavailable") expectedOutcome = "invalid_response";
   } else if (!validateEvidenceSupport(value.value, input.candidates, input.settings.profile ?? "binary")) return false;
-  return value.attempts.every(attempt => plain(attempt) && keysExactly(attempt, ["operation", "provider", "model", "attempt", "durationMs", "outcome", "totalTokens", "inputTokens", "outputTokens", "cacheReadTokens", "cacheWriteTokens", "costUsd"])
+  return value.attempts.every(attempt => plain(attempt) && keysExactly(attempt, ["operation", "provider", "model", "attempt", "durationMs", "outcome", "totalTokens", "inputTokens", "outputTokens", "cacheReadTokens", "cacheWriteTokens", "costUsd", ...(input.settings.pricing.currency === "CNY" ? ["costCny"] : [])])
     && attempt.operation === "support" && attempt.provider === input.settings.provider && attempt.model === input.settings.model && attempt.attempt === 1
     && attempt.outcome === expectedOutcome && typeof attempt.durationMs === "number" && Number.isFinite(attempt.durationMs) && attempt.durationMs >= 0
     && ["totalTokens", "inputTokens", "outputTokens", "cacheReadTokens", "cacheWriteTokens"].every(key => attempt[key] === null || (Number.isSafeInteger(attempt[key]) && Number(attempt[key]) >= 0))
-    && (attempt.costUsd === null || (typeof attempt.costUsd === "number" && Number.isFinite(attempt.costUsd) && attempt.costUsd >= 0)));
+    && (attempt.costUsd === null || (typeof attempt.costUsd === "number" && Number.isFinite(attempt.costUsd) && attempt.costUsd >= 0))
+    && (input.settings.pricing.currency !== "CNY" || attempt.costUsd === null && attempt.costCny === estimateModelUsage(
+      { provider: input.settings.provider, id: input.settings.model, cost: input.settings.pricing.rates },
+      { input: attempt.inputTokens, output: attempt.outputTokens, cacheRead: attempt.cacheReadTokens, cacheWrite: attempt.cacheWriteTokens,
+        totalTokens: attempt.totalTokens }).estimatedCostCny));
 }
 export class EvidenceSupportError extends Error {
   readonly attempts: EvidenceSupportAttempt[];
@@ -228,20 +241,20 @@ export async function createEvidenceSupportClient(options: { env?: NodeJS.Proces
   if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1000 || timeoutMs > 120_000) throw new Error("支持性判别超时配置无效。");
   const selected = options.modelSelection === undefined ? null : resolveEvidenceSupportModel(options.modelSelection, options.env);
   const configured = options.runtime ?? await (async () => {
-    const env = selected ? { ...(options.env ?? process.env), MODEL_PROVIDER: selected.provider, MODEL_ID: selected.model } : options.env;
-    const { modelRuntime, model } = await createConfiguredModelRuntime(env);
+    const { modelRuntime, model } = await createConfiguredModelRuntime(options.env, options.modelSelection);
     return { model, complete: (context: Context, parameters: CompletionOptions) => modelRuntime.complete(model, context, parameters) };
   })();
   const model = configured.model;
   if (selected && (model.provider !== selected.provider || model.id !== selected.model)) throw new Error("支持判别配置与注入模型不一致。");
-  if (model.provider !== "deepseek" || model.api !== "openai-completions") throw new Error("支持性判别仅允许已配置的 DeepSeek chat 模型。");
+  if (!["deepseek", "bailian"].includes(model.provider) || model.api !== "openai-completions") throw new Error("支持性判别仅允许已配置的 DeepSeek 或百炼 chat 模型。");
   const endpoint = new URL(model.baseUrl);
   if (endpoint.protocol !== "https:" || endpoint.username || endpoint.password || endpoint.search || endpoint.hash) throw new Error("支持性判别 endpoint 无效。");
   const settings: EvidenceSupportSettings = { provider: model.provider, model: model.id, api: model.api, endpoint: model.baseUrl, timeoutMs,
     temperature: 0, maxTokens: Math.min(model.maxTokens, 2048), maxRetries: 0, promptVersion,
     promptHash: contentHash(prompt), serialization: evidenceSupportSerialization,
-    serializationHash: contentHash(evidenceSupportSerialization), pricing: { currency: "USD", estimated: true, source: "Pi model catalog", rates: structuredClone(model.cost) },
+    serializationHash: contentHash(evidenceSupportSerialization), pricing: modelPricing(model),
     ...(profile === "typed" ? { profile } : {}), ...(isolated ? { validationVersion: evidenceSupportValidationVersion } : {}) };
+  if (!validModelPricing(settings)) throw new Error("百炼支持判别模型、北京 endpoint 与价格合同不一致。");
   return { settings, async verify(query, candidates) {
     validateCandidates(query, candidates);
     const requestHash = evidenceSupportRequestHash({ query, candidates, settings });
@@ -250,7 +263,8 @@ export async function createEvidenceSupportClient(options: { env?: NodeJS.Proces
     } } : {}) };
     const started = performance.now(), controller = new AbortController();
     const attempt: EvidenceSupportAttempt = { operation: "support", provider: model.provider, model: model.id, attempt: 1, durationMs: 0,
-      outcome: "provider_error", totalTokens: null, inputTokens: null, outputTokens: null, cacheReadTokens: null, cacheWriteTokens: null, costUsd: null };
+      outcome: "provider_error", totalTokens: null, inputTokens: null, outputTokens: null, cacheReadTokens: null, cacheWriteTokens: null, costUsd: null,
+      ...(settings.pricing.currency === "CNY" ? { costCny: null } : {}) };
     let timedOut = false, timer: NodeJS.Timeout | undefined;
     let code: EvidenceSupportFailureCode = "provider_error", outputHash: string | null = null;
     try {
@@ -261,14 +275,16 @@ export async function createEvidenceSupportClient(options: { env?: NodeJS.Proces
         samplingParams: { response_format: { type: "json_object" } }, onPayload: value => {
           if (!plain(value)) throw new Error("支持性判别请求无效。");
           // Set explicit wire values so a catalog reasoning default cannot turn this judge into a hidden agent loop.
-          const { tools: _tools, tool_choice: _toolChoice, ...rest } = value;
-          return { ...rest, temperature: 0, thinking: { type: "disabled" }, response_format: { type: "json_object" } };
+          const { tools: _tools, tool_choice: _toolChoice, thinking: _thinking, reasoning_effort: _effort, enable_thinking: _enableThinking, ...rest } = value;
+          return { ...rest, temperature: 0, ...(model.provider === "bailian" ? { enable_thinking: false } : { thinking: { type: "disabled" } }), response_format: { type: "json_object" } };
         } }), timeout]);
       const usage = response.usage;
       if (usage && Number.isSafeInteger(usage.totalTokens) && usage.totalTokens > 0 && [usage.input, usage.output, usage.cacheRead, usage.cacheWrite].every(n => Number.isSafeInteger(n) && n >= 0)) {
         attempt.totalTokens = usage.totalTokens; attempt.inputTokens = usage.input; attempt.outputTokens = usage.output;
         attempt.cacheReadTokens = usage.cacheRead; attempt.cacheWriteTokens = usage.cacheWrite;
-        if (usage.cost && Number.isFinite(usage.cost.total) && usage.cost.total >= 0) attempt.costUsd = usage.cost.total;
+        const cost = estimateModelUsage(model, usage);
+        attempt.costUsd = cost.estimatedCostUsd;
+        if (settings.pricing.currency === "CNY") attempt.costCny = cost.estimatedCostCny;
       }
       const text = response.content.map(item => item.type === "text" ? item.text : "").join("");
       outputHash = contentHash(text);

@@ -403,11 +403,11 @@ export async function createSupportSession(
       // other adapters and independent verifier requests keep their own options.
       if (api !== "openai-completions" || !payload || typeof payload !== "object" || Array.isArray(payload)) return payload;
       const request = payload as { tools?: Array<{ type?: string; function?: { name?: string } }>;
-        thinking?: { type?: string }; reasoning_effort?: unknown };
+        thinking?: { type?: string }; reasoning_effort?: unknown; enable_thinking?: boolean };
       if (!Array.isArray(request.tools) || !request.tools.some(tool => tool?.type === "function" && tool.function?.name === "support_action")) return payload;
       const requireAction = Boolean(turn && state.abort && !state.abort.signal.aborted && !state.turnError
         && !state.actionStarted && !state.result && state.invalidActions <= repairBudget
-        && request.thinking?.type !== "enabled" && !request.reasoning_effort);
+        && request.thinking?.type !== "enabled" && !request.reasoning_effort && request.enable_thinking !== true);
       return { ...payload, tool_choice: requireAction ? { type: "function", function: { name: "support_action" } } : "auto" };
     });
   session.subscribe(event => {

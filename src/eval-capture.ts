@@ -1,5 +1,6 @@
 import type { AgentSessionEvent } from "@earendil-works/pi-coding-agent";
 import type { EvalStep, EvalUsage } from "./evaluation.ts";
+import { estimateModelUsage } from "./model-selection.ts";
 
 const denial = "未找到当前客户可查询的订单，请核对订单号或联系人工客服。";
 
@@ -35,10 +36,13 @@ export function captureEvaluationTurn(modelName: string, expectedDeniedOrder?: s
         if (usage && Number.isFinite(usage.totalTokens) && usage.totalTokens > 0
           && [usage.input, usage.output, usage.cacheRead, usage.cacheWrite].every(value => Number.isFinite(value) && value >= 0)) {
           const price = usage.cost?.total;
+          const cny = message.provider === "bailian" ? estimateModelUsage({ provider: message.provider, id: message.model,
+            cost: { input: NaN, output: NaN, cacheRead: NaN, cacheWrite: NaN } }, usage).estimatedCostCny : undefined;
           step.usage = {
             input: usage.input, output: usage.output, cacheRead: usage.cacheRead, cacheWrite: usage.cacheWrite,
             totalTokens: usage.totalTokens,
-            estimatedCostUsd: Number.isFinite(price) && price >= 0 ? price : null,
+            estimatedCostUsd: cny !== undefined ? null : Number.isFinite(price) && price >= 0 ? price : null,
+            ...(cny !== undefined ? { estimatedCostCny: cny } : {}),
           } satisfies EvalUsage;
         }
         pendingModel = undefined;

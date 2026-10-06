@@ -17,15 +17,15 @@ import { readKnowledgeParameters, resolveSupportParameters, resolveSupportRunPar
 import { runSupportV2Live } from "./support-v2-live.ts";
 
 const knowledgeDefaults = { knowledgeMode: "lexical", knowledgeSupport: "binary", knowledgeSupportModel: "configured", knowledgeSupportPrompt: "v5", knowledgeApplicability: "model_only", knowledgeQueryMode: "combined", knowledgeThreshold: .71, knowledgeTimeoutMs: 15_000 };
-assert.deepEqual(resolveSupportParameters(), { timeoutMs: 60_000, repairBudget: 1, merchantEvents: "architecture", ...knowledgeDefaults });
+assert.deepEqual(resolveSupportParameters(), { agentModel: "configured", timeoutMs: 60_000, repairBudget: 1, merchantEvents: "architecture", ...knowledgeDefaults });
 assert.deepEqual(resolveSupportParameters({ timeoutMs: 10_000, repairBudget: 0, merchantEvents: "host" }),
-  { timeoutMs: 10_000, repairBudget: 0, merchantEvents: "host", ...knowledgeDefaults });
+  { agentModel: "configured", timeoutMs: 10_000, repairBudget: 0, merchantEvents: "host", ...knowledgeDefaults });
 assert.deepEqual(resolveSupportParameters({ timeoutMs: 120_000, repairBudget: 2, merchantEvents: "model" }),
-  { timeoutMs: 120_000, repairBudget: 2, merchantEvents: "model", ...knowledgeDefaults });
-assert.deepEqual(resolveSupportRunParameters("atomic"), { timeoutMs: 60_000, repairBudget: null, merchantEvents: "model", ...knowledgeDefaults });
-assert.deepEqual(resolveSupportRunParameters("controller"), { timeoutMs: 60_000, repairBudget: 1, merchantEvents: "host", ...knowledgeDefaults });
+  { agentModel: "configured", timeoutMs: 120_000, repairBudget: 2, merchantEvents: "model", ...knowledgeDefaults });
+assert.deepEqual(resolveSupportRunParameters("atomic"), { agentModel: "configured", timeoutMs: 60_000, repairBudget: null, merchantEvents: "model", ...knowledgeDefaults });
+assert.deepEqual(resolveSupportRunParameters("controller"), { agentModel: "configured", timeoutMs: 60_000, repairBudget: 1, merchantEvents: "host", ...knowledgeDefaults });
 assert.deepEqual(resolveSupportRunParameters("atomic", { merchantEvents: "host", repairBudget: 2 }),
-  { timeoutMs: 60_000, repairBudget: null, merchantEvents: "host", ...knowledgeDefaults });
+  { agentModel: "configured", timeoutMs: 60_000, repairBudget: null, merchantEvents: "host", ...knowledgeDefaults });
 assert.deepEqual(readKnowledgeParameters({}), knowledgeDefaults);
 assert.deepEqual(readKnowledgeParameters({ KNOWLEDGE_MODE: "m4-support", KNOWLEDGE_THRESHOLD: "0.8", KNOWLEDGE_TIMEOUT_MS: "12000" }),
   { knowledgeMode: "m4-support", knowledgeSupport: "binary", knowledgeSupportModel: "configured", knowledgeSupportPrompt: "v5", knowledgeApplicability: "model_only", knowledgeQueryMode: "combined", knowledgeThreshold: .8, knowledgeTimeoutMs: 12_000 });

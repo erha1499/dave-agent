@@ -4,12 +4,13 @@ import { connect } from "node:net";
 import { readFile } from "node:fs/promises";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { readKnowledgeParameters, resolveSupportRunParameters } from "../src/support-parameters.ts";
+import { readKnowledgeParameters, resolveSupportParameters, resolveSupportRunParameters } from "../src/support-parameters.ts";
 import { experimentCatalog, resolveExperimentConfig, remoteRequired, requireExperimentExecution, ExperimentInputError } from "../src/experiment-config.ts";
 import { parseExperimentArgs } from "./experiment.ts";
 import { auditSupportKnowledgeCall, type runSupportV2Live } from "./support-v2-live.ts";
 import { knowledgeQueryPlanVersion, type KnowledgeTrace } from "../src/knowledge-service.ts";
-import { createEvidenceSupportClient, evidenceSupportTypedV6PromptVersion } from "../src/evidence-support.ts";
+import { createEvidenceSupportClient, evidenceSupportTypedV6PromptVersion, resolveEvidenceSupportModel } from "../src/evidence-support.ts";
+import { modelSelections, resolveModelSelection } from "../src/model-selection.ts";
 import { createEvaluationServer } from "../src/eval-server.ts";
 import { executeExperiment, ExperimentBusyError, type ExperimentJob } from "../src/experiment-jobs.ts";
 
@@ -31,7 +32,7 @@ assert.ok(knowledgeAB.variants.every(variant => variant.parameters.knowledgeThre
 assert.deepEqual(resolveExperimentConfig(JSON.parse(await readFile("configs/experiments/support-knowledge-ab.json", "utf8"))), knowledgeAB);
 assert.throws(() => requireExperimentExecution(knowledgeAB));
 assert.throws(() => resolveExperimentConfig({ ...support, variants: [{ id: "A", architecture: "atomic", parameters: { knowledgeMode: "m4-support" } }] }));
-for (const key of ["knowledgeMode", "knowledgeSupport", "knowledgeSupportModel", "knowledgeSupportPrompt", "knowledgeApplicability", "knowledgeQueryMode", "knowledgeThreshold", "knowledgeTimeoutMs"]) assert.ok(catalog.fields.support.some(field => field.key === key));
+for (const key of ["agentModel", "knowledgeMode", "knowledgeSupport", "knowledgeSupportModel", "knowledgeSupportPrompt", "knowledgeApplicability", "knowledgeQueryMode", "knowledgeThreshold", "knowledgeTimeoutMs"]) assert.ok(catalog.fields.support.some(field => field.key === key));
 const profileAB = catalog.presets.find(preset => preset.id === "support-knowledge-profile-ab")!.config;
 assert.equal(profileAB.kind, "support");
 if (profileAB.kind !== "support") throw new Error("profile preset kind");
@@ -43,6 +44,52 @@ if (modelAB.kind !== "support") throw new Error("model preset kind");
 assert.deepEqual(modelAB.variants.map(v => [v.architecture, v.parameters.knowledgeMode, v.parameters.knowledgeSupport, v.parameters.knowledgeSupportModel, v.parameters.knowledgeThreshold]),
   [["controller", "m4-support", "typed", "configured", .5], ["controller", "m4-support", "typed", "deepseek-v4-pro", .5]]);
 assert.deepEqual(resolveExperimentConfig(JSON.parse(await readFile("configs/experiments/support-knowledge-model-ab.json", "utf8"))), modelAB);
+assert.equal(resolveSupportParameters().agentModel, "configured");
+for (const key of ["agentModel", "knowledgeSupportModel"] as const) {
+  assert.deepEqual(catalog.fields.support.find(field => field.key === key)!.options!.map(option => option.value), modelSelections);
+  for (const invalid of [null, undefined, 0, [], {}, "", "Configured", "deepseek", "qwen3.7-plus", " qwen3.7-plus-2026-05-26"]) {
+    const parameters = { knowledgeMode: "m4-support", [key]: invalid };
+    assert.throws(() => resolveSupportParameters(parameters as Parameters<typeof resolveSupportParameters>[0]), new RegExp(key));
+    assert.throws(() => resolveExperimentConfig({ ...support, variants: [{ id: "A", architecture: "controller", parameters }] }), ExperimentInputError);
+  }
+}
+for (const agentModel of modelSelections) {
+  assert.equal(resolveSupportRunParameters("atomic", { agentModel }).agentModel, agentModel, "agent selection is independent of the knowledge mode");
+  for (const knowledgeSupportModel of modelSelections) {
+    const parameters = resolveSupportRunParameters("controller", { agentModel, knowledgeMode: "m4-support", knowledgeSupportModel });
+    assert.equal(parameters.agentModel, agentModel); assert.equal(parameters.knowledgeSupportModel, knowledgeSupportModel);
+  }
+  if (agentModel !== "configured") assert.throws(() => resolveSupportParameters({ knowledgeSupportModel: agentModel }), /仅适用于 m4-support/);
+}
+for (const MODEL_PROVIDER of ["deepseek", "openai", "bailian"]) {
+  const env = { MODEL_PROVIDER, MODEL_ID: "global-model", AGENT_MODEL: "deepseek-flash" };
+  assert.deepEqual(resolveEvidenceSupportModel("configured", env), { provider: MODEL_PROVIDER, model: "global-model" }, "configured judge preserves its own global identity");
+  for (const selection of modelSelections.filter(value => value !== "configured")) {
+    const provider = selection === "qwen3.7-plus-2026-05-26" ? "bailian" : "deepseek";
+    assert.deepEqual(resolveModelSelection(selection, env), { provider, modelId: selection });
+    assert.deepEqual(resolveEvidenceSupportModel(selection, env), { provider, model: selection }, "fixed judge ignores the global provider and the agent selection");
+  }
+}
+const knowledgeOnlyDefaults = { knowledgeMode: "lexical", knowledgeSupport: "binary", knowledgeSupportModel: "configured", knowledgeSupportPrompt: "v5",
+  knowledgeApplicability: "model_only", knowledgeQueryMode: "combined", knowledgeThreshold: .71, knowledgeTimeoutMs: 15_000 };
+assert.deepEqual(readKnowledgeParameters({ AGENT_MODEL: "qwen3.7-plus-2026-05-26", MODEL_PROVIDER: "openai", MODEL_ID: "other-agent" }), knowledgeOnlyDefaults);
+const knowledgeOnlyEnv = new Proxy<NodeJS.ProcessEnv>({ KNOWLEDGE_MODE: "m4-support", KNOWLEDGE_SUPPORT_MODEL: " qwen3.7-plus-2026-05-26 " }, {
+  get(target, key) { assert.ok(typeof key === "string" && key.startsWith("KNOWLEDGE_"), "knowledge parameter parsing must not read global models or credentials"); return target[key]; },
+});
+assert.deepEqual(readKnowledgeParameters(knowledgeOnlyEnv), { ...knowledgeOnlyDefaults, knowledgeMode: "m4-support", knowledgeSupportModel: "qwen3.7-plus-2026-05-26" });
+const qwenAB = catalog.presets.find(preset => preset.id === "support-knowledge-qwen-ab")!.config;
+if (qwenAB.kind !== "support") throw new Error("Qwen preset kind");
+assert.deepEqual(qwenAB.variants.map(variant => [variant.architecture, variant.parameters.agentModel, variant.parameters.knowledgeSupportModel]),
+  [["controller", "deepseek-flash", "deepseek-v4-pro"], ["controller", "deepseek-flash", "qwen3.7-plus-2026-05-26"]]);
+assert.deepEqual({ ...qwenAB.variants[0]!.parameters, knowledgeSupportModel: "same" },
+  { ...qwenAB.variants[1]!.parameters, knowledgeSupportModel: "same" }, "Pro / Qwen changes only the judge, with the agent fixed");
+assert.ok(qwenAB.variants.every(variant => variant.parameters.knowledgeMode === "m4-support" && variant.parameters.knowledgeSupport === "typed"
+  && variant.parameters.knowledgeSupportPrompt === "v6" && variant.parameters.knowledgeApplicability === "declared-v2"
+  && variant.parameters.knowledgeQueryMode === "separated" && variant.parameters.knowledgeThreshold === .5));
+assert.equal(qwenAB.repeat, 1); assert.equal(qwenAB.allowRemote, false); assert.throws(() => requireExperimentExecution(qwenAB), ExperimentInputError);
+for (const preset of catalog.presets.filter(preset => preset.id !== "support-knowledge-qwen-ab")) {
+  if (preset.config.kind === "support") assert.ok(preset.config.variants.every(variant => variant.parameters.agentModel === "configured"), "existing presets retain the configured agent");
+}
 assert.equal(readKnowledgeParameters({}).knowledgeSupportModel, "configured");
 assert.equal(readKnowledgeParameters({}).knowledgeApplicability, "model_only");
 assert.equal(readKnowledgeParameters({ KNOWLEDGE_MODE: "m4-support", KNOWLEDGE_APPLICABILITY: "declared" }).knowledgeApplicability, "declared");
@@ -95,7 +142,7 @@ for (const knowledgeSupportPrompt of ["typo", "V6", null, undefined]) assert.thr
 for (const parameters of [{ knowledgeSupportPrompt: "v6" as const }, { knowledgeMode: "m4-support" as const, knowledgeSupportPrompt: "v6" as const }])
   assert.throws(() => resolveSupportRunParameters("controller", parameters), /knowledgeSupportPrompt v6 仅适用于/);
 assert.throws(() => resolveSupportRunParameters("atomic", { knowledgeMode: "m4-support", knowledgeSupport: "typed", knowledgeSupportPrompt: "v6" }), /atomic/);
-for (const config of [queryAB, promptAB, categoryAB]) for (const variant of config.variants) {
+for (const config of [queryAB, promptAB, categoryAB, qwenAB]) for (const variant of config.variants) {
   let actual: Parameters<typeof runSupportV2Live>[0] | undefined;
   await assert.rejects(executeExperiment({ config: { ...config, allowRemote: true }, variant, jobId: "query-check", repetition: 1,
     batch: { id: "query-check", repetition: 1, plannedRepetitions: 1 } }, {
@@ -320,6 +367,11 @@ const promptCli = await promisify(execFile)(process.execPath, ["scripts/experime
   env: { PATH: process.env.PATH }, maxBuffer: 100_000,
 });
 assert.deepEqual(JSON.parse(promptCli.stdout).config, promptAB, "prompt A/B preview resolves without model/DB credentials");
+const qwenCli = await promisify(execFile)(process.execPath, ["scripts/experiment.ts", "--preset", "support-knowledge-qwen-ab", "--dry-run"], {
+  env: { PATH: process.env.PATH }, maxBuffer: 100_000,
+});
+assert.deepEqual(JSON.parse(qwenCli.stdout).config, qwenAB, "Pro / Qwen preview resolves without model/DB credentials or a provider call");
+assert.equal(JSON.parse(qwenCli.stdout).remoteRequired, true);
 
 let starts = 0, busy = false;
 const job: ExperimentJob = {
