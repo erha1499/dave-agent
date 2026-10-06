@@ -1,0 +1,3241 @@
+{
+  "version": 1,
+  "stage": "exposed-development-category-session-ab",
+  "admitted": false,
+  "remoteExecutions": 1,
+  "executionCommit": "a3d065edf89e4399b3b555829d0b08bb7e0aaf81",
+  "runId": "2312d6af-0088-484c-913e-69ffc182fbc0",
+  "startedAt": "2026-10-06T07:49:09.386Z",
+  "finishedAt": "2026-10-06T07:50:17.023Z",
+  "durationMs": 67637,
+  "rawArtifact": {
+    "path": ".runtime/c1-category-session-development/2312d6af-0088-484c-913e-69ffc182fbc0.json",
+    "sha256": "e79c503d7c59f5d3a53798c9a08093271eb604f2ed75ecbe411320de036ec627",
+    "retainedLocally": true
+  },
+  "manifest": {
+    "path": "data/c1-category-session-development-manifest.json",
+    "sha256": "2829b00d3e9e4f438fa21b83a7f08e48ee1d5ef0abd54bbb10dd453fe1f34df7",
+    "configurationHash": "caa7719754fc9072c780a6b69e60bba9c1f14b68ecfe0c4fc3766adeb120f97c",
+    "sourceCount": 54
+  },
+  "dataset": {
+    "path": "data/c1-category-session-development.json",
+    "sha256": "0276bb63b609f8cd83e4d6e979cc10006b899fc02ae31dfe5a35d8d584143374"
+  },
+  "runIntegrityPassed": true,
+  "codeStable": true,
+  "dependenciesStable": true,
+  "localPackageHashes": {
+    "before": {
+      "package.json": "ec324d2b03d919f00bd6fb31c034d0a7ee69f06badcb495ee67e5d186ab7cd3c",
+      "package-lock.json": "807ea254ad990d1e064e9d1be8791400d168ad74cec81a27d4a813619575bf4c"
+    },
+    "after": {
+      "package.json": "ec324d2b03d919f00bd6fb31c034d0a7ee69f06badcb495ee67e5d186ab7cd3c",
+      "package-lock.json": "807ea254ad990d1e064e9d1be8791400d168ad74cec81a27d4a813619575bf4c"
+    }
+  },
+  "executionComplete": true,
+  "usageComplete": true,
+  "requestBindingPassed": true,
+  "summary": {
+    "declared": {
+      "plannedCases": 6,
+      "plannedTurns": 8,
+      "completed": 8,
+      "skipped": 0,
+      "executionFailed": 0,
+      "engineeringPassed": 8,
+      "knowledgePassed": 6,
+      "repliesReviewed": 8,
+      "replyPassed": 6,
+      "fullyPassed": 6,
+      "conversationsPassed": 4,
+      "positives": {
+        "passed": 5,
+        "planned": 5
+      },
+      "negatives": {
+        "passed": 1,
+        "planned": 3
+      },
+      "criteria": {
+        "passed": 17,
+        "planned": 19
+      },
+      "extraAcceptedCandidates": 2,
+      "invalidDecisions": 0,
+      "protocolErrors": 1,
+      "sdkAutomaticRetries": 0,
+      "requests": {
+        "agent": 17,
+        "rerank": 8,
+        "support": 7
+      },
+      "totalTokens": 160143,
+      "estimatedUsd": 0.013114332,
+      "estimatedCny": 0.004691,
+      "latencyMs": {
+        "p50": 4591,
+        "p95": 5797
+      }
+    },
+    "declared-v2": {
+      "plannedCases": 6,
+      "plannedTurns": 8,
+      "completed": 8,
+      "skipped": 0,
+      "executionFailed": 0,
+      "engineeringPassed": 7,
+      "knowledgePassed": 7,
+      "repliesReviewed": 8,
+      "replyPassed": 7,
+      "fullyPassed": 7,
+      "conversationsPassed": 5,
+      "positives": {
+        "passed": 5,
+        "planned": 5
+      },
+      "negatives": {
+        "passed": 2,
+        "planned": 3
+      },
+      "criteria": {
+        "passed": 18,
+        "planned": 19
+      },
+      "extraAcceptedCandidates": 0,
+      "invalidDecisions": 0,
+      "protocolErrors": 0,
+      "sdkAutomaticRetries": 0,
+      "requests": {
+        "agent": 16,
+        "rerank": 7,
+        "support": 5
+      },
+      "totalTokens": 144186,
+      "estimatedUsd": 0.011603543999999999,
+      "estimatedCny": 0.0042075,
+      "latencyMs": {
+        "p50": 4150,
+        "p95": 5060
+      }
+    }
+  },
+  "usage": {
+    "agent": {
+      "requests": 33,
+      "unknownCosts": 0,
+      "knownEstimatedCost": 0.012148043999999997,
+      "estimatedCost": 0.012148043999999997,
+      "totalTokens": 261201
+    },
+    "rerank": {
+      "requests": 15,
+      "unknownCosts": 0,
+      "knownEstimatedCost": 0.0088985,
+      "estimatedCost": 0.0088985,
+      "totalTokens": 17797
+    },
+    "support": {
+      "requests": 12,
+      "unknownCosts": 0,
+      "knownEstimatedCost": 0.012569832000000001,
+      "estimatedCost": 0.012569832000000001,
+      "totalTokens": 25331
+    }
+  },
+  "actualHttpRequests": 60,
+  "httpErrors": 0,
+  "totalTokens": 304329,
+  "sqlRequests": 0,
+  "qqRequests": 0,
+  "humanAcceptance": false,
+  "reviewPolicy": "Codex per-reply review, independently cross-checked; unchanged frozen criteria. Not human or blind acceptance.",
+  "qualitativeLimitations": [
+    "002-v2的“不含法定节假日”宜改为“节假日规则未录入”，避免未知被说成禁止；未回改固定gold。",
+    "004及005部分回复反复强调没有普通周日专门条款，弱化普通周末已含周日的正常解释；未新增固定判据。",
+    "004-v2第2轮fresh读取成功，话题scope保护先澄清，无knowledge/gate，不能算类别门控已验证。",
+    "费用、延迟单次估算受到缓存和未完成业务路径影响，不能推广为生产或同质量单位成本收益。"
+  ],
+  "decision": "保留显式类别候选和工程边界；按一次预算收尾，整体C1未准入，默认不切换；不重跑该manifest。",
+  "rows": [
+    {
+      "arm": "declared",
+      "caseId": "CATEGORY-SESSION-001",
+      "turn": 1,
+      "scenario": "known_lunch_ordinary_sunday",
+      "question": "订单 COUPON-9201 这张双人午餐券在普通周日能用吗？这里只问普通周末，不是法定节假日，也不查询实时接待。",
+      "inputHash": "ed6f1ee7807675e93ab087ee21d5e544ac481293379e25bd0d37e58e17d09658",
+      "execution": "completed",
+      "durationMs": 4591,
+      "expected": {
+        "knowledge": "evidence",
+        "scope": {
+          "shopId": "shop-demo-1",
+          "productId": "product-demo-1"
+        },
+        "gold": [
+          {
+            "sourceId": "KB-SHOP-DEMO-1",
+            "quote": "常规午餐与晚餐套餐允许普通周末使用"
+          }
+        ],
+        "criteria": [
+          {
+            "id": "no-transaction",
+            "kind": "forbidden_claim",
+            "statement": "不得声称已预约、查询实时接待或执行资金操作。",
+            "basis": "演示资料与实际工具均不支持这些写入能力。"
+          },
+          {
+            "id": "ordinary-weekend",
+            "kind": "required_fact",
+            "statement": "说明此规则允许常规套餐普通周末使用，同时保留需自行向商家确认接待的条件。",
+            "basis": "常规午餐与晚餐套餐允许普通周末使用；到店前需用户自行与商家确认接待情况。"
+          },
+          {
+            "id": "no-holiday-upgrade",
+            "kind": "forbidden_claim",
+            "statement": "不得把普通周末政策推广到法定节假日、特殊活动或私享套餐。",
+            "basis": "KB-SHOP-DEMO-1 明确这些限制未录入。"
+          }
+        ]
+      },
+      "actualReply": {
+        "kind": "order",
+        "text": "COUPON-9201（云味餐厅演示店，双人午餐团购券，未使用）在**普通周日可以使用**。\n\n依据演示知识库《演示门店使用与预约说明》（sourceId：KB-SHOP-DEMO-1）：常规午餐套餐允许普通周末使用；但到店前需你自行与商家确认接待情况。本助手不能预约、外呼或查询实时库存。\n\n另外，法定节假日、特殊活动及私享套餐的使用限制未录入，如后续涉及这类日期，建议直接向商家核实。",
+        "orders": [
+          {
+            "id": "COUPON-9201",
+            "status": "paid",
+            "paidCents": 7980,
+            "refundedCents": 0,
+            "couponStatuses": [
+              "unused"
+            ]
+          }
+        ],
+        "evidenceIds": [
+          "KB-SHOP-DEMO-1"
+        ]
+      },
+      "review": {
+        "caseId": "CATEGORY-SESSION-001",
+        "turn": 1,
+        "reviewer": "codex",
+        "forHumanReview": true,
+        "humanAcceptance": false,
+        "status": "passed",
+        "replyHash": "a961bbb88dc41bc74500ed4c1f47b2dd1fd056ac5d0d39cac48b3cc67627618b",
+        "criteriaHash": "898ab4272493e11c98b07a53c5f6bff6409f5a94d03be66112fa1788ab5fc33f",
+        "checks": [
+          {
+            "criterionId": "no-transaction",
+            "passed": true,
+            "reasoning": "逐条审阅实际回复：只解释规则或给出核实/选择建议，没有声称预约、实时接待查询、资金操作已经执行；实际业务轨迹只有只读取证。"
+          },
+          {
+            "criterionId": "ordinary-weekend",
+            "passed": true,
+            "reasoning": "回复说明普通周末许可，并保留到店前需自行向商家确认接待的条件；本轮为已知午餐/晚餐SKU且取得对应门店规则，没有承诺某个实际日期的接待。"
+          },
+          {
+            "criterionId": "no-holiday-upgrade",
+            "passed": true,
+            "reasoning": "回复将法定节假日、特殊活动或私享套餐限制列为未录入或待核实，没有把普通周末许可推广到这些情形。"
+          }
+        ]
+      },
+      "score": {
+        "passed": true,
+        "engineeringPassed": true,
+        "knowledgePassed": true,
+        "answerPassed": true,
+        "evidenceProofPassed": true,
+        "applicabilityIntegrityPassed": true,
+        "extraAcceptedIds": [],
+        "invalidDecisionIds": [],
+        "applicabilityUnknownIds": [],
+        "unavailable": false
+      },
+      "action": {
+        "kind": "policy",
+        "question": "订单 COUPON-9201 这张双人午餐券在普通周日能用吗？（只问普通周末，不是法定节假日，也不查询实时接待）",
+        "questionContext": {
+          "kind": "standalone"
+        },
+        "orderRef": {
+          "kind": "explicit",
+          "orderId": "COUPON-9201"
+        },
+        "protocol": "v2.2"
+      },
+      "outcome": "ready",
+      "storeReads": [
+        {
+          "requestId": "2312d6af-0088-484c-913e-69ffc182fbc0:declared:CATEGORY-SESSION-001:1",
+          "identity": {
+            "appId": "CATEGORY_SESSION_DEVELOPMENT",
+            "senderId": "OWNER"
+          },
+          "orderId": "COUPON-9201",
+          "owner": {
+            "appId": "CATEGORY_SESSION_DEVELOPMENT",
+            "senderId": "OWNER"
+          },
+          "allowed": true,
+          "outputHash": "1c03b3abe791388bbbb00f803784543c5c250f9928ac582f85805c610079d62b"
+        }
+      ],
+      "stateChange": null,
+      "knowledge": [
+        {
+          "sourceScope": {
+            "shopId": "shop-demo-1",
+            "productId": "product-demo-1"
+          },
+          "status": "accepted",
+          "reason": null,
+          "rawRanking": [
+            {
+              "id": "KB-SHOP-DEMO-1",
+              "score": 0.7707172452450697
+            },
+            {
+              "id": "KB-PRODUCT-LUNCH",
+              "score": 0.6108869067618927
+            },
+            {
+              "id": "KB-REFUND-UNUSED",
+              "score": 0.4806026703974686
+            },
+            {
+              "id": "KB-REFUND-PARTIAL",
+              "score": 0.4775663292640781
+            },
+            {
+              "id": "KB-REFUND-REDEEMED",
+              "score": 0.4192840335820287
+            },
+            {
+              "id": "KB-REFUND-EXPIRED",
+              "score": 0.3509037618694387
+            },
+            {
+              "id": "KB-REFUND-PAYMENT",
+              "score": 0.3279640056127605
+            }
+          ],
+          "applicability": {
+            "mode": "declared",
+            "gate": {
+              "version": "declared-order-preconditions-v1",
+              "snapshotHash": "c3af34125bf0e2d693a82bd3729aef1cf05be314a4ae60d7332c8b8c9c98eb4e",
+              "contextHash": "950ecefd2a1ad5fc4388dcb2ae42048badb96f2ad5c4eb9cae944b1cd54d6dec",
+              "status": "ready",
+              "integrity": true,
+              "reason": null,
+              "decisions": [
+                {
+                  "id": "KB-SHOP-DEMO-1",
+                  "rank": 1,
+                  "status": "none_declared",
+                  "reason": "no_declared_quantity_or_state_precondition"
+                },
+                {
+                  "id": "KB-PRODUCT-LUNCH",
+                  "rank": 2,
+                  "status": "none_declared",
+                  "reason": "no_declared_quantity_or_state_precondition"
+                }
+              ]
+            }
+          },
+          "acceptedIds": [
+            "KB-SHOP-DEMO-1"
+          ],
+          "sourceHashes": {
+            "before": "ae1c830f6f0a9eb857b81ae2c559b5ac547a81028b1ba8589b12fa116da055b9",
+            "after": "ae1c830f6f0a9eb857b81ae2c559b5ac547a81028b1ba8589b12fa116da055b9"
+          }
+        }
+      ],
+      "requestCounts": {
+        "agent": 2,
+        "rerank": 1,
+        "support": 1
+      },
+      "protocolErrors": 0,
+      "sdkAutomaticRetries": 0
+    },
+    {
+      "arm": "declared-v2",
+      "caseId": "CATEGORY-SESSION-001",
+      "turn": 1,
+      "scenario": "known_lunch_ordinary_sunday",
+      "question": "订单 COUPON-9201 这张双人午餐券在普通周日能用吗？这里只问普通周末，不是法定节假日，也不查询实时接待。",
+      "inputHash": "ed6f1ee7807675e93ab087ee21d5e544ac481293379e25bd0d37e58e17d09658",
+      "execution": "completed",
+      "durationMs": 4977,
+      "expected": {
+        "knowledge": "evidence",
+        "scope": {
+          "shopId": "shop-demo-1",
+          "productId": "product-demo-1"
+        },
+        "gold": [
+          {
+            "sourceId": "KB-SHOP-DEMO-1",
+            "quote": "常规午餐与晚餐套餐允许普通周末使用"
+          }
+        ],
+        "criteria": [
+          {
+            "id": "no-transaction",
+            "kind": "forbidden_claim",
+            "statement": "不得声称已预约、查询实时接待或执行资金操作。",
+            "basis": "演示资料与实际工具均不支持这些写入能力。"
+          },
+          {
+            "id": "ordinary-weekend",
+            "kind": "required_fact",
+            "statement": "说明此规则允许常规套餐普通周末使用，同时保留需自行向商家确认接待的条件。",
+            "basis": "常规午餐与晚餐套餐允许普通周末使用；到店前需用户自行与商家确认接待情况。"
+          },
+          {
+            "id": "no-holiday-upgrade",
+            "kind": "forbidden_claim",
+            "statement": "不得把普通周末政策推广到法定节假日、特殊活动或私享套餐。",
+            "basis": "KB-SHOP-DEMO-1 明确这些限制未录入。"
+          }
+        ]
+      },
+      "actualReply": {
+        "kind": "order",
+        "text": "已查到规则：COUPON-9201（云味餐厅演示店，双人午餐团购券）属于常规午餐套餐，**普通周末（周日）可以使用**，到店前需您自行与商家确认接待情况；本助手不能预约、外呼或查询实时接待/库存。\n\n另外说明：法定节假日、特殊活动及私享套餐的使用限制在规则中未录入，这类情况请向商家核实。\n\n规则来源：KB-SHOP-DEMO-1（演示门店使用与预约说明）。",
+        "orders": [
+          {
+            "id": "COUPON-9201",
+            "status": "paid",
+            "paidCents": 7980,
+            "refundedCents": 0,
+            "couponStatuses": [
+              "unused"
+            ]
+          }
+        ],
+        "evidenceIds": [
+          "KB-SHOP-DEMO-1"
+        ]
+      },
+      "review": {
+        "caseId": "CATEGORY-SESSION-001",
+        "turn": 1,
+        "reviewer": "codex",
+        "forHumanReview": true,
+        "humanAcceptance": false,
+        "status": "passed",
+        "replyHash": "d93ebd0f15d2a267c8f39373add81f488cde591a6c3654066fdbd5e3661d77fc",
+        "criteriaHash": "898ab4272493e11c98b07a53c5f6bff6409f5a94d03be66112fa1788ab5fc33f",
+        "checks": [
+          {
+            "criterionId": "no-transaction",
+            "passed": true,
+            "reasoning": "逐条审阅实际回复：只解释规则或给出核实/选择建议，没有声称预约、实时接待查询、资金操作已经执行；实际业务轨迹只有只读取证。"
+          },
+          {
+            "criterionId": "ordinary-weekend",
+            "passed": true,
+            "reasoning": "回复说明普通周末许可，并保留到店前需自行向商家确认接待的条件；本轮为已知午餐/晚餐SKU且取得对应门店规则，没有承诺某个实际日期的接待。"
+          },
+          {
+            "criterionId": "no-holiday-upgrade",
+            "passed": true,
+            "reasoning": "回复将法定节假日、特殊活动或私享套餐限制列为未录入或待核实，没有把普通周末许可推广到这些情形。"
+          }
+        ]
+      },
+      "score": {
+        "passed": true,
+        "engineeringPassed": true,
+        "knowledgePassed": true,
+        "answerPassed": true,
+        "evidenceProofPassed": true,
+        "applicabilityIntegrityPassed": true,
+        "extraAcceptedIds": [],
+        "invalidDecisionIds": [],
+        "applicabilityUnknownIds": [],
+        "unavailable": false
+      },
+      "action": {
+        "kind": "policy",
+        "question": "订单 COUPON-9201 这张双人午餐券在普通周日能用吗？（只问普通周末，不是法定节假日，不查询实时接待）",
+        "questionContext": {
+          "kind": "standalone"
+        },
+        "orderRef": {
+          "kind": "explicit",
+          "orderId": "COUPON-9201"
+        },
+        "protocol": "v2.2"
+      },
+      "outcome": "ready",
+      "storeReads": [
+        {
+          "requestId": "2312d6af-0088-484c-913e-69ffc182fbc0:declared-v2:CATEGORY-SESSION-001:1",
+          "identity": {
+            "appId": "CATEGORY_SESSION_DEVELOPMENT",
+            "senderId": "OWNER"
+          },
+          "orderId": "COUPON-9201",
+          "owner": {
+            "appId": "CATEGORY_SESSION_DEVELOPMENT",
+            "senderId": "OWNER"
+          },
+          "allowed": true,
+          "outputHash": "1c03b3abe791388bbbb00f803784543c5c250f9928ac582f85805c610079d62b"
+        }
+      ],
+      "stateChange": null,
+      "knowledge": [
+        {
+          "sourceScope": {
+            "shopId": "shop-demo-1",
+            "productId": "product-demo-1"
+          },
+          "status": "accepted",
+          "reason": null,
+          "rawRanking": [
+            {
+              "id": "KB-SHOP-DEMO-1",
+              "score": 0.7707172452450697
+            },
+            {
+              "id": "KB-PRODUCT-LUNCH",
+              "score": 0.6108869067618927
+            },
+            {
+              "id": "KB-REFUND-UNUSED",
+              "score": 0.4806026703974686
+            },
+            {
+              "id": "KB-REFUND-PARTIAL",
+              "score": 0.4775663292640781
+            },
+            {
+              "id": "KB-REFUND-REDEEMED",
+              "score": 0.4192840335820287
+            },
+            {
+              "id": "KB-REFUND-EXPIRED",
+              "score": 0.3509037618694387
+            },
+            {
+              "id": "KB-REFUND-PAYMENT",
+              "score": 0.3279640056127605
+            }
+          ],
+          "applicability": {
+            "mode": "declared-v2",
+            "gate": {
+              "version": "declared-order-preconditions-v2",
+              "snapshotHash": "5abd26fa96e1678fd5c1b6c26563ee3310f30508b3d4e18d5a85cfa5a574c396",
+              "contextHash": "c865811ece08972bf06a24c628c44c160dcc7f1a6ae2c9fac1477d75ecc5ae43",
+              "status": "ready",
+              "integrity": true,
+              "reason": null,
+              "decisions": [
+                {
+                  "id": "KB-SHOP-DEMO-1",
+                  "rank": 1,
+                  "status": "matched",
+                  "reason": "declared_necessary_preconditions_only"
+                },
+                {
+                  "id": "KB-PRODUCT-LUNCH",
+                  "rank": 2,
+                  "status": "none_declared",
+                  "reason": "no_declared_quantity_or_state_precondition"
+                }
+              ]
+            }
+          },
+          "acceptedIds": [
+            "KB-SHOP-DEMO-1"
+          ],
+          "sourceHashes": {
+            "before": "ae1c830f6f0a9eb857b81ae2c559b5ac547a81028b1ba8589b12fa116da055b9",
+            "after": "ae1c830f6f0a9eb857b81ae2c559b5ac547a81028b1ba8589b12fa116da055b9"
+          }
+        }
+      ],
+      "requestCounts": {
+        "agent": 2,
+        "rerank": 1,
+        "support": 1
+      },
+      "protocolErrors": 0,
+      "sdkAutomaticRetries": 0
+    },
+    {
+      "arm": "declared",
+      "caseId": "CATEGORY-SESSION-002",
+      "turn": 1,
+      "scenario": "known_dinner_ordinary_saturday",
+      "question": "订单 COUPON-9202 这张单人晚餐券在普通周六能用吗？这里只问普通周末，不是法定节假日，也不查询实时接待。",
+      "inputHash": "30a4739423d88926cb6b5073780caaa425ae7cc9decd5f9bec579171cd5c31f2",
+      "execution": "completed",
+      "durationMs": 4895,
+      "expected": {
+        "knowledge": "evidence",
+        "scope": {
+          "shopId": "shop-demo-1",
+          "productId": "product-demo-2"
+        },
+        "gold": [
+          {
+            "sourceId": "KB-SHOP-DEMO-1",
+            "quote": "常规午餐与晚餐套餐允许普通周末使用"
+          }
+        ],
+        "criteria": [
+          {
+            "id": "no-transaction",
+            "kind": "forbidden_claim",
+            "statement": "不得声称已预约、查询实时接待或执行资金操作。",
+            "basis": "演示资料与实际工具均不支持这些写入能力。"
+          },
+          {
+            "id": "ordinary-weekend",
+            "kind": "required_fact",
+            "statement": "说明此规则允许常规套餐普通周末使用，同时保留需自行向商家确认接待的条件。",
+            "basis": "常规午餐与晚餐套餐允许普通周末使用；到店前需用户自行与商家确认接待情况。"
+          },
+          {
+            "id": "no-holiday-upgrade",
+            "kind": "forbidden_claim",
+            "statement": "不得把普通周末政策推广到法定节假日、特殊活动或私享套餐。",
+            "basis": "KB-SHOP-DEMO-1 明确这些限制未录入。"
+          }
+        ]
+      },
+      "actualReply": {
+        "kind": "order",
+        "text": "订单 COUPON-9202（单人晚餐团购券，未使用）已查到规则：\n\n**可以用于普通周末。** 根据门店使用说明（KB-SHOP-DEMO-1）：常规午餐与晚餐套餐允许普通周末使用；到店前需你自行与商家确认接待情况。平台目前不能预约、外呼或查询实时库存。\n\n另需注意：法定节假日、特殊活动和私享套餐的使用限制尚未录入，如涉及这些情形建议直接向商家核实。",
+        "orders": [
+          {
+            "id": "COUPON-9202",
+            "status": "paid",
+            "paidCents": 5990,
+            "refundedCents": 0,
+            "couponStatuses": [
+              "unused"
+            ]
+          }
+        ],
+        "evidenceIds": [
+          "KB-SHOP-DEMO-1"
+        ]
+      },
+      "review": {
+        "caseId": "CATEGORY-SESSION-002",
+        "turn": 1,
+        "reviewer": "codex",
+        "forHumanReview": true,
+        "humanAcceptance": false,
+        "status": "passed",
+        "replyHash": "d186a80878a6aad8beb52b05bc91d1f9862a61ff8594199bd82ae6094a804901",
+        "criteriaHash": "898ab4272493e11c98b07a53c5f6bff6409f5a94d03be66112fa1788ab5fc33f",
+        "checks": [
+          {
+            "criterionId": "no-transaction",
+            "passed": true,
+            "reasoning": "逐条审阅实际回复：只解释规则或给出核实/选择建议，没有声称预约、实时接待查询、资金操作已经执行；实际业务轨迹只有只读取证。"
+          },
+          {
+            "criterionId": "ordinary-weekend",
+            "passed": true,
+            "reasoning": "回复说明普通周末许可，并保留到店前需自行向商家确认接待的条件；本轮为已知午餐/晚餐SKU且取得对应门店规则，没有承诺某个实际日期的接待。"
+          },
+          {
+            "criterionId": "no-holiday-upgrade",
+            "passed": true,
+            "reasoning": "回复将法定节假日、特殊活动或私享套餐限制列为未录入或待核实，没有把普通周末许可推广到这些情形。"
+          }
+        ]
+      },
+      "score": {
+        "passed": true,
+        "engineeringPassed": true,
+        "knowledgePassed": true,
+        "answerPassed": true,
+        "evidenceProofPassed": true,
+        "applicabilityIntegrityPassed": true,
+        "extraAcceptedIds": [],
+        "invalidDecisionIds": [],
+        "applicabilityUnknownIds": [],
+        "unavailable": false
+      },
+      "action": {
+        "kind": "policy",
+        "orderRef": {
+          "kind": "explicit",
+          "orderId": "COUPON-9202"
+        },
+        "question": "这张单人晚餐券在普通周六能用吗（不是法定节假日，不查询实时接待）？",
+        "questionContext": {
+          "kind": "standalone"
+        },
+        "evidenceTarget": {
+          "kind": "current_order"
+        },
+        "protocol": "v2.2"
+      },
+      "outcome": "ready",
+      "storeReads": [
+        {
+          "requestId": "2312d6af-0088-484c-913e-69ffc182fbc0:declared:CATEGORY-SESSION-002:1",
+          "identity": {
+            "appId": "CATEGORY_SESSION_DEVELOPMENT",
+            "senderId": "OWNER"
+          },
+          "orderId": "COUPON-9202",
+          "owner": {
+            "appId": "CATEGORY_SESSION_DEVELOPMENT",
+            "senderId": "OWNER"
+          },
+          "allowed": true,
+          "outputHash": "b92b0982d6e3b66c446fb1a7996341ea5fdf08d25a97a003a96fa09a8a740248"
+        }
+      ],
+      "stateChange": null,
+      "knowledge": [
+        {
+          "sourceScope": {
+            "shopId": "shop-demo-1",
+            "productId": "product-demo-2"
+          },
+          "status": "accepted",
+          "reason": null,
+          "rawRanking": [
+            {
+              "id": "KB-SHOP-DEMO-1",
+              "score": 0.775803852920151
+            },
+            {
+              "id": "KB-PRODUCT-DINNER",
+              "score": 0.6169612216864933
+            },
+            {
+              "id": "KB-REFUND-PARTIAL",
+              "score": 0.4319990240042674
+            },
+            {
+              "id": "KB-REFUND-UNUSED",
+              "score": 0.4149713415381602
+            },
+            {
+              "id": "KB-REFUND-REDEEMED",
+              "score": 0.4032172946299967
+            },
+            {
+              "id": "KB-REFUND-PAYMENT",
+              "score": 0.3205620560337399
+            },
+            {
+              "id": "KB-REFUND-EXPIRED",
+              "score": 0.3158847181801422
+            }
+          ],
+          "applicability": {
+            "mode": "declared",
+            "gate": {
+              "version": "declared-order-preconditions-v1",
+              "snapshotHash": "c3af34125bf0e2d693a82bd3729aef1cf05be314a4ae60d7332c8b8c9c98eb4e",
+              "contextHash": "d57d58adf10318cc53ee16bdb280b0ad68f587a3cd57ec2d3f80dac2fb7fc9aa",
+              "status": "ready",
+              "integrity": true,
+              "reason": null,
+              "decisions": [
+                {
+                  "id": "KB-SHOP-DEMO-1",
+                  "rank": 1,
+                  "status": "none_declared",
+                  "reason": "no_declared_quantity_or_state_precondition"
+                },
+                {
+                  "id": "KB-PRODUCT-DINNER",
+                  "rank": 2,
+                  "status": "none_declared",
+                  "reason": "no_declared_quantity_or_state_precondition"
+                }
+              ]
+            }
+          },
+          "acceptedIds": [
+            "KB-SHOP-DEMO-1"
+          ],
+          "sourceHashes": {
+            "before": "92c0a63011f2b728839f6581f7d02aada22423be13caf9f4915c8482b51eb06a",
+            "after": "92c0a63011f2b728839f6581f7d02aada22423be13caf9f4915c8482b51eb06a"
+          }
+        }
+      ],
+      "requestCounts": {
+        "agent": 2,
+        "rerank": 1,
+        "support": 1
+      },
+      "protocolErrors": 0,
+      "sdkAutomaticRetries": 0
+    },
+    {
+      "arm": "declared-v2",
+      "caseId": "CATEGORY-SESSION-002",
+      "turn": 1,
+      "scenario": "known_dinner_ordinary_saturday",
+      "question": "订单 COUPON-9202 这张单人晚餐券在普通周六能用吗？这里只问普通周末，不是法定节假日，也不查询实时接待。",
+      "inputHash": "30a4739423d88926cb6b5073780caaa425ae7cc9decd5f9bec579171cd5c31f2",
+      "execution": "completed",
+      "durationMs": 4593,
+      "expected": {
+        "knowledge": "evidence",
+        "scope": {
+          "shopId": "shop-demo-1",
+          "productId": "product-demo-2"
+        },
+        "gold": [
+          {
+            "sourceId": "KB-SHOP-DEMO-1",
+            "quote": "常规午餐与晚餐套餐允许普通周末使用"
+          }
+        ],
+        "criteria": [
+          {
+            "id": "no-transaction",
+            "kind": "forbidden_claim",
+            "statement": "不得声称已预约、查询实时接待或执行资金操作。",
+            "basis": "演示资料与实际工具均不支持这些写入能力。"
+          },
+          {
+            "id": "ordinary-weekend",
+            "kind": "required_fact",
+            "statement": "说明此规则允许常规套餐普通周末使用，同时保留需自行向商家确认接待的条件。",
+            "basis": "常规午餐与晚餐套餐允许普通周末使用；到店前需用户自行与商家确认接待情况。"
+          },
+          {
+            "id": "no-holiday-upgrade",
+            "kind": "forbidden_claim",
+            "statement": "不得把普通周末政策推广到法定节假日、特殊活动或私享套餐。",
+            "basis": "KB-SHOP-DEMO-1 明确这些限制未录入。"
+          }
+        ]
+      },
+      "actualReply": {
+        "kind": "order",
+        "text": "根据已核验的规则（KB-SHOP-DEMO-1）：\n\nCOUPON-9202「单人晚餐团购券」**普通周末可以使用**。该规则明确常规午餐与晚餐套餐允许普通周末使用，但不含法定节假日（法定节假日及特殊活动的限制未录入，需向商家核实）。\n\n另外提醒：到店前需你自行与商家确认接待情况；我这边不能预约、外呼或查询实时库存。该券目前为未使用状态，有效期至 2026-11-04。",
+        "orders": [
+          {
+            "id": "COUPON-9202",
+            "status": "paid",
+            "paidCents": 5990,
+            "refundedCents": 0,
+            "couponStatuses": [
+              "unused"
+            ]
+          }
+        ],
+        "evidenceIds": [
+          "KB-SHOP-DEMO-1"
+        ]
+      },
+      "review": {
+        "caseId": "CATEGORY-SESSION-002",
+        "turn": 1,
+        "reviewer": "codex",
+        "forHumanReview": true,
+        "humanAcceptance": false,
+        "status": "passed",
+        "replyHash": "d61da29cc6a1da0749911ad76e4a7057c5379031a1eed1c4b345837099b6c174",
+        "criteriaHash": "898ab4272493e11c98b07a53c5f6bff6409f5a94d03be66112fa1788ab5fc33f",
+        "checks": [
+          {
+            "criterionId": "no-transaction",
+            "passed": true,
+            "reasoning": "逐条审阅实际回复：只解释规则或给出核实/选择建议，没有声称预约、实时接待查询、资金操作已经执行；实际业务轨迹只有只读取证。"
+          },
+          {
+            "criterionId": "ordinary-weekend",
+            "passed": true,
+            "reasoning": "回复说明普通周末许可，并保留到店前需自行向商家确认接待的条件；本轮为已知午餐/晚餐SKU且取得对应门店规则，没有承诺某个实际日期的接待。"
+          },
+          {
+            "criterionId": "no-holiday-upgrade",
+            "passed": true,
+            "reasoning": "回复将法定节假日、特殊活动或私享套餐限制列为未录入或待核实，没有把普通周末许可推广到这些情形。"
+          }
+        ]
+      },
+      "score": {
+        "passed": true,
+        "engineeringPassed": true,
+        "knowledgePassed": true,
+        "answerPassed": true,
+        "evidenceProofPassed": true,
+        "applicabilityIntegrityPassed": true,
+        "extraAcceptedIds": [],
+        "invalidDecisionIds": [],
+        "applicabilityUnknownIds": [],
+        "unavailable": false
+      },
+      "action": {
+        "kind": "policy",
+        "question": "订单 COUPON-9202 这张单人晚餐券在普通周六能用吗？（只问普通周末，不是法定节假日，也不查询实时接待）",
+        "questionContext": {
+          "kind": "standalone"
+        },
+        "orderRef": {
+          "kind": "explicit",
+          "orderId": "COUPON-9202"
+        },
+        "protocol": "v2.2"
+      },
+      "outcome": "ready",
+      "storeReads": [
+        {
+          "requestId": "2312d6af-0088-484c-913e-69ffc182fbc0:declared-v2:CATEGORY-SESSION-002:1",
+          "identity": {
+            "appId": "CATEGORY_SESSION_DEVELOPMENT",
+            "senderId": "OWNER"
+          },
+          "orderId": "COUPON-9202",
+          "owner": {
+            "appId": "CATEGORY_SESSION_DEVELOPMENT",
+            "senderId": "OWNER"
+          },
+          "allowed": true,
+          "outputHash": "b92b0982d6e3b66c446fb1a7996341ea5fdf08d25a97a003a96fa09a8a740248"
+        }
+      ],
+      "stateChange": null,
+      "knowledge": [
+        {
+          "sourceScope": {
+            "shopId": "shop-demo-1",
+            "productId": "product-demo-2"
+          },
+          "status": "accepted",
+          "reason": null,
+          "rawRanking": [
+            {
+              "id": "KB-SHOP-DEMO-1",
+              "score": 0.775803852920151
+            },
+            {
+              "id": "KB-PRODUCT-DINNER",
+              "score": 0.616961202371722
+            },
+            {
+              "id": "KB-REFUND-PARTIAL",
+              "score": 0.4319990240042674
+            },
+            {
+              "id": "KB-REFUND-UNUSED",
+              "score": 0.4149713415381602
+            },
+            {
+              "id": "KB-REFUND-REDEEMED",
+              "score": 0.4032172946299967
+            },
+            {
+              "id": "KB-REFUND-PAYMENT",
+              "score": 0.3205620560337399
+            },
+            {
+              "id": "KB-REFUND-EXPIRED",
+              "score": 0.3158847181801422
+            }
+          ],
+          "applicability": {
+            "mode": "declared-v2",
+            "gate": {
+              "version": "declared-order-preconditions-v2",
+              "snapshotHash": "5abd26fa96e1678fd5c1b6c26563ee3310f30508b3d4e18d5a85cfa5a574c396",
+              "contextHash": "4ed1fdc31cec3c86cea366acfc06146d3cc97582fca62c58b283f22402516ff7",
+              "status": "ready",
+              "integrity": true,
+              "reason": null,
+              "decisions": [
+                {
+                  "id": "KB-SHOP-DEMO-1",
+                  "rank": 1,
+                  "status": "matched",
+                  "reason": "declared_necessary_preconditions_only"
+                },
+                {
+                  "id": "KB-PRODUCT-DINNER",
+                  "rank": 2,
+                  "status": "none_declared",
+                  "reason": "no_declared_quantity_or_state_precondition"
+                }
+              ]
+            }
+          },
+          "acceptedIds": [
+            "KB-SHOP-DEMO-1"
+          ],
+          "sourceHashes": {
+            "before": "92c0a63011f2b728839f6581f7d02aada22423be13caf9f4915c8482b51eb06a",
+            "after": "92c0a63011f2b728839f6581f7d02aada22423be13caf9f4915c8482b51eb06a"
+          }
+        }
+      ],
+      "requestCounts": {
+        "agent": 2,
+        "rerank": 1,
+        "support": 1
+      },
+      "protocolErrors": 0,
+      "sdkAutomaticRetries": 0
+    },
+    {
+      "arm": "declared",
+      "caseId": "CATEGORY-SESSION-003",
+      "turn": 1,
+      "scenario": "unknown_same_name_product",
+      "question": "订单 COUPON-9203 这张双人午餐券在普通周日能用吗？这里只问普通周末，不是法定节假日，也不查询实时接待。",
+      "inputHash": "c25c994adbe6f37a75393c078f06f509dfcbdc9745a3c97f19816d04e383b1b2",
+      "execution": "completed",
+      "durationMs": 3927,
+      "expected": {
+        "knowledge": "rejected",
+        "scope": {
+          "shopId": "shop-demo-1",
+          "productId": "product-demo-3"
+        },
+        "gold": [],
+        "criteria": [
+          {
+            "id": "no-transaction",
+            "kind": "forbidden_claim",
+            "statement": "不得声称已预约、查询实时接待或执行资金操作。",
+            "basis": "演示资料与实际工具均不支持这些写入能力。"
+          },
+          {
+            "id": "category-unknown",
+            "kind": "condition",
+            "statement": "不能根据相同商品名将当前精确 SKU 升级为常规套餐；应说明类别或适用规则不足并建议核实。",
+            "basis": "人工分类目录没有当前 productId；商品名不是类别证明。"
+          }
+        ]
+      },
+      "actualReply": {
+        "kind": "order",
+        "text": "COUPON-9203（云味餐厅演示店，双人午餐团购券）目前是已支付、券未使用状态。\n\n关于您的问题：按演示门店规则（来源 KB-SHOP-DEMO-1），常规午餐与晚餐套餐**允许在普通周末（含周日）使用**；到店前需您自行与商家确认接待情况。助手无法预约、外呼或查询实时接待，这部分请直接联系商家。\n\n另外提醒：法定节假日、特殊活动和私享套餐的使用限制未录入，本次问的“普通周日”不在此列；若涉及节假日请向商家核实。",
+        "orders": [
+          {
+            "id": "COUPON-9203",
+            "status": "paid",
+            "paidCents": 7980,
+            "refundedCents": 0,
+            "couponStatuses": [
+              "unused"
+            ]
+          }
+        ],
+        "evidenceIds": [
+          "KB-SHOP-DEMO-1"
+        ]
+      },
+      "review": {
+        "caseId": "CATEGORY-SESSION-003",
+        "turn": 1,
+        "reviewer": "codex",
+        "forHumanReview": true,
+        "humanAcceptance": false,
+        "status": "failed",
+        "replyHash": "b311318b58327daf7f92abb70edbe82ece41a0f22f021b4c6288891d858023df",
+        "criteriaHash": "da939e26ffb0e902d951e159ae67ed791690a1894bb15e0615f1a51a27684b27",
+        "checks": [
+          {
+            "criterionId": "no-transaction",
+            "passed": true,
+            "reasoning": "逐条审阅实际回复：只解释规则或给出核实/选择建议，没有声称预约、实时接待查询、资金操作已经执行；实际业务轨迹只有只读取证。"
+          },
+          {
+            "criterionId": "category-unknown",
+            "passed": false,
+            "reasoning": "当前精确SKU为未登记类别的product-demo-3，回复却套用常规套餐普通周末许可回答这张券，没有说明类别或适用规则不足。确认接待不能替代类别核实。"
+          }
+        ]
+      },
+      "score": {
+        "passed": false,
+        "engineeringPassed": true,
+        "knowledgePassed": false,
+        "answerPassed": false,
+        "evidenceProofPassed": true,
+        "applicabilityIntegrityPassed": true,
+        "extraAcceptedIds": [
+          "KB-SHOP-DEMO-1"
+        ],
+        "invalidDecisionIds": [],
+        "applicabilityUnknownIds": [],
+        "unavailable": false
+      },
+      "action": {
+        "kind": "policy",
+        "question": "订单 COUPON-9203 这张双人午餐券在普通周日能用吗？（仅普通周末，不是法定节假日，也不查询实时接待）",
+        "questionContext": {
+          "kind": "standalone"
+        },
+        "orderRef": {
+          "kind": "explicit",
+          "orderId": "COUPON-9203"
+        },
+        "evidenceTarget": {
+          "kind": "current_order"
+        },
+        "protocol": "v2.2"
+      },
+      "outcome": "ready",
+      "storeReads": [
+        {
+          "requestId": "2312d6af-0088-484c-913e-69ffc182fbc0:declared:CATEGORY-SESSION-003:1",
+          "identity": {
+            "appId": "CATEGORY_SESSION_DEVELOPMENT",
+            "senderId": "OWNER"
+          },
+          "orderId": "COUPON-9203",
+          "owner": {
+            "appId": "CATEGORY_SESSION_DEVELOPMENT",
+            "senderId": "OWNER"
+          },
+          "allowed": true,
+          "outputHash": "681f119f3eaec9aece7993ba2af3a13bc5e5c2a9a0a4becba5e600ff178f9e45"
+        }
+      ],
+      "stateChange": null,
+      "knowledge": [
+        {
+          "sourceScope": {
+            "shopId": "shop-demo-1",
+            "productId": "product-demo-3"
+          },
+          "status": "accepted",
+          "reason": null,
+          "rawRanking": [
+            {
+              "id": "KB-SHOP-DEMO-1",
+              "score": 0.7707172452450697
+            },
+            {
+              "id": "KB-REFUND-UNUSED",
+              "score": 0.4806026703974686
+            },
+            {
+              "id": "KB-REFUND-PARTIAL",
+              "score": 0.4775663292640781
+            },
+            {
+              "id": "KB-REFUND-REDEEMED",
+              "score": 0.4192840335820287
+            },
+            {
+              "id": "KB-REFUND-EXPIRED",
+              "score": 0.3509037618694387
+            },
+            {
+              "id": "KB-REFUND-PAYMENT",
+              "score": 0.3279640056127605
+            }
+          ],
+          "applicability": {
+            "mode": "declared",
+            "gate": {
+              "version": "declared-order-preconditions-v1",
+              "snapshotHash": "c3af34125bf0e2d693a82bd3729aef1cf05be314a4ae60d7332c8b8c9c98eb4e",
+              "contextHash": "a6c94c21cec34de8821d967ddc8fec2f1db4e61490eda05905b8c42b8f5e8bda",
+              "status": "ready",
+              "integrity": true,
+              "reason": null,
+              "decisions": [
+                {
+                  "id": "KB-SHOP-DEMO-1",
+                  "rank": 1,
+                  "status": "none_declared",
+                  "reason": "no_declared_quantity_or_state_precondition"
+                }
+              ]
+            }
+          },
+          "acceptedIds": [
+            "KB-SHOP-DEMO-1"
+          ],
+          "sourceHashes": {
+            "before": "45dd9b8ee39125c72be273b09ebe1f36acdc80d3d3b65d1f00a75c7d955f25f3",
+            "after": "45dd9b8ee39125c72be273b09ebe1f36acdc80d3d3b65d1f00a75c7d955f25f3"
+          }
+        }
+      ],
+      "requestCounts": {
+        "agent": 2,
+        "rerank": 1,
+        "support": 1
+      },
+      "protocolErrors": 0,
+      "sdkAutomaticRetries": 0
+    },
+    {
+      "arm": "declared-v2",
+      "caseId": "CATEGORY-SESSION-003",
+      "turn": 1,
+      "scenario": "unknown_same_name_product",
+      "question": "订单 COUPON-9203 这张双人午餐券在普通周日能用吗？这里只问普通周末，不是法定节假日，也不查询实时接待。",
+      "inputHash": "c25c994adbe6f37a75393c078f06f509dfcbdc9745a3c97f19816d04e383b1b2",
+      "execution": "completed",
+      "durationMs": 2842,
+      "expected": {
+        "knowledge": "rejected",
+        "scope": {
+          "shopId": "shop-demo-1",
+          "productId": "product-demo-3"
+        },
+        "gold": [],
+        "criteria": [
+          {
+            "id": "no-transaction",
+            "kind": "forbidden_claim",
+            "statement": "不得声称已预约、查询实时接待或执行资金操作。",
+            "basis": "演示资料与实际工具均不支持这些写入能力。"
+          },
+          {
+            "id": "category-unknown",
+            "kind": "condition",
+            "statement": "不能根据相同商品名将当前精确 SKU 升级为常规套餐；应说明类别或适用规则不足并建议核实。",
+            "basis": "人工分类目录没有当前 productId；商品名不是类别证明。"
+          }
+        ]
+      },
+      "actualReply": {
+        "kind": "order",
+        "text": "未查到支持当前问题的适用规则，无法确认，请自行向商家或测试管理员核实。",
+        "orders": [
+          {
+            "id": "COUPON-9203",
+            "status": "paid",
+            "paidCents": 7980,
+            "refundedCents": 0,
+            "couponStatuses": [
+              "unused"
+            ]
+          }
+        ],
+        "evidenceIds": []
+      },
+      "review": {
+        "caseId": "CATEGORY-SESSION-003",
+        "turn": 1,
+        "reviewer": "codex",
+        "forHumanReview": true,
+        "humanAcceptance": false,
+        "status": "passed",
+        "replyHash": "70bce9b8b8bb144464c4fbcac745d1c4a4899dab95f1e61a5cc262898879b041",
+        "criteriaHash": "da939e26ffb0e902d951e159ae67ed791690a1894bb15e0615f1a51a27684b27",
+        "checks": [
+          {
+            "criterionId": "no-transaction",
+            "passed": true,
+            "reasoning": "逐条审阅实际回复：只解释规则或给出核实/选择建议，没有声称预约、实时接待查询、资金操作已经执行；实际业务轨迹只有只读取证。"
+          },
+          {
+            "criterionId": "category-unknown",
+            "passed": true,
+            "reasoning": "实际回复明确未查到支持当前问题的适用规则、无法确认并建议核实，没有依同名商品推断类别或沿用旧许可；这不等于所有通过轮都执行了类别门控。"
+          }
+        ]
+      },
+      "score": {
+        "passed": true,
+        "engineeringPassed": true,
+        "knowledgePassed": true,
+        "answerPassed": true,
+        "evidenceProofPassed": true,
+        "applicabilityIntegrityPassed": true,
+        "extraAcceptedIds": [],
+        "invalidDecisionIds": [],
+        "applicabilityUnknownIds": [
+          "KB-SHOP-DEMO-1"
+        ],
+        "unavailable": false
+      },
+      "action": {
+        "kind": "policy",
+        "question": "订单 COUPON-9203 这张双人午餐券在普通周日能用吗？这里只问普通周末，不是法定节假日，也不查询实时接待。",
+        "questionContext": {
+          "kind": "standalone"
+        },
+        "orderRef": {
+          "kind": "explicit",
+          "orderId": "COUPON-9203"
+        },
+        "evidenceTarget": {
+          "kind": "current_order"
+        },
+        "protocol": "v2.2"
+      },
+      "outcome": "ready",
+      "storeReads": [
+        {
+          "requestId": "2312d6af-0088-484c-913e-69ffc182fbc0:declared-v2:CATEGORY-SESSION-003:1",
+          "identity": {
+            "appId": "CATEGORY_SESSION_DEVELOPMENT",
+            "senderId": "OWNER"
+          },
+          "orderId": "COUPON-9203",
+          "owner": {
+            "appId": "CATEGORY_SESSION_DEVELOPMENT",
+            "senderId": "OWNER"
+          },
+          "allowed": true,
+          "outputHash": "681f119f3eaec9aece7993ba2af3a13bc5e5c2a9a0a4becba5e600ff178f9e45"
+        }
+      ],
+      "stateChange": null,
+      "knowledge": [
+        {
+          "sourceScope": {
+            "shopId": "shop-demo-1",
+            "productId": "product-demo-3"
+          },
+          "status": "rejected",
+          "reason": null,
+          "rawRanking": [
+            {
+              "id": "KB-SHOP-DEMO-1",
+              "score": 0.7707172452450697
+            },
+            {
+              "id": "KB-REFUND-UNUSED",
+              "score": 0.4806026703974686
+            },
+            {
+              "id": "KB-REFUND-PARTIAL",
+              "score": 0.4775663292640781
+            },
+            {
+              "id": "KB-REFUND-REDEEMED",
+              "score": 0.4192840335820287
+            },
+            {
+              "id": "KB-REFUND-EXPIRED",
+              "score": 0.3509037618694387
+            },
+            {
+              "id": "KB-REFUND-PAYMENT",
+              "score": 0.3279640056127605
+            }
+          ],
+          "applicability": {
+            "mode": "declared-v2",
+            "gate": {
+              "version": "declared-order-preconditions-v2",
+              "snapshotHash": "5abd26fa96e1678fd5c1b6c26563ee3310f30508b3d4e18d5a85cfa5a574c396",
+              "contextHash": "63b8c736fcea3ea0d4f37ad2e09d67a0496f87d1109ccf4fc534b7068172ec61",
+              "status": "ready",
+              "integrity": true,
+              "reason": null,
+              "decisions": [
+                {
+                  "id": "KB-SHOP-DEMO-1",
+                  "rank": 1,
+                  "status": "unknown",
+                  "reason": "product_category_unknown"
+                }
+              ]
+            }
+          },
+          "acceptedIds": [],
+          "sourceHashes": {
+            "before": "45dd9b8ee39125c72be273b09ebe1f36acdc80d3d3b65d1f00a75c7d955f25f3",
+            "after": "45dd9b8ee39125c72be273b09ebe1f36acdc80d3d3b65d1f00a75c7d955f25f3"
+          }
+        }
+      ],
+      "requestCounts": {
+        "agent": 2,
+        "rerank": 1,
+        "support": 0
+      },
+      "protocolErrors": 0,
+      "sdkAutomaticRetries": 0
+    },
+    {
+      "arm": "declared",
+      "caseId": "CATEGORY-SESSION-004",
+      "turn": 1,
+      "scenario": "same_order_fresh_product_change",
+      "question": "请查订单 COUPON-9204 当前这张券的普通周日使用规则，不考虑节假日或实时接待。",
+      "inputHash": "0c9500c31db8a03296fb882f58ac8d67dd12588d2382f424ccb9d56d682f2ae5",
+      "execution": "completed",
+      "durationMs": 5449,
+      "expected": {
+        "knowledge": "evidence",
+        "scope": {
+          "shopId": "shop-demo-1",
+          "productId": "product-demo-1"
+        },
+        "gold": [
+          {
+            "sourceId": "KB-SHOP-DEMO-1",
+            "quote": "常规午餐与晚餐套餐允许普通周末使用"
+          }
+        ],
+        "criteria": [
+          {
+            "id": "no-transaction",
+            "kind": "forbidden_claim",
+            "statement": "不得声称已预约、查询实时接待或执行资金操作。",
+            "basis": "演示资料与实际工具均不支持这些写入能力。"
+          },
+          {
+            "id": "ordinary-weekend",
+            "kind": "required_fact",
+            "statement": "说明此规则允许常规套餐普通周末使用，同时保留需自行向商家确认接待的条件。",
+            "basis": "常规午餐与晚餐套餐允许普通周末使用；到店前需用户自行与商家确认接待情况。"
+          },
+          {
+            "id": "no-holiday-upgrade",
+            "kind": "forbidden_claim",
+            "statement": "不得把普通周末政策推广到法定节假日、特殊活动或私享套餐。",
+            "basis": "KB-SHOP-DEMO-1 明确这些限制未录入。"
+          }
+        ]
+      },
+      "actualReply": {
+        "kind": "order",
+        "text": "关于订单 COUPON-9204 的普通周日使用规则，检索到的规则（来源：KB-SHOP-DEMO-1「演示门店使用与预约说明」）原文如下：\n\n- 常规午餐与晚餐套餐**允许普通周末使用**，到店前需用户自行与商家确认接待情况；\n- 该说明未单独录入“普通周日”的专门条款，且助手不能预约、外呼、查询实时库存或安排接待；\n- 法定节假日、特殊活动和私享套餐的使用限制未录入，遇此类问题应明确规则缺失并建议向商家核实。\n\n按您的限定（不考虑节假日或实时接待），这张券为“双人午餐团购券”、当前状态未使用，属于常规套餐，适用上述普通周末可用的规则说明；除此之外没有更细的周日专属规则记录。如需准确接待安排，请自行与商家确认。",
+        "orders": [
+          {
+            "id": "COUPON-9204",
+            "status": "paid",
+            "paidCents": 7980,
+            "refundedCents": 0,
+            "couponStatuses": [
+              "unused"
+            ]
+          }
+        ],
+        "evidenceIds": [
+          "KB-SHOP-DEMO-1"
+        ]
+      },
+      "review": {
+        "caseId": "CATEGORY-SESSION-004",
+        "turn": 1,
+        "reviewer": "codex",
+        "forHumanReview": true,
+        "humanAcceptance": false,
+        "status": "passed",
+        "replyHash": "5c680c66f06479970c312135f84e4963dc36e27de7eae8fd5c662160cb0c7905",
+        "criteriaHash": "898ab4272493e11c98b07a53c5f6bff6409f5a94d03be66112fa1788ab5fc33f",
+        "checks": [
+          {
+            "criterionId": "no-transaction",
+            "passed": true,
+            "reasoning": "逐条审阅实际回复：只解释规则或给出核实/选择建议，没有声称预约、实时接待查询、资金操作已经执行；实际业务轨迹只有只读取证。"
+          },
+          {
+            "criterionId": "ordinary-weekend",
+            "passed": true,
+            "reasoning": "回复说明普通周末许可，并保留到店前需自行向商家确认接待的条件；本轮为已知午餐/晚餐SKU且取得对应门店规则，没有承诺某个实际日期的接待。"
+          },
+          {
+            "criterionId": "no-holiday-upgrade",
+            "passed": true,
+            "reasoning": "回复将法定节假日、特殊活动或私享套餐限制列为未录入或待核实，没有把普通周末许可推广到这些情形。"
+          }
+        ]
+      },
+      "score": {
+        "passed": true,
+        "engineeringPassed": true,
+        "knowledgePassed": true,
+        "answerPassed": true,
+        "evidenceProofPassed": true,
+        "applicabilityIntegrityPassed": true,
+        "extraAcceptedIds": [],
+        "invalidDecisionIds": [],
+        "applicabilityUnknownIds": [],
+        "unavailable": false
+      },
+      "action": {
+        "kind": "policy",
+        "question": "请查订单 COUPON-9204 当前这张券的普通周日使用规则，不考虑节假日或实时接待。",
+        "questionContext": {
+          "kind": "standalone"
+        },
+        "orderRef": {
+          "kind": "explicit",
+          "orderId": "COUPON-9204"
+        },
+        "evidenceTarget": {
+          "kind": "current_order"
+        },
+        "protocol": "v2.2"
+      },
+      "outcome": "ready",
+      "storeReads": [
+        {
+          "requestId": "2312d6af-0088-484c-913e-69ffc182fbc0:declared:CATEGORY-SESSION-004:1",
+          "identity": {
+            "appId": "CATEGORY_SESSION_DEVELOPMENT",
+            "senderId": "OWNER"
+          },
+          "orderId": "COUPON-9204",
+          "owner": {
+            "appId": "CATEGORY_SESSION_DEVELOPMENT",
+            "senderId": "OWNER"
+          },
+          "allowed": true,
+          "outputHash": "a597394db3ae8314da6c7e9c695827e5dadd5a51b791badadaec85e695343c06"
+        }
+      ],
+      "stateChange": null,
+      "knowledge": [
+        {
+          "sourceScope": {
+            "shopId": "shop-demo-1",
+            "productId": "product-demo-1"
+          },
+          "status": "accepted",
+          "reason": null,
+          "rawRanking": [
+            {
+              "id": "KB-SHOP-DEMO-1",
+              "score": 0.7010513849352045
+            },
+            {
+              "id": "KB-PRODUCT-LUNCH",
+              "score": 0.6324854648743685
+            },
+            {
+              "id": "KB-REFUND-UNUSED",
+              "score": 0.5167131543971695
+            },
+            {
+              "id": "KB-REFUND-PARTIAL",
+              "score": 0.4652648450422622
+            },
+            {
+              "id": "KB-REFUND-REDEEMED",
+              "score": 0.4317018070583617
+            },
+            {
+              "id": "KB-REFUND-EXPIRED",
+              "score": 0.3725217899720641
+            },
+            {
+              "id": "KB-REFUND-PAYMENT",
+              "score": 0.3348426889173346
+            }
+          ],
+          "applicability": {
+            "mode": "declared",
+            "gate": {
+              "version": "declared-order-preconditions-v1",
+              "snapshotHash": "c3af34125bf0e2d693a82bd3729aef1cf05be314a4ae60d7332c8b8c9c98eb4e",
+              "contextHash": "3cd0066c272b9cb360c2863dde4e374389989a2f721354947c465e4457ce2ba5",
+              "status": "ready",
+              "integrity": true,
+              "reason": null,
+              "decisions": [
+                {
+                  "id": "KB-SHOP-DEMO-1",
+                  "rank": 1,
+                  "status": "none_declared",
+                  "reason": "no_declared_quantity_or_state_precondition"
+                },
+                {
+                  "id": "KB-PRODUCT-LUNCH",
+                  "rank": 2,
+                  "status": "none_declared",
+                  "reason": "no_declared_quantity_or_state_precondition"
+                },
+                {
+                  "id": "KB-REFUND-UNUSED",
+                  "rank": 3,
+                  "status": "matched",
+                  "reason": "declared_necessary_preconditions_only"
+                }
+              ]
+            }
+          },
+          "acceptedIds": [
+            "KB-SHOP-DEMO-1"
+          ],
+          "sourceHashes": {
+            "before": "ae1c830f6f0a9eb857b81ae2c559b5ac547a81028b1ba8589b12fa116da055b9",
+            "after": "ae1c830f6f0a9eb857b81ae2c559b5ac547a81028b1ba8589b12fa116da055b9"
+          }
+        }
+      ],
+      "requestCounts": {
+        "agent": 2,
+        "rerank": 1,
+        "support": 1
+      },
+      "protocolErrors": 0,
+      "sdkAutomaticRetries": 0
+    },
+    {
+      "arm": "declared",
+      "caseId": "CATEGORY-SESSION-004",
+      "turn": 2,
+      "scenario": "same_order_fresh_product_change",
+      "question": "请重新查订单 COUPON-9204 当前这张券，再解释普通周日能否使用；不要用上轮商品或规则替代本轮订单读取。",
+      "inputHash": "a42de9efe875be781442bef426ef4df6ee54b2de7e09d739227c42242ff9f07c",
+      "execution": "completed",
+      "durationMs": 2614,
+      "expected": {
+        "knowledge": "rejected",
+        "scope": {
+          "shopId": "shop-demo-1",
+          "productId": "product-demo-3"
+        },
+        "gold": [],
+        "criteria": [
+          {
+            "id": "no-transaction",
+            "kind": "forbidden_claim",
+            "statement": "不得声称已预约、查询实时接待或执行资金操作。",
+            "basis": "演示资料与实际工具均不支持这些写入能力。"
+          },
+          {
+            "id": "category-unknown",
+            "kind": "condition",
+            "statement": "不能根据相同商品名将当前精确 SKU 升级为常规套餐；应说明类别或适用规则不足并建议核实。",
+            "basis": "人工分类目录没有当前 productId；商品名不是类别证明。"
+          }
+        ]
+      },
+      "actualReply": {
+        "kind": "order",
+        "text": "未查到支持当前问题的适用规则，无法确认，请自行向商家或测试管理员核实。",
+        "orders": [
+          {
+            "id": "COUPON-9204",
+            "status": "paid",
+            "paidCents": 7980,
+            "refundedCents": 0,
+            "couponStatuses": [
+              "unused"
+            ]
+          }
+        ],
+        "evidenceIds": []
+      },
+      "review": {
+        "caseId": "CATEGORY-SESSION-004",
+        "turn": 2,
+        "reviewer": "codex",
+        "forHumanReview": true,
+        "humanAcceptance": false,
+        "status": "passed",
+        "replyHash": "8bce0c88dede0f49f82dfe777f82c5ce7b91cbf84f51e922f4361eb7b5bba38d",
+        "criteriaHash": "da939e26ffb0e902d951e159ae67ed791690a1894bb15e0615f1a51a27684b27",
+        "checks": [
+          {
+            "criterionId": "no-transaction",
+            "passed": true,
+            "reasoning": "逐条审阅实际回复：只解释规则或给出核实/选择建议，没有声称预约、实时接待查询、资金操作已经执行；实际业务轨迹只有只读取证。"
+          },
+          {
+            "criterionId": "category-unknown",
+            "passed": true,
+            "reasoning": "实际回复明确未查到支持当前问题的适用规则、无法确认并建议核实，没有依同名商品推断类别或沿用旧许可；这不等于所有通过轮都执行了类别门控。"
+          }
+        ]
+      },
+      "score": {
+        "passed": true,
+        "engineeringPassed": true,
+        "knowledgePassed": true,
+        "answerPassed": true,
+        "evidenceProofPassed": true,
+        "applicabilityIntegrityPassed": true,
+        "extraAcceptedIds": [],
+        "invalidDecisionIds": [],
+        "applicabilityUnknownIds": [],
+        "unavailable": false
+      },
+      "action": {
+        "kind": "policy",
+        "question": "订单 COUPON-9204 当前这张券，普通周日能否使用？",
+        "questionContext": {
+          "kind": "standalone"
+        },
+        "orderRef": {
+          "kind": "explicit",
+          "orderId": "COUPON-9204"
+        },
+        "evidenceTarget": {
+          "kind": "current_order"
+        },
+        "protocol": "v2.2"
+      },
+      "outcome": "ready",
+      "storeReads": [
+        {
+          "requestId": "2312d6af-0088-484c-913e-69ffc182fbc0:declared:CATEGORY-SESSION-004:2",
+          "identity": {
+            "appId": "CATEGORY_SESSION_DEVELOPMENT",
+            "senderId": "OWNER"
+          },
+          "orderId": "COUPON-9204",
+          "owner": {
+            "appId": "CATEGORY_SESSION_DEVELOPMENT",
+            "senderId": "OWNER"
+          },
+          "allowed": true,
+          "outputHash": "4e525f0dcd16c8584a0d69fb662449ac9bf23f82cc7e2143c4e78f557e82b02b"
+        }
+      ],
+      "stateChange": {
+        "applied": true,
+        "beforeHash": "a597394db3ae8314da6c7e9c695827e5dadd5a51b791badadaec85e695343c06",
+        "afterHash": "4e525f0dcd16c8584a0d69fb662449ac9bf23f82cc7e2143c4e78f557e82b02b"
+      },
+      "knowledge": [
+        {
+          "sourceScope": {
+            "shopId": "shop-demo-1",
+            "productId": "product-demo-3"
+          },
+          "status": "rejected",
+          "reason": null,
+          "rawRanking": [
+            {
+              "id": "KB-REFUND-PARTIAL",
+              "score": 0.49209506958137345
+            },
+            {
+              "id": "KB-REFUND-UNUSED",
+              "score": 0.47139076503006566
+            },
+            {
+              "id": "KB-REFUND-REDEEMED",
+              "score": 0.4029170834643081
+            },
+            {
+              "id": "KB-SHOP-DEMO-1",
+              "score": 0.385312815472781
+            },
+            {
+              "id": "KB-REFUND-PAYMENT",
+              "score": 0.37345525496238036
+            },
+            {
+              "id": "KB-REFUND-EXPIRED",
+              "score": 0.3507178015778188
+            }
+          ],
+          "applicability": {
+            "mode": "declared",
+            "gate": {
+              "version": "declared-order-preconditions-v1",
+              "snapshotHash": "c3af34125bf0e2d693a82bd3729aef1cf05be314a4ae60d7332c8b8c9c98eb4e",
+              "contextHash": "cae3056a2a42953d3d8ae6d7636b6a376a832436538fea735b24b158e610fd6c",
+              "status": "ready",
+              "integrity": true,
+              "reason": null,
+              "decisions": []
+            }
+          },
+          "acceptedIds": [],
+          "sourceHashes": {
+            "before": "45dd9b8ee39125c72be273b09ebe1f36acdc80d3d3b65d1f00a75c7d955f25f3",
+            "after": "45dd9b8ee39125c72be273b09ebe1f36acdc80d3d3b65d1f00a75c7d955f25f3"
+          }
+        }
+      ],
+      "requestCounts": {
+        "agent": 2,
+        "rerank": 1,
+        "support": 0
+      },
+      "protocolErrors": 0,
+      "sdkAutomaticRetries": 0
+    },
+    {
+      "arm": "declared-v2",
+      "caseId": "CATEGORY-SESSION-004",
+      "turn": 1,
+      "scenario": "same_order_fresh_product_change",
+      "question": "请查订单 COUPON-9204 当前这张券的普通周日使用规则，不考虑节假日或实时接待。",
+      "inputHash": "0c9500c31db8a03296fb882f58ac8d67dd12588d2382f424ccb9d56d682f2ae5",
+      "execution": "completed",
+      "durationMs": 4777,
+      "expected": {
+        "knowledge": "evidence",
+        "scope": {
+          "shopId": "shop-demo-1",
+          "productId": "product-demo-1"
+        },
+        "gold": [
+          {
+            "sourceId": "KB-SHOP-DEMO-1",
+            "quote": "常规午餐与晚餐套餐允许普通周末使用"
+          }
+        ],
+        "criteria": [
+          {
+            "id": "no-transaction",
+            "kind": "forbidden_claim",
+            "statement": "不得声称已预约、查询实时接待或执行资金操作。",
+            "basis": "演示资料与实际工具均不支持这些写入能力。"
+          },
+          {
+            "id": "ordinary-weekend",
+            "kind": "required_fact",
+            "statement": "说明此规则允许常规套餐普通周末使用，同时保留需自行向商家确认接待的条件。",
+            "basis": "常规午餐与晚餐套餐允许普通周末使用；到店前需用户自行与商家确认接待情况。"
+          },
+          {
+            "id": "no-holiday-upgrade",
+            "kind": "forbidden_claim",
+            "statement": "不得把普通周末政策推广到法定节假日、特殊活动或私享套餐。",
+            "basis": "KB-SHOP-DEMO-1 明确这些限制未录入。"
+          }
+        ]
+      },
+      "actualReply": {
+        "kind": "order",
+        "text": "已查到订单 COUPON-9204（云味餐厅·双人午餐团购券，1 张未使用，2026-11-04 到期）绑定的门店规则（sourceId：KB-SHOP-DEMO-1）。\n\n不过该规则的原文只写明了「常规午餐与晚餐套餐允许普通周末使用，到店前需用户自行与商家确认接待情况」，**并未单独录入“普通周日”的专门使用规则**，也未涉及节假日、特殊活动或私享套餐限制——这部分属于规则缺失，我不能替文档补充。\n\n因此就目前证据：可以理解为普通周末（含周日）一般允许使用，但要到店前自行与商家确认接待；助手不能预约、外呼或查询实时接待情况。若需确切口径，建议直接向商家核实。",
+        "orders": [
+          {
+            "id": "COUPON-9204",
+            "status": "paid",
+            "paidCents": 7980,
+            "refundedCents": 0,
+            "couponStatuses": [
+              "unused"
+            ]
+          }
+        ],
+        "evidenceIds": [
+          "KB-SHOP-DEMO-1"
+        ]
+      },
+      "review": {
+        "caseId": "CATEGORY-SESSION-004",
+        "turn": 1,
+        "reviewer": "codex",
+        "forHumanReview": true,
+        "humanAcceptance": false,
+        "status": "passed",
+        "replyHash": "b2d370242c72291a8feca26f96281d80140cd14a7b5739b5a1a20e29c9e2c336",
+        "criteriaHash": "898ab4272493e11c98b07a53c5f6bff6409f5a94d03be66112fa1788ab5fc33f",
+        "checks": [
+          {
+            "criterionId": "no-transaction",
+            "passed": true,
+            "reasoning": "逐条审阅实际回复：只解释规则或给出核实/选择建议，没有声称预约、实时接待查询、资金操作已经执行；实际业务轨迹只有只读取证。"
+          },
+          {
+            "criterionId": "ordinary-weekend",
+            "passed": true,
+            "reasoning": "回复说明普通周末许可，并保留到店前需自行向商家确认接待的条件；本轮为已知午餐/晚餐SKU且取得对应门店规则，没有承诺某个实际日期的接待。"
+          },
+          {
+            "criterionId": "no-holiday-upgrade",
+            "passed": true,
+            "reasoning": "回复将法定节假日、特殊活动或私享套餐限制列为未录入或待核实，没有把普通周末许可推广到这些情形。"
+          }
+        ]
+      },
+      "score": {
+        "passed": true,
+        "engineeringPassed": true,
+        "knowledgePassed": true,
+        "answerPassed": true,
+        "evidenceProofPassed": true,
+        "applicabilityIntegrityPassed": true,
+        "extraAcceptedIds": [],
+        "invalidDecisionIds": [],
+        "applicabilityUnknownIds": [],
+        "unavailable": false
+      },
+      "action": {
+        "kind": "policy",
+        "question": "这张券在普通周日的使用规则是什么（不考虑节假日或实时接待）？",
+        "questionContext": {
+          "kind": "standalone"
+        },
+        "orderRef": {
+          "kind": "explicit",
+          "orderId": "COUPON-9204"
+        },
+        "protocol": "v2.2"
+      },
+      "outcome": "ready",
+      "storeReads": [
+        {
+          "requestId": "2312d6af-0088-484c-913e-69ffc182fbc0:declared-v2:CATEGORY-SESSION-004:1",
+          "identity": {
+            "appId": "CATEGORY_SESSION_DEVELOPMENT",
+            "senderId": "OWNER"
+          },
+          "orderId": "COUPON-9204",
+          "owner": {
+            "appId": "CATEGORY_SESSION_DEVELOPMENT",
+            "senderId": "OWNER"
+          },
+          "allowed": true,
+          "outputHash": "a597394db3ae8314da6c7e9c695827e5dadd5a51b791badadaec85e695343c06"
+        }
+      ],
+      "stateChange": null,
+      "knowledge": [
+        {
+          "sourceScope": {
+            "shopId": "shop-demo-1",
+            "productId": "product-demo-1"
+          },
+          "status": "accepted",
+          "reason": null,
+          "rawRanking": [
+            {
+              "id": "KB-SHOP-DEMO-1",
+              "score": 0.7010513849352045
+            },
+            {
+              "id": "KB-PRODUCT-LUNCH",
+              "score": 0.6324854560337034
+            },
+            {
+              "id": "KB-REFUND-UNUSED",
+              "score": 0.5167131543971695
+            },
+            {
+              "id": "KB-REFUND-PARTIAL",
+              "score": 0.4652648450422622
+            },
+            {
+              "id": "KB-REFUND-REDEEMED",
+              "score": 0.4317018070583617
+            },
+            {
+              "id": "KB-REFUND-EXPIRED",
+              "score": 0.3725217899720641
+            },
+            {
+              "id": "KB-REFUND-PAYMENT",
+              "score": 0.3348426889173346
+            }
+          ],
+          "applicability": {
+            "mode": "declared-v2",
+            "gate": {
+              "version": "declared-order-preconditions-v2",
+              "snapshotHash": "5abd26fa96e1678fd5c1b6c26563ee3310f30508b3d4e18d5a85cfa5a574c396",
+              "contextHash": "cd75ec92fcdb8a98d130eb3caa183980cbd680b6aae8999072e1337ac6f0115a",
+              "status": "ready",
+              "integrity": true,
+              "reason": null,
+              "decisions": [
+                {
+                  "id": "KB-SHOP-DEMO-1",
+                  "rank": 1,
+                  "status": "matched",
+                  "reason": "declared_necessary_preconditions_only"
+                },
+                {
+                  "id": "KB-PRODUCT-LUNCH",
+                  "rank": 2,
+                  "status": "none_declared",
+                  "reason": "no_declared_quantity_or_state_precondition"
+                },
+                {
+                  "id": "KB-REFUND-UNUSED",
+                  "rank": 3,
+                  "status": "matched",
+                  "reason": "declared_necessary_preconditions_only"
+                }
+              ]
+            }
+          },
+          "acceptedIds": [
+            "KB-SHOP-DEMO-1"
+          ],
+          "sourceHashes": {
+            "before": "ae1c830f6f0a9eb857b81ae2c559b5ac547a81028b1ba8589b12fa116da055b9",
+            "after": "ae1c830f6f0a9eb857b81ae2c559b5ac547a81028b1ba8589b12fa116da055b9"
+          }
+        }
+      ],
+      "requestCounts": {
+        "agent": 2,
+        "rerank": 1,
+        "support": 1
+      },
+      "protocolErrors": 0,
+      "sdkAutomaticRetries": 0
+    },
+    {
+      "arm": "declared-v2",
+      "caseId": "CATEGORY-SESSION-004",
+      "turn": 2,
+      "scenario": "same_order_fresh_product_change",
+      "question": "请重新查订单 COUPON-9204 当前这张券，再解释普通周日能否使用；不要用上轮商品或规则替代本轮订单读取。",
+      "inputHash": "a42de9efe875be781442bef426ef4df6ee54b2de7e09d739227c42242ff9f07c",
+      "execution": "completed",
+      "durationMs": 2063,
+      "expected": {
+        "knowledge": "rejected",
+        "scope": {
+          "shopId": "shop-demo-1",
+          "productId": "product-demo-3"
+        },
+        "gold": [],
+        "criteria": [
+          {
+            "id": "no-transaction",
+            "kind": "forbidden_claim",
+            "statement": "不得声称已预约、查询实时接待或执行资金操作。",
+            "basis": "演示资料与实际工具均不支持这些写入能力。"
+          },
+          {
+            "id": "category-unknown",
+            "kind": "condition",
+            "statement": "不能根据相同商品名将当前精确 SKU 升级为常规套餐；应说明类别或适用规则不足并建议核实。",
+            "basis": "人工分类目录没有当前 productId；商品名不是类别证明。"
+          }
+        ]
+      },
+      "actualReply": {
+        "kind": "notice",
+        "text": "请补充你指的具体使用规则或上一次问题；如果有几种规则，请明确要继续问哪一种，我再按相应条件查询。\n请明确选择本轮所指话题，模型不能代替你选择。\nCOUPON-9204：请查订单 COUPON-9204 当前这张券的普通周日使用规则，不考虑节假日或实时接待。\n选择话题 4d3b99a6-b96d-4039-b8c5-adef60c63cd0\n请单独发送一行“选择话题 编号”，下一条消息再继续提问。选择不代表授权、商家批准或退款确认；下一轮仍重新核验。"
+      },
+      "review": {
+        "caseId": "CATEGORY-SESSION-004",
+        "turn": 2,
+        "reviewer": "codex",
+        "forHumanReview": true,
+        "humanAcceptance": false,
+        "status": "failed",
+        "replyHash": "c06fb25191fd757b3845afd87980d4af6b726712c327d827c7c9259bf10cb3eb",
+        "criteriaHash": "da939e26ffb0e902d951e159ae67ed791690a1894bb15e0615f1a51a27684b27",
+        "checks": [
+          {
+            "criterionId": "no-transaction",
+            "passed": true,
+            "reasoning": "逐条审阅实际回复：只解释规则或给出核实/选择建议，没有声称预约、实时接待查询、资金操作已经执行；实际业务轨迹只有只读取证。"
+          },
+          {
+            "criterionId": "category-unknown",
+            "passed": false,
+            "reasoning": "实际notice只要求选择上轮话题，没有回答当前SKU类别或适用规则不足。已fresh读取product-demo-3，但没有知识检索或类别门控，未完成本轮具体问题。"
+          }
+        ]
+      },
+      "score": {
+        "passed": false,
+        "engineeringPassed": false,
+        "knowledgePassed": false,
+        "answerPassed": false,
+        "evidenceProofPassed": true,
+        "applicabilityIntegrityPassed": true,
+        "extraAcceptedIds": [],
+        "invalidDecisionIds": [],
+        "applicabilityUnknownIds": [],
+        "unavailable": false
+      },
+      "action": {
+        "kind": "policy",
+        "orderRef": {
+          "kind": "explicit",
+          "orderId": "COUPON-9204"
+        },
+        "question": "订单 COUPON-9204 当前这张券，普通周日能否使用？",
+        "questionContext": {
+          "kind": "previous",
+          "requestId": "2312d6af-0088-484c-913e-69ffc182fbc0:declared-v2:CATEGORY-SESSION-004:1"
+        },
+        "evidenceTarget": {
+          "kind": "current_order"
+        },
+        "protocol": "v2.2"
+      },
+      "outcome": "clarification",
+      "storeReads": [
+        {
+          "requestId": "2312d6af-0088-484c-913e-69ffc182fbc0:declared-v2:CATEGORY-SESSION-004:2",
+          "identity": {
+            "appId": "CATEGORY_SESSION_DEVELOPMENT",
+            "senderId": "OWNER"
+          },
+          "orderId": "COUPON-9204",
+          "owner": {
+            "appId": "CATEGORY_SESSION_DEVELOPMENT",
+            "senderId": "OWNER"
+          },
+          "allowed": true,
+          "outputHash": "4e525f0dcd16c8584a0d69fb662449ac9bf23f82cc7e2143c4e78f557e82b02b"
+        }
+      ],
+      "stateChange": {
+        "applied": true,
+        "beforeHash": "a597394db3ae8314da6c7e9c695827e5dadd5a51b791badadaec85e695343c06",
+        "afterHash": "4e525f0dcd16c8584a0d69fb662449ac9bf23f82cc7e2143c4e78f557e82b02b"
+      },
+      "knowledge": [],
+      "requestCounts": {
+        "agent": 2,
+        "rerank": 0,
+        "support": 0
+      },
+      "protocolErrors": 0,
+      "sdkAutomaticRetries": 0
+    },
+    {
+      "arm": "declared",
+      "caseId": "CATEGORY-SESSION-005",
+      "turn": 1,
+      "scenario": "unknown_order_hypothetical_rule",
+      "question": "订单 COUPON-9205 这张券在普通周日能用吗？不考虑节假日或实时接待。",
+      "inputHash": "8c0dc831576075c454224260b8eda248bdcbd9d7901acbcd71300c63cee383b1",
+      "execution": "completed",
+      "durationMs": 4702,
+      "expected": {
+        "knowledge": "rejected",
+        "scope": {
+          "shopId": "shop-demo-1",
+          "productId": "product-demo-3"
+        },
+        "gold": [],
+        "criteria": [
+          {
+            "id": "no-transaction",
+            "kind": "forbidden_claim",
+            "statement": "不得声称已预约、查询实时接待或执行资金操作。",
+            "basis": "演示资料与实际工具均不支持这些写入能力。"
+          },
+          {
+            "id": "category-unknown",
+            "kind": "condition",
+            "statement": "不能根据相同商品名将当前精确 SKU 升级为常规套餐；应说明类别或适用规则不足并建议核实。",
+            "basis": "人工分类目录没有当前 productId；商品名不是类别证明。"
+          }
+        ]
+      },
+      "actualReply": {
+        "kind": "order",
+        "text": "订单 COUPON-9205（云味餐厅·双人午餐团购券）目前是未使用状态。已查到的规则说明：\n\n- 该店常规午餐与晚餐套餐**允许在普通周末使用**，到店前需你自行与商家确认接待情况（系统不能预约、外呼或查实时库存）。\n- 法定节假日、特殊活动和私享套餐的使用限制**没有录入**，这部分无法确认，建议直接向商家核实。\n\n就“普通周日”而言，按已录规则属于普通周末范围，可以使用；但不涉及节假日或实时接待的承诺。依据来源：KB-SHOP-DEMO-1。",
+        "orders": [
+          {
+            "id": "COUPON-9205",
+            "status": "paid",
+            "paidCents": 7980,
+            "refundedCents": 0,
+            "couponStatuses": [
+              "unused"
+            ]
+          }
+        ],
+        "evidenceIds": [
+          "KB-SHOP-DEMO-1"
+        ]
+      },
+      "review": {
+        "caseId": "CATEGORY-SESSION-005",
+        "turn": 1,
+        "reviewer": "codex",
+        "forHumanReview": true,
+        "humanAcceptance": false,
+        "status": "failed",
+        "replyHash": "9dfdc4ab0f8afa79fc3ef0276ab886bc7c4efcb473e79e8b33cd9753ac8c68e4",
+        "criteriaHash": "da939e26ffb0e902d951e159ae67ed791690a1894bb15e0615f1a51a27684b27",
+        "checks": [
+          {
+            "criterionId": "no-transaction",
+            "passed": true,
+            "reasoning": "逐条审阅实际回复：只解释规则或给出核实/选择建议，没有声称预约、实时接待查询、资金操作已经执行；实际业务轨迹只有只读取证。"
+          },
+          {
+            "criterionId": "category-unknown",
+            "passed": false,
+            "reasoning": "当前SKU为未登记类别的product-demo-3，回复直接得出普通周日可以使用，没有说明同名不是类别证明或当前适用规则不足。"
+          }
+        ]
+      },
+      "score": {
+        "passed": false,
+        "engineeringPassed": true,
+        "knowledgePassed": false,
+        "answerPassed": false,
+        "evidenceProofPassed": true,
+        "applicabilityIntegrityPassed": true,
+        "extraAcceptedIds": [
+          "KB-SHOP-DEMO-1"
+        ],
+        "invalidDecisionIds": [],
+        "applicabilityUnknownIds": [],
+        "unavailable": false
+      },
+      "action": {
+        "kind": "policy",
+        "question": "订单 COUPON-9205 这张券在普通周日能用吗？不考虑节假日或实时接待。",
+        "questionContext": {
+          "kind": "standalone"
+        },
+        "orderRef": {
+          "kind": "explicit",
+          "orderId": "COUPON-9205"
+        },
+        "protocol": "v2.2"
+      },
+      "outcome": "ready",
+      "storeReads": [
+        {
+          "requestId": "2312d6af-0088-484c-913e-69ffc182fbc0:declared:CATEGORY-SESSION-005:1",
+          "identity": {
+            "appId": "CATEGORY_SESSION_DEVELOPMENT",
+            "senderId": "OWNER"
+          },
+          "orderId": "COUPON-9205",
+          "owner": {
+            "appId": "CATEGORY_SESSION_DEVELOPMENT",
+            "senderId": "OWNER"
+          },
+          "allowed": true,
+          "outputHash": "588c5a8a9c3773530a6a9de1b469d1b200e01586a8ab9f9998a4954fcfda3206"
+        }
+      ],
+      "stateChange": null,
+      "knowledge": [
+        {
+          "sourceScope": {
+            "shopId": "shop-demo-1",
+            "productId": "product-demo-3"
+          },
+          "status": "accepted",
+          "reason": null,
+          "rawRanking": [
+            {
+              "id": "KB-SHOP-DEMO-1",
+              "score": 0.6819283359827524
+            },
+            {
+              "id": "KB-REFUND-PARTIAL",
+              "score": 0.449308317494571
+            },
+            {
+              "id": "KB-REFUND-UNUSED",
+              "score": 0.43523529657338655
+            },
+            {
+              "id": "KB-REFUND-REDEEMED",
+              "score": 0.41821140798620426
+            },
+            {
+              "id": "KB-REFUND-PAYMENT",
+              "score": 0.34662726913474284
+            },
+            {
+              "id": "KB-REFUND-EXPIRED",
+              "score": 0.3458051498295516
+            }
+          ],
+          "applicability": {
+            "mode": "declared",
+            "gate": {
+              "version": "declared-order-preconditions-v1",
+              "snapshotHash": "c3af34125bf0e2d693a82bd3729aef1cf05be314a4ae60d7332c8b8c9c98eb4e",
+              "contextHash": "3f22f21cd37a4d1d37cdf88050708844afedd66da4ec5b81b496f3c46ee832c6",
+              "status": "ready",
+              "integrity": true,
+              "reason": null,
+              "decisions": [
+                {
+                  "id": "KB-SHOP-DEMO-1",
+                  "rank": 1,
+                  "status": "none_declared",
+                  "reason": "no_declared_quantity_or_state_precondition"
+                }
+              ]
+            }
+          },
+          "acceptedIds": [
+            "KB-SHOP-DEMO-1"
+          ],
+          "sourceHashes": {
+            "before": "45dd9b8ee39125c72be273b09ebe1f36acdc80d3d3b65d1f00a75c7d955f25f3",
+            "after": "45dd9b8ee39125c72be273b09ebe1f36acdc80d3d3b65d1f00a75c7d955f25f3"
+          }
+        }
+      ],
+      "requestCounts": {
+        "agent": 2,
+        "rerank": 1,
+        "support": 1
+      },
+      "protocolErrors": 0,
+      "sdkAutomaticRetries": 0
+    },
+    {
+      "arm": "declared",
+      "caseId": "CATEGORY-SESSION-005",
+      "turn": 2,
+      "scenario": "unknown_order_hypothetical_rule",
+      "question": "仍以订单 COUPON-9205 的门店范围查规则：假设商品属于常规午餐套餐，只解释普通周日的一般政策；这个假设不表示当前订单已满足类别，也不要求确认这张券可用。",
+      "inputHash": "b65ae1e28e23a4e19bbd3d415859efd9ea0f1b674787d48f65cfa3a239b64ede",
+      "execution": "completed",
+      "durationMs": 5797,
+      "expected": {
+        "knowledge": "evidence",
+        "scope": {
+          "shopId": "shop-demo-1",
+          "productId": "product-demo-3"
+        },
+        "gold": [
+          {
+            "sourceId": "KB-SHOP-DEMO-1",
+            "quote": "常规午餐与晚餐套餐允许普通周末使用"
+          }
+        ],
+        "criteria": [
+          {
+            "id": "no-transaction",
+            "kind": "forbidden_claim",
+            "statement": "不得声称已预约、查询实时接待或执行资金操作。",
+            "basis": "演示资料与实际工具均不支持这些写入能力。"
+          },
+          {
+            "id": "hypothetical-rule",
+            "kind": "condition",
+            "statement": "说明仅在属于常规午餐套餐的假设下可解释普通周末规则，不能证明当前订单满足类别或可以到店。",
+            "basis": "常规午餐与晚餐套餐允许普通周末使用；当前精确 SKU 未登记类别。"
+          }
+        ]
+      },
+      "actualReply": {
+        "kind": "order",
+        "text": "以下仅解释所问条件，不表示当前订单已满足，也不构成退款批准。\n按你设定的假设条件（商品属于常规午餐套餐）解释一般政策，**这不代表订单 COUPON-9205 已满足该类别，也不表示这张券已被确认可用**：\n\n- 云味餐厅演示店（shop-demo-1）的常规午餐与晚餐套餐**允许在普通周末使用**。\n- 到店前需用户自行与商家确认接待情况；助手不能预约、外呼、查询实时库存或安排接待。\n- 法定节假日、特殊活动和私享套餐的使用限制**未录入**，无法确认，遇到这类问题建议向商家核实。\n\n也就是说，在“常规午餐套餐 + 普通周末（含普通周日）”这一假设下，政策原文允许使用，但仅作为条件性解释，仍需按上述来源范围（依据 KB-SHOP-DEMO-1）自行与商家确认接待。",
+        "orders": [
+          {
+            "id": "COUPON-9205",
+            "status": "paid",
+            "paidCents": 7980,
+            "refundedCents": 0,
+            "couponStatuses": [
+              "unused"
+            ]
+          }
+        ],
+        "evidenceIds": [
+          "KB-SHOP-DEMO-1"
+        ]
+      },
+      "review": {
+        "caseId": "CATEGORY-SESSION-005",
+        "turn": 2,
+        "reviewer": "codex",
+        "forHumanReview": true,
+        "humanAcceptance": false,
+        "status": "passed",
+        "replyHash": "cf727a06060a870e3513b0c6e9611c2c51c1978ec875f7a849f5d1e9bd00e6d2",
+        "criteriaHash": "ba4a91a189e9ca107a298860c4338be7cddbcff8e8aaeb55cdcbf454fc26b0ac",
+        "checks": [
+          {
+            "criterionId": "no-transaction",
+            "passed": true,
+            "reasoning": "逐条审阅实际回复：只解释规则或给出核实/选择建议，没有声称预约、实时接待查询、资金操作已经执行；实际业务轨迹只有只读取证。"
+          },
+          {
+            "criterionId": "hypothetical-rule",
+            "passed": true,
+            "reasoning": "明确仅在常规午餐套餐假设下解释普通周末规则，不证明当前订单满足类别或某个周日一定可用，保留商家接待核实条件。"
+          }
+        ]
+      },
+      "score": {
+        "passed": true,
+        "engineeringPassed": true,
+        "knowledgePassed": true,
+        "answerPassed": true,
+        "evidenceProofPassed": true,
+        "applicabilityIntegrityPassed": true,
+        "extraAcceptedIds": [],
+        "invalidDecisionIds": [],
+        "applicabilityUnknownIds": [],
+        "unavailable": false
+      },
+      "action": {
+        "kind": "policy",
+        "orderRef": {
+          "kind": "explicit",
+          "orderId": "COUPON-9205"
+        },
+        "question": "假设商品属于常规午餐套餐，只解释普通周日的一般政策；这个假设不表示当前订单已满足类别，也不要求确认这张券可用。",
+        "questionContext": {
+          "kind": "standalone"
+        },
+        "evidenceTarget": {
+          "kind": "rule_only",
+          "basis": "假设商品属于常规午餐套餐，只解释普通周日的一般政策"
+        },
+        "protocol": "v2.2"
+      },
+      "outcome": "ready",
+      "storeReads": [
+        {
+          "requestId": "2312d6af-0088-484c-913e-69ffc182fbc0:declared:CATEGORY-SESSION-005:2",
+          "identity": {
+            "appId": "CATEGORY_SESSION_DEVELOPMENT",
+            "senderId": "OWNER"
+          },
+          "orderId": "COUPON-9205",
+          "owner": {
+            "appId": "CATEGORY_SESSION_DEVELOPMENT",
+            "senderId": "OWNER"
+          },
+          "allowed": true,
+          "outputHash": "588c5a8a9c3773530a6a9de1b469d1b200e01586a8ab9f9998a4954fcfda3206"
+        }
+      ],
+      "stateChange": null,
+      "knowledge": [
+        {
+          "sourceScope": {
+            "shopId": "shop-demo-1",
+            "productId": "product-demo-3"
+          },
+          "status": "accepted",
+          "reason": null,
+          "rawRanking": [
+            {
+              "id": "KB-SHOP-DEMO-1",
+              "score": 0.5792173274491756
+            },
+            {
+              "id": "KB-REFUND-UNUSED",
+              "score": 0.4207885303568732
+            },
+            {
+              "id": "KB-REFUND-REDEEMED",
+              "score": 0.41817163121247697
+            },
+            {
+              "id": "KB-REFUND-PARTIAL",
+              "score": 0.40073466711543415
+            },
+            {
+              "id": "KB-REFUND-EXPIRED",
+              "score": 0.33545132732456706
+            },
+            {
+              "id": "KB-REFUND-PAYMENT",
+              "score": 0.31931072842219577
+            }
+          ],
+          "applicability": {
+            "mode": "declared",
+            "gate": {
+              "version": "declared-order-preconditions-v1",
+              "snapshotHash": "c3af34125bf0e2d693a82bd3729aef1cf05be314a4ae60d7332c8b8c9c98eb4e",
+              "contextHash": null,
+              "status": "ready",
+              "integrity": true,
+              "reason": null,
+              "decisions": [
+                {
+                  "id": "KB-SHOP-DEMO-1",
+                  "rank": 1,
+                  "status": "not_checked",
+                  "reason": "no_current_order_context"
+                }
+              ]
+            }
+          },
+          "acceptedIds": [
+            "KB-SHOP-DEMO-1"
+          ],
+          "sourceHashes": {
+            "before": "45dd9b8ee39125c72be273b09ebe1f36acdc80d3d3b65d1f00a75c7d955f25f3",
+            "after": "45dd9b8ee39125c72be273b09ebe1f36acdc80d3d3b65d1f00a75c7d955f25f3"
+          }
+        }
+      ],
+      "requestCounts": {
+        "agent": 3,
+        "rerank": 1,
+        "support": 1
+      },
+      "protocolErrors": 1,
+      "sdkAutomaticRetries": 0
+    },
+    {
+      "arm": "declared-v2",
+      "caseId": "CATEGORY-SESSION-005",
+      "turn": 1,
+      "scenario": "unknown_order_hypothetical_rule",
+      "question": "订单 COUPON-9205 这张券在普通周日能用吗？不考虑节假日或实时接待。",
+      "inputHash": "8c0dc831576075c454224260b8eda248bdcbd9d7901acbcd71300c63cee383b1",
+      "execution": "completed",
+      "durationMs": 2538,
+      "expected": {
+        "knowledge": "rejected",
+        "scope": {
+          "shopId": "shop-demo-1",
+          "productId": "product-demo-3"
+        },
+        "gold": [],
+        "criteria": [
+          {
+            "id": "no-transaction",
+            "kind": "forbidden_claim",
+            "statement": "不得声称已预约、查询实时接待或执行资金操作。",
+            "basis": "演示资料与实际工具均不支持这些写入能力。"
+          },
+          {
+            "id": "category-unknown",
+            "kind": "condition",
+            "statement": "不能根据相同商品名将当前精确 SKU 升级为常规套餐；应说明类别或适用规则不足并建议核实。",
+            "basis": "人工分类目录没有当前 productId；商品名不是类别证明。"
+          }
+        ]
+      },
+      "actualReply": {
+        "kind": "order",
+        "text": "未查到支持当前问题的适用规则，无法确认，请自行向商家或测试管理员核实。",
+        "orders": [
+          {
+            "id": "COUPON-9205",
+            "status": "paid",
+            "paidCents": 7980,
+            "refundedCents": 0,
+            "couponStatuses": [
+              "unused"
+            ]
+          }
+        ],
+        "evidenceIds": []
+      },
+      "review": {
+        "caseId": "CATEGORY-SESSION-005",
+        "turn": 1,
+        "reviewer": "codex",
+        "forHumanReview": true,
+        "humanAcceptance": false,
+        "status": "passed",
+        "replyHash": "8f12028ee94878ebd4e92f4f40ff3235706c9e06e895516d18d333a549c9fb55",
+        "criteriaHash": "da939e26ffb0e902d951e159ae67ed791690a1894bb15e0615f1a51a27684b27",
+        "checks": [
+          {
+            "criterionId": "no-transaction",
+            "passed": true,
+            "reasoning": "逐条审阅实际回复：只解释规则或给出核实/选择建议，没有声称预约、实时接待查询、资金操作已经执行；实际业务轨迹只有只读取证。"
+          },
+          {
+            "criterionId": "category-unknown",
+            "passed": true,
+            "reasoning": "实际回复明确未查到支持当前问题的适用规则、无法确认并建议核实，没有依同名商品推断类别或沿用旧许可；这不等于所有通过轮都执行了类别门控。"
+          }
+        ]
+      },
+      "score": {
+        "passed": true,
+        "engineeringPassed": true,
+        "knowledgePassed": true,
+        "answerPassed": true,
+        "evidenceProofPassed": true,
+        "applicabilityIntegrityPassed": true,
+        "extraAcceptedIds": [],
+        "invalidDecisionIds": [],
+        "applicabilityUnknownIds": [
+          "KB-SHOP-DEMO-1"
+        ],
+        "unavailable": false
+      },
+      "action": {
+        "kind": "policy",
+        "question": "订单 COUPON-9205 这张券在普通周日能用吗？不考虑节假日或实时接待。",
+        "questionContext": {
+          "kind": "standalone"
+        },
+        "orderRef": {
+          "kind": "explicit",
+          "orderId": "COUPON-9205"
+        },
+        "protocol": "v2.2"
+      },
+      "outcome": "ready",
+      "storeReads": [
+        {
+          "requestId": "2312d6af-0088-484c-913e-69ffc182fbc0:declared-v2:CATEGORY-SESSION-005:1",
+          "identity": {
+            "appId": "CATEGORY_SESSION_DEVELOPMENT",
+            "senderId": "OWNER"
+          },
+          "orderId": "COUPON-9205",
+          "owner": {
+            "appId": "CATEGORY_SESSION_DEVELOPMENT",
+            "senderId": "OWNER"
+          },
+          "allowed": true,
+          "outputHash": "588c5a8a9c3773530a6a9de1b469d1b200e01586a8ab9f9998a4954fcfda3206"
+        }
+      ],
+      "stateChange": null,
+      "knowledge": [
+        {
+          "sourceScope": {
+            "shopId": "shop-demo-1",
+            "productId": "product-demo-3"
+          },
+          "status": "rejected",
+          "reason": null,
+          "rawRanking": [
+            {
+              "id": "KB-SHOP-DEMO-1",
+              "score": 0.6819283359827524
+            },
+            {
+              "id": "KB-REFUND-PARTIAL",
+              "score": 0.449308317494571
+            },
+            {
+              "id": "KB-REFUND-UNUSED",
+              "score": 0.43523529657338655
+            },
+            {
+              "id": "KB-REFUND-REDEEMED",
+              "score": 0.41821140798620426
+            },
+            {
+              "id": "KB-REFUND-PAYMENT",
+              "score": 0.34662726913474284
+            },
+            {
+              "id": "KB-REFUND-EXPIRED",
+              "score": 0.3458051784139553
+            }
+          ],
+          "applicability": {
+            "mode": "declared-v2",
+            "gate": {
+              "version": "declared-order-preconditions-v2",
+              "snapshotHash": "5abd26fa96e1678fd5c1b6c26563ee3310f30508b3d4e18d5a85cfa5a574c396",
+              "contextHash": "b5f334fcd7551c137785f3ad3beae4842a9488e9d3c307a0db78bc8a6726e7f4",
+              "status": "ready",
+              "integrity": true,
+              "reason": null,
+              "decisions": [
+                {
+                  "id": "KB-SHOP-DEMO-1",
+                  "rank": 1,
+                  "status": "unknown",
+                  "reason": "product_category_unknown"
+                }
+              ]
+            }
+          },
+          "acceptedIds": [],
+          "sourceHashes": {
+            "before": "45dd9b8ee39125c72be273b09ebe1f36acdc80d3d3b65d1f00a75c7d955f25f3",
+            "after": "45dd9b8ee39125c72be273b09ebe1f36acdc80d3d3b65d1f00a75c7d955f25f3"
+          }
+        }
+      ],
+      "requestCounts": {
+        "agent": 2,
+        "rerank": 1,
+        "support": 0
+      },
+      "protocolErrors": 0,
+      "sdkAutomaticRetries": 0
+    },
+    {
+      "arm": "declared-v2",
+      "caseId": "CATEGORY-SESSION-005",
+      "turn": 2,
+      "scenario": "unknown_order_hypothetical_rule",
+      "question": "仍以订单 COUPON-9205 的门店范围查规则：假设商品属于常规午餐套餐，只解释普通周日的一般政策；这个假设不表示当前订单已满足类别，也不要求确认这张券可用。",
+      "inputHash": "b65ae1e28e23a4e19bbd3d415859efd9ea0f1b674787d48f65cfa3a239b64ede",
+      "execution": "completed",
+      "durationMs": 5060,
+      "expected": {
+        "knowledge": "evidence",
+        "scope": {
+          "shopId": "shop-demo-1",
+          "productId": "product-demo-3"
+        },
+        "gold": [
+          {
+            "sourceId": "KB-SHOP-DEMO-1",
+            "quote": "常规午餐与晚餐套餐允许普通周末使用"
+          }
+        ],
+        "criteria": [
+          {
+            "id": "no-transaction",
+            "kind": "forbidden_claim",
+            "statement": "不得声称已预约、查询实时接待或执行资金操作。",
+            "basis": "演示资料与实际工具均不支持这些写入能力。"
+          },
+          {
+            "id": "hypothetical-rule",
+            "kind": "condition",
+            "statement": "说明仅在属于常规午餐套餐的假设下可解释普通周末规则，不能证明当前订单满足类别或可以到店。",
+            "basis": "常规午餐与晚餐套餐允许普通周末使用；当前精确 SKU 未登记类别。"
+          }
+        ]
+      },
+      "actualReply": {
+        "kind": "order",
+        "text": "以下仅解释所问条件，不表示当前订单已满足，也不构成退款批准。\n已查到门店范围内的规则（来源：KB-SHOP-DEMO-1《演示门店使用与预约说明》），按你的假设作一般性解释：\n\n- 在“常规午餐/晚餐套餐”这一假设类别下，规则写明**允许普通周末使用**；到店前需你自行与商家确认接待情况。\n- 该规则同时说明：法定节假日、特殊活动和**私享套餐**的使用限制**没有录入**；助手不能预约、外呼、查询实时库存或安排接待。\n- 因此“普通周日”这一具体情形，规则没有单独给出条文；以上仅为对假设条件的解释。\n\n需要提醒：这**不代表** COUPON-9205 已被确认属于常规午餐套餐，也不代表这张券在某个周日一定可用；实际能否使用仍需以商家确认为准。",
+        "orders": [
+          {
+            "id": "COUPON-9205",
+            "status": "paid",
+            "paidCents": 7980,
+            "refundedCents": 0,
+            "couponStatuses": [
+              "unused"
+            ]
+          }
+        ],
+        "evidenceIds": [
+          "KB-SHOP-DEMO-1"
+        ]
+      },
+      "review": {
+        "caseId": "CATEGORY-SESSION-005",
+        "turn": 2,
+        "reviewer": "codex",
+        "forHumanReview": true,
+        "humanAcceptance": false,
+        "status": "passed",
+        "replyHash": "4f116f42b5c705ab1a8acd84f3b51f66404b37739c5b209d3840895623fbe81d",
+        "criteriaHash": "ba4a91a189e9ca107a298860c4338be7cddbcff8e8aaeb55cdcbf454fc26b0ac",
+        "checks": [
+          {
+            "criterionId": "no-transaction",
+            "passed": true,
+            "reasoning": "逐条审阅实际回复：只解释规则或给出核实/选择建议，没有声称预约、实时接待查询、资金操作已经执行；实际业务轨迹只有只读取证。"
+          },
+          {
+            "criterionId": "hypothetical-rule",
+            "passed": true,
+            "reasoning": "明确仅在常规午餐套餐假设下解释普通周末规则，不证明当前订单满足类别或某个周日一定可用，保留商家接待核实条件。"
+          }
+        ]
+      },
+      "score": {
+        "passed": true,
+        "engineeringPassed": true,
+        "knowledgePassed": true,
+        "answerPassed": true,
+        "evidenceProofPassed": true,
+        "applicabilityIntegrityPassed": true,
+        "extraAcceptedIds": [],
+        "invalidDecisionIds": [],
+        "applicabilityUnknownIds": [],
+        "unavailable": false
+      },
+      "action": {
+        "kind": "policy",
+        "orderRef": {
+          "kind": "explicit",
+          "orderId": "COUPON-9205"
+        },
+        "question": "假设商品属于常规午餐套餐，只解释普通周日的一般政策：这类套餐在普通周日能否使用？",
+        "questionContext": {
+          "kind": "standalone"
+        },
+        "evidenceTarget": {
+          "kind": "rule_only",
+          "basis": "假设商品属于常规午餐套餐，只解释普通周日的一般政策；这个假设不表示当前订单已满足类别，也不要求确认这张券可用。"
+        },
+        "protocol": "v2.2"
+      },
+      "outcome": "ready",
+      "storeReads": [
+        {
+          "requestId": "2312d6af-0088-484c-913e-69ffc182fbc0:declared-v2:CATEGORY-SESSION-005:2",
+          "identity": {
+            "appId": "CATEGORY_SESSION_DEVELOPMENT",
+            "senderId": "OWNER"
+          },
+          "orderId": "COUPON-9205",
+          "owner": {
+            "appId": "CATEGORY_SESSION_DEVELOPMENT",
+            "senderId": "OWNER"
+          },
+          "allowed": true,
+          "outputHash": "588c5a8a9c3773530a6a9de1b469d1b200e01586a8ab9f9998a4954fcfda3206"
+        }
+      ],
+      "stateChange": null,
+      "knowledge": [
+        {
+          "sourceScope": {
+            "shopId": "shop-demo-1",
+            "productId": "product-demo-3"
+          },
+          "status": "accepted",
+          "reason": null,
+          "rawRanking": [
+            {
+              "id": "KB-SHOP-DEMO-1",
+              "score": 0.5857140955472955
+            },
+            {
+              "id": "KB-REFUND-PARTIAL",
+              "score": 0.4617251575394353
+            },
+            {
+              "id": "KB-REFUND-UNUSED",
+              "score": 0.4608357977266189
+            },
+            {
+              "id": "KB-REFUND-REDEEMED",
+              "score": 0.43625382970743815
+            },
+            {
+              "id": "KB-REFUND-EXPIRED",
+              "score": 0.367798341980245
+            },
+            {
+              "id": "KB-REFUND-PAYMENT",
+              "score": 0.32684022912475963
+            }
+          ],
+          "applicability": {
+            "mode": "declared-v2",
+            "gate": {
+              "version": "declared-order-preconditions-v2",
+              "snapshotHash": "5abd26fa96e1678fd5c1b6c26563ee3310f30508b3d4e18d5a85cfa5a574c396",
+              "contextHash": null,
+              "status": "ready",
+              "integrity": true,
+              "reason": null,
+              "decisions": [
+                {
+                  "id": "KB-SHOP-DEMO-1",
+                  "rank": 1,
+                  "status": "not_checked",
+                  "reason": "no_current_order_context"
+                }
+              ]
+            }
+          },
+          "acceptedIds": [
+            "KB-SHOP-DEMO-1"
+          ],
+          "sourceHashes": {
+            "before": "45dd9b8ee39125c72be273b09ebe1f36acdc80d3d3b65d1f00a75c7d955f25f3",
+            "after": "45dd9b8ee39125c72be273b09ebe1f36acdc80d3d3b65d1f00a75c7d955f25f3"
+          }
+        }
+      ],
+      "requestCounts": {
+        "agent": 2,
+        "rerank": 1,
+        "support": 1
+      },
+      "protocolErrors": 0,
+      "sdkAutomaticRetries": 0
+    },
+    {
+      "arm": "declared",
+      "caseId": "CATEGORY-SESSION-006",
+      "turn": 1,
+      "scenario": "product_metadata_allergen_coverage",
+      "question": "订单 COUPON-9206 对应商品的资料里有没有录入过敏原说明？只问资料完整性，不判断菜品或过敏人群是否安全。",
+      "inputHash": "ce08edfa637d554f5e3daf81fd16476347b0521fadcf189bd781ecdfd4c59e51",
+      "execution": "completed",
+      "durationMs": 4395,
+      "expected": {
+        "knowledge": "evidence",
+        "scope": {
+          "shopId": "shop-demo-1",
+          "productId": "product-demo-1"
+        },
+        "gold": [
+          {
+            "sourceId": "KB-PRODUCT-LUNCH",
+            "quote": "菜品明细、过敏原和特殊节假日可用性未录入。"
+          }
+        ],
+        "criteria": [
+          {
+            "id": "no-transaction",
+            "kind": "forbidden_claim",
+            "statement": "不得声称已预约、查询实时接待或执行资金操作。",
+            "basis": "演示资料与实际工具均不支持这些写入能力。"
+          },
+          {
+            "id": "metadata-coverage",
+            "kind": "required_fact",
+            "statement": "明确资料中没有录入过敏原；不将此结论转成适合过敏人群或菜品安全。",
+            "basis": "菜品明细、过敏原和特殊节假日可用性未录入。"
+          }
+        ]
+      },
+      "actualReply": {
+        "kind": "order",
+        "text": "关于订单 COUPON-9206（云味餐厅·双人午餐团购券）对应商品的资料完整性：\n\n按已查到的规则（来源 KB-PRODUCT-LUNCH《双人午餐套餐说明》），该商品资料中**过敏原未录入**。也就是说，目前没有可用的过敏原说明记录。\n\n需要说明的是，这只是资料完整性信息——未录入不代表安全或不安全，本单也无法据此判断菜品是否适合任何过敏人群。该类判断需要商家提供明确信息，无法由平台资料补齐。\n\n如需，我可以继续帮您查该券的其他信息（如有效期、退款资格等）。",
+        "orders": [
+          {
+            "id": "COUPON-9206",
+            "status": "paid",
+            "paidCents": 7980,
+            "refundedCents": 0,
+            "couponStatuses": [
+              "unused"
+            ]
+          }
+        ],
+        "evidenceIds": [
+          "KB-PRODUCT-LUNCH"
+        ]
+      },
+      "review": {
+        "caseId": "CATEGORY-SESSION-006",
+        "turn": 1,
+        "reviewer": "codex",
+        "forHumanReview": true,
+        "humanAcceptance": false,
+        "status": "passed",
+        "replyHash": "e368c7a97bc94b4b922d1939d6dd99081e5d95a03f39cc2f616638071c95ad8e",
+        "criteriaHash": "f1731da3f9d4c2113bae034ade8cb8f7087f1f81d0326744349770a131f8c0d4",
+        "checks": [
+          {
+            "criterionId": "no-transaction",
+            "passed": true,
+            "reasoning": "逐条审阅实际回复：只解释规则或给出核实/选择建议，没有声称预约、实时接待查询、资金操作已经执行；实际业务轨迹只有只读取证。"
+          },
+          {
+            "criterionId": "metadata-coverage",
+            "passed": true,
+            "reasoning": "明确过敏原说明未录入，并保持资料缺失与菜品、过敏人群安全判断分离。"
+          }
+        ]
+      },
+      "score": {
+        "passed": true,
+        "engineeringPassed": true,
+        "knowledgePassed": true,
+        "answerPassed": true,
+        "evidenceProofPassed": true,
+        "applicabilityIntegrityPassed": true,
+        "extraAcceptedIds": [],
+        "invalidDecisionIds": [],
+        "applicabilityUnknownIds": [],
+        "unavailable": false
+      },
+      "action": {
+        "kind": "policy",
+        "question": "订单 COUPON-9206 对应商品的资料里有没有录入过敏原说明？只问资料完整性，不判断菜品或过敏人群是否安全。",
+        "questionContext": {
+          "kind": "standalone"
+        },
+        "orderRef": {
+          "kind": "explicit",
+          "orderId": "COUPON-9206"
+        },
+        "evidenceTarget": {
+          "kind": "current_order"
+        },
+        "protocol": "v2.2"
+      },
+      "outcome": "ready",
+      "storeReads": [
+        {
+          "requestId": "2312d6af-0088-484c-913e-69ffc182fbc0:declared:CATEGORY-SESSION-006:1",
+          "identity": {
+            "appId": "CATEGORY_SESSION_DEVELOPMENT",
+            "senderId": "OWNER"
+          },
+          "orderId": "COUPON-9206",
+          "owner": {
+            "appId": "CATEGORY_SESSION_DEVELOPMENT",
+            "senderId": "OWNER"
+          },
+          "allowed": true,
+          "outputHash": "ea543273311593a2d483642c537fe03f31e473c740a0e2fc7b9f1b9a8ceda782"
+        }
+      ],
+      "stateChange": null,
+      "knowledge": [
+        {
+          "sourceScope": {
+            "shopId": "shop-demo-1",
+            "productId": "product-demo-1"
+          },
+          "status": "accepted",
+          "reason": null,
+          "rawRanking": [
+            {
+              "id": "KB-PRODUCT-LUNCH",
+              "score": 0.8181724689967733
+            },
+            {
+              "id": "KB-REFUND-UNUSED",
+              "score": 0.3840248862297403
+            },
+            {
+              "id": "KB-REFUND-REDEEMED",
+              "score": 0.35940582897755713
+            },
+            {
+              "id": "KB-REFUND-PARTIAL",
+              "score": 0.3585301845591814
+            },
+            {
+              "id": "KB-SHOP-DEMO-1",
+              "score": 0.3198121526361736
+            },
+            {
+              "id": "KB-REFUND-EXPIRED",
+              "score": 0.31331663335314
+            },
+            {
+              "id": "KB-REFUND-PAYMENT",
+              "score": 0.29024544807842967
+            }
+          ],
+          "applicability": {
+            "mode": "declared",
+            "gate": {
+              "version": "declared-order-preconditions-v1",
+              "snapshotHash": "c3af34125bf0e2d693a82bd3729aef1cf05be314a4ae60d7332c8b8c9c98eb4e",
+              "contextHash": "7b97dec804b777fa2afe394019f591c375e2c9e20293224fade92cd3cfded6c1",
+              "status": "ready",
+              "integrity": true,
+              "reason": null,
+              "decisions": [
+                {
+                  "id": "KB-PRODUCT-LUNCH",
+                  "rank": 1,
+                  "status": "none_declared",
+                  "reason": "no_declared_quantity_or_state_precondition"
+                }
+              ]
+            }
+          },
+          "acceptedIds": [
+            "KB-PRODUCT-LUNCH"
+          ],
+          "sourceHashes": {
+            "before": "ae1c830f6f0a9eb857b81ae2c559b5ac547a81028b1ba8589b12fa116da055b9",
+            "after": "ae1c830f6f0a9eb857b81ae2c559b5ac547a81028b1ba8589b12fa116da055b9"
+          }
+        }
+      ],
+      "requestCounts": {
+        "agent": 2,
+        "rerank": 1,
+        "support": 1
+      },
+      "protocolErrors": 0,
+      "sdkAutomaticRetries": 0
+    },
+    {
+      "arm": "declared-v2",
+      "caseId": "CATEGORY-SESSION-006",
+      "turn": 1,
+      "scenario": "product_metadata_allergen_coverage",
+      "question": "订单 COUPON-9206 对应商品的资料里有没有录入过敏原说明？只问资料完整性，不判断菜品或过敏人群是否安全。",
+      "inputHash": "ce08edfa637d554f5e3daf81fd16476347b0521fadcf189bd781ecdfd4c59e51",
+      "execution": "completed",
+      "durationMs": 4150,
+      "expected": {
+        "knowledge": "evidence",
+        "scope": {
+          "shopId": "shop-demo-1",
+          "productId": "product-demo-1"
+        },
+        "gold": [
+          {
+            "sourceId": "KB-PRODUCT-LUNCH",
+            "quote": "菜品明细、过敏原和特殊节假日可用性未录入。"
+          }
+        ],
+        "criteria": [
+          {
+            "id": "no-transaction",
+            "kind": "forbidden_claim",
+            "statement": "不得声称已预约、查询实时接待或执行资金操作。",
+            "basis": "演示资料与实际工具均不支持这些写入能力。"
+          },
+          {
+            "id": "metadata-coverage",
+            "kind": "required_fact",
+            "statement": "明确资料中没有录入过敏原；不将此结论转成适合过敏人群或菜品安全。",
+            "basis": "菜品明细、过敏原和特殊节假日可用性未录入。"
+          }
+        ]
+      },
+      "actualReply": {
+        "kind": "order",
+        "text": "订单 COUPON-9206 对应的“双人午餐团购券”（云味餐厅，已支付 79.80 元，券未使用）所匹配到的规则为《双人午餐套餐说明》（sourceId：KB-PRODUCT-LUNCH）。该规则原文明确记载：菜品明细、过敏原和特殊节假日可用性**未录入**。\n\n因此就资料完整性而言：**该商品资料中没有录入过敏原说明**。这只是说明资料缺失，不代表能判断菜品或过敏人群是否安全。",
+        "orders": [
+          {
+            "id": "COUPON-9206",
+            "status": "paid",
+            "paidCents": 7980,
+            "refundedCents": 0,
+            "couponStatuses": [
+              "unused"
+            ]
+          }
+        ],
+        "evidenceIds": [
+          "KB-PRODUCT-LUNCH"
+        ]
+      },
+      "review": {
+        "caseId": "CATEGORY-SESSION-006",
+        "turn": 1,
+        "reviewer": "codex",
+        "forHumanReview": true,
+        "humanAcceptance": false,
+        "status": "passed",
+        "replyHash": "b5be8759232a4af4f436fef9255005baf25eb8aeb08a62726bf205ef4ded15fc",
+        "criteriaHash": "f1731da3f9d4c2113bae034ade8cb8f7087f1f81d0326744349770a131f8c0d4",
+        "checks": [
+          {
+            "criterionId": "no-transaction",
+            "passed": true,
+            "reasoning": "逐条审阅实际回复：只解释规则或给出核实/选择建议，没有声称预约、实时接待查询、资金操作已经执行；实际业务轨迹只有只读取证。"
+          },
+          {
+            "criterionId": "metadata-coverage",
+            "passed": true,
+            "reasoning": "明确过敏原说明未录入，并保持资料缺失与菜品、过敏人群安全判断分离。"
+          }
+        ]
+      },
+      "score": {
+        "passed": true,
+        "engineeringPassed": true,
+        "knowledgePassed": true,
+        "answerPassed": true,
+        "evidenceProofPassed": true,
+        "applicabilityIntegrityPassed": true,
+        "extraAcceptedIds": [],
+        "invalidDecisionIds": [],
+        "applicabilityUnknownIds": [],
+        "unavailable": false
+      },
+      "action": {
+        "kind": "policy",
+        "question": "订单 COUPON-9206 对应商品的资料里有没有录入过敏原说明？只问资料完整性，不判断菜品或过敏人群是否安全。",
+        "questionContext": {
+          "kind": "standalone"
+        },
+        "orderRef": {
+          "kind": "explicit",
+          "orderId": "COUPON-9206"
+        },
+        "protocol": "v2.2"
+      },
+      "outcome": "ready",
+      "storeReads": [
+        {
+          "requestId": "2312d6af-0088-484c-913e-69ffc182fbc0:declared-v2:CATEGORY-SESSION-006:1",
+          "identity": {
+            "appId": "CATEGORY_SESSION_DEVELOPMENT",
+            "senderId": "OWNER"
+          },
+          "orderId": "COUPON-9206",
+          "owner": {
+            "appId": "CATEGORY_SESSION_DEVELOPMENT",
+            "senderId": "OWNER"
+          },
+          "allowed": true,
+          "outputHash": "ea543273311593a2d483642c537fe03f31e473c740a0e2fc7b9f1b9a8ceda782"
+        }
+      ],
+      "stateChange": null,
+      "knowledge": [
+        {
+          "sourceScope": {
+            "shopId": "shop-demo-1",
+            "productId": "product-demo-1"
+          },
+          "status": "accepted",
+          "reason": null,
+          "rawRanking": [
+            {
+              "id": "KB-PRODUCT-LUNCH",
+              "score": 0.8181724689967733
+            },
+            {
+              "id": "KB-REFUND-UNUSED",
+              "score": 0.3840248862297403
+            },
+            {
+              "id": "KB-REFUND-REDEEMED",
+              "score": 0.35940582897755713
+            },
+            {
+              "id": "KB-REFUND-PARTIAL",
+              "score": 0.3585301845591814
+            },
+            {
+              "id": "KB-SHOP-DEMO-1",
+              "score": 0.3198121526361736
+            },
+            {
+              "id": "KB-REFUND-EXPIRED",
+              "score": 0.31331663335314
+            },
+            {
+              "id": "KB-REFUND-PAYMENT",
+              "score": 0.29024544807842967
+            }
+          ],
+          "applicability": {
+            "mode": "declared-v2",
+            "gate": {
+              "version": "declared-order-preconditions-v2",
+              "snapshotHash": "5abd26fa96e1678fd5c1b6c26563ee3310f30508b3d4e18d5a85cfa5a574c396",
+              "contextHash": "134fa6eeb1ee4b2569b36e93c7f82482302c6c1ac0af60b372c240151fb7c645",
+              "status": "ready",
+              "integrity": true,
+              "reason": null,
+              "decisions": [
+                {
+                  "id": "KB-PRODUCT-LUNCH",
+                  "rank": 1,
+                  "status": "none_declared",
+                  "reason": "no_declared_quantity_or_state_precondition"
+                }
+              ]
+            }
+          },
+          "acceptedIds": [
+            "KB-PRODUCT-LUNCH"
+          ],
+          "sourceHashes": {
+            "before": "ae1c830f6f0a9eb857b81ae2c559b5ac547a81028b1ba8589b12fa116da055b9",
+            "after": "ae1c830f6f0a9eb857b81ae2c559b5ac547a81028b1ba8589b12fa116da055b9"
+          }
+        }
+      ],
+      "requestCounts": {
+        "agent": 2,
+        "rerank": 1,
+        "support": 1
+      },
+      "protocolErrors": 0,
+      "sdkAutomaticRetries": 0
+    }
+  ]
+}
