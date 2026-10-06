@@ -5,7 +5,9 @@ import { OrderAccessError, type CouponStore, type QQIdentity } from "./coupon-st
 import type { KnowledgeService, KnowledgeTrace } from "./knowledge-service.ts";
 import type { KnowledgeApplicabilityContext } from "./knowledge-applicability.ts";
 import { buildSupportEvidenceBinding, validateSupportEvidenceTarget, policyTopicQueries, policyTopicQueryContext, SupportEvidenceFactsError, orderRefundState as refundQuery,
-  type SupportEvidenceTarget, type SupportOrderFacts } from "./support-evidence-context.ts";
+  evidenceBindingV3Version, type EvidenceBindingVersion, type SupportEvidenceTarget, type SupportOrderFacts } from "./support-evidence-context.ts";
+import { buildSupportQuestionResolutionInput, requireSupportQuestionResolution, supportQuestionResolutionInputHash,
+  type SupportQuestionResolver, type SupportQuestionResolutionInput, type SupportQuestionResolution } from "./support-question-resolution.ts";
 import { RefundBusinessError, type RefundStore } from "./refunds.ts";
 import { isRefundOperation, type Reply } from "./reply.ts";
 import { SupportProtocolError } from "./support-action.ts";
@@ -14,7 +16,7 @@ export { parseAnySupportAction as parseExecutedSupportAction } from "./support-c
 import { amountChoiceNotice, compareRemainingAmount, createAmountReference, resolveAmountReference, selectAlternativeOrder, supportObjectReference,
   type RemainingAmountComparison, type TrustedAmountReference, type TrustedAmountChoices, type TrustedOrderChoices } from "./support-context.ts";
 export type { RemainingAmountComparison, TrustedAmountReference, TrustedAmountChoices, TrustedOrderChoices } from "./support-context.ts";
-import { currentReferenceChoices, referenceChoiceNotice, resolveReferenceChoice, type TrustedReferenceChoices } from "./support-reference-selection.ts";
+import { currentReferenceChoices, emptyReferenceChoices, referenceChoiceNotice, resolveReferenceChoice, type TrustedReferenceChoices } from "./support-reference-selection.ts";
 import { currentTaskChoices, resolveTaskReference, taskChoiceNotice, type TrustedTaskChoices } from "./support-task-context.ts";
 
 type Order = Awaited<ReturnType<CouponStore["getOrder"]>>;
@@ -39,7 +41,7 @@ export type SupportKnowledgeContext = {
   policyTopic: TrustedPolicyTopic | null;
   objectReference: { kind: "remaining_amount" | "alternative_order"; sourceRequestIds: string[]; fromOrderId: string; toOrderId: string } | null;
   protocol?: "v2.2";
-  evidenceBindingVersion?: "order-evidence-binding-v2";
+  evidenceBindingVersion?: EvidenceBindingVersion;
   evidenceTarget?: SupportEvidenceTarget;
   evidenceUse?: "current_order" | "explanation";
   // Built from this turn's authorized order, never from user/model-supplied counts.
@@ -56,6 +58,7 @@ export type SupportPolicyScopeRepair = {
   version: "policy-scope-repair-v1"; reason: "scope_changed";
   action: AnySupportAction; topic: TrustedPolicyTopic; call: SupportCall;
   budget?: { limit: number; usedBefore: number; usedAfter: number; toolCallId: string };
+  questionResolution?: { input: SupportQuestionResolutionInput; value: SupportQuestionResolution };
 };
 function freezePolicyScopeRepair(value: unknown, seen = new WeakSet<object>()): void {
   if (!value || typeof value !== "object" || seen.has(value)) return;
@@ -131,6 +134,7 @@ export type EvidenceBundle = {
   version: 1; requestId: string; trustedRoute: SupportTurnContext["trustedRoute"];
   action: AnySupportAction; actualCalls: SupportCall[];
   policyScopeRepair?: SupportPolicyScopeRepair;
+  questionResolution?: { input: SupportQuestionResolutionInput; value: SupportQuestionResolution };
   traceDeliveryFailed?: boolean;
   order?: Order; rules: Array<Knowledge[number] & { version: string }>;
   knowledge: Array<{ callId: string; context: SupportKnowledgeContext; trace: KnowledgeTrace }>;
@@ -151,12 +155,15 @@ export type SupportResult = {
   verifiedAmountReference?: TrustedAmountReference;
   pendingReferenceKind?: "order" | "policy";
   referencePresentation?: "order" | "policy" | "task";
+  discardPolicyTopic?: true;
 };
 export type SupportServices = {
   store: Pick<CouponStore, "getOrder" | "searchKnowledge">;
   merchant?: Pick<AfterSalesStore, "prepare" | "getTask">;
   refunds?: Pick<RefundStore, "prepare" | "get">;
   knowledge?: KnowledgeService;
+  questionContract?: "v2" | "v3";
+  questionResolver?: SupportQuestionResolver;
 };
 
 const notice = (text: string): Reply => ({ kind: "notice", text });
@@ -172,7 +179,16 @@ function selectedPolicyTopic(context: SupportTurnContext): TrustedPolicyTopic | 
 }
 export class SupportController {
   private services: SupportServices;
-  constructor(services: SupportServices) { this.services = services; }
+  private readonly questionContract: "v2" | "v3";
+  private readonly questionResolver?: SupportQuestionResolver;
+  constructor(services: SupportServices) {
+    if (services.questionContract !== undefined && !["v2", "v3"].includes(services.questionContract)) throw new Error("咨询合同仅支持v2或v3。");
+    if (services.questionContract === "v3" && typeof services.questionResolver?.resolve !== "function") throw new Error("v3咨询合同必须提供独立解析端口，不能退回模型的standalone标签。");
+    if (services.questionResolver && services.questionContract !== "v3") throw new Error("咨询解析端口仅用于显式v3合同。");
+    this.services = services;
+    this.questionContract = services.questionContract ?? "v2";
+    this.questionResolver = services.questionResolver;
+  }
 
   createTurn(context: SupportTurnContext) {
     if (!context.requestId || context.requestId.length > 512 || !context.userText.trim() || context.userText.length > 5000
@@ -194,8 +210,35 @@ export class SupportController {
     let pending: Promise<SupportResult> | undefined;
     let sequence = 0;
     let policyScopeRepair: SupportPolicyScopeRepair | undefined;
+    let resolution: { hash: string; promise: Promise<{ input: SupportQuestionResolutionInput; value: SupportQuestionResolution }> } | undefined;
+    const resolveQuestion = this.questionContract === "v3" ? async (topic: TrustedPolicyTopic | null) => {
+      const input = buildSupportQuestionResolutionInput({ requestId: trusted.requestId, originalQuery: trusted.userText, previousTopic: topic });
+      const hash = supportQuestionResolutionInputHash(input);
+      if (resolution && resolution.hash !== hash) throw new SupportProtocolError("本轮咨询解析上下文已经固定，不能改用其他历史来源。");
+      if (!resolution) resolution = { hash, promise: (async () => {
+        trusted.signal?.throwIfAborted();
+        const signal = AbortSignal.any([AbortSignal.timeout(15_000), ...(trusted.signal ? [trusted.signal] : [])]);
+        let abort = () => {};
+        const cancelled = new Promise<never>((_resolve, reject) => { abort = () => reject(signal.reason); signal.addEventListener("abort", abort, { once: true }); });
+        let value: SupportQuestionResolution;
+        try { value = requireSupportQuestionResolution(await Promise.race([
+          this.questionResolver!.resolve(structuredClone(input), { signal }), cancelled,
+        ]), input); }
+        finally { signal.removeEventListener("abort", abort); }
+        signal.throwIfAborted();
+        trusted.signal?.throwIfAborted();
+        return { input, value };
+      })() };
+      return structuredClone(await resolution.promise);
+    } : undefined;
     const validate = (input: unknown): AnySupportAction => {
       const action = parseAnySupportAction(input);
+      if (this.questionContract === "v3") {
+        if (!isContextSupportAction(action)) throw new SupportProtocolError("v3咨询合同需要当前v2.2动作协议。");
+        if ((action.kind === "policy" || action.kind === "refund_eligibility") && action.question !== trusted.userText.trim()) {
+          throw new SupportProtocolError("question必须保留本轮用户原文（仅可去掉首尾空白），不能从历史或模型补写；这只是出处校验，不表示问题完整。");
+        }
+      }
       if (policyScopeRepair) {
         trusted.signal?.throwIfAborted();
         const original = policyScopeRepair.action;
@@ -255,7 +298,7 @@ export class SupportController {
         try { validate(action); } catch (error) { return Promise.reject(error); }
         accepted = structuredClone(action);
         // Cache the promise, including rejection: a model retry cannot re-run an uncertain mutation.
-        pending = this.execute(trusted, accepted, { nextCallId: () => `${trusted.requestId}:${++sequence}`, policyScopeRepair }).catch(error => {
+        pending = this.execute(trusted, accepted, { nextCallId: () => `${trusted.requestId}:${++sequence}`, policyScopeRepair, resolveQuestion }).catch(error => {
           // Only this completed, side-effect-free scope rejection can release
           // the lock. Service failures and cancellation remain terminal.
           if (error instanceof SupportPolicyScopeRepairError && !policyScopeRepair) {
@@ -272,10 +315,12 @@ export class SupportController {
   }
 
   private async execute(context: SupportTurnContext, action: AnySupportAction,
-    attempt: { nextCallId: () => string; policyScopeRepair?: SupportPolicyScopeRepair }): Promise<SupportResult> {
+    attempt: { nextCallId: () => string; policyScopeRepair?: SupportPolicyScopeRepair;
+      resolveQuestion?: (topic: TrustedPolicyTopic | null) => Promise<{ input: SupportQuestionResolutionInput; value: SupportQuestionResolution }> }): Promise<SupportResult> {
     const evidence: EvidenceBundle = { version: 1, requestId: context.requestId, trustedRoute: { ...context.trustedRoute }, action,
       actualCalls: attempt.policyScopeRepair ? [structuredClone(attempt.policyScopeRepair.call)] : [], rules: [], knowledge: [],
       ...(attempt.policyScopeRepair ? { policyScopeRepair: structuredClone(attempt.policyScopeRepair) } : {}) };
+    if (attempt.policyScopeRepair?.questionResolution) evidence.questionResolution = structuredClone(attempt.policyScopeRepair.questionResolution);
     if (context.amountChoices) evidence.amountChoices = structuredClone(context.amountChoices);
     if (context.policyChoices) evidence.policyChoices = structuredClone(context.policyChoices);
     if (context.orderReferenceChoices) evidence.orderReferenceChoices = structuredClone(context.orderReferenceChoices);
@@ -287,13 +332,15 @@ export class SupportController {
     const policyTopic = selectedPolicyTopic(context);
     let pendingReferenceKind = context.pendingReferenceKind;
     let referencePresentation: SupportResult["referencePresentation"];
+    let discardPolicyTopic = false;
     let verifiedOrderId: string | undefined;
     let verifiedPolicyTopic: TrustedPolicyTopic | undefined;
     let verifiedAmountReference: TrustedAmountReference | undefined;
     const result = (reply: Reply, outcome: SupportResult["outcome"] = "ready", needsAnswer = false): SupportResult =>
       ({ action, outcome, reply, evidence, needsAnswer, ...(verifiedOrderId ? { verifiedOrderId } : {}),
         ...(verifiedPolicyTopic ? { verifiedPolicyTopic } : {}), ...(verifiedAmountReference ? { verifiedAmountReference } : {}),
-        ...(pendingReferenceKind ? { pendingReferenceKind } : {}), ...(referencePresentation ? { referencePresentation } : {}) });
+        ...(pendingReferenceKind ? { pendingReferenceKind } : {}), ...(referencePresentation ? { referencePresentation } : {}),
+        ...(discardPolicyTopic ? { discardPolicyTopic: true as const } : {}) });
     const emit = (step: SupportCall) => {
       // Telemetry is not part of the business transaction and cannot turn a completed prepare into a retry.
       try { context.onCall?.(structuredClone(step)); }
@@ -353,8 +400,18 @@ export class SupportController {
       pendingReferenceKind = "policy";
       return result(notice("前文问题链已超过本轮可可靠恢复的范围。请完整重述当前问题，写明具体对象、条件和要确认的内容；不能省略或截断旧条件后继续判断。"), "clarification");
     };
+    const unresolvedQuestion = (unavailable = false) => {
+      pendingReferenceKind = "policy";
+      discardPolicyTopic = true;
+      referencePresentation = undefined;
+      // No stale choice is shown or reusable after this restatement request.
+      evidence.policyChoices = emptyReferenceChoices("policy", binding);
+      return result(notice((unavailable ? "本轮咨询问题暂时无法可靠解析。" : "本轮尚未明确完整的咨询问题。")
+        + "请完整重述当前对象、条件和要确认的内容；旧话题不能补成当前商品的问题。本轮未检索规则或办理业务。"), "clarification");
+    };
     if (action.kind === "clarify") {
       if (attempt.policyScopeRepair && action.field === "policy_topic") {
+        if (attempt.resolveQuestion) return unresolvedQuestion();
         pendingReferenceKind = "policy";
         return result(notice("本订单的商品或门店范围已变化。请完整重述当前对象、条件和要确认的问题；旧话题不能直接沿用。"), "clarification");
       }
@@ -568,6 +625,22 @@ export class SupportController {
     // The model may classify the request, but cannot replace an unknown fact with an easier policy question.
     const currentScope = { shopId: order?.shop.id ?? null, productId: order?.items[0]?.productId ?? null };
     if (question.topic && context.policyChoices && !isDeepStrictEqual(selectedPolicyTopic(context), question.topic)) return clarify("policy_topic");
+    if (attempt.resolveQuestion && semantic && (action.kind === "policy" || action.kind === "refund_eligibility")) {
+      // Old questions are absent from the parser input after a scope change.
+      // The parser judges meaning; the host separately verifies its provenance.
+      const previous = question.topic && !alternativeOrderId && isDeepStrictEqual(question.topic.scope, currentScope) ? question.topic : null;
+      try { evidence.questionResolution = await attempt.resolveQuestion(previous); }
+      catch {
+        context.signal?.throwIfAborted();
+        return unresolvedQuestion(true);
+      }
+      // Parsing is asynchronous; a previously valid reference may expire while it runs.
+      if (previous && context.policyChoices && !isDeepStrictEqual(selectedPolicyTopic(context), previous)) return unresolvedQuestion();
+      const decision = evidence.questionResolution.value;
+      if (decision.decision === "needs_clarification" || decision.decision === "previous_resolved"
+        && (!previous || action.questionContext.kind !== "previous" || decision.previousRequestId !== previous.requestId)
+        || decision.decision === "current_complete" && (previous || alternativeOrderId && question.topic)) return unresolvedQuestion();
+    }
     if (question.topic && !alternativeOrderId && !isDeepStrictEqual(question.topic.scope, currentScope)) {
       const read = evidence.actualCalls[0];
       if (context.allowPolicyScopeRepair && !attempt.policyScopeRepair && context.policyChoices && semantic && action.kind === "policy"
@@ -578,14 +651,16 @@ export class SupportController {
         && read.input.orderId === order.id && isDeepStrictEqual(read.output, order) && !evidence.traceDeliveryFailed) {
         context.signal?.throwIfAborted();
         throw new SupportPolicyScopeRepairError({ version: "policy-scope-repair-v1", reason: "scope_changed",
-          action, topic: question.topic, call: read });
+          action, topic: question.topic, call: read,
+          ...(evidence.questionResolution ? { questionResolution: evidence.questionResolution } : {}) });
       }
-      return clarify("policy_topic");
+      return attempt.resolveQuestion ? unresolvedQuestion() : clarify("policy_topic");
     }
     let evidenceBinding: ReturnType<typeof buildSupportEvidenceBinding> | undefined;
     try {
       if (semantic) evidenceBinding = buildSupportEvidenceBinding({ action, originalQuery: context.userText,
         verifiedTopic: question.topic, order, requestId: context.requestId,
+        ...(attempt.resolveQuestion ? { version: evidenceBindingV3Version } : {}),
         binding: { ...binding, orderId: order?.id ?? null } });
     } catch (error) {
       if (error instanceof SupportEvidenceFactsError) return result(notice(error.message), "clarification");

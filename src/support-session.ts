@@ -9,6 +9,7 @@ import { merchantSourceKey, type AfterSalesStore } from "./after-sales.ts";
 import type { CouponStore, QQIdentity } from "./coupon-store.ts";
 import type { KnowledgeService } from "./knowledge-service.ts";
 import type { RefundStore } from "./refunds.ts";
+import type { SupportQuestionResolver } from "./support-question-resolution.ts";
 import type { SupportContextPort, SupportContextSnapshot, SupportContextValue } from "./conversation-state.ts";
 import type { Reply } from "./reply.ts";
 import { normalizeModelSupportAction, getModelSupportActionParameters, type TaskReferenceMode } from "./support-context-action.ts";
@@ -121,7 +122,8 @@ export function supportReply(session: AgentSession, text = ""): Reply | undefine
 export async function createSupportSession(
   identity: QQIdentity, store: CouponStore, runtime: ModelRuntime, model: Model<Api>,
   afterSales?: { store: AfterSalesStore; sourceKey: string; refunds?: RefundStore },
-  options: { groupOpenid?: string; focus?: SupportFocus; context?: SupportContextPort; onCall?: (call: SupportCall) => void; repairBudget?: number; knowledge?: KnowledgeService; taskReferenceMode?: TaskReferenceMode } = {},
+  options: { groupOpenid?: string; focus?: SupportFocus; context?: SupportContextPort; onCall?: (call: SupportCall) => void; repairBudget?: number; knowledge?: KnowledgeService; taskReferenceMode?: TaskReferenceMode;
+    questionContract?: "v2" | "v3"; questionResolver?: SupportQuestionResolver } = {},
 ) {
   if (options.focus && options.context) throw new Error("会话定位只能使用一个存储来源。");
   const taskReferenceMode = options.taskReferenceMode === undefined ? "id" : options.taskReferenceMode;
@@ -145,7 +147,8 @@ export async function createSupportSession(
   ]);
   const skills = loadSkillsFromDir({ dir: fileURLToPath(new URL("../skills/shop-support-v2", import.meta.url)), source: "project" });
   if (skills.skills.length !== 1 || skills.diagnostics.length) throw new Error("客服 v2 Skill 加载失败。");
-  const controller = new SupportController({ store, merchant: afterSales?.store, refunds: afterSales?.refunds, knowledge: options.knowledge });
+  const controller = new SupportController({ store, merchant: afterSales?.store, refunds: afterSales?.refunds, knowledge: options.knowledge,
+    questionContract: options.questionContract, questionResolver: options.questionResolver });
   const state: State = { invalidActions: 0, actionStarted: false };
   let turn: ReturnType<SupportController["createTurn"]> | undefined;
   let activeRun: { abort: AbortController; contextText: string; promise?: Promise<void> } | undefined;
@@ -331,6 +334,11 @@ export async function createSupportSession(
         if (result.referencePresentation === "task") state.taskPresentation = structuredClone(state.taskChoices);
       }
       if (!taskAction) {
+        if (result.discardPolicyTopic) {
+          state.policyTopic = undefined;
+          state.policyChoices = emptyReferenceChoices("policy", binding);
+          if (state.presentations) delete state.presentations.policy;
+        }
         state.policyTopic = result.verifiedPolicyTopic;
         if (result.verifiedPolicyTopic) {
           const action = result.action;
@@ -360,6 +368,9 @@ export async function createSupportSession(
         if (result.pendingReferenceKind) {
           state.pendingReferenceKind = result.pendingReferenceKind;
         }
+        if (options.questionContract === "v3" && result.outcome === "ready"
+          && result.evidence.questionResolution && result.evidence.questionResolution.value.decision !== "needs_clarification"
+          && state.pendingReferenceKind === "policy") state.pendingReferenceKind = undefined;
         if (result.referencePresentation && result.referencePresentation !== "task") {
           const choices = result.referencePresentation === "order" ? state.orderReferenceChoices : state.policyChoices;
           if (choices) {
@@ -385,6 +396,7 @@ export async function createSupportSession(
       const { order, rules, task, operation, amountComparison, displayedPaidUnit, knowledge } = result.evidence;
       return { content: [{ type: "text", text: JSON.stringify({
         outcome: result.outcome, reply: result.reply, evidence: { order, rules, task, operation,
+          ...(result.evidence.questionResolution ? { questionResolution: result.evidence.questionResolution } : {}),
           knowledgeUse: knowledge.map(entry => ({ evidenceBindingVersion: entry.context.evidenceBindingVersion, evidenceUse: entry.context.evidenceUse })),
           amountComparison: amountComparison ? { remainingCouponCount: amountComparison.remainingCouponCount,
             remainingUnitPaidCents: amountComparison.remainingUnitPaidCents, referencePaidCents: amountComparison.referencePaidCents,
@@ -395,7 +407,8 @@ export async function createSupportSession(
     },
   })];
   const session = await createSession(runtime, { ...model, maxTokens: Math.min(model.maxTokens, 2048) },
-    taskReferenceText(`${prompt.trim()}\n\n${skill.trim()}`), tools, skills, async () =>
+    taskReferenceText(`${prompt.trim()}\n\n${skill.trim()}`
+      + (options.questionContract === "v3" ? "\n\n候选v3咨询合同：question必须是本轮用户原文（仅可去掉首尾空白），历史原问由宿主按引用取得，不可补写。订单状态、实付及券状态用order；商品人数、核销方式、使用日期或套餐限制用policy取规则，不能凭商品名推断。宿主独立解析当前完整问题或合法续问；无法解析将要求完整重述，订单状态不是新的退款诉求。" : "")), tools, skills, async () =>
       activeRun && activeRun.abort === state.abort && !activeRun.abort.signal.aborted ? activeRun.contextText : undefined,
     (payload, api) => {
       // Pi's native payload hook is per Session and per request. The current

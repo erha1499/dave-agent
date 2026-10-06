@@ -6,6 +6,9 @@ import type { TrustedPolicyTopic } from "./support-controller.ts";
 
 type Order = Awaited<ReturnType<CouponStore["getOrder"]>>;
 export const evidenceBindingVersion = "order-evidence-binding-v2" as const;
+export const evidenceBindingV3Version = "order-evidence-binding-v3" as const;
+export const evidenceBindingVersions = [evidenceBindingVersion, evidenceBindingV3Version] as const;
+export type EvidenceBindingVersion = typeof evidenceBindingVersions[number];
 export class SupportEvidenceFactsError extends Error {
   constructor(message: string) { super(message); this.name = "SupportEvidenceFactsError"; }
 }
@@ -84,8 +87,10 @@ export function orderRefundState(order: Order): string {
     ? "未核销退款" : "券状态待核实的退款条件";
 }
 
-export function buildSupportEvidenceBinding(input: TargetInput & { order?: Order; requestId: string }) {
+export function buildSupportEvidenceBinding(input: TargetInput & { order?: Order; requestId: string; version?: EvidenceBindingVersion }) {
   const { action, order, verifiedTopic: topic } = input;
+  const version = Object.hasOwn(input, "version") ? input.version : evidenceBindingVersion;
+  if (version !== evidenceBindingVersion && version !== evidenceBindingV3Version) throw new SupportProtocolError("知识证据绑定版本无效。");
   const target = validateSupportEvidenceTarget(input);
   const prerequisite = action.kind === "merchant_prepare" || action.kind === "refund_prepare";
   if (target.kind === "current_order" && !order) throw new SupportProtocolError("当前订单取证缺少本轮已授权事实。");
@@ -121,24 +126,26 @@ export function buildSupportEvidenceBinding(input: TargetInput & { order?: Order
   }
   if (prerequisite) query = orderRefundState(order!);
   if (order) query += `\n已核实订单商品：${order.items[0]!.productName}。`;
-  // Ranking gets the same trusted question/object with a short lifecycle hint;
-  // support verification retains all fresh counts and status-bound dates below.
+  // v2 retains its historical lifecycle hint. v3 read-only ranking carries only
+  // the real question/object; neutral evidence facts do not create a new intent.
   let retrievalQuery = query;
   if (target.kind === "current_order") {
-    if (!prerequisite) retrievalQuery += `\n订单状态对应的规则条件：${facts!.refundState}。`;
+    const neutral = version === evidenceBindingV3Version && !prerequisite;
+    if (!prerequisite && !neutral) retrievalQuery += `\n订单状态对应的规则条件：${facts!.refundState}。`;
     const counts = facts!.couponCounts, dates = facts!.couponDates;
     const dateGroups = (["unused", "redeemed", "expired", "refunded"] as const).flatMap((status, index) => {
       const rows = dates.filter(row => row.status === status);
       return rows.length ? [`${["未核销", "已核销", "已过期", "已退款"][index]}券：日期已过期${rows.filter(row => row.expiredAtAsOf === true).length}张、未到期${rows.filter(row => row.expiredAtAsOf === false).length}张、截止时间未知${rows.filter(row => row.expiredAtAsOf === null).length}张`] : [];
     });
-    query += `\n已核实订单状态：${facts!.status}；状态对应条件：${facts!.refundState}。`
+    query += (neutral ? `\n已核实订单状态：${facts!.status}。` : `\n已核实订单状态：${facts!.status}；状态对应条件：${facts!.refundState}。`)
       + `\n已核实本单券数：共${counts.total}张，未核销${counts.unused}张、已核销${counts.redeemed}张、已过期${counts.expired}张、已退款${counts.refunded}张（按券状态字段计数）。`
       + `\n有效期事实（截至${facts!.asOf}）：${dateGroups.join("；")}。`;
+    if (neutral) query += "\n以上订单事实仅用于判断上述咨询的适用条件，不构成新的咨询问题。";
   } else {
     query += `\n仅解释所问规则条件${target.basis ? `（原文依据：${target.basis}）` : ""}，不证明当前订单已满足，也不构成退款批准。`;
     retrievalQuery = query;
   }
   const normalizeLocator = (text: string) => order ? text.replaceAll(`订单 ${order.id}`, "该订单").replaceAll(`订单${order.id}`, "该订单").replaceAll(order.id, "该订单") : text;
-  return { evidenceBindingVersion, evidenceTarget: target, evidenceUse: target.kind === "current_order" ? "current_order" as const : "explanation" as const,
+  return { evidenceBindingVersion: version, evidenceTarget: target, evidenceUse: target.kind === "current_order" ? "current_order" as const : "explanation" as const,
     purpose, facts, ...(applicability ? { applicability } : {}), effectiveQuery: normalizeLocator(query), retrievalQuery: normalizeLocator(retrievalQuery) };
 }
