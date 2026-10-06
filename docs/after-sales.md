@@ -8,15 +8,26 @@
 
 数据库检查会创建并清理各自的临时合成数据，但 `processDue` 会扫描全库待处理协商，通知检查也会扫描 `TEST_APP` 的终态待发通知。请使用专用演示库，确认没有其他待处理协商或 `TEST_APP` 终态待发通知，停止已运行的 CLI/QQ 及商家 worker，再串行执行检查；临时数据隔离不等于扫描范围隔离。
 
+稳定演示在同一新终端先固定以下参数。环境变量优先于Node加载的`.env`；空值覆盖遗留解析参数和通用模型密钥，模型使用`.env`中的`DEEPSEEK_API_KEY`。这只固定演示进程，不修改`.env`或常驻服务。
+
 ```sh
+export SUPPORT_ARCHITECTURE=atomic SUPPORT_CONTEXT_MODE=memory
+export KNOWLEDGE_MODE=lexical KNOWLEDGE_SUPPORT=binary
+export KNOWLEDGE_SUPPORT_MODEL=configured KNOWLEDGE_SUPPORT_PROMPT=v5
+export KNOWLEDGE_APPLICABILITY=model_only KNOWLEDGE_QUERY_MODE=combined
+export KNOWLEDGE_THRESHOLD=0.71 KNOWLEDGE_TIMEOUT_MS=15000
+export CLI_QUESTION_CONTRACT=v2 CLI_QUESTION_MODEL= CLI_QUESTION_TIMEOUT_MS=
+export MODEL_PROVIDER=deepseek MODEL_ID=deepseek-flash MODEL_API_KEY=
+export CLI_DEMO_USER=TEST_USER1
+
 npm run db:up
 npm run after-sales:init
 npm run check:merchant
 npm run check:refund
 npm run check:merchant-notifications
-SUPPORT_ARCHITECTURE=atomic SUPPORT_CONTEXT_MODE=memory KNOWLEDGE_MODE=lexical npm start
+npm start
 # QQ 凭据、白名单和身份绑定已配置时：
-# SUPPORT_ARCHITECTURE=atomic SUPPORT_CONTEXT_MODE=memory KNOWLEDGE_MODE=lexical npm run qq
+# npm run qq
 ```
 
 `after-sales:init` 保留已有数据、任务和 QQ 绑定，补充协商表、退款操作表、通知表、有界上下文表与三张演示订单，并建立两个独立受限账户。`AFTER_SALES_DB_USER` 默认 `dave_agent_after_sales`，`REFUND_DB_USER` 默认 `dave_agent_refund`；密码只保存于忽略的 `.env`。D3 复用协商账户，不增加数据库或账户。重启 QQ/CLI 后启用相应能力；未配置时不注册相应工具，已配置但连接失败时报错退出。
@@ -45,7 +56,7 @@ SUPPORT_ARCHITECTURE=atomic SUPPORT_CONTEXT_MODE=memory KNOWLEDGE_MODE=lexical n
 
 ## 面试演示路线
 
-准备使用上面的启动步骤；依赖版本以 [`package.json`](../package.json) 和锁文件为准，当前固定 Pi `1.0.0`、QQ SDK `1.0.4`。本机 `.env` 需具备模型、基础只读库、协商库和退款库配置；QQ 另外需要白名单和管理员核对后的[身份绑定](./qq-integration.md#接收与回复协议)。演示历史默认路径时使用 `SUPPORT_ARCHITECTURE=atomic SUPPORT_CONTEXT_MODE=memory KNOWLEDGE_MODE=lexical npm start`，QQ 对应 `SUPPORT_ARCHITECTURE=atomic SUPPORT_CONTEXT_MODE=memory KNOWLEDGE_MODE=lexical npm run qq`；显式覆盖 `.env` 中可能保留的 Controller/mysql 候选设置。CLI 与 QQ 是不同来源，协商、方案和确认须在同一入口及原会话继续。
+准备使用上面的启动步骤；依赖版本以 [`package.json`](../package.json) 和锁文件为准，当前固定 Pi `1.0.0`、QQ SDK `1.0.4`。本机 `.env` 需具备模型、基础只读库、协商库和退款库配置；QQ 另外需要白名单和管理员核对后的[身份绑定](./qq-integration.md#接收与回复协议)。演示历史默认路径时先在同一终端执行[启动配置](#启动)的完整export清单，再使用 `npm start` 或 `npm run qq`；只覆盖atomic/memory/lexical不足以清除遗留typed、declared-v2、解析或模型候选设置。CLI 与 QQ 是不同来源，协商、方案和确认须在同一入口及原会话继续。
 
 先查询 `COUPON-2001` 的状态与有效期；只有本人、仍有效、单张未核销且尚未退款时，才适合从头演示成功路径。初始化不会重置旧单。已处理或已过期时展示实际状态与查询恢复，完整新流程可用下表会自行建立临时合成订单的现有检查脚本；不要为了演示删除历史任务或重置已退款事实。
 
@@ -54,7 +65,7 @@ SUPPORT_ARCHITECTURE=atomic SUPPORT_CONTEXT_MODE=memory KNOWLEDGE_MODE=lexical n
 | 1. 对象不明，先澄清 | 新会话先说“我想退款”，明确订单后再继续；多单可问“COUPON-2001 和 COUPON-2002，我想退一笔”。 | 应询问订单/具体对象，不能替用户猜单或提交退款。默认路径依赖模型选择，历史[多轮业务回归](./evaluation.md#p1-第二轮多轮业务回归)保留成功与失败；本次不宣称这些新输入已实测。C1 的确定性候选恢复另见[引用演示](./c1-reference-selection.md#已实现与可复现演示)。 |
 | 2. 等待商家仍能接待 | 按[演示一单](#演示一单)完成准备和精确确认，等待时问套餐问题，再查 `COUPON-2001` 协商进度。 | 准备不创建任务，完整用户确认才返回任务；通知仍绑定原任务且不自动退款。历史真实模型联合套件包含等待期间咨询，真实 QQ 已验证原会话通知；[验证记录](#验证记录)分别列出。 |
 | 3. 同意后仍需展示、确认、幂等 | 取得 approved 后请求退款；复制本轮实际方案的 `确认退款 <操作编号>`，成功后再发送同一条。 | 方案成功展示后才开放确认；普通“同意”不执行。重复精确确认返回同一退款记录，不增加金额。真实事务可运行 `npm run check:refund`；真实模型套件可运行 `npm run check:refund-model -- --label "面试售后演示"`，后者调用模型并写入隔离的临时合成数据。 |
-| 4. 相同入口下拒绝他人订单 | 独立终端运行 `CLI_DEMO_USER=TEST_USER2 SUPPORT_ARCHITECTURE=atomic SUPPORT_CONTEXT_MODE=memory KNOWLEDGE_MODE=lexical npm start`，查询客户一的 `COUPON-2001`。 | 应拒绝读取他人订单；不能因为知道订单号或复制确认文字就获得权限。`node --env-file-if-exists=.env scripts/qq-isolation-check.ts` 用真实 MySQL、Pi 脚本模型和本地发送检查双用户交叉确认后数据库不变；[真实双用户 QQ 记录](./qq-integration.md#双用户隔离与异额退款)另行提供客户端证据。 |
+| 4. 相同入口下拒绝他人订单 | 独立终端先执行[同一完整export清单](#启动)，再运行 `CLI_DEMO_USER=TEST_USER2 npm start`，查询客户一的 `COUPON-2001`。 | 应拒绝读取他人订单；不能因为知道订单号或复制确认文字就获得权限。`node --env-file-if-exists=.env scripts/qq-isolation-check.ts` 用真实 MySQL、Pi 脚本模型和本地发送检查双用户交叉确认后数据库不变；[真实双用户 QQ 记录](./qq-integration.md#双用户隔离与异额退款)另行提供客户端证据。 |
 | 5. 失败后恢复，不盲目重做 | 收不到回执时在原入口询问“查询 COUPON-2001 的退款状态”；重启后也明确提供该订单号。查看拒绝/超时可沿主线使用 `COUPON-2002` / `COUPON-2003`。 | 查询持久结果，不把发送未知解释为未退款；拒绝/超时不生成退款方案。`node scripts/refund-agent-check.ts` 演示发送后登记、失败不重发、过期卡只读和丢失回执后查询；`node scripts/merchant-notification-agent-check.ts` 演示通知 unknown/claimed 后不重发。这两条为真实 Pi/faux、合成服务及本地发送，0 远程模型、0 数据库，不能替代平台验收。 |
 
 需要重跑完整联合真实模型路径时，先按[评测准备](./evaluation.md#d1d2-模拟售后评测)初始化评测表，再运行 `npm run check:notification-model -- --label "面试异步售后复现"`。当前脚本是 3 场景 / 21 处理轮的版本；它调用真实模型和 MySQL，QQ 发送仍由本地函数替代。逐轮结果、失败与用量会进入现有工作台，不能把它称为真实 QQ 重验；不要并行运行修改同一演示库的售后套件。

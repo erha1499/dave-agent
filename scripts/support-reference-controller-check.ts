@@ -52,7 +52,9 @@ for (const topic of [credit, balance]) {
 }
 for (const field of ["policy_topic", "time_channel", "actor"] as const) {
   const result = await controller.createTurn(context("请继续", { policyChoices: choices })).execute({ protocol: "v2.2", kind: "clarify", field, reason: "ambiguous" });
-  stopped(result, "policy"); assert.match(text(result), field === "time_channel" ? /支付渠道/ : field === "actor" ? /哪项操作/ : /具体使用规则/);
+  stopped(result, "policy");
+  if (field === "policy_topic") for (const required of [/完整重述/, /当前对象/, /订单|券/, /具体条件/, /要确认的内容/, /哪一种/]) assert.match(text(result), required);
+  else assert.match(text(result), field === "time_channel" ? /支付渠道/ : /哪项操作/);
   assert.match(text(result), /选择话题/);
 }
 const orderStillPending = await controller.createTurn(context("也需要澄清话题", { policyChoices: choices, pendingReferenceKind: "order" }))

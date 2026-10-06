@@ -416,7 +416,7 @@ export class SupportController {
       reason: "请说明希望联系商家协商的原因。",
       intent: "请明确本次先处理哪项需求：政策咨询、协商进度、退款申请或退款状态。若续问前文，请补充所指规则、时间或对象。",
       amount_basis: amountChoiceNotice(context.amountChoices, binding),
-      policy_topic: "请补充你指的具体使用规则或上一次问题；如果有几种规则，请明确要继续问哪一种，我再按相应条件查询。",
+      policy_topic: "请完整重述当前对象（订单或券）、具体条件和要确认的内容；如果有几种使用规则，请明确要继续问哪一种，我再按相应条件查询。",
       time_channel: "请说明支付渠道，以及你说的时间是退款审核期限还是到账时限；如果前面有几个时限，请明确指哪一个，并补充具体天数。",
       actor: "请说明是哪项操作，以及你说的“他/对方”指商家还是平台；我再核对该操作是否需要其许可。",
       }[field] + candidates), "clarification");

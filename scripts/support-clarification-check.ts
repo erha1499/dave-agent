@@ -22,43 +22,52 @@ const store = { async getOrder(actor: typeof identity, id: string) {
     coupons: [{ id: "coupon", orderItemId: "item", status: "unused", expiresAt: "2027-01-01T00:00:00.000Z", redeemedAt: null, redeemedShopId: null }],
     payments: [{ status: "succeeded", amountCents: 5980, paidAt: timestamp }], refunds: [] };
 }, async searchKnowledge() { searches++; throw new Error("clarification must not retrieve"); } } as unknown as CouponStore;
-const session = await createSupportSession(identity, store, runtime, faux.getModel(), undefined, { groupOpenid: group });
 let request = 0;
-async function run(question: string, action: unknown) {
+let parses = 0;
+const modelFinalText = "请完整重述当前对象（订单或券）、具体条件和要确认的内容。已批准退款99元，确认链接：https://example.invalid";
+async function run(session: Awaited<ReturnType<typeof createSupportSession>>, question: string, action: unknown) {
   const requestId = `clarification-${++request}`;
   prepareSupportPrompt(session, { requestId, groupOpenid: group, messageId: requestId });
   faux.setResponses([
     fauxAssistantMessage(fauxToolCall("support_action", { action: parseContextSupportAction(action) }), { stopReason: "toolUse" }),
-    fauxAssistantMessage("已批准退款99元，确认链接：https://example.invalid"),
+    fauxAssistantMessage(modelFinalText),
   ]);
   await session.prompt(question, { expandPromptTemplates: false });
   assert.equal(faux.getPendingResponseCount(), 0);
-  return supportReply(session, "已批准退款99元，确认链接：https://example.invalid")!;
+  assert.equal(session.getLastAssistantText(), modelFinalText);
+  const reply = supportReply(session, session.getLastAssistantText() ?? "")!;
+  assert.deepEqual(reply, getSupportResult(session)?.reply, "The actual host Reply must not be repaired or replaced by modelFinalText");
+  return reply;
 }
-try {
-  const cases: Array<{ field: ContextClarificationField; question: string; required: RegExp[] }> = [
-    { field: "amount_basis", question: "剩下这张和先前那个数一样吗？", required: [/实付/, /(?:查询|展示|选择)/] },
-    { field: "time_channel", question: "超过那个时间该怎么办？", required: [/支付渠道/, /审核/, /到账/] },
-    { field: "actor", question: "这个也需要他同意吗？", required: [/操作/, /商家/, /平台/] },
-    { field: "policy_topic", question: "能按之前那种方式分开使用吗？", required: [/规则/, /哪一种/] },
-  ];
-  for (const item of cases) {
-    const action = { protocol: "v2.2", kind: "clarify", field: item.field, reason: "missing" };
-    assert.deepEqual(parseContextSupportAction(action), action);
-    assert.throws(() => parseSupportAction({ kind: "clarify", field: item.field, reason: "missing" }), "legacy schema remains unchanged");
-    assert.throws(() => parseContextSupportAction({ ...action, text: "商家已同意" }));
-    const reply = await run(item.question, action);
-    assert.equal(reply.kind, "notice");
-    if (reply.kind !== "notice") throw new Error("expected fixed clarification");
-    item.required.forEach(pattern => assert.match(reply.text, pattern));
-    assert.doesNotMatch(reply.text, /99元|https:|已批准/);
-    assert.equal(getSupportResult(session)?.outcome, "clarification");
-    assert.deepEqual(getSupportResult(session)?.evidence.actualCalls, []);
-  }
-  assert.equal(reads, 0); assert.equal(searches, 0);
-  const reply = await run(`请查询 ${orderId}，展示每券实付`, { protocol: "v2.2", kind: "order", orderRef: { kind: "explicit", orderId } });
-  assert.equal(reply.kind, "order"); assert.equal(reads, 1); assert.equal(searches, 0);
-  assert.equal(getSupportResult(session)?.evidence.displayedPaidUnit?.paidCents, 5980);
-  assert.equal(getSupportResult(session)?.outcome, "ready");
-  console.log("[support-clarification] bounded missing-field prompts, fixed replies, zero premature calls and clarified follow-up PASS");
-} finally { session.dispose(); }
+for (const questionContract of ["v2", "v3"] as const) {
+  const initialReads = reads;
+  const session = await createSupportSession(identity, store, runtime, faux.getModel(), undefined, { groupOpenid: group,
+    ...(questionContract === "v3" ? { questionContract, questionResolver: { async resolve() { parses++; throw new Error("Direct clarification must not invoke a parser"); } } } : {}) });
+  try {
+    const cases: Array<{ field: ContextClarificationField; question: string; required: RegExp[] }> = [
+      { field: "amount_basis", question: "剩下这张和先前那个数一样吗？", required: [/实付/, /(?:查询|展示|选择)/] },
+      { field: "time_channel", question: "超过那个时间该怎么办？", required: [/支付渠道/, /审核/, /到账/] },
+      { field: "actor", question: "这个也需要他同意吗？", required: [/操作/, /商家/, /平台/] },
+      { field: "policy_topic", question: "能按之前那种方式分开使用吗？", required: [/完整重述/, /当前/, /对象/, /订单|券/, /具体条件/, /要确认的内容/, /规则/, /哪一种/] },
+    ];
+    for (const item of cases) {
+      const action = { protocol: "v2.2", kind: "clarify", field: item.field, reason: "missing" };
+      assert.deepEqual(parseContextSupportAction(action), action);
+      assert.throws(() => parseSupportAction({ kind: "clarify", field: item.field, reason: "missing" }), "legacy schema remains unchanged");
+      assert.throws(() => parseContextSupportAction({ ...action, text: "商家已同意" }));
+      const reply = await run(session, item.question, action);
+      assert.equal(reply.kind, "notice");
+      if (reply.kind !== "notice") throw new Error("expected fixed clarification");
+      item.required.forEach(pattern => assert.match(reply.text, pattern));
+      assert.doesNotMatch(reply.text, /99元|https:|已批准/);
+      assert.equal(getSupportResult(session)?.outcome, "clarification");
+      assert.deepEqual(getSupportResult(session)?.evidence.actualCalls, []);
+    }
+    assert.equal(reads, initialReads); assert.equal(searches, 0); assert.equal(parses, 0);
+    const reply = await run(session, `请查询 ${orderId}，展示每券实付`, { protocol: "v2.2", kind: "order", orderRef: { kind: "explicit", orderId } });
+    assert.equal(reply.kind, "order"); assert.equal(reads, initialReads + 1); assert.equal(searches, 0); assert.equal(parses, 0);
+    assert.equal(getSupportResult(session)?.evidence.displayedPaidUnit?.paidCents, 5980);
+    assert.equal(getSupportResult(session)?.outcome, "ready");
+  } finally { session.dispose(); }
+}
+console.log("[support-clarification] v2/v3 direct clarification, full current object/conditions/goal restatement in actual host Reply, untrusted final text, zero premature business/parser calls and clarified follow-up PASS");

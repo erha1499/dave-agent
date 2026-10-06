@@ -156,7 +156,7 @@ Controller/Session保存成功与失败的解析trace，`onQuestionTrace`提供�
 
 [provider span适配器](../src/knowledge-evaluation.ts)供回调消费者将解析记录纳入既有EvalSpan，按实际HTTP0/1、已知Token覆盖及USD/CNY分列。无效JSON、禁止工具/思考或不完整字段的输出，在首完整SDK响应与实际wire用量核对成立时仍计费；拦截额外请求不抹掉首请求账本。缺usage或对账不成立保持未知。**部分流超时可能已经观察到usage，但完整SDK结果未闭合时，费用仍为null；原始独立记录保留已到片段，不代表零费用或供应商停止计费。**原`summarizeEvaluation`仍仅汇总Agent模型step，不能称其为全链路总费用。工作台/QQ尚未激活v3解析或新增其费用展示；本片只提供候选API与适配器。
 
-独立证明只在冻结`order-evidence-binding-v3`及`questionSettings`时启用，摘要标识`c1-session-validation-v10-question-v3`与`questionProofVersion=c1-question-evidence-v1`；旧v2仍v9且无新增摘要字段。评分从实际原问、完整合法前序历史、宿主候选、授权读取、SDK动作、独立HTTP body/原始SSE/SDK响应、完成时间、查询及价格重建，匹配自报hash不足以通过。0次FAQ的澄清/失败和取消也检查解析请求，不能绕过费用及来源核验。只有独立证明通过的完整重述才清除待澄清状态，旧话题清除后不能重新显示或复活。
+独立证明只在冻结`order-evidence-binding-v3`及`questionSettings`时启用，摘要标识`c1-session-validation-v10-question-v3`与`questionProofVersion=c1-question-evidence-v1`；旧v2仍v9且无新增摘要字段。评分从实际原问、完整合法前序历史、宿主候选、授权读取、SDK动作、独立HTTP body/原始SSE/SDK响应、完成时间、查询及价格重建，匹配自报hash不足以通过。0次FAQ的澄清/失败和取消也检查解析请求，不能绕过费用及来源核验。运行时在完整重述的宿主出处/引用校验与ready结果成立后清除policy待澄清；独立评分随后从原始HTTP/SDK重建出处，并核对该转换，生产Session不调用评分checker。旧话题清除后不能重新显示或复活。
 
 显式本机候选入口（此命令会使用本机业务库并实际请求模型，本片未执行）：
 
@@ -243,7 +243,7 @@ node --env-file-if-exists=.env scripts/c1-question-session-development.ts --live
 独立审阅24条实际交付回复、92项冻结判据，reviewer为codex、forHumanReview=true、humanAcceptance=false。评分使用[答复审阅](../data/c1-question-session-development-answer-reviews.json)与实际replyHash/criteriaHash重算，并经另一只读任务复核；不把modelFinalText或工具成功代替宿主实际回复。严格保留以下失败：
 
 - v2 004第2轮：未知商品下当前省略问题被扩展为退款规则，接收并显示`KB-REFUND-UNUSED`，未要求完整重述。实际文案又说明退款资料不能回答周末，故这是错误检索/接收及未澄清，不能描述成已给错误退款资格或资金结论。v3原生解析判为needs_clarification，FAQ0并清除旧话题，实际提示明确当前对象/条件/目标完整重述，阻断误收。
-- v2 005第3轮：第二轮完整重述取证成功后仍遗留policy待澄清，随后合法续问被要求选择已有话题，没有可用结论或接待边界。v3在独立证明通过后解除待澄清，第三轮实际previous解析与重新授权取证成立。
+- v2 005第3轮：第二轮完整重述取证成功后仍遗留policy待澄清，随后合法续问被要求选择已有话题，没有可用结论或接待边界。v3按宿主出处/引用校验与ready结果解除待澄清，第三轮实际previous解析与重新授权取证成立；事后独立原生证明核对该转换。
 - 两臂005第1轮：实际相同宿主notice为“补充具体使用规则或上一次问题”，未明确要求当前对象、条件和目标的完整重述。按冻结判据保守失败，记录语言歧义；模型另说得更全不能补实际交付。这是共同回复模板缺口，工程安全澄清和无FAQ状态仍成立，已经发生的前序依赖与原gold不回改。
 
 v3有界候选推进条件成立：完整执行与来源/费用可信、省略负控0误收、完整正例无新增误澄清、严格业务11大于9。但本次是由已知失败类型设计的非盲小样本，比较中性查询、原问解析与澄清恢复整套方案，不能归因于单一模型，也不能推导生产效果、稳定P95或完整C1/O4/O5/QQ准入。v3每轮用时更高、USD总额增加，当前单批成功轮摊销较低不代表稳定成本优势；缓存、网络和执行顺序影响仍未单独控制。
@@ -251,3 +251,24 @@ v3有界候选推进条件成立：完整执行与来源/费用可信、省略�
 [公开结果](../data/c1-question-session-development-results.json)保留24合成输入、实际交付/模型文本区别、评分、请求计数及用量、解析决定、配置和来源hash。完整原始artifact和原生请求/SSE留在忽略目录`.runtime/c1-question-session-development/78131547-63d2-474a-9aa8-9c85cd7025e7.json`，公开摘要不含完整raw审计，不能单独重建全部HTTP证明；须核对结果中artifact SHA及执行前版本。原始CLI输出和工程日志分别为`.runtime/c1-question-session-development-live.log`与`.runtime/c1-question-session-engineering-validate.log`。本文结果段在执行结束后添加，当前文档hash变化不改变冻结历史，也不得重新freeze同题追分。
 
 本次预算关闭，默认模型及atomic + lexical、memory/id、QQ/工作台均不切换。先修共享完整重述提示并用0远程工程检查核对，保留本次9/12与11/12原始分数；然后补稳定闭环的演示、源码讲解和取舍材料。后续有界候选验证须有新问题及合同，不因为本轮仍有失败或预算剩余就追加调用。
+
+### 共享澄清提示与演示复核合同（实施前，2026-10-06）
+
+- **业务约束：** 初次省略咨询必须收到可执行的完整重述要求，写清当前对象、条件和要确认内容；实际宿主回复不能由模型最终文本补齐。保留真实候选选择、身份、范围与待澄清状态，不能因文案修复绕过既有授权或恢复合同。
+- **面试追问：** “为何模型说得完整，用户实际收到的提示仍失败；固定宿主回复与生成回复的责任如何分开？如何从演示追到问题出处、重新取证和已记录成本？”
+- **个人与复用：** 只修现有Controller共享policy_topic提示与相应Pi Session检查，复用Pi循环、固定宿主Reply和业务服务；沿用已有售后与C1文档补最新源码/证据指路，不扩建Harness、前端或演示平台。
+- **验收及演示：** 两个questionContract的直接clarify均检查实际Reply包含对象/条件/目标完整重述、拒绝模型伪造资金话术且无提前业务/解析调用；既有真实候选、完整重述恢复、合法续问与全量工程检查仍通过。独立复核稳定售后演示和候选C1路径的命令、配置、源码及验证层级，补缺项，不认领新模型/QQ验收。
+- **预算与停止：** 0远程模型、0DB、0QQ；定向工程与全量validate一次，只有实际错误再做必要修复检查。新题唯一运行9/12与11/12、原gold/reviews/manifest保持不变，不重新请求或对旧成绩追认修复。文案和证据入口核验通过即提交收尾；未完成C1/O4/O5与QQ候选准入另列，不因材料补齐勾选。
+
+
+### 共享提示修复与材料收尾（2026-10-06，0远程工程）
+
+Controller只改共享`policy_topic`固定文案为完整重述当前对象（订单或券）、具体条件和要确认内容，保留多规则选择提醒及已有候选展示。默认v2和显式v3分别经过4条澄清与1条明确订单后续查询，共10轮实际Pi/faux；`supportReply`严格等于宿主`result.reply`，模型另行生成完整提示或伪造批准/金额/链接均不能替代实际交付，澄清阶段store/FAQ/parser调用0。既有完整重述恢复、合法previous、范围/TTL/取消及独立证明检查由全量回归继续覆盖，没有修改状态机、授权、资金、评分或默认配置。
+
+旧提示缺完整要求先复现失败；修改后的定向与类型检查通过。首次两次全量检查分别定位Controller和Reference Controller仍匹配旧文案，必要修复只加强当前对象/条件/目标的文字语义，原待澄清、候选选择和0calls断言保留；最终`npm run validate`退出0。before、两次旧断言失败与最终日志分别在忽略目录`.runtime/shared-policy-clarification-before.log`、`shared-policy-clarification-validate.log`、`shared-policy-clarification-validate-final.log`、`shared-policy-clarification-validate-final2.log`，不覆盖失败。
+
+[稳定售后演示](./after-sales.md#启动)的完整17项export先用合成`.env`复现旧三选项命令失效，再以真实Node env-file读取及离线Pi模型metadata核验atomic/memory/lexical、v2和DeepSeek Flash；没有读取真实密钥或启动业务库/QQ，日志`.runtime/shared-policy-demo-config-final.log`。这证明配置解析，不是本机CLI/QQ服务再次启动验收。初次配置检查误计export数量的本地断言已删除，改用实际参数及provider/密钥隔离合同核验；失败留在`shared-policy-demo-config.log`。
+
+[C1源码与演示入口](./c1-implementation-results.md#最新v3路径与0远程复现)已补新题取舍及declared-v2目录边界，并明确运行时宿主出处/引用校验与事后原始HTTP/SDK独审是不同步骤。CLI候选提示也区分方案有界对照与当前配置/完整准入。独立只读审阅及文档本地链接核对通过，未增加新Harness、平台或前端。
+
+本片0远程模型、0DB、0QQ，原dataset、gold、reviews、结果与manifest字节保持；此前真实9/12和11/12不改，不能据工程修复说真实12/12。共享提示与材料按预算收尾；下一步优先补已有v3在工作台后端的参数/快照/解析span和分币种费用入口，候选激活及完整C1/O4/O5仍另有验收合同。

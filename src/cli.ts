@@ -107,7 +107,7 @@ async function main() {
       : await createCouponSession(identity, store, modelRuntime, model, business);
     const input = createInterface({ input: stdin, output: stdout });
     console.log(`团购券客服演示（${senderId}）：券单 COUPON-1001${afterSales ? "；模拟协商 COUPON-2001 / 2002 / 2003" : "，只读咨询"}；输入 /exit 退出。全部是模拟数据。`);
-    if (questionResolver) console.log(`显式咨询候选 v3：${questionResolver.settings.provider}/${questionResolver.settings.model}，超时${questionResolver.settings.timeoutMs}ms；每次解析最多增加1个模型请求。尚未通过真实语义验收。`);
+    if (questionResolver) console.log(`显式咨询候选 v3：${questionResolver.settings.provider}/${questionResolver.settings.model}，超时${questionResolver.settings.timeoutMs}ms；每次解析最多增加1个模型请求。v3方案已有有界真实开发对照，完整C1仍未准入；当前配置效果需另行验证。`);
     try {
       while (true) {
         const line = parseCliInput(await input.question("你："));
