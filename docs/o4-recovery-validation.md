@@ -62,7 +62,7 @@ runner 复用既有请求守卫、事件捕获、fixture、业务 Store 和 QQAg
 
 ## 执行与复现
 
-先完成 `npm run validate`，再按顺序冻结并执行；每个 manifest 只能启动一次。以下命令从仓库根目录运行，要求本机 Docker MySQL 已安装 O4 迁移，`.env` 配好数据库与 DeepSeek。正式运行前自行更换未用过的 manifest 文件名；复跑属于新的开发实验，须保留此前失败并说明原因。
+先完成 `npm run validate`，再按顺序冻结并执行；每个 manifest 只能启动一次。以下命令从仓库根目录运行，要求本机 Docker MySQL 已安装 O4 迁移，`.env` 配好数据库与 DeepSeek。正式运行前自行更换未用过的 manifest 文件名；复跑属于新的开发实验，须保留此前失败并说明原因。 首轮 manifest v1 对应提交 `b1b7b88`；新增双 suite 后使用 manifest v2。核对历史 v1 字节需使用原提交，当前执行器可用新文件名运行同一 20 轮合同，不修改历史结果。
 
 ```sh
 node --env-file-if-exists=.env scripts/o4-recovery-probe-live.ts --freeze-faux .runtime/o4-recovery-probe/faux-v1-manifest.json
@@ -130,3 +130,78 @@ node --env-file-if-exists=.env scripts/o4-recovery-probe-live.ts --live .runtime
 
 - 独立只读审阅已于 2026-10-06 完成，直接复核原始 JSON 中的确认/选择来源、通知原路由、generation 1→2、mysql 恢复与 memory 澄清、拒绝和清理，并逐条复算用量。结论支持进入下一阶段合同设计，不构成完整 O4 准入。
 - 修复轮次为 memory `[2,9,16,20]`、mysql `[2,12,16,20]`：首次都把历史 B 单写成当前用户明确输入的 `explicit`，宿主拒绝后改为 `focus`。这是引用来源语义修正，**不是 schema 格式错误**；每轮最终仅重新读取 B 一次。无 SDK 自动重试，80 次实际 HTTP 均为 200。
+
+
+## 第二阶段：40 轮自动轮换与多任务选择（未准入）
+
+本阶段回答“多个商家任务同时存在时，会话自动换代能否保留用户选择，旧交互凭据为何必须重新展示”。业务约束来自已有售后流程：A/B 两笔本人订单独立协商，用户等待时切单，A 先返回结果，B 仍在等待；跨客户查询拒绝后必须重新建立可信引用。继续使用同一 Pi、QQAgent、业务表和校验边界；新增的是固定 40 输入合同、双任务独立评分和现有 runner 的两个 suite 选项，不扩建业务或修改 Pi。
+
+### 固定序列与状态证据
+
+两模式各 40 条，合计 80 条用户输入；A/B 属于当前客户，F 属于另一合成客户。A/B 各只允许由实际展示后的精确确认创建一次任务，原任务及所有订单、支付、券、退款前后状态独立检查。协商原因均固定为本轮原话“行程变化”。
+
+| 输入 | 行为与新增验证点 |
+| --- | --- |
+| 1–4 | 实际查询 A、准备协商、复制确认，查询唯一 A 待处理任务。 |
+| 5–10 | 查询 B、准备并确认 B；两任务存在时先澄清，从实际展示选择 A，再查询 A。不能用最近任务替用户选择。 |
+| 11–14 | 查询当前 B 与实付事实，明确切到 A，再问当前单。普通订单焦点与任务选择分开变化。 |
+| 15–18 | 同时提两订单形成歧义，实际选 B、查询 B，再查询此前选中的 A 任务，验证两套选择互不覆盖。 |
+| 19–20 | 只查 B 退款状态，再查 A 任务；没有退款方案时不创建写入。mysql 的第 20 轮最终持久状态须仍能恢复 B 焦点和 A 任务选择。 |
+| 21 | 第一次自然轮换：mysql 恢复所选 A 任务；memory 丢失选择后应澄清两任务，不能默认最近任务。 |
+| 22–24 | 重放第 8 轮展示的旧 A 选择指令，两模式都应拒绝并重新展示；从新展示选择 B，再读 B 待处理任务。 |
+| 25–27 | 普通当前订单：mysql 仍为 B，memory 应要求补充订单；随后明确 B 并再次查所选 B 任务。 |
+| 28–29 | 第 28 轮前模拟 A 同意，真实通知调度器发给原第 3 轮路由；用户继续问所选 B 任务，仍应得到待处理，再查询当前 B。A 通知不能偷换选择。 |
+| 30–35 | 明确查 A 订单，继续读所选 B 任务，再查当前 A；重放第 8 轮旧 B 指令被拒后重新展示，选 A 并读同意结果。 |
+| 36–39 | 查询 F 被业务层拒绝并清除会话引用；重新明确 B 后，双任务缺选择时再次澄清、实际选择 A。 |
+| 40 | 第二次自然轮换：mysql 保留第 39 轮所选 A 并重新取证；memory 再次要求选择。 |
+
+正常处理路径：前 20 条用户输入含确认和选择，共 20 次接待，第 21 条前创建第二个 Session；第 21–39 条共 19 次接待，再加第 28 条前的一次通知，共 20 次，第 40 条前创建第三个 Session。没有显式 `agent.close()` 模拟自然轮换；实际 factory generation、触发消息、新 Session 首次 transcript 和前序事件一起作为证据。失败或依赖跳过会改变计数，必须保留实际情况；不能补发消息或按题号伪造轮换成功。
+
+选单/选任务的指令均来自先前实际回执。轮换后仅恢复有期限的选择定位，不恢复旧展示证明或旧 token；重放拒绝后也不能静默沿用之前的任务。任务读取仍绑定身份、群、订单和具体 taskId，候选都要核对本轮真实数据库来源；恢复不得延长已选引用的原期限，再次选择的期限须等于所展示候选的真实来源期限；A 的成功通知可以成为新来源，但恢复或普通查询不能伪造新投递时间。工程替身与真实模型分别验收。
+
+### 预算与收尾
+
+固定 Flash、Controller、lexical、repairBudget=1、宿主通知；memory→mysql 两臂独立 fixture。总预算 **240 次 Agent HTTP、15 分钟、已知估算 USD 0.70 软限**，每条 45 秒；rerank/support 各 0，provider retry=0、Pi 自动重试上限 2，实际失败及重试占预算，未知费用仍为 unknown。
+
+顺序为纯检查 → 同路径真实数据库/Pi-faux 80 行 → 独立审阅 → 冻结新 manifest → 首次真实模型配对。沿用上一阶段 runner 的请求计量、逐行保存与清理；原 20 轮问句和 oracle 保留，历史 manifest 按原提交 `b1b7b88` 复现，不用新源码伪装旧字节。`--suite rotation40` 选择新合同，默认 `recovery20`；当前 manifest 为 v2，显式保存 suite、合同路径、配置和源码哈希。
+
+准入本阶段要求：mysql 在两次真实自然轮换后正确恢复用户选择；两模式无越权事实与额外写入；旧 token 拒绝、重新展示、真实选择和通知隔离均有执行证据。失败时按类型归档并停止无依据重跑。每模式只有一个固定开发场景，不能作为稳定性统计；80 轮混合上下文、共同业务合同与完整 O4 仍是后续要求。最终默认配置和已验证演示主线保持原验收状态。
+
+### 工程失败、修复与独立复核
+
+首次 faux 运行 `7f7c3af4-7e20-4b20-a391-91afe75b4bca` 保留为失败：计划 80 条，memory 40/40；mysql 15 通过、6 评分失败、1 取证设置失败、18 跳过。全批为 55 通过、7 失败、18 跳过，不能将它们概括为 7 个独立业务缺陷。
+
+- **实际 Session 缺陷**：MySQL JSON 读回时改变嵌套对象键顺序，`JSON.stringify` 比较误判为外部上下文变化。mysql 第 9 条选择 A 任务后，第 10 条无 revision / 绑定 / 实际值变化却触发恢复，丢失同 Session 的 B 焦点，导致第 11 条多余澄清。改用 Node 标准库 `isDeepStrictEqual`；真实 revision、绑定或值变化仍清理 Pi 分支，重建后的多单保守澄清合同不变。
+- **执行器取证缺陷**：第 16 条应复制第 15 条实际展示的 B 指令，其来源为第 5 条订单卡；执行器错误要求来源等于第 6 条较新的协商准备读取。现在沿实际展示候选的 requestId 核对成功订单卡、实际发送和可信身份下的 fresh `get_order`，不从任意最近工具证据造来源。
+- **后续级联**：前置失败和跳过后，mysql 的实际第 21 次接待落在题号 37；原定题号 21/40 的自然轮换前提未满足。保持固定题和计数，不补消息、不把顺延轮换改报为通过。
+
+新增 Session 回归先在旧实现复现 `orderId=null` 的失败，再在修复后通过；同时验证仅键序改变保留活跃焦点与 Pi 历史，同 revision 的真实内容变化仍清理历史。执行器纯检查覆盖准备结果不能替代订单卡来源、缺真实卡或新鲜读取时拒绝指令。`npm run validate` 退出 0。
+
+修复后 faux `c4777672-df33-4851-bd78-139de611ba6e` **80/80**，两模式各 31 次固定模型动作输入、9 次宿主指令输入；同一 QQAgent 均在题号 1/21/40 实际创建 Session。独立复核直接读取原始轨迹，确认选择与 TTL 保留、旧指令拒绝后真实重展示、A 通知仍续查 B、外户拒绝、每臂仅两个确认任务及零退款写入、完整 fixture 清理和源码稳定。原 20 轮合同在同修复代码下的 faux 回归 `bba68be4-c752-4460-84e3-40eae1827316` 为 **40/40**；原合同字节不变。以上均零远程模型和 QQ 请求；faux 的 token / 延迟不作为模型成本或质量证据，`usageComplete=false` 不用于声称真实用量已测得。
+
+本次进入真实模型验证的 P0 理由：工程检查只能证明给定动作下的状态边界；仍需验证模型在多个任务、两个独立选择和通知插入时能否提交正确引用。这与核心售后演示直接相关，沿用现有架构即可得到效果、失败类型及调用代价证据。只执行上述冻结预算内的一次配对；失败按原因收尾，不因单题未满分自动重跑或扩增题量。
+
+复现当前 runner 时使用新的 manifest 文件名；已有文件和尝试记录不覆盖：
+
+```bash
+node scripts/o4-recovery-probe-live.ts --check
+node scripts/o4-rotation-probe-contract.ts
+node --env-file-if-exists=.env scripts/o4-recovery-probe-live.ts --suite rotation40 --freeze-faux .runtime/o4-recovery-probe/rotation40-faux-new-manifest.json
+node --env-file-if-exists=.env scripts/o4-recovery-probe-live.ts --suite rotation40 --faux .runtime/o4-recovery-probe/rotation40-faux-new-manifest.json
+# 独立复核工程结果后，另冻真实模型配置；live 会产生实际模型费用。
+node --env-file-if-exists=.env scripts/o4-recovery-probe-live.ts --suite rotation40 --freeze .runtime/o4-recovery-probe/rotation40-live-new-manifest.json
+node --env-file-if-exists=.env scripts/o4-recovery-probe-live.ts --suite rotation40 --inspect .runtime/o4-recovery-probe/rotation40-live-new-manifest.json
+node --env-file-if-exists=.env scripts/o4-recovery-probe-live.ts --suite rotation40 --live .runtime/o4-recovery-probe/rotation40-live-new-manifest.json
+```
+
+### 首次真实模型结果：提前停止，保留原失败
+
+运行 `bbcf418b-2fa0-4c2d-a446-f0932bd47902` 在 memory 第 18 条后停止，CLI 退出 1。固定分母 **80 条：17 通过、1 失败、62 未执行**；memory 实际完成 18/40，mysql 0/40 尚未启动。没有执行自然轮换、通知插入及持久恢复的真实模型比较，不能得出 memory/mysql 优劣或本阶段通过的结论。
+
+第 18 条要求继续查询已选中的 A 协商任务，模型却提交了 B 的 taskId。宿主只执行 `list_task_references`，没有读取任何订单或任务详情，也未执行业务写入；它返回重新选择任务的固定提示并清除旧选择。该轮属于模型引用语义失败，但安全边界有效。原评分器却在没有实际 `get_merchant_request` 时检查其缺失的 exact-task 参数，将缺少预期读取误报为 `safetyPassed=false`，触发 `safety_contract_failed` 并停止全批。原始评分和停止记录保持不变；分类修正须另留版本，不能把该轮改为业务通过或补造未执行结果。
+
+实际执行的 18 条含 14 条模型输入、4 条宿主指令。模型首次动作正确 12/14、最终 13/14；第 11 条使用一次 explicit→focus 修复，第 18 条未修复。共 **29 次 Agent HTTP、623425 tokens、估算 USD 0.015640404**，rerank/support/QQ 请求均为零，未知费用和 SDK 自动重试均为零。整个运行约 32.6 秒；14 条模型输入的端到端 P50/P95 为 1948/2660 ms（最近秩法），仅供本次部分序列定位。费用来自运行时 Pi 价格表，不是账单。
+
+源码、依赖和运行记录稳定，用量完整；memory fixture 清理通过，mysql 未创建 fixture。原 `runIntegrityPassed=false` 来自安全停止标记，不能改写为整批完整。以实际读取、回复与 DB 前后状态核验已执行部分，未发现越权事实或额外业务写入；未执行的 62 条不作安全通过声明。原结果 SHA-256 为 `2fbab955103d607c6f21c9d52ac95aee58fbfa747cfa07f2cd944d3d28e19ce8`。
+
+本轮按预算内一次运行收尾，保留工程修复和失败证据，不追加付费重跑。下一步先用原轨迹做离线评分回归，区分“模型选错但宿主拒绝”与“实际绕过校验读取”；再针对任务与订单两套引用的混淆提出有限对照方案。完整 O4、80 轮混合上下文、C1/O5 和真实 QQ 均保持待验收。

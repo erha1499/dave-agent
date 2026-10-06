@@ -138,6 +138,35 @@ export async function checkSupportContext() {
     } finally { h.dispose(); }
   }
 
+  // MySQL JSON key order is not an external state change; real value changes still invalidate the branch.
+  {
+    const h = await harness();
+    try {
+      const marker = "合成历史来源标记";
+      await h.run(`查询 ${a}，${marker}`, orderAction(explicit(a)));
+      await h.run(`查询 ${b}`, orderAction(explicit(b)));
+      const saved = h.memory.value();
+      assert.equal(saved.value?.requiresRestatement, true, "multi-order recovery remains conservative across a new Session");
+      assert.equal(saved.value.focus?.orderId, b);
+      h.memory.interceptRead(snapshot => {
+        if (snapshot.value?.focus) snapshot.value.focus = Object.fromEntries(Object.entries(snapshot.value.focus).reverse()) as typeof snapshot.value.focus;
+        assert.deepEqual(snapshot, h.memory.value());
+        assert.notEqual(JSON.stringify(snapshot), JSON.stringify(h.memory.value()), "exercise a real serialization-order difference");
+      });
+      const continued = await h.run("查询当前订单", orderAction());
+      assert.equal(continued.host?.orderId, b); assert.equal(continued.result?.evidence.order?.id, b);
+      assert.ok(JSON.stringify(continued.transcripts).includes(marker), "equivalent storage must not erase Pi history");
+      assert.deepEqual(h.reads, [a, b, b]);
+      h.memory.interceptRead();
+      const changed = h.memory.value();
+      h.memory.replace({ ...changed, value: { version: 1, requiresRestatement: true } });
+      const invalidated = await h.run("再查当前订单", orderAction());
+      assert.equal(invalidated.host?.orderId, null); assert.equal(invalidated.result?.outcome, "clarification");
+      assert.ok(!JSON.stringify(invalidated.transcripts).includes(marker), "a changed value invalidates history even with the same revision");
+      assert.deepEqual(h.reads, [a, b, b]);
+    } finally { h.dispose(); }
+  }
+
   // A changed customer binding resets Pi's native branch, not only its current agent message array.
   {
     const h = await harness();

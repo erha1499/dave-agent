@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
+import { isDeepStrictEqual } from "node:util";
 import type { Api, Model } from "@earendil-works/pi-ai";
 import { defineTool, loadSkillsFromDir, type AgentSession, type ModelRuntime } from "@earendil-works/pi-coding-agent";
 import { createSession } from "./agent.ts";
@@ -416,7 +417,8 @@ export async function createSupportSession(
         const next = await options.context.read(); assertCurrent();
         const changed = !contextSnapshot || next.revision !== contextSnapshot.revision
           || next.customerId !== contextSnapshot.customerId || next.bindingId !== contextSnapshot.bindingId
-          || JSON.stringify(next.value) !== JSON.stringify(contextSnapshot.value);
+          // MySQL may reorder JSON object keys without changing the saved state.
+          || !isDeepStrictEqual(next.value, contextSnapshot.value);
         if (changed) {
           if (contextSnapshot) {
             // Pi can rebuild finalized messages from its branch. Clear that

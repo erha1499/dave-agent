@@ -60,6 +60,8 @@ const { checkO4RecoveryProbeContract } = await import("./o4-recovery-probe-contr
 checkO4RecoveryProbeContract();
 const { checkO4RecoveryProbe } = await import("./o4-recovery-probe-live.ts");
 await checkO4RecoveryProbe();
+const { checkO4RotationProbeContract } = await import("./o4-rotation-probe-contract.ts");
+checkO4RotationProbeContract();
 const { checkC1ReferenceEvidence } = await import("./c1-reference-evidence-check.ts");
 await checkC1ReferenceEvidence();
 const { checkReferenceProbe } = await import("./c1-reference-selection-live.ts");
