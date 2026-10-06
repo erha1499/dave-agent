@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { randomBytes } from "node:crypto";
 import { spawnSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { createPool, type Pool, type RowDataPacket } from "mysql2/promise";
 import { fauxAssistantMessage, fauxProvider, fauxToolCall, type FauxResponseStep } from "@earendil-works/pi-ai";
@@ -12,12 +13,98 @@ import { CouponStore, readDatabaseConfig, type QQIdentity } from "../src/coupon-
 import { QQAgent } from "../src/qq-agent.ts";
 import { RefundStore, readRefundDatabaseConfig } from "../src/refunds.ts";
 import type { ContextSupportAction } from "../src/support-context-action.ts";
-import { createSupportSession, getSupportResult, prepareSupportPrompt, supportReply } from "../src/support-session.ts";
+import { createSupportSession, getSupportHostReceipt, getSupportResult, prepareSupportPrompt, supportReply } from "../src/support-session.ts";
 import { createMerchantFixture } from "./merchant-test-fixture.ts";
 
 type Port = ReturnType<ConversationStateStore["bind"]>;
 type Value = NonNullable<Awaited<ReturnType<Port["read"]>>["value"]>;
 type Session = Awaited<ReturnType<typeof createSupportSession>>;
+type Candidate = { requestId: string; orderId: string; expiresAt: number };
+type ChildInput = { identity: QQIdentity; channel: string; orders: [string, string]; oldCommand?: string; expectedPaidCents?: number };
+
+function displayedCommand(reply: ReturnType<typeof supportReply>, orderId: string) {
+  assert.equal(reply?.kind, "notice");
+  const lines = (reply as { text: string }).text.split("\n"), index = lines.indexOf(orderId);
+  assert.ok(index >= 0, "The order must actually be displayed before extracting its selection command");
+  const command = lines[index + 1];
+  assert.match(command ?? "", /^选择订单 [0-9a-f-]{36}$/);
+  return command!;
+}
+
+// Each mode owns its pools and Pi session; the parent waits for process exit before starting the next one.
+async function contextChild(mode: string, input: ChildInput) {
+  assert.ok(mode === "write" || mode === "recover");
+  assert.match(input.identity.appId, /^CS_DB_[a-f0-9]{16}$/);
+  const nonce = input.identity.appId.slice(6);
+  assert.equal(input.identity.senderId, `owner_${nonce}`); assert.equal(input.channel, `cs-${nonce}-process`);
+  assert.equal(input.orders.length, 2); for (const id of input.orders) assert.match(id, /^COUPON-2\d{3}$/);
+  const contextPool = createPool(readAfterSalesDatabaseConfig()), businessPool = createPool(readDatabaseConfig());
+  const contexts = new ConversationStateStore(contextPool), business = new CouponStore(businessPool);
+  const port = contexts.bind(input.identity, input.channel), reads: string[] = [];
+  const observed = { async getOrder(who: QQIdentity, orderId: string) { reads.push(orderId); return business.getOrder(who, orderId); },
+    searchKnowledge: (...args: Parameters<CouponStore["searchKnowledge"]>) => business.searchKnowledge(...args) } as unknown as CouponStore;
+  let session: Session | undefined;
+  try {
+    const runtime = await createModelRuntime(), faux = fauxProvider(); runtime.registerNativeProvider(faux.provider);
+    session = await createSupportSession(input.identity, observed, runtime, faux.getModel(), undefined, { groupOpenid: input.channel, context: port });
+    let request = 0;
+    async function turn(text: string, action?: ContextSupportAction) {
+      const requestId = `cs-child-${process.pid}-${++request}`;
+      prepareSupportPrompt(session!, { requestId, groupOpenid: input.channel, messageId: requestId });
+      faux.setResponses(action ? [() => fauxAssistantMessage(fauxToolCall("support_action", { action }), { stopReason: "toolUse" }),
+        () => fauxAssistantMessage("仅按本轮模拟业务结果回复。")] : []);
+      const calls = faux.state.callCount, before = reads.length;
+      await session!.prompt(text, { expandPromptTemplates: false });
+      assert.equal(session!.agent.state.errorMessage, undefined); assert.equal(faux.getPendingResponseCount(), 0);
+      if (!action) { assert.equal(faux.state.callCount, calls, "Host selection cannot invoke a model"); assert.equal(reads.length, before); }
+      return { requestId, reply: supportReply(session!), result: getSupportResult(session!), receipt: getSupportHostReceipt(session!) };
+    }
+    const [orderA, orderB] = input.orders;
+    if (mode === "write") {
+      for (const orderId of input.orders) await turn(`查看 ${orderId}`, { protocol: "v2.2", kind: "order", orderRef: { kind: "explicit", orderId } });
+      const shown = await turn("刚才提到的那笔订单呢？", { protocol: "v2.2", kind: "clarify", field: "order", reason: "ambiguous" });
+      const command = displayedCommand(shown.reply, orderB), saved = (await port.read()).value;
+      assert.equal(saved?.version, 2); assert.ok(saved?.version === 2 && saved.orderChoices?.pending);
+      assert.deepEqual(saved.orderChoices.candidates.map(row => row.orderId).sort(), [orderA, orderB].sort());
+      assert.equal(saved.requiresRestatement, true); assert.doesNotMatch(JSON.stringify(saved), /token|presentation|amountCents|paidCents/);
+      assert.deepEqual(reads, [orderA, orderB]);
+      return { pid: process.pid, command, candidates: saved.orderChoices.candidates };
+    }
+    assert.ok(input.oldCommand); assert.ok(Number.isSafeInteger(input.expectedPaidCents));
+    const before = (await port.read()).value;
+    assert.ok(before?.version === 2 && before.orderChoices?.pending);
+    const rejected = await turn(input.oldCommand);
+    assert.equal(rejected.receipt?.version, "reference-selection-v1"); assert.equal(rejected.receipt?.outcome, "rejected");
+    assert.equal(rejected.result, undefined);
+    const command = displayedCommand(rejected.reply, orderB); assert.notEqual(command, input.oldCommand);
+    const selected = await turn(command);
+    assert.equal(selected.receipt?.version, "reference-selection-v1"); assert.equal(selected.receipt?.outcome, "selected");
+    if (selected.receipt?.version !== "reference-selection-v1") throw new Error("Missing reference receipt");
+    assert.equal(selected.receipt.selectedOrderId, orderB); assert.equal(selected.receipt.presentationRequestId, rejected.requestId);
+    const selectedValue = (await port.read()).value;
+    assert.ok(selectedValue?.version === 2 && selectedValue.orderChoices);
+    assert.deepEqual(selectedValue.orderChoices.candidates, before.orderChoices.candidates,
+      "Restart, redisplay and selection preserve the original candidate expiry");
+    const fresh = await turn("这笔订单当前情况呢？", { protocol: "v2.2", kind: "order", orderRef: { kind: "focus" } });
+    assert.deepEqual(reads, [orderB]); assert.equal(fresh.result?.evidence.order?.id, orderB);
+    assert.equal(fresh.result?.evidence.order?.amounts.paidCents, input.expectedPaidCents);
+    const after = (await port.read()).value; assert.equal(after?.focus?.orderId, orderB);
+    assert.equal(after?.focus?.source, "selection"); assert.equal(after?.focus?.requestId, selected.requestId);
+    return { pid: process.pid, selectedOrderId: orderB, paidCents: fresh.result?.evidence.order?.amounts.paidCents,
+      candidates: selectedValue.orderChoices.candidates };
+  } finally { session?.dispose(); await Promise.all([contextPool.end(), businessPool.end()]); }
+}
+
+function runContextChild(mode: "write" | "recover", input: ChildInput) {
+  const child = spawnSync(process.execPath, [fileURLToPath(import.meta.url), `--context-child=${mode}`], {
+    cwd: fileURLToPath(new URL("../", import.meta.url)), input: JSON.stringify(input), encoding: "utf8", timeout: 30_000, maxBuffer: 1024 * 1024,
+  });
+  // This output contains only synthetic identifiers/assertions; environment values are never serialized.
+  assert.ifError(child.error); assert.equal(child.status, 0, child.stderr);
+  const output = JSON.parse(child.stdout.trim()) as { pid: number; command?: string; candidates?: Candidate[]; selectedOrderId?: string; paidCents?: number };
+  assert.equal(output.pid, child.pid); assert.notEqual(output.pid, process.pid);
+  return output;
+}
 
 // Administrator access is only for fresh fixture identities, deliberate corruption and cleanup.
 // Business/session reads and writes below use the existing restricted database accounts.
@@ -34,8 +121,8 @@ export async function checkConversationStateDatabase() {
   const nonce = randomBytes(8).toString("hex"), app = `CS_DB_${nonce}`;
   const identity: QQIdentity = { appId: app, senderId: `owner_${nonce}` };
   const otherUser = { ...identity, senderId: `peer_${nonce}` }, otherApp = { ...identity, appId: `CS_ALT_${nonce}` };
-  const fixture = await createMerchantFixture(["approve", "approve", "approve", "approve"], { delayMs: 5000 });
-  const [orderA, orderB, writeOrder, noticeOrder] = fixture.orders as [string, string, string, string];
+  const fixture = await createMerchantFixture(["approve", "approve", "approve", "approve", "approve", "approve"], { delayMs: 5000 });
+  const [orderA, orderB, writeOrder, noticeOrder, childA, childB] = fixture.orders as [string, string, string, string, string, string];
   const sessions: Session[] = [], sourceKeys = new Set<string>();
   const reads: string[] = [];
   let contexts!: ConversationStateStore, contextPool!: Pool, business!: CouponStore, merchant!: AfterSalesStore, refunds!: RefundStore;
@@ -206,6 +293,91 @@ export async function checkConversationStateDatabase() {
     ambiguitySession.dispose(); await expectBlocked(ambiguityGroup);
     console.log("[conversation-state] expired/corrupt state and actual unresolved ambiguity never restore one order PASS");
 
+    const candidatesValue = (candidates: Candidate[], overrides: Partial<{ overflow: boolean; selectionRequired: boolean; pending: boolean }> = {}): Value => ({
+      version: 2, requiresRestatement: true, orderChoices: { candidates, overflow: false, selectionRequired: false, pending: true, ...overrides } });
+    const expiresAt = Date.now() + 14 * 60_000;
+    const candidates: Candidate[] = [orderB, writeOrder].map((orderId, index) => ({ orderId, requestId: `cs-candidate-${index}`, expiresAt }));
+    const choicesGroup = group("choices"), choicesPort = bind(choicesGroup), choicesEmpty = await choicesPort.read();
+    const choicesWritten = await choicesPort.write(choicesEmpty, candidatesValue(candidates));
+    assert.equal(choicesWritten.value?.version, 2);
+    assert.ok(choicesWritten.value?.version === 2 && choicesWritten.value.orderChoices?.selectionRequired,
+      "Two candidates require a choice even if an input flag was false");
+    assert.deepEqual(choicesWritten.value.orderChoices.candidates, candidates);
+    assert.doesNotMatch(JSON.stringify(choicesWritten.value), /token|presentation/);
+    await assert.rejects(choicesPort.write(choicesEmpty, candidatesValue(candidates)), "Candidate snapshots obey the same CAS");
+    for (const bad of [
+      candidatesValue([{ ...candidates[0]!, orderId: "COUPON-1002" }]),
+      candidatesValue([{ ...candidates[0]!, expiresAt: Date.now() + 16 * 60_000 }]),
+      candidatesValue([candidates[0]!, candidates[1]!, { ...candidates[0]!, requestId: "third", orderId: childA },
+        { ...candidates[0]!, requestId: "fourth", orderId: childB }]),
+      { ...candidatesValue(candidates), orderChoices: { candidates, overflow: false, selectionRequired: true, pending: true, token: "forged" } },
+    ]) await assert.rejects(choicesPort.write(choicesWritten, bad as Value));
+    assert.deepEqual((await choicesPort.read()).value, choicesWritten.value, "Rejected writes cannot alter the saved candidate set");
+    for (const [who, channel] of [[identity, group("choices-other")], [otherUser, choicesGroup], [otherApp, choicesGroup]] as const) {
+      assert.equal((await bind(channel, who).read()).value, undefined);
+      await expectBlocked(channel, bind(channel, who), who);
+      const reply = JSON.stringify(supportReply(sessions.at(-1)!));
+      for (const candidate of candidates) assert.ok(!reply.includes(candidate.orderId), "Another trusted route cannot expose saved candidate labels");
+    }
+    for (const remaining of [1, 0]) {
+      const channel = group(`choices-expired-${remaining}`), port = bind(channel);
+      await port.write(await port.read(), candidatesValue(candidates));
+      corrupt(channel, candidatesValue(candidates.map((candidate, index) => ({ ...candidate, expiresAt: index < remaining ? expiresAt : Date.now() - 1 })),
+        { pending: false, selectionRequired: false }));
+      const saved = (await port.read()).value;
+      assert.ok(saved?.version === 2 && saved.orderChoices);
+      assert.equal(saved.orderChoices.candidates.length, remaining); assert.equal(saved.orderChoices.selectionRequired, true);
+      assert.equal(saved.requiresRestatement, true); await expectBlocked(channel);
+    }
+    const expiredFocusGroup = group("choices-expired-focus"), expiredFocusPort = bind(expiredFocusGroup);
+    await expiredFocusPort.write(await expiredFocusPort.read(), candidatesValue(candidates));
+    corrupt(expiredFocusGroup, { ...candidatesValue(candidates), requiresRestatement: false,
+      focus: value(orderB, "expired-focus", Date.now() - 16 * 60_000).focus });
+    const withoutFocus = (await expiredFocusPort.read()).value;
+    assert.ok(withoutFocus?.version === 2 && withoutFocus.orderChoices);
+    assert.equal(withoutFocus.focus, undefined); assert.equal(withoutFocus.requiresRestatement, true);
+    assert.deepEqual(withoutFocus.orderChoices.candidates, candidates);
+    for (const [label, bad] of [["shape", { ...candidatesValue(candidates), orderChoices: { candidates, pending: "yes" } }],
+      ["token", { ...candidatesValue(candidates), selectedToken: "forged" }]] as const) {
+      const channel = group(`choices-bad-${label}`), port = bind(channel);
+      await port.write(await port.read(), candidatesValue(candidates)); corrupt(channel, bad);
+      const saved = (await port.read()).value;
+      assert.equal(saved?.requiresRestatement, true); assert.equal(saved?.focus, undefined);
+      assert.ok(saved?.version !== 2 || !saved.orderChoices); await expectBlocked(channel);
+    }
+    console.log("[conversation-state] v2 candidate CAS/ownership, route isolation, malformed data and expiry keep ambiguity PASS");
+
+    const processGroup = group("process"); bind(processGroup);
+    const childInput: ChildInput = { identity, channel: processGroup, orders: [childA, childB] };
+    const writer = runContextChild("write", childInput); assert.ok(writer.command);
+    await fixture.repriceRefund(childB, 6543);
+    const reader = runContextChild("recover", { ...childInput, oldCommand: writer.command, expectedPaidCents: 6543 });
+    assert.notEqual(writer.pid, reader.pid); assert.equal(reader.selectedOrderId, childB); assert.equal(reader.paidCents, 6543);
+    for (const original of writer.candidates ?? []) {
+      const currentCandidate = reader.candidates?.find(candidate => candidate.orderId === original.orderId);
+      assert.ok(currentCandidate); assert.equal(currentCandidate.expiresAt, original.expiresAt, "A process restart and selection cannot renew candidate expiry");
+    }
+    console.log(`[conversation-state] synthetic child ${writer.pid} exit -> child ${reader.pid}: old command rejected, actual new command selected, B fresh read PASS`);
+
+    const transferredGroup = group("changed-ownership"), transferredPort = bind(transferredGroup);
+    await transferredPort.write(await transferredPort.read(), { ...candidatesValue([{ orderId: childA, requestId: "formerly-owned", expiresAt }],
+      { selectionRequired: false, pending: false }), requiresRestatement: false, focus: value(childA).focus });
+    // Transfer only a fresh fixture order after a valid snapshot was saved, without forging stored context.
+    admin(`UPDATE orders SET customer_id = (SELECT customer_id FROM qq_identities WHERE app_id = 'TEST_APP' AND sender_id = 'TEST_USER2')
+      WHERE id = '${childA}' AND customer_id = (SELECT customer_id FROM qq_identities WHERE app_id = '${identity.appId}' AND sender_id = '${identity.senderId}');`);
+    try {
+      const previousPrepares = refundPrepares, changed = await turn(await create(transferredGroup), transferredGroup, "这笔订单当前情况呢？", action("order"));
+      assert.deepEqual(changed.reads, [`order:${childA}`], "Restored locators must reach the current authorization check");
+      assert.equal(changed.result?.evidence.order, undefined); assert.notEqual(changed.result?.outcome, "ready");
+      assert.equal(changed.reply?.kind, "notice"); assert.equal(refundPrepares, previousPrepares);
+      const saved = (await transferredPort.read()).value;
+      assert.equal(saved?.requiresRestatement, true); assert.equal(saved?.focus, undefined);
+      assert.ok(saved?.version !== 2 || !saved.orderChoices?.candidates.length);
+    } finally {
+      admin(`UPDATE orders SET customer_id = (SELECT customer_id FROM qq_identities WHERE app_id = '${identity.appId}' AND sender_id = '${identity.senderId}') WHERE id = '${childA}';`);
+    }
+    console.log("[conversation-state] formerly owned candidate/focus loses access after ownership changes; fresh authorization rejects PASS");
+
     const faultGroup = group("fault"), good = bind(faultGroup); await good.write(await good.read(), value(writeOrder));
     await expectBlocked(faultGroup, { ...good, read: async () => { throw new Error("synthetic-private-read-failure"); } }, identity, true);
     const writeTask = await merchant.request(identity, merchantSourceKey(identity, faultGroup), writeOrder, "持久化写入失败不能重做业务");
@@ -249,7 +421,7 @@ export async function checkConversationStateDatabase() {
     faux.setResponses(responses(action("order"))); await qq.handle(message(qqGroup, "继续查看这笔订单"));
     assert.equal(getSupportResult(sessions.at(-1)!)?.evidence.order?.id, orderB);
     console.log("[conversation-state] real QQAgent local transport, 20-turn replacement and A-notification/B-focus isolation PASS");
-    console.log("PASS conversation state: real MySQL + Pi/faux only; no paid model or QQ platform requests. Full O4 model/history recovery remains unverified.");
+    console.log("PASS conversation state: real MySQL + Pi/faux, including two synthetic CLI processes; no paid model or QQ platform requests. Full O4 model/history recovery remains unverified.");
   } finally {
     await qq?.close();
     try {
@@ -259,4 +431,8 @@ export async function checkConversationStateDatabase() {
   }
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) await checkConversationStateDatabase();
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  const childMode = process.argv.find(value => value.startsWith("--context-child="))?.split("=")[1];
+  if (childMode) console.log(JSON.stringify(await contextChild(childMode, JSON.parse(readFileSync(0, "utf8")) as ChildInput)));
+  else await checkConversationStateDatabase();
+}

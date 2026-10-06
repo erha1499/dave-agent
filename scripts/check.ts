@@ -33,6 +33,8 @@ await checkSupportReferenceSession();
 await import("./support-session-check.ts");
 const { checkSupportContext } = await import("./support-context-check.ts");
 await checkSupportContext();
+const { checkConversationStateValue } = await import("./conversation-state-value-check.ts");
+await checkConversationStateValue();
 await import("./support-clarification-check.ts");
 const { checkSupportAmountContext } = await import("./support-amount-context-check.ts");
 await checkSupportAmountContext();

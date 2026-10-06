@@ -16,7 +16,7 @@ const a = "COUPON-4601", b = "COUPON-4602";
 const explicit = (orderId: string) => ({ kind: "explicit" as const, orderId });
 const orderAction = (orderRef: Exclude<ContextOrderRef, { kind: "alternative" }> = { kind: "focus" }): ContextSupportAction => ({ protocol: "v2.2", kind: "order", orderRef });
 type Host = { kind?: string; orderId?: string | null; policyTopic?: { requestId: string } | null;
-  itemPaidUnit?: { requestId: string } | null; orderChoices?: TrustedReferenceChoices };
+  itemPaidUnit?: { requestId: string } | null; orderChoices?: TrustedReferenceChoices; pendingReferenceKind?: string | null };
 const hostReference = (context: TranscriptContext): Host => context.messages.flatMap(message => typeof message.content === "string" ? [message.content]
   : message.content.filter(part => part.type === "text").map(part => part.text))
   .map(text => { try { return JSON.parse(text) as Host; } catch { return {}; } }).filter(value => value.kind === "host_order_reference").at(-1) ?? {};
@@ -189,6 +189,82 @@ export async function checkSupportContext() {
       const recovered = await h.run("查我选中这笔的状态", orderAction());
       assert.equal(recovered.result?.evidence.order?.id, a); assert.deepEqual(h.reads, [a, b, a]);
     } finally { h.dispose(); }
+  }
+
+  // A restart keeps the conflict, but old selection commands and presentation proofs expire with the Session.
+  {
+    const h = await harness();
+    try {
+      await h.run(`查询 ${a}`, orderAction(explicit(a))); await h.run(`查询 ${b}`, orderAction(explicit(b)));
+      const offered = await h.run("选哪笔订单？", { protocol: "v2.2", kind: "clarify", field: "order", reason: "ambiguous" });
+      const old = offered.result?.evidence.orderReferenceChoices?.candidates.find(row => row.reference.kind === "order" && row.reference.orderId === b);
+      assert.ok(old); assert.ok(offered.reply && "text" in offered.reply && offered.reply.text.includes(`选择订单 ${old.token}`));
+      const saved = h.memory.value(); assert.equal(saved.value?.version, 2);
+      assert.ok(saved.value?.version === 2 && saved.value.orderChoices?.pending);
+      const deadlines = saved.value.orderChoices.candidates.map(row => row.expiresAt);
+      assert.doesNotMatch(JSON.stringify(saved.value), /token|presentation|paidCents|approved/);
+      await h.restart(); const modelCalls = faux.state.callCount, readCount = h.reads.length;
+      const rejected = await h.run(`选择订单 ${old.token}`);
+      assert.equal(rejected.receipt?.outcome, "rejected"); assert.equal(faux.state.callCount, modelCalls); assert.equal(h.reads.length, readCount);
+      assert.ok(rejected.receipt?.version === "reference-selection-v1");
+      const fresh = rejected.receipt.choices.candidates.find(row => row.reference.kind === "order" && row.reference.orderId === b);
+      assert.ok(fresh); assert.notEqual(fresh.token, old.token);
+      assert.deepEqual(rejected.receipt.choices.candidates.map(row => row.expiresAt), deadlines);
+      assert.ok(rejected.reply && "text" in rejected.reply && rejected.reply.text.includes(`选择订单 ${fresh.token}`));
+      const selected = await h.run(`选择订单 ${fresh.token}`);
+      assert.equal(selected.receipt?.outcome, "selected"); assert.equal(faux.state.callCount, modelCalls); assert.equal(h.reads.length, readCount);
+      h.status("refunded"); await h.restart();
+      const current = await h.run("查选中这笔的当前状态", orderAction());
+      assert.equal(current.result?.evidence.order?.id, b); assert.equal(current.result?.evidence.order?.status, "refunded");
+      assert.deepEqual(h.reads, [a, b, b]);
+    } finally { h.dispose(); }
+  }
+  // Losing one expired candidate must not resolve a pending choice in favor of the survivor.
+  {
+    const h = await harness();
+    try {
+      await h.run(`查询 ${a}`, orderAction(explicit(a))); await h.run(`查询 ${b}`, orderAction(explicit(b)));
+      await h.run("这笔是哪单？", { protocol: "v2.2", kind: "clarify", field: "order", reason: "ambiguous" });
+      const snapshot = h.memory.value(); assert.ok(snapshot.value?.version === 2 && snapshot.value.orderChoices);
+      snapshot.value.orderChoices.candidates[0]!.expiresAt = Date.now() - 1;
+      h.memory.replace(snapshot); await h.restart(); const before = h.reads.length;
+      const resumed = await h.run("查它的状态", orderAction());
+      assert.equal(resumed.host?.orderId, null); assert.equal(resumed.host?.pendingReferenceKind, "order");
+      assert.equal(resumed.result?.outcome, "clarification"); assert.equal(h.reads.length, before);
+      assert.equal(resumed.result.evidence.orderReferenceChoices?.candidates.length, 1);
+      assert.ok(resumed.result.evidence.orderReferenceChoices?.selectionRequired);
+    } finally { h.dispose(); }
+  }
+  // The non-sliding focus may expire while a more recent authorized query still supplies a live candidate.
+  {
+    const h = await harness();
+    try {
+      await h.run(`查询 ${a}`, orderAction(explicit(a)));
+      const snapshot = h.memory.value(); assert.ok(snapshot.value?.focus && snapshot.value.version === 2 && snapshot.value.orderChoices);
+      snapshot.value.focus.selectedAt = Date.now() - 16 * 60_000; snapshot.value.focus.expiresAt = Date.now() - 60_000;
+      const expiry = snapshot.value.orderChoices.candidates[0]!.expiresAt;
+      h.memory.replace(snapshot); const before = h.reads.length;
+      const resumed = await h.run("这笔现在怎样？", orderAction());
+      assert.equal(resumed.host?.orderId, null); assert.equal(resumed.result?.outcome, "clarification"); assert.equal(h.reads.length, before);
+      assert.equal(resumed.result.evidence.orderReferenceChoices?.candidates[0]?.expiresAt, expiry);
+      assert.ok(resumed.result.evidence.orderReferenceChoices?.selectionRequired);
+    } finally { h.dispose(); }
+  }
+
+  // A candidate-only publication also contains recoverable context, even though it still requires a choice.
+  {
+    const h = await harness(), entered = deferred(), release = deferred();
+    try {
+      await h.run(`查询 ${a}`, orderAction(explicit(a))); await h.run(`查询 ${b}`, orderAction(explicit(b)));
+      h.memory.intercept(async value => { if (value.version === 2 && value.orderChoices?.pending) { entered.resolve(); await release.promise; } });
+      const old = h.run("让我选单", { protocol: "v2.2", kind: "clarify", field: "order", reason: "ambiguous" });
+      await entered.promise; cancelSupportTurn(h.session()); release.resolve(); await old;
+      assert.deepEqual(h.memory.value().value, { version: 1, requiresRestatement: true });
+      h.memory.intercept(); await h.restart(); const reads = h.reads.length;
+      const resumed = await h.run("继续处理它", orderAction());
+      assert.equal(resumed.result?.outcome, "clarification"); assert.equal(h.reads.length, reads);
+      assert.equal(resumed.host?.orderChoices?.candidates.length, 0);
+    } finally { release.resolve(); h.dispose(); }
   }
 
   for (const ending of ["error", "no_action"] as const) {

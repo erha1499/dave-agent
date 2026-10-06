@@ -2,9 +2,14 @@ import type { Pool, PoolConnection, ResultSetHeader, RowDataPacket } from "mysql
 import { merchantSourceKey } from "./after-sales.ts";
 import type { QQIdentity } from "./coupon-store.ts";
 
-export type SupportContextValue = { version: 1;
+export type SupportContextOrderChoices = {
+  candidates: Array<{ requestId: string; orderId: string; expiresAt: number }>;
+  overflow: boolean; selectionRequired: boolean; pending: boolean;
+};
+export type SupportContextValue = {
   focus?: { orderId: string; requestId: string; source: "explicit" | "selection"; selectedAt: number; expiresAt: number };
-  requiresRestatement: boolean };
+  requiresRestatement: boolean;
+} & ({ version: 1 } | { version: 2; orderChoices?: SupportContextOrderChoices });
 export type SupportContextSnapshot = { revision: number; customerId?: string; bindingId?: string; value?: SupportContextValue };
 export type SupportContextPort = {
   read(): Promise<SupportContextSnapshot>;
@@ -23,27 +28,56 @@ function rejectUnless(condition: unknown, message = invalid): asserts condition 
   if (!condition) throw new ConversationStateError(message);
 }
 
-// This value is a locator, never a cached authorization, approval or monetary fact.
-function contextValue(input: unknown, now: number, allowExpired: boolean): SupportContextValue {
-  rejectUnless(plain(input) && keys(input, ["version", "requiresRestatement"], ["focus"])
-    && input.version === 1 && typeof input.requiresRestatement === "boolean");
-  if (input.focus === undefined) return { version: 1, requiresRestatement: input.requiresRestatement };
-  const focus = input.focus;
-  rejectUnless(plain(focus) && keys(focus, ["orderId", "requestId", "source", "selectedAt", "expiresAt"]));
-  rejectUnless(typeof focus.orderId === "string" && /^COUPON-\d{4}$/.test(focus.orderId)
-    && typeof focus.requestId === "string" && focus.requestId.length > 0 && focus.requestId.length <= 512
-    && focus.requestId === focus.requestId.trim() && !/[\u0000-\u001f\u007f]/u.test(focus.requestId)
-    && (focus.source === "explicit" || focus.source === "selection"));
-  rejectUnless(typeof focus.selectedAt === "number" && Number.isSafeInteger(focus.selectedAt) && focus.selectedAt > 0 && focus.selectedAt <= now
-    && typeof focus.expiresAt === "number" && Number.isSafeInteger(focus.expiresAt) && focus.expiresAt <= 8.64e15
-    && focus.expiresAt > focus.selectedAt && focus.expiresAt - focus.selectedAt <= ttlMs
-    && (allowExpired || focus.expiresAt > now));
-  if (focus.expiresAt <= now) return { version: 1, requiresRestatement: true };
-  return { version: 1, requiresRestatement: input.requiresRestatement, focus: { orderId: focus.orderId,
-    requestId: focus.requestId, source: focus.source, selectedAt: focus.selectedAt, expiresAt: focus.expiresAt } };
+const validOrderId = (value: unknown): value is string => typeof value === "string" && /^COUPON-\d{4}$/.test(value);
+const validRequestId = (value: unknown): value is string => typeof value === "string" && value.length > 0 && value.length <= 512
+  && value === value.trim() && !/[\u0000-\u001f\u007f]/u.test(value);
+
+// These are locators, never cached authorization, approval, choice tokens or monetary facts.
+export function validateSupportContextValue(input: unknown, options: { now?: number; allowExpiredFocus?: boolean } = {}): SupportContextValue {
+  const now = options.now ?? Date.now();
+  rejectUnless(Number.isSafeInteger(now) && now > 0 && now <= 8.64e15);
+  rejectUnless(plain(input) && (input.version === 1 || input.version === 2)
+    && keys(input, ["version", "requiresRestatement"], input.version === 1 ? ["focus"] : ["focus", "orderChoices"])
+    && typeof input.requiresRestatement === "boolean");
+  const value: SupportContextValue = { version: input.version, requiresRestatement: input.requiresRestatement };
+  if (input.focus !== undefined) {
+    const focus = input.focus;
+    rejectUnless(plain(focus) && keys(focus, ["orderId", "requestId", "source", "selectedAt", "expiresAt"]));
+    rejectUnless(validOrderId(focus.orderId) && validRequestId(focus.requestId)
+      && (focus.source === "explicit" || focus.source === "selection"));
+    rejectUnless(typeof focus.selectedAt === "number" && Number.isSafeInteger(focus.selectedAt) && focus.selectedAt > 0 && focus.selectedAt <= now
+      && typeof focus.expiresAt === "number" && Number.isSafeInteger(focus.expiresAt) && focus.expiresAt <= 8.64e15
+      && focus.expiresAt > focus.selectedAt && focus.expiresAt - focus.selectedAt <= ttlMs
+      && (options.allowExpiredFocus || focus.expiresAt > now));
+    if (focus.expiresAt <= now) value.requiresRestatement = true;
+    else value.focus = { orderId: focus.orderId, requestId: focus.requestId, source: focus.source,
+      selectedAt: focus.selectedAt, expiresAt: focus.expiresAt };
+  }
+  if (value.version === 2 && input.orderChoices !== undefined) {
+    const choices = input.orderChoices;
+    rejectUnless(plain(choices) && keys(choices, ["candidates", "overflow", "selectionRequired", "pending"])
+      && Array.isArray(choices.candidates) && choices.candidates.length <= 3
+      && typeof choices.overflow === "boolean" && typeof choices.selectionRequired === "boolean" && typeof choices.pending === "boolean");
+    const orders = new Set<string>(), requests = new Set<string>();
+    const candidates = Array.from(choices.candidates, candidate => {
+      rejectUnless(plain(candidate) && keys(candidate, ["requestId", "orderId", "expiresAt"])
+        && validRequestId(candidate.requestId) && validOrderId(candidate.orderId)
+        && typeof candidate.expiresAt === "number" && Number.isSafeInteger(candidate.expiresAt)
+        && candidate.expiresAt > 0 && candidate.expiresAt <= 8.64e15 && candidate.expiresAt <= now + ttlMs);
+      rejectUnless(!orders.has(candidate.orderId) && !requests.has(candidate.requestId));
+      orders.add(candidate.orderId); requests.add(candidate.requestId);
+      return { requestId: candidate.requestId, orderId: candidate.orderId, expiresAt: candidate.expiresAt };
+    });
+    // Validate all entries before expiry filtering; expiry cannot hide malformed or duplicate references.
+    const remaining = candidates.filter(candidate => candidate.expiresAt > now);
+    value.orderChoices = { candidates: remaining, overflow: choices.overflow, pending: choices.pending,
+      selectionRequired: choices.selectionRequired || choices.overflow || candidates.length > 1 };
+    if (remaining.length !== candidates.length && !value.focus) value.requiresRestatement = true;
+  }
+  return value;
 }
 function storedValue(input: unknown): SupportContextValue {
-  try { return contextValue(typeof input === "string" ? JSON.parse(input) : input, Date.now(), true); }
+  try { return validateSupportContextValue(typeof input === "string" ? JSON.parse(input) : input, { allowExpiredFocus: true }); }
   catch { return { version: 1, requiresRestatement: true }; }
 }
 function revision(value: unknown) {
@@ -93,7 +127,7 @@ export class ConversationStateStore {
         const expectedBinding = bindingId(expected.bindingId);
         rejectUnless(expectedRevision < Number.MAX_SAFE_INTEGER && typeof expectedCustomer === "string" && /^[A-Za-z0-9_-]{1,64}$/.test(expectedCustomer), conflict);
         // Validate and copy before the first await; caller mutation cannot change the write.
-        const value = contextValue(input, Date.now(), false);
+        let value = validateSupportContextValue(input);
         let connection: PoolConnection | undefined;
         try {
           connection = await this.pool.getConnection();
@@ -105,12 +139,14 @@ export class ConversationStateStore {
             "SELECT revision FROM conversation_state WHERE source_key = ? FOR UPDATE", [sourceKey]);
           const currentRevision = rows[0] ? revision(rows[0].revision) : 0;
           rejectUnless(currentRevision === expectedRevision, conflict);
-          if (value.focus) {
+          const orderIds = new Set([...(value.focus ? [value.focus.orderId] : []),
+            ...(value.version === 2 ? value.orderChoices?.candidates.map(candidate => candidate.orderId) ?? [] : [])]);
+          for (const orderId of orderIds) {
             const [orders] = await connection.execute<RowDataPacket[]>(
-              "SELECT id FROM orders WHERE id = ? AND customer_id = ? FOR SHARE", [value.focus.orderId, expectedCustomer]);
+              "SELECT id FROM orders WHERE id = ? AND customer_id = ? FOR SHARE", [orderId, expectedCustomer]);
             rejectUnless(orders.length === 1, "未找到当前客户可恢复的订单，请重新明确订单号。");
           }
-          contextValue(value, Date.now(), false); // A delayed lock must not extend an expired locator.
+          value = validateSupportContextValue(value); // A delayed lock cannot renew a locator or retain expired candidates.
           const nextRevision = expectedRevision + 1, encoded = JSON.stringify(value);
           if (rows[0]) {
             const [changed] = await connection.execute<ResultSetHeader>(`UPDATE conversation_state

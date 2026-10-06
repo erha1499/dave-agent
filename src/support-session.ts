@@ -15,7 +15,7 @@ import { SupportController, type SupportCall, type SupportResult, type TrustedPo
 import { amountChoiceNotice, amountChoicesVersion, currentAmountChoices, rememberAmountChoice, rememberOrderChoice,
   resolveAmountReference, selectAmountChoice, selectAlternativeOrder, type TrustedAmountChoices, type TrustedOrderChoices } from "./support-context.ts";
 import { resolveSupportParameters } from "./support-parameters.ts";
-import { currentReferenceChoices, emptyReferenceChoices, referenceChoiceNotice, rememberReferenceChoice,
+import { currentReferenceChoices, emptyReferenceChoices, referenceChoiceNotice, referenceChoiceTtlMs, rememberReferenceChoice,
   resolveReferenceChoice, selectReferenceChoice, type TrustedReferenceChoices } from "./support-reference-selection.ts";
 
 export type SupportPrompt = {
@@ -139,7 +139,7 @@ export async function createSupportSession(
       contextSnapshot = await options.context!.write(expected, value);
       // A final publication already in flight may finish after cancellation.
       // Serialize its invalidation before a new prompt can read the record.
-      if (!value.requiresRestatement && (abort.signal.aborted || state.abort !== abort)) {
+      if ((value.focus || value.version === 2 && value.orderChoices) && (abort.signal.aborted || state.abort !== abort)) {
         contextSnapshot = await options.context!.write(contextSnapshot, blockedContext());
       }
     })();
@@ -175,8 +175,14 @@ export async function createSupportSession(
       || Boolean(state.pendingReferenceKind) || ambiguousOrders
       || Boolean(result && (result.outcome !== "ready" || ["policy", "refund_eligibility", "paid_amount_compare"].includes(result.action.kind)))
       || Boolean(receipt && !selected);
-    const value: SupportContextValue = { version: 1, requiresRestatement: needsRestatement,
-      ...(contextFocus && contextFocus.expiresAt > Date.now() ? { focus: contextFocus } : {}) };
+    const choices = !state.turnError && (result || receipt) ? currentReferenceChoices(state.orderReferenceChoices, binding) : undefined;
+    const value: SupportContextValue = choices ? { version: 2, requiresRestatement: needsRestatement,
+      ...(contextFocus && contextFocus.expiresAt > Date.now() ? { focus: contextFocus } : {}),
+      orderChoices: { candidates: choices.candidates.flatMap(row => row.reference.kind === "order"
+        ? [{ requestId: row.reference.requestId, orderId: row.reference.orderId, expiresAt: row.expiresAt }] : []),
+        overflow: choices.overflow, selectionRequired: choices.selectionRequired, pending: state.pendingReferenceKind === "order" } }
+      : { version: 1, requiresRestatement: needsRestatement,
+        ...(contextFocus && contextFocus.expiresAt > Date.now() ? { focus: contextFocus } : {}) };
     try { await saveContext(value, abort); }
     catch {
       if (state.abort === abort) {
@@ -375,9 +381,30 @@ export async function createSupportSession(
           contextFocus = next.value?.requiresRestatement ? undefined : next.value?.focus;
           contextOrderConfirmed = Boolean(contextFocus);
           state.focusOrderId = contextFocus?.orderId;
+          if (next.value?.version === 2 && next.value.orderChoices) {
+            const saved = next.value.orderChoices;
+            let choices = emptyReferenceChoices("order", binding);
+            // Reuse the existing selector and original deadlines, but issue new
+            // tokens. Old presentation proofs cannot survive Session replacement.
+            for (const row of saved.candidates) {
+              if (row.expiresAt <= Date.now()) continue;
+              choices = rememberReferenceChoice(choices, binding,
+                { kind: "order", orderId: row.orderId, requestId: row.requestId }, {}, row.expiresAt - referenceChoiceTtlMs)!;
+            }
+            state.orderReferenceChoices = { ...choices, overflow: saved.overflow,
+              selectionRequired: saved.selectionRequired || saved.overflow || saved.candidates.length > 1 };
+            if (saved.pending || !contextFocus && (saved.selectionRequired || saved.overflow)) state.pendingReferenceKind = "order";
+          }
         }
         if (contextFocus && contextFocus.expiresAt <= Date.now()) {
-          clearReferences(state); state.focusOrderId = undefined; contextFocus = undefined;
+          const choices = currentReferenceChoices(state.orderReferenceChoices, binding);
+          clearReferences(state); state.focusOrderId = undefined; contextFocus = undefined; contextOrderConfirmed = false;
+          // A recent authorized query may have produced candidates newer than
+          // the original focus. Keep their deadlines, but require a new choice.
+          if (choices) {
+            state.orderReferenceChoices = { ...choices, selectedToken: undefined, selectionRequired: true };
+            state.pendingReferenceKind = "order";
+          }
         }
         contextSnapshot = next;
         state.focusUnavailable = false;
