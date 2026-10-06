@@ -97,3 +97,4 @@ await loadC1SupportDevelopment("language");
 await (await import("./support-question-client-check.ts")).checkSupportQuestionClient();
 await (await import("./support-question-observation-check.ts")).checkSupportQuestionObservation();
 await (await import("./support-question-evidence-check.ts")).checkSupportQuestionEvidence();
+await (await import("./c1-question-session-development.ts")).checkQuestionSession();

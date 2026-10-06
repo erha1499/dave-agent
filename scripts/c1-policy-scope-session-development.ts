@@ -17,7 +17,7 @@ import { cancelSupportTurn, createSupportSession, getSupportHostReceipt, getSupp
 import { currentReferenceChoices, resolveReferenceChoice, type TrustedReferenceChoices } from "../src/support-reference-selection.ts";
 import { resolveSupportRunParameters } from "../src/support-parameters.ts";
 import { assertC1PolicyScopeRepairEvidence, scoreC1ValidationTurn, type C1AnswerReview, type C1ValidationActual, type C1ValidationTurn } from "./c1-session-validation-check.ts";
-import { c1ValidationCodeFiles, controlledStore, createC1ValidationGuard, readC1ValidationDependencies, withinTurnDeadline, type StoreRead } from "./c1-session-validation-live.ts";
+import { c1ValidationCodeFiles, controlledStore, createC1ValidationGuard, readC1ValidationDependencies, withinTurnDeadline, type C1ValidationLimits, type StoreRead } from "./c1-session-validation-live.ts";
 
 const root = new URL("../", import.meta.url), datasetPath = "data/c1-policy-scope-session-development.json";
 const directory = new URL(".runtime/c1-policy-scope-session-development/", root);
@@ -98,6 +98,9 @@ async function configuration(env: NodeJS.ProcessEnv = process.env) {
       /(?:^|\.)dashscope\.aliyuncs\.com$|\.cn-beijing\.maas\.aliyuncs\.com$/.test(new URL(rerank.settings.endpoints.origin).hostname) ? .5 : null } };
 }
 type Configuration = Awaited<ReturnType<typeof configuration>>;
+// Other fixed Session experiments can reuse primary request measurement; the
+// reviewed wire/provider rules below stay unchanged.
+export type PolicyScopeMeasurementConfiguration = Pick<Configuration, "model" | "support" | "rerank" | "pricing">;
 type Manifest = { version: 1; stage: Dataset["stage"]; frozenAt: string; frozenBeforeExecution: true; remoteExecutions: 1;
   dataset: { path: string; sha256: string }; counts: { casesPerArm: 4; turnsPerArm: 8; pairedTurns: 16 };
   sourceHashes: Record<string, string>; configuration: Configuration; configurationHash: string };
@@ -196,9 +199,10 @@ export function summarizePolicyScopeSession(rows: Row[], data: Dataset) {
 type Wire = { index: number; operation: Operation; requestId: string; provider: string; model: string; endpoint: string;
   bodyText: string; bodyHash: string; hash: string; responseHash: string | null; models: string[]; rawUsage: Record<string, unknown> | null;
   sdkUsage: unknown; attempt: number | null; known: boolean; outputText: string | null; outputHash: string | null; finishReason: string | null };
-export function measuredPolicyScopeGuard(fetcher: typeof fetch, config: Configuration, data: Dataset,
-  beforeAgent: (body: Record<string, unknown>) => void = () => {}, sourceCheck: () => Promise<void> = async () => {}, now = Date.now) {
-  const guard = createC1ValidationGuard(fetcher, now, policyScopeSessionLimits, "per-operation"), wires: Wire[] = [];
+export function measuredPolicyScopeGuard(fetcher: typeof fetch, config: PolicyScopeMeasurementConfiguration, data: Pick<Dataset, "corpus">,
+  beforeAgent: (body: Record<string, unknown>) => void = () => {}, sourceCheck: () => Promise<void> = async () => {}, now = Date.now,
+  limits: C1ValidationLimits = policyScopeSessionLimits) {
+  const guard = createC1ValidationGuard(fetcher, now, limits, "per-operation"), wires: Wire[] = [];
   let extraStop: string | null = null, sealed = false;
   const stop = (reason: string) => { extraStop ??= reason; return extraStop; };
   const stopped = () => extraStop ?? guard.stopped();
@@ -458,8 +462,9 @@ async function execute(data: Dataset, config: Configuration, fake = false, save:
 }
 
 // Reconstruct wire-to-SDK-to-knowledge binding independently of reported scores.
-export function policyScopeWireBindingPassed(artifact: Pick<Awaited<ReturnType<typeof execute>>, "requests" | "wires" | "rows" | "data" | "actualSettings">,
-  config: Configuration) {
+export function policyScopeWireBindingPassed(artifact: { requests: ReturnType<typeof createC1ValidationGuard>["requests"]; wires: Wire[];
+  rows: C1ValidationActual[]; data: Pick<Dataset, "corpus">; actualSettings: unknown },
+  config: PolicyScopeMeasurementConfiguration & { arms: unknown }) {
   try {
     assert.deepEqual(artifact.actualSettings, { model: config.model, rerank: config.rerank, support: config.support, arms: config.arms });
     assert.equal(artifact.wires.length, artifact.requests.length);

@@ -183,3 +183,40 @@ npm run validate
 独立审阅已复现并修复三类缺口：额外请求被拦截时错误清空首请求已知费用；参考评分器未镜像安全清除旧话题及完整重述后解除待澄清；普通SDK工具输出可被整体替换而未与宿主结果配对。现逐项保留负控，工具实际动作、成功位、回复、解析出处和业务投影均与宿主匹配，普通返回及范围错误都不把完整解析trace送入模型。被拦额外请求的特有事件尚无通用C1原始记录字段，独立评分对这种不完整录制保守拒绝；客户端专属检查仍证明只有1次HTTP及首账本未丢。
 
 首次全量通过后发现的SDK输出证明缺项已另做必要修复，再次全量通过；日志分别留在忽略目录`.runtime/c1-question-client-engineering-validate.log`及`.runtime/c1-question-client-engineering-validate-final.log`。本片未修改题集gold、历史成绩、线上规则、数据库或前端；本机已有`package.json`、锁文件和`.idea/`改动保留且不纳入本片。真实解析质量、额外请求净收益、v3线上执行runner/付费manifest及QQ/工作台激活仍未交付。
+
+### 新题Session对照合同（实施前，2026-10-06）
+
+- **业务约束：** 本人券单定位不等于完整咨询；人数、周末使用、省略续问和失效商品引用按实际当前原问、合法历史和fresh读取取证。使用现有原创演示规则与目录，合成状态修订只模拟fixture商品定位变化，不模拟商家改变已购合同。独立case/arm内存store与原生Pi Session，不注入成功话题、模型答案或直接解析标签。
+- **面试追问：** “增加一次无工具问题解析能否减少旧意图污染，是否引入误澄清；业务完成率增加后每个正确业务轮付出多少延迟和费用；工程出处验证如何与真实模型效果分开？”
+- **个人与复用：** 复用原Session、Controller、真实解析client、知识服务、授权fixture、期限/预算及独立评分。只补新题执行和账本接线；v2/v3比较包含中性查询与解析，不能归因于单一模型。两臂固定Flash主Agent、Pro typed v6、M4-support、declared-v2、separated及repairBudget1，v3解析Flash/10秒。默认不切换，QQ/数据库/前端不改。
+- **新题与验收：** 6场景、每臂12轮，共24轮：完整人数、同范围合法续问、范围变化后的完整重述、范围变化后的省略负控、澄清→完整重述→合法续问、跨单完整问题。新问法独立编写及审阅，属于非盲开发验证。需要真实前序话题或澄清的轮次必须先核对已完成来源，否则保留未执行。记录完整24分母、业务完成/资料误收/误澄清、解析实际触发、原始wire/SDK/出处、范围修复、回复判据、真实请求、P50/P95和USD/CNY。明确全链路与Agent-only指标；来源正确仍不能代替语义质量。
+- **预算与停止：** 一个新manifest仅执行一次，最多Agent72、rerank24、support24、question12 HTTP（总132），10分钟、每轮75秒；累计USD0.15、CNY0.05为请求前软停止，已发单次可能超限。未知费用、重试、源/配置/依赖变化或wire账本不符时停止后续发送，保留完整未执行分母。工程与独审先用0远程/DB/QQ跑通、提交，再冻结实际环境及题集；随后只执行这一批新题，不运行已关闭manifest、第三模型或同题追分。
+
+候选推进须两臂完整执行、来源/费用完整性可信、v3省略负控零资料误收、完整问题无新增误澄清且严格业务完成数提高，同时分列额外解析的时延及费用。未达到便按本次证据归档，不继续扩大测试。单次小样本即使通过也只支持后续候选验证，不替代完整C1/O4/O5、QQ或商业验收。
+
+### 新题执行器与工程边界（2026-10-06）
+
+[新题](../data/c1-question-session-development.json)包含6个独立场景、两臂各12轮，复用原线上8篇原创演示文档及declared-v2目录，不覆盖已有题集。题集SHA-256为`5971fd9d76a6934b8c9e46170630d74d82a7e6108a59d3ac43d78ca91be601c7`。[执行器](../scripts/c1-question-session-development.ts)提供check/freeze/inspect/live；复用已有原生Session与三角色测量，只为问题解析另接已有预算计数器，两者共享停止、费用及源/依赖核验。没有修改Pi核心、生产业务、默认配置或前端。
+
+前序依赖检查的是实际来源状态：合法话题须有已通过出处、范围、身份及规则接收证明的真实前轮；澄清须实际处于policy待澄清、无verified话题且FAQ调用0。前轮回复文案的严格判据仍独立评分、计入整场业务完成；不把“回复判据全通过”误当建立澄清状态的必要条件，也不注入成功历史。首次Agent请求核对前序宿主状态，修复或完整重述后的最终Agent请求可合法携带新状态。
+
+原生替代HTTP工程路径执行24轮、12次解析、12个隔离store并全部清理；全部24轮独立出处证明通过。v2在场景005的第三轮仍保留policy待澄清，虽第二轮完整重述已成功，随后合法续问仍澄清、FAQ0，工程业务严格失败；v2为11/12，v3为12/12。该失败与原gold保留，明确例外只允许断言这项已知业务失败，不豁免出处证明。所有固定模型分类和固定回复均非真实语义效果，回复保持unreviewed，严格完整业务数尚未评定。
+
+独审修正了用冻结配置重造actualSettings而非核验真实settings、在最终Agent请求仍强求旧宿主状态、以及已知业务失败绕过原24轮出处断言三个检查缺项。共享预算、未知用量阻止后续发送、取消/无效输出账本、配置及请求篡改均有负控；实际`wx`锁以临时忽略目录证明第二次claim被拒绝、dummy-send保持一次。旧范围runner只扩展复用类型和可选limits，默认逻辑及wire规则不变，旧check仍通过。
+
+工程命令均为0远程、0DB、0QQ：
+
+```sh
+node scripts/c1-question-session-development.ts --check
+npm run validate
+```
+
+完成全量核验和提交后才冻结新合同（freeze/inspect为0远程；live有真实模型与重排费用，只允许一次）：
+
+```sh
+node --env-file-if-exists=.env scripts/c1-question-session-development.ts --freeze data/c1-question-session-development-manifest.json
+node --env-file-if-exists=.env scripts/c1-question-session-development.ts --inspect data/c1-question-session-development-manifest.json
+node --env-file-if-exists=.env scripts/c1-question-session-development.ts --live data/c1-question-session-development-manifest.json
+```
+
+最终`npm run validate`退出0，包含新runner与既有业务、QQ离线及前端接口回归。全量日志保留于忽略目录`.runtime/c1-question-session-engineering-validate.log`；费用上限与失败停止按前述预定合同执行。工程审阅未调用远程模型，未认领v3效果或C1准入；真实结果需另据新manifest与执行记录判定。
