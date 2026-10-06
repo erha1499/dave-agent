@@ -7,6 +7,8 @@ import { normalizeModelSupportAction, type ContextSupportAction, type TaskRefere
 import type { SupportResult } from "../src/support-controller.ts";
 import type { TrustedTaskChoices } from "../src/support-task-context.ts";
 import type { O4ProbeActual, O4ProbeDbSnapshot, O4ProbeMapping, O4ProbeMode, O4ProbeScore, O4ProbeAlias } from "./o4-recovery-probe-contract.ts";
+import { freshRotationUserText, type RotationWording } from "./o4-task-reference-wording.ts";
+export type { RotationWording } from "./o4-task-reference-wording.ts";
 
 export type RotationMapping = O4ProbeMapping & { taskB?: string };
 export type RotationExpected = {
@@ -86,6 +88,12 @@ export const rotationTurns: readonly RotationTurn[] = freeze([
     mysql: { ...task("A", "approved"), recovery: "task" }, memory: { ...clarify("task"), recovery: "safe_restatement" } }),
 ]);
 export const rotationPlanHash = createHash("sha256").update(JSON.stringify(rotationTurns)).digest("hex");
+export const freshRotationTurns: readonly RotationTurn[] = freeze(rotationTurns.map(turn => {
+  if (turn.kind !== "user") return turn;
+  const text = freshRotationUserText[turn.id]; assert.ok(text, `missing fresh wording for input ${turn.id}`);
+  return { ...turn, text };
+}));
+export const freshRotationPlanHash = createHash("sha256").update(JSON.stringify(freshRotationTurns)).digest("hex");
 export function rotationText(turn: RotationTurn, mapping: RotationMapping) {
   assert.equal(turn.kind, "user", "Host commands must come from an actual prior reply");
   return turn.text.replace(/\{\{([ABF])\}\}/g, (_all, alias: O4ProbeAlias) => mapping.orders[alias]);
@@ -169,14 +177,16 @@ function selectedTaskProof(row: O4ProbeActual, history: readonly O4ProbeActual[]
 }
 
 export function scoreRotationTurn(actual: O4ProbeActual, history: readonly O4ProbeActual[], mode: O4ProbeMode, mapping: RotationMapping,
-  taskReferenceMode: TaskReferenceMode = "id"): O4ProbeScore {
+  taskReferenceMode: TaskReferenceMode = "id", wording: RotationWording = "original"): O4ProbeScore {
   assert.ok(taskReferenceMode === "id" || taskReferenceMode === "current", "unknown task reference mode");
+  assert.ok(wording === "original" || wording === "fresh-v1", "unknown rotation wording");
   const issues: string[] = [], safety: string[] = [];
   let malformed = false, firstActionPassed: boolean | null = null, finalActionPassed: boolean | null = null;
   let firstActionError: O4ProbeScore["firstActionError"] = null;
   const metrics = () => ({ firstActionPassed, finalActionPassed, firstActionError, repairRequired: actual.modelActions.length > 1 });
   const check = (ok: unknown, issue: string, unsafe = false) => { if (!ok) { issues.push(issue); if (unsafe) safety.push(issue); } };
-  const turn = rotationTurns.find(t => t.id === actual.id), expected = turn?.expected[mode];
+  const turns = wording === "original" ? rotationTurns : freshRotationTurns;
+  const turn = turns.find(t => t.id === actual.id), expected = turn?.expected[mode];
   if (!turn || !expected) return { passed: false, issues: ["unknown input"], safetyPassed: false, recoveryApplicable: false, recoveryPassed: null, ...metrics() };
   const prior = (id: number) => history.find(r => r.id === id);
   check(actual.status === "completed", `input ${actual.id} was ${actual.status}; full denominator retained`);
@@ -428,6 +438,20 @@ export function scoreRotationTurn(actual: O4ProbeActual, history: readonly O4Pro
 // business path. That path is exercised by the separate real-DB faux run.
 export function checkO4RotationProbeContract() {
   assert.equal(rotationPlanHash, "3f16b04ccb196acefce99eae6caf6432a60e7ed39ee4f82b93c923a506220844", "mode candidate must preserve frozen inputs/gold");
+  assert.notEqual(freshRotationPlanHash, rotationPlanHash);
+  assert.deepEqual(Object.keys(freshRotationUserText).map(Number), rotationTurns.filter(t => t.kind === "user").map(t => t.id));
+  assert.equal(Object.keys(freshRotationUserText).length, 31);
+  assert.equal(new Set(Object.values(freshRotationUserText)).size, 31);
+  assert.ok(Object.isFrozen(freshRotationTurns));
+  for (const [i, fresh] of freshRotationTurns.entries()) {
+    const original = rotationTurns[i]!;
+    assert.deepEqual({ ...fresh, text: original.text }, original, "wording cannot alter gold, dependencies, generations or host events");
+    assert.ok(Object.isFrozen(fresh));
+    if (original.kind === "user") {
+      assert.notEqual(fresh.text, original.text);
+      assert.deepEqual(fresh.text.match(/\{\{[ABF]\}\}/g), original.text.match(/\{\{[ABF]\}\}/g), "explicit order aliases stay identical");
+    } else assert.equal(fresh, original, "all nine host commands retain original frozen rows");
+  }
   assert.deepEqual(rotationTurns.map(t => t.id), Array.from({ length: 40 }, (_, i) => i + 1));
   assert.deepEqual(rotationTurns.filter(t => t.before).map(t => [t.id, t.before]), [[28, "notifyA"]]);
   assert.deepEqual(rotationTurns.filter(t => t.kind === "merchant_confirmation").map(t => [t.id, t.fromTurn, t.target]), [[3, 2, "A"], [7, 6, "B"]]);
@@ -464,6 +488,10 @@ export function checkO4RotationProbeContract() {
   const score = (row: RotationActual, history: RotationActual[] = [], mode: O4ProbeMode = "mysql") => scoreRotationTurn(row, history, mode, m);
   const passes = (row: RotationActual, history: RotationActual[] = [], mode: O4ProbeMode = "mysql") => assert.deepEqual(score(row, history, mode).issues, []);
   passes(first);
+  const freshFirst = structuredClone(first); freshFirst.text = rotationText(freshRotationTurns[0]!, m);
+  assert.deepEqual(scoreRotationTurn(freshFirst, [], "mysql", m, "id", "fresh-v1").issues, []);
+  assert.ok(scoreRotationTurn(first, [], "mysql", m, "id", "fresh-v1").issues.includes("frozen user input changed"));
+  assert.ok(score(freshFirst).issues.includes("frozen user input changed"));
   const mutations: Array<(r: RotationActual) => void> = [
     r => { r.modelActions = []; }, r => { r.modelRequests = 0; }, r => { r.factoryEvents = []; },
     r => { r.factoryEvents![0]!.messageId = "other"; }, r => { r.calls[1]!.input.identity = { ...m.identity, senderId: "other" }; },
@@ -661,6 +689,7 @@ export function checkO4RotationProbeContract() {
   }
   assert.throws(() => scoreRotationTurn(first, [], "mysql", m, "unknown" as TaskReferenceMode), /unknown task reference mode/);
   assert.throws(() => fauxRotationAction(1, "mysql", m, "unknown" as TaskReferenceMode), /unknown task reference mode/);
+  assert.throws(() => scoreRotationTurn(first, [], "mysql", m, "id", "unknown" as RotationWording), /unknown rotation wording/);
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

@@ -27,32 +27,38 @@ import { cancelSupportTurn, createSupportSession, getSupportHostReceipt, getSupp
 import { createC1ValidationGuard, readC1ValidationDependencies, withinTurnDeadline } from "./c1-session-validation-live.ts";
 import { createMerchantFixture } from "./merchant-test-fixture.ts";
 import { o4RecoveryTurns, o4RecoveryText, scoreO4RecoveryTurn, fauxO4RecoveryAction } from "./o4-recovery-probe-contract.ts";
-import { rotationTurns, rotationText, scoreRotationTurn, fauxRotationAction } from "./o4-rotation-probe-contract.ts";
+import { rotationTurns, freshRotationTurns, rotationText, scoreRotationTurn, fauxRotationAction, type RotationWording } from "./o4-rotation-probe-contract.ts";
 
 const root = new URL("../", import.meta.url), directory = new URL(".runtime/o4-recovery-probe/", root);
 export const o4RecoveryLimits = { requests: { agent: 120, rerank: 0, support: 0 }, deadlineMs: 600_000,
   turnTimeoutMs: 45_000, estimatedUsd: .35, estimatedCny: .01 };
 export const o4RotationLimits = { requests: { agent: 240, rerank: 0, support: 0 }, deadlineMs: 900_000,
   turnTimeoutMs: 45_000, estimatedUsd: .70, estimatedCny: .01 };
-type SuiteName = "recovery20" | "rotation40";
+type SuiteName = "recovery20" | "rotation40" | "rotation40fresh";
 type ProbeTurn = typeof o4RecoveryTurns[number] | typeof rotationTurns[number];
-const validSuite = (value: string): value is SuiteName => value === "recovery20" || value === "rotation40";
+const isRotationSuite = (value: string) => value === "rotation40" || value === "rotation40fresh";
+const validSuite = (value: string): value is SuiteName => value === "recovery20" || isRotationSuite(value);
 function taskReferenceSettings(suite: SuiteName, mode: TaskReferenceMode) {
   assert.ok(mode === "id" || mode === "current", "--task-reference must be id or current");
-  assert.ok(mode === "id" || suite === "rotation40", "current task references are limited to rotation40");
+  assert.ok(mode === "id" || isRotationSuite(suite), "current task references are limited to rotation40 or rotation40fresh");
   return { taskReferenceMode: mode, taskReferenceContractVersion,
     taskReferenceSchemaHash: contentHash(getModelSupportActionParameters(mode)) };
 }
 function suiteDefinition(name: SuiteName, taskReferenceMode: TaskReferenceMode = "id") {
   assert.ok(validSuite(name));
   taskReferenceSettings(name, taskReferenceMode);
-  return name === "rotation40"
-    ? { name, turns: rotationTurns, limits: o4RotationLimits, contractPath: "scripts/o4-rotation-probe-contract.ts",
+  const wording: RotationWording = name === "rotation40fresh" ? "fresh-v1" : "original";
+  return isRotationSuite(name)
+    ? { name, wording, turns: name === "rotation40fresh" ? freshRotationTurns : rotationTurns, limits: o4RotationLimits, contractPath: "scripts/o4-rotation-probe-contract.ts",
       text: (turn: ProbeTurn, mapping: Mapping) => rotationText(turn as typeof rotationTurns[number], mapping),
-      score: (actual: Actual, history: Actual[], mode: Mode, mapping: Mapping) => scoreRotationTurn(actual, history, mode, mapping, taskReferenceMode),
+      score: (actual: Actual, history: Actual[], mode: Mode, mapping: Mapping) => scoreRotationTurn(actual, history, mode, mapping, taskReferenceMode, wording),
       fauxAction: (id: number, mode: Mode, mapping: Mapping) => fauxRotationAction(id, mode, mapping, taskReferenceMode) }
-    : { name, turns: o4RecoveryTurns, limits: o4RecoveryLimits, contractPath: "scripts/o4-recovery-probe-contract.ts",
+    : { name, wording, turns: o4RecoveryTurns, limits: o4RecoveryLimits, contractPath: "scripts/o4-recovery-probe-contract.ts",
       text: (turn: ProbeTurn, mapping: Mapping) => o4RecoveryText(turn as typeof o4RecoveryTurns[number], mapping), score: scoreO4RecoveryTurn, fauxAction: fauxO4RecoveryAction };
+}
+function wordingSettings(suite: ReturnType<typeof suiteDefinition>) {
+  return { wording: suite.wording, wordingVersion: "o4-wording-v1",
+    wordingHash: contentHash(suite.turns.map(({ id, kind, text }) => ({ id, kind, text }))) };
 }
 type Mode = "memory" | "mysql";
 type Mapping = Parameters<typeof scoreO4RecoveryTurn>[3] & { taskB?: string };
@@ -72,7 +78,7 @@ const blankDb = (): Snapshot => ({ orders: [], merchantTasks: [], refundOperatio
 const json = (v: unknown) => JSON.stringify(v, null, 2) + "\n";
 const hashFiles = async (paths: string[]) => Object.fromEntries(await Promise.all(paths.map(async path => [path, contentHash(await readFile(new URL(path, root)))])));
 async function sourceFiles() {
-  return [...new Set(["scripts/o4-recovery-probe-live.ts", "scripts/o4-recovery-probe-contract.ts", "scripts/o4-rotation-probe-contract.ts", "scripts/merchant-test-fixture.ts",
+  return [...new Set(["scripts/o4-recovery-probe-live.ts", "scripts/o4-recovery-probe-contract.ts", "scripts/o4-rotation-probe-contract.ts", "scripts/o4-task-reference-wording.ts", "scripts/merchant-test-fixture.ts",
     "scripts/c1-session-validation-live.ts", "scripts/c1-session-validation-check.ts", "scripts/c1-session-live.ts",
     "prompts/customer-service-v2.md", "skills/shop-support-v2/SKILL.md",
     ...(await readdir(new URL("src/", root))).filter(n => n.endsWith(".ts")).map(n => `src/${n}`),
@@ -83,7 +89,7 @@ const snapshotModel = (model: Awaited<ReturnType<typeof createConfiguredModelRun
 async function configuration(execution: "live" | "faux", suiteName: SuiteName, taskReferenceMode: TaskReferenceMode) {
   const suite = suiteDefinition(suiteName, taskReferenceMode);
   const runtime = await createModelRuntime(), model = runtime.getModel("deepseek", "deepseek-flash"); assert.ok(model);
-  return { execution, suite: suiteName, ...taskReferenceSettings(suiteName, taskReferenceMode), architecture: "controller", knowledgeMode: "lexical", repairBudget: 1, model: snapshotModel(model), thinking: "disabled",
+  return { execution, suite: suiteName, ...taskReferenceSettings(suiteName, taskReferenceMode), ...wordingSettings(suite), architecture: "controller", knowledgeMode: "lexical", repairBudget: 1, model: snapshotModel(model), thinking: "disabled",
     providerRetries: 0, sessionAutomaticRetries: 2, merchantEvents: "host", limits: suite.limits,
     dependencySnapshot: await readC1ValidationDependencies(), pricing: { estimated: true, source: "Pi model catalog, not an actual invoice" },
     planned: { modes: ["memory", "mysql"], userTurnsPerMode: suite.turns.length, totalUserTurns: suite.turns.length * 2,
@@ -91,19 +97,19 @@ async function configuration(execution: "live" | "faux", suiteName: SuiteName, t
       laterScenarios: suiteName === "recovery20" ? "40/80 not run in this artifact" : "80 not run in this artifact" }, fixture: { delayMs: 5000, pendingHoldMs: 180000, testOnlyWaitingWindow: true } };
 }
 type Configuration = Awaited<ReturnType<typeof configuration>>;
-type Manifest = { version: 3; suite: SuiteName; contractPath: string; stage: "exposed-development"; frozenAt: string; contractHash: string;
+type Manifest = { version: 4; suite: SuiteName; contractPath: string; stage: "exposed-development"; frozenAt: string; contractHash: string;
   sourceHashes: Record<string, string>; configuration: Configuration; configurationHash: string };
 export async function freezeO4RecoveryProbe(path: string, execution: "live" | "faux" = "live", suiteName: SuiteName = "recovery20", taskReferenceMode: TaskReferenceMode = "id") {
   const suite = suiteDefinition(suiteName, taskReferenceMode), config = await configuration(execution, suiteName, taskReferenceMode);
-  const manifest: Manifest = { version: 3, suite: suiteName, contractPath: suite.contractPath, stage: "exposed-development", frozenAt: new Date().toISOString(),
+  const manifest: Manifest = { version: 4, suite: suiteName, contractPath: suite.contractPath, stage: "exposed-development", frozenAt: new Date().toISOString(),
     contractHash: contentHash(suite.turns), sourceHashes: await hashFiles(await sourceFiles()), configuration: config, configurationHash: contentHash(config) };
   await mkdir(directory, { recursive: true }); await writeFile(new URL(path, root), json(manifest), { flag: "wx" });
-  console.log(json({ manifest: path, execution, taskReferenceMode, planned: config.planned, databaseCalls: 0, providerRequests: 0 }));
+  console.log(json({ manifest: path, execution, taskReferenceMode, ...wordingSettings(suite), planned: config.planned, databaseCalls: 0, providerRequests: 0 }));
 }
 export async function inspectO4RecoveryProbe(path: string, suiteName: SuiteName = "recovery20", taskReferenceMode: TaskReferenceMode = "id") {
   const suite = suiteDefinition(suiteName, taskReferenceMode);
   const bytes = await readFile(new URL(path, root)), manifest = JSON.parse(bytes.toString()) as Manifest;
-  assert.equal(manifest.version, 3, "Historical v1/v2 manifests must be reproduced with their original commit; hashes and task-reference semantics are never rebased");
+  assert.equal(manifest.version, 4, "Historical v1/v2/v3 manifests must be reproduced with their original commit; hashes, wording and task-reference semantics are never rebased");
   assert.equal(manifest.suite, suiteName);
   assert.equal(manifest.contractPath, suite.contractPath); assert.equal(manifest.stage, "exposed-development");
   assert.ok(["live", "faux"].includes(manifest.configuration.execution)); assert.equal(manifest.contractHash, contentHash(suite.turns));
@@ -230,7 +236,7 @@ export async function runO4RecoveryProbe(path: string, execution: "live" | "faux
     failure?: string; cleanup: { attempted: boolean; remaining?: Snapshot; contextRemaining?: number; passed: boolean };
     pendingWindowExtensions: Array<{ beforeInput: number; orderId: string; milliseconds: number }>; contextSnapshots: unknown[];
     factoryEvents: FactoryEvent[]; }> = [];
-  const artifact = { version: 3, suite: suiteName, stage: "exposed-development", runId, execution, manifest, manifestHash,
+  const artifact = { version: 4, suite: suiteName, stage: "exposed-development", runId, execution, manifest, manifestHash,
     startedAt: new Date().toISOString(), finishedAt: null as string | null, rows, arms, requests: guard.requests, wire,
     usage: guard.usage(), actualSettings: null as unknown, sourceHashes: { before: manifest.sourceHashes, after: {} as Record<string, string> },
     localPackageHashes: { before: await hashFiles(["package.json", "package-lock.json"]), after: {} as Record<string, string> },
@@ -257,7 +263,10 @@ export async function runO4RecoveryProbe(path: string, execution: "live" | "faux
     assert.deepEqual(actualTaskReference, { taskReferenceMode: manifest.configuration.taskReferenceMode,
       taskReferenceContractVersion: manifest.configuration.taskReferenceContractVersion,
       taskReferenceSchemaHash: manifest.configuration.taskReferenceSchemaHash });
-    artifact.actualSettings = { ...actualTaskReference, model: snapshotModel(model), configuredModel: manifest.configuration.model, knowledgeMode: "lexical",
+    const actualWording = wordingSettings(suite);
+    assert.deepEqual(actualWording, { wording: manifest.configuration.wording,
+      wordingVersion: manifest.configuration.wordingVersion, wordingHash: manifest.configuration.wordingHash });
+    artifact.actualSettings = { ...actualTaskReference, ...actualWording, model: snapshotModel(model), configuredModel: manifest.configuration.model, knowledgeMode: "lexical",
       thinking: "disabled", repairBudget: 1, providerRetries: 0, sessionAutomaticRetries: 2, transport: execution === "live" ? "remote" : "Pi faux provider; no remote model" };
     const original = runtime.streamSimple.bind(runtime);
     runtime.streamSimple = (selected, transcript, options) => {
@@ -378,7 +387,7 @@ export async function runO4RecoveryProbe(path: string, execution: "live" | "faux
               row.reason = "restart_not_observed"; await save(); continue;
             }
           }
-          if (suiteName === "rotation40" && [22, 25, 33].includes(turn.id)
+          if (isRotationSuite(suiteName) && [22, 25, 33].includes(turn.id)
             && !observedNaturalRotation(prior.find(row => row.id === 21), arm.factoryEvents[0], generation)) {
             row.reason = "natural_rotation_not_observed"; await save(); continue;
           }
@@ -391,7 +400,7 @@ export async function runO4RecoveryProbe(path: string, execution: "live" | "faux
               arm.pendingWindowExtensions.push({ beforeInput: turn.id, orderId: String(task.order_id), milliseconds: 180000 });
             }
             if (turn.before === "restart") {
-              assert.equal(suiteName, "recovery20", "rotation40 must use production automatic rotation");
+              assert.equal(suiteName, "recovery20", "Rotation suites must use production automatic rotation");
               const previousGeneration = generation; await agent.close(); agent = makeAgent(); session = undefined;
               row.beforeEvent = { kind: "restart", previousGeneration, nextGeneration: 0 };
             }
@@ -518,8 +527,22 @@ export async function checkO4RecoveryProbe() {
   for (const mode of ["memory", "mysql"] as const) assert.deepEqual(rows.filter(r => r.mode === mode).map(r => r.id), Array.from({ length: 20 }, (_, i) => i + 1));
   const rotationRows = plannedRows("rotation40"); assert.equal(rotationRows.length, 80);
   for (const mode of ["memory", "mysql"] as const) assert.deepEqual(rotationRows.filter(r => r.mode === mode).map(r => r.id), Array.from({ length: 40 }, (_, i) => i + 1));
+  const freshRows = plannedRows("rotation40fresh"); assert.equal(freshRows.length, 80);
+  for (const mode of ["memory", "mysql"] as const) assert.deepEqual(freshRows.filter(r => r.mode === mode).map(r => r.id), Array.from({ length: 40 }, (_, i) => i + 1));
   assert.equal(suiteDefinition("recovery20").limits.requests.agent, 120);
   assert.equal(suiteDefinition("rotation40").limits.requests.agent, 240);
+  const freshSuite = suiteDefinition("rotation40fresh", "current");
+  assert.deepEqual(freshSuite.limits, o4RotationLimits);
+  assert.deepEqual(freshSuite.turns.map(({ text: _text, ...turn }) => turn), rotationTurns.map(({ text: _text, ...turn }) => turn),
+    "Fresh wording must not change scenarios, dependencies, expected states or the oracle");
+  assert.equal(freshSuite.turns.filter((turn, index) => turn.text !== rotationTurns[index]!.text).length, 31);
+  assert.ok(isRotationSuite("rotation40fresh"), "Fresh wording retains natural-rotation prerequisites");
+  const freshConfig = await configuration("faux", "rotation40fresh", "current");
+  assert.equal(freshConfig.planned.totalUserTurns, 80); assert.equal(freshConfig.wording, "fresh-v1");
+  assert.deepEqual(wordingSettings(freshSuite), { wording: freshConfig.wording,
+    wordingVersion: freshConfig.wordingVersion, wordingHash: freshConfig.wordingHash });
+  assert.notEqual(freshConfig.wordingHash, wordingSettings(suiteDefinition("rotation40")).wordingHash);
+  assert.ok((await sourceFiles()).includes("scripts/o4-task-reference-wording.ts"));
   const firstFactory: FactoryEvent = { agentInstanceId: "real-agent", generation: 1, messageId: "first", trigger: "user", createdAt: new Date().toISOString() };
   const rotated: Row = { ...rotationRows[20]!, status: "completed", requestId: "actual21", messageId: "actual21", generationBefore: 1, generation: 2,
     factoryEvents: [{ ...firstFactory, messageId: "actual21", generation: 2 }] };
@@ -538,6 +561,13 @@ export async function checkO4RecoveryProbe() {
   const identity = { appId: "TEST_APP", senderId: "TEST_USER1" }, groupOpenid = "O4_PURE_CHECK";
   const mapping: Mapping = { identity, groupOpenid, sourceKey: merchantSourceKey(identity, groupOpenid), orders: { A: "COUPON-2101", B: "COUPON-2102", F: "COUPON-2103" } };
   assert.equal(commandFromPrior(o4RecoveryTurns[0]!, [], mapping).text, `查询订单 ${mapping.orders.B} 的当前状态。`);
+  const freshText = commandFromPrior(freshRotationTurns[0]!, [], mapping, "rotation40fresh").text;
+  assert.equal(freshText, rotationText(freshRotationTurns[0]!, mapping));
+  assert.notEqual(freshText, rotationText(rotationTurns[0]!, mapping));
+  const freshScoringProbe = { ...freshRows[0]!, status: "completed" as const, text: freshText };
+  assert.ok(!freshSuite.score(freshScoringProbe, [], "memory", mapping).issues.includes("frozen user input changed"));
+  assert.ok(suiteDefinition("rotation40", "current").score(freshScoringProbe, [], "memory", mapping).issues.includes("frozen user input changed"),
+    "The runner must pass fresh-v1 to the scorer instead of scoring new text against the original wording");
   const score = { passed: true, issues: [], safetyPassed: true, recoveryApplicable: false, recoveryPassed: null, firstActionPassed: true, finalActionPassed: true, firstActionError: null, repairRequired: false };
   const confirmation: Reply = { kind: "merchant_confirmation", orderId: mapping.orders.A, amountCents: 7980, confirmationText: `确认联系商家 ${mapping.orders.A} 原因：行程变化` };
   const shown = { ...rows[2]!, requestId: "shown3", score, reply: confirmation, sends: [{ reply: confirmation,
@@ -619,6 +649,10 @@ export async function checkO4RecoveryProbe() {
     { suite: "rotation40", taskReferenceMode: "current", args: ["--check"] });
   assert.deepEqual(parseCli(["--freeze", "manifest.json", "--suite", "rotation40", "--task-reference", "current"]),
     { suite: "rotation40", taskReferenceMode: "current", args: ["--freeze", "manifest.json"] });
+  assert.deepEqual(parseCli(["--suite", "rotation40fresh", "--task-reference", "current", "--freeze", "fresh.json"]),
+    { suite: "rotation40fresh", taskReferenceMode: "current", args: ["--freeze", "fresh.json"] });
+  assert.deepEqual(parseCli(["--inspect", "fresh.json", "--suite", "rotation40fresh"]),
+    { suite: "rotation40fresh", taskReferenceMode: "id", args: ["--inspect", "fresh.json"] });
   assert.throws(() => parseCli(["--suite", "rotation80", "--check"]));
   assert.throws(() => parseCli(["--suite", "rotation40", "--suite", "recovery20", "--check"]));
   assert.throws(() => parseCli(["--task-reference", "current", "--check"]));
@@ -638,16 +672,19 @@ export async function checkO4RecoveryProbe() {
   assert.ok(currentAction?.kind === "merchant_status" && "taskRef" in currentAction);
   assert.deepEqual(idAction.taskRef, { taskId: mapping.taskA });
   assert.deepEqual(currentAction.taskRef, { kind: "current" });
+  assert.deepEqual(freshSuite.fauxAction(18, "mysql", mapping), currentAction);
+  assert.deepEqual(taskReferenceSettings("rotation40fresh", "current"), currentSettings);
   // Prebuilt rows preserve both arms and the full denominator even if nothing starts.
   assert.equal(rows.filter(r => r.status === "skipped").length, 40);
   assert.equal(rotationRows.filter(r => r.status === "skipped").length, 80);
-  console.log("O4 probe runner checks passed: 40/80 planned rows, explicit id/current schema snapshots and suite restriction, actual order/task/confirmation display binding, stale-token replay and redisplay, disabled remote stages and unknown-cost accounting; no database/network.");
+  assert.equal(freshRows.filter(r => r.status === "skipped").length, 80);
+  console.log("O4 probe runner checks passed: original/fresh 40/80 planned rows and wording-bound scoring, explicit id/current schema snapshots, actual order/task/confirmation display binding, stale-token replay and redisplay, disabled remote stages and unknown-cost accounting; no database/network.");
 }
 function parseCli(input: string[]): { suite: SuiteName; taskReferenceMode: TaskReferenceMode; args: string[] } {
   const args = [...input]; let suite: SuiteName = "recovery20", taskReferenceMode: TaskReferenceMode = "id";
   const suiteIndex = args.indexOf("--suite");
   if (suiteIndex >= 0) {
-    const value = args[suiteIndex + 1]; assert.ok(value && validSuite(value), "--suite must be recovery20 or rotation40");
+    const value = args[suiteIndex + 1]; assert.ok(value && validSuite(value), "--suite must be recovery20, rotation40 or rotation40fresh");
     suite = value; args.splice(suiteIndex, 2); assert.ok(!args.includes("--suite"), "--suite may be provided only once");
   }
   const taskIndex = args.indexOf("--task-reference");
@@ -663,7 +700,7 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
   if (!args.length || args.length === 1 && args[0] === "--check") await checkO4RecoveryProbe();
   else {
     assert.ok(args.length === 2 && ["--freeze", "--freeze-faux", "--inspect", "--live", "--faux"].includes(args[0]!),
-      "Use [--suite recovery20|rotation40] [--task-reference id|current] --check|--freeze|--freeze-faux|--inspect|--live|--faux MANIFEST; current is rotation40 only; --faux uses the real local database");
+      "Use [--suite recovery20|rotation40|rotation40fresh] [--task-reference id|current] --check|--freeze|--freeze-faux|--inspect|--live|--faux MANIFEST; current requires a rotation suite; --faux uses the real local database");
     if (args[0] === "--freeze" || args[0] === "--freeze-faux") await freezeO4RecoveryProbe(args[1]!, args[0] === "--freeze" ? "live" : "faux", suite, taskReferenceMode);
     else if (args[0] === "--inspect") { const value = await inspectO4RecoveryProbe(args[1]!, suite, taskReferenceMode); console.log(json({ frozen: true, suite, taskReferenceMode, execution: value.manifest.configuration.execution, providerRequests: 0, databaseCalls: 0 })); }
     else {
