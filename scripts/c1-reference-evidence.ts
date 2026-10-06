@@ -9,6 +9,9 @@ import type { C1ValidationActual, C1ValidationHistory } from "./c1-session-valid
 export type C1ReferenceEvidenceOptions = {
   required?: boolean;
   verifyPolicyTopic?: (actual: C1ValidationActual, question: string, history: C1ValidationHistory) => boolean;
+  // Only a separately verified v3 parser stop can retire the input topics.
+  verifyQuestionDiscard?: (actual: C1ValidationActual, question: string, history: C1ValidationHistory) => boolean;
+  verifyQuestionCompletion?: (actual: C1ValidationActual, question: string, history: C1ValidationHistory) => boolean;
 };
 type Kind = TrustedReference["kind"];
 type Candidate = TrustedReferenceChoices["candidates"][number];
@@ -157,9 +160,21 @@ export function scoreC1ReferenceEvidence(actual: C1ValidationActual, originalQue
       assert.equal(result.evidence.requestId, value.requestId); assert.deepEqual(result.evidence.action, result.action);
       assert.deepEqual(result.evidence.trustedRoute, { groupOpenid, messageId: ingress.messageId });
       assert.deepEqual(value.calls, result.evidence.actualCalls); assert.ok(value.calls.every(call => call.parentSpanId === value.requestId));
+      const questionDiscard = result.discardPolicyTopic === true;
+      if (questionDiscard) {
+        assert.ok(options.verifyQuestionDiscard?.(value, row.question, rows.slice(0, index)),
+          "Discarded policy topics require independent question execution and restatement proof");
+        assert.equal(result.outcome, "clarification"); assert.equal(result.pendingReferenceKind, "policy");
+        assert.equal(result.referencePresentation, undefined); assert.equal(result.verifiedPolicyTopic, undefined);
+        assert.deepEqual(value.reply, result.reply); assert.ok(!value.calls.some(call => call.name === "search_faq"));
+      }
       for (const kind of ["order", "policy"] as const) {
         const recorded: TrustedReferenceChoices | undefined = kind === "order" ? result.evidence.orderReferenceChoices : result.evidence.policyChoices;
-        if (result.referencePresentation === kind) {
+        if (kind === "policy" && questionDiscard) {
+          assert.deepEqual(recorded, { version: "reference-choices-v1", kind: "policy", ...binding,
+            candidates: [], overflow: false, selectionRequired: false }, "Discard must leave no reusable or displayed policy choices");
+          states.policy = empty(); delete presentations.policy;
+        } else if (result.referencePresentation === kind) {
           assert.equal(result.outcome, "clarification"); assert.equal(result.needsAnswer, false); assert.deepEqual(value.reply, result.reply);
           const choices = checkChoices(recorded, kind, start, "presentation");
           const text = object(value.reply).text; assert.ok(typeof text === "string" && choices.candidates.length > 0);
@@ -213,6 +228,12 @@ export function scoreC1ReferenceEvidence(actual: C1ValidationActual, originalQue
       const nextFocus = result.verifiedOrderId ?? (selectedOrder && order?.id === selectedOrder ? selectedOrder : undefined);
       if (nextFocus) { assert.equal(order?.id, nextFocus); focus = nextFocus; selectedOrder = undefined; }
       if (order && result.outcome === "ready" && "orderRef" in action && action.orderRef?.kind === "explicit" && pending === "order") pending = undefined;
+      if (pending === "policy" && result.outcome === "ready" && result.evidence.questionResolution
+        && result.evidence.questionResolution.value.decision !== "needs_clarification") {
+        assert.ok(options.verifyQuestionCompletion?.(value, row.question, rows.slice(0, index)),
+          "A pending question needs independently proven v3 completion before it can be cleared");
+        pending = undefined;
+      }
     }
     return { passed: true, issues: [] };
   } catch (error) { return { passed: false, issues: [`${location}: ${error instanceof Error ? error.message : String(error)}`] }; }

@@ -8,6 +8,7 @@ import { buildSupportEvidenceBinding, validateSupportEvidenceTarget, policyTopic
   evidenceBindingV3Version, type EvidenceBindingVersion, type SupportEvidenceTarget, type SupportOrderFacts } from "./support-evidence-context.ts";
 import { buildSupportQuestionResolutionInput, requireSupportQuestionResolution, supportQuestionResolutionInputHash,
   type SupportQuestionResolver, type SupportQuestionResolutionInput, type SupportQuestionResolution } from "./support-question-resolution.ts";
+import type { SupportQuestionTrace, SupportQuestionObservation } from "./support-question-resolution.ts";
 import { RefundBusinessError, type RefundStore } from "./refunds.ts";
 import { isRefundOperation, type Reply } from "./reply.ts";
 import { SupportProtocolError } from "./support-action.ts";
@@ -59,6 +60,7 @@ export type SupportPolicyScopeRepair = {
   action: AnySupportAction; topic: TrustedPolicyTopic; call: SupportCall;
   budget?: { limit: number; usedBefore: number; usedAfter: number; toolCallId: string };
   questionResolution?: { input: SupportQuestionResolutionInput; value: SupportQuestionResolution };
+  questionTrace?: SupportQuestionTrace;
 };
 function freezePolicyScopeRepair(value: unknown, seen = new WeakSet<object>()): void {
   if (!value || typeof value !== "object" || seen.has(value)) return;
@@ -71,7 +73,8 @@ export class SupportPolicyScopeRepairError extends SupportProtocolError {
   constructor(repair: SupportPolicyScopeRepair) {
     const audit = structuredClone(repair);
     freezePolicyScopeRepair(audit);
-    super(JSON.stringify({ code: "POLICY_SCOPE_CHANGED", repair: audit,
+    const { questionTrace: _questionTrace, ...modelAudit } = audit;
+    super(JSON.stringify({ code: "POLICY_SCOPE_CHANGED", repair: modelAudit,
       instruction: "前序话题的商品范围与本轮订单不同；本轮尚未检索规则或办理业务。若当前原问完整，请重新选择同订单的 policy、standalone 和 current_order；否则明确 clarify policy_topic。不能沿用 previous、旧商品事实或假设。" }));
     this.name = "SupportPolicyScopeRepairError";
     this.repair = audit;
@@ -129,12 +132,14 @@ export type SupportTurnContext = {
   pendingReferenceKind?: "order" | "policy";
   allowPolicyScopeRepair?: boolean;
   onCall?: (call: SupportCall) => void;
+  onQuestionTrace?: (observation: SupportQuestionObservation) => void;
 };
 export type EvidenceBundle = {
   version: 1; requestId: string; trustedRoute: SupportTurnContext["trustedRoute"];
   action: AnySupportAction; actualCalls: SupportCall[];
   policyScopeRepair?: SupportPolicyScopeRepair;
   questionResolution?: { input: SupportQuestionResolutionInput; value: SupportQuestionResolution };
+  questionTrace?: SupportQuestionTrace;
   traceDeliveryFailed?: boolean;
   order?: Order; rules: Array<Knowledge[number] & { version: string }>;
   knowledge: Array<{ callId: string; context: SupportKnowledgeContext; trace: KnowledgeTrace }>;
@@ -210,6 +215,8 @@ export class SupportController {
     let pending: Promise<SupportResult> | undefined;
     let sequence = 0;
     let policyScopeRepair: SupportPolicyScopeRepair | undefined;
+    let questionTrace: SupportQuestionTrace | undefined;
+    let questionTraceDeliveryFailed = false;
     let resolution: { hash: string; promise: Promise<{ input: SupportQuestionResolutionInput; value: SupportQuestionResolution }> } | undefined;
     const resolveQuestion = this.questionContract === "v3" ? async (topic: TrustedPolicyTopic | null) => {
       const input = buildSupportQuestionResolutionInput({ requestId: trusted.requestId, originalQuery: trusted.userText, previousTopic: topic });
@@ -222,11 +229,23 @@ export class SupportController {
         const cancelled = new Promise<never>((_resolve, reject) => { abort = () => reject(signal.reason); signal.addEventListener("abort", abort, { once: true }); });
         let value: SupportQuestionResolution;
         try { value = requireSupportQuestionResolution(await Promise.race([
-          this.questionResolver!.resolve(structuredClone(input), { signal }), cancelled,
+          this.questionResolver!.resolve(structuredClone(input), { signal, onTrace: trace => {
+            if (questionTrace) { questionTraceDeliveryFailed = true; return; }
+            try {
+              questionTrace = structuredClone(trace);
+              trusted.onQuestionTrace?.({ requestId: trusted.requestId, observedAt: new Date().toISOString(),
+                input: structuredClone(input), trace: structuredClone(trace) });
+            } catch { questionTraceDeliveryFailed = true; }
+          } }), cancelled,
         ]), input); }
         finally { signal.removeEventListener("abort", abort); }
         signal.throwIfAborted();
         trusted.signal?.throwIfAborted();
+        if (this.questionResolver!.settings && (!questionTrace || questionTrace.inputHash !== hash
+          || !isDeepStrictEqual(questionTrace.settings, this.questionResolver!.settings)
+          || questionTrace.failure !== null || !isDeepStrictEqual(questionTrace.value, value))) {
+          throw new SupportProtocolError("咨询解析请求缺少匹配的实际执行记录。");
+        }
         return { input, value };
       })() };
       return structuredClone(await resolution.promise);
@@ -298,7 +317,8 @@ export class SupportController {
         try { validate(action); } catch (error) { return Promise.reject(error); }
         accepted = structuredClone(action);
         // Cache the promise, including rejection: a model retry cannot re-run an uncertain mutation.
-        pending = this.execute(trusted, accepted, { nextCallId: () => `${trusted.requestId}:${++sequence}`, policyScopeRepair, resolveQuestion }).catch(error => {
+        pending = this.execute(trusted, accepted, { nextCallId: () => `${trusted.requestId}:${++sequence}`, policyScopeRepair, resolveQuestion,
+          questionTrace: () => questionTrace, questionTraceDeliveryFailed: () => questionTraceDeliveryFailed }).catch(error => {
           // Only this completed, side-effect-free scope rejection can release
           // the lock. Service failures and cancellation remain terminal.
           if (error instanceof SupportPolicyScopeRepairError && !policyScopeRepair) {
@@ -316,6 +336,7 @@ export class SupportController {
 
   private async execute(context: SupportTurnContext, action: AnySupportAction,
     attempt: { nextCallId: () => string; policyScopeRepair?: SupportPolicyScopeRepair;
+      questionTrace?: () => SupportQuestionTrace | undefined; questionTraceDeliveryFailed?: () => boolean;
       resolveQuestion?: (topic: TrustedPolicyTopic | null) => Promise<{ input: SupportQuestionResolutionInput; value: SupportQuestionResolution }> }): Promise<SupportResult> {
     const evidence: EvidenceBundle = { version: 1, requestId: context.requestId, trustedRoute: { ...context.trustedRoute }, action,
       actualCalls: attempt.policyScopeRepair ? [structuredClone(attempt.policyScopeRepair.call)] : [], rules: [], knowledge: [],
@@ -336,11 +357,15 @@ export class SupportController {
     let verifiedOrderId: string | undefined;
     let verifiedPolicyTopic: TrustedPolicyTopic | undefined;
     let verifiedAmountReference: TrustedAmountReference | undefined;
-    const result = (reply: Reply, outcome: SupportResult["outcome"] = "ready", needsAnswer = false): SupportResult =>
-      ({ action, outcome, reply, evidence, needsAnswer, ...(verifiedOrderId ? { verifiedOrderId } : {}),
+    const result = (reply: Reply, outcome: SupportResult["outcome"] = "ready", needsAnswer = false): SupportResult => {
+      const trace = attempt.questionTrace?.();
+      if (trace) evidence.questionTrace = structuredClone(trace);
+      if (attempt.questionTraceDeliveryFailed?.()) evidence.traceDeliveryFailed = true;
+      return { action, outcome, reply, evidence, needsAnswer, ...(verifiedOrderId ? { verifiedOrderId } : {}),
         ...(verifiedPolicyTopic ? { verifiedPolicyTopic } : {}), ...(verifiedAmountReference ? { verifiedAmountReference } : {}),
         ...(pendingReferenceKind ? { pendingReferenceKind } : {}), ...(referencePresentation ? { referencePresentation } : {}),
-        ...(discardPolicyTopic ? { discardPolicyTopic: true as const } : {}) });
+        ...(discardPolicyTopic ? { discardPolicyTopic: true as const } : {}) };
+    };
     const emit = (step: SupportCall) => {
       // Telemetry is not part of the business transaction and cannot turn a completed prepare into a retry.
       try { context.onCall?.(structuredClone(step)); }
@@ -641,6 +666,7 @@ export class SupportController {
         && (!previous || action.questionContext.kind !== "previous" || decision.previousRequestId !== previous.requestId)
         || decision.decision === "current_complete" && (previous || alternativeOrderId && question.topic)) return unresolvedQuestion();
     }
+    if (attempt.questionTraceDeliveryFailed?.()) evidence.traceDeliveryFailed = true;
     if (question.topic && !alternativeOrderId && !isDeepStrictEqual(question.topic.scope, currentScope)) {
       const read = evidence.actualCalls[0];
       if (context.allowPolicyScopeRepair && !attempt.policyScopeRepair && context.policyChoices && semantic && action.kind === "policy"
@@ -650,9 +676,11 @@ export class SupportController {
         && evidence.actualCalls.length === 1 && read?.name === "get_order" && !read.isError
         && read.input.orderId === order.id && isDeepStrictEqual(read.output, order) && !evidence.traceDeliveryFailed) {
         context.signal?.throwIfAborted();
+        const parserTrace = attempt.questionTrace?.();
         throw new SupportPolicyScopeRepairError({ version: "policy-scope-repair-v1", reason: "scope_changed",
           action, topic: question.topic, call: read,
-          ...(evidence.questionResolution ? { questionResolution: evidence.questionResolution } : {}) });
+          ...(evidence.questionResolution ? { questionResolution: evidence.questionResolution } : {}),
+          ...(parserTrace ? { questionTrace: structuredClone(parserTrace) } : {}) });
       }
       return attempt.resolveQuestion ? unresolvedQuestion() : clarify("policy_topic");
     }

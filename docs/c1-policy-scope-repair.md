@@ -106,7 +106,7 @@ npm run validate
 
 ### v3工程实现与取舍（2026-10-06）
 
-已实现解析端口、来源校验、中性查询与Controller/Session接线。只有调用者显式传入`questionContract: "v3"`及`questionResolver`才能使用；缺少端口直接拒绝。当前没有线上解析客户端、CLI/QQ实验开关或解析费用汇总，不能将本片描述为线上可用的语义优化。默认v2、DeepSeek、atomic + lexical、memory/id与常驻QQ均保持既有配置。
+第一片（`0352d8c`）实现解析端口、来源校验、中性查询与Controller/Session接线。只有调用者显式传入`questionContract: "v3"`及`questionResolver`才能使用；缺少端口直接拒绝。该片尚无真实解析客户端、CLI开关或费用接线；随后工程进展见本文末节，不能将端口检查描述为真实语义改善。默认v2、DeepSeek、atomic + lexical、memory/id与常驻QQ均保持既有配置。
 
 执行顺序是：校验动作原问 → 本人订单重新授权读取 → 按fresh范围选择允许的历史原问 → 独立解析端口 → 来源及当前引用有效性校验 → 构造查询 → 原知识服务。解析仅输入`requestId`、本轮原文及合法前序原问链；范围变化或跨单时历史输入为`null`，不传旧回答、订单状态、资料或退款意图。输出固定为三种决策、输入hash、当前原文引文及前序请求ID；校验严格字段、数组、长度、重放及链预算。**模型仍可能引用真实原文却判断错语义**，来源校验无法识别这种错误，检查中保留了这一反例。
 
@@ -121,7 +121,7 @@ npm run validate
 
 只扩充Prompt的成本低，但无法防止模型复制旧问题或宿主自动生成退款意图；仅做原文相等校验也不能判定“刚才那个现在呢”是否完整。此候选因此将语义判断和确定性来源校验分开：前者可错，后者限制错误可沿用的历史。新增解析请求将增加延迟、费用及可能的误澄清，尚需真实对照决定收益。没有引入第二个Agent循环或通用编排；候选Prompt追加人数/日期咨询使用policy、订单事实使用order的说明，尚未证明真实动作选择改善。
 
-源码入口：[解析合同与来源验证](../src/support-question-resolution.ts)、[中性查询v3](../src/support-evidence-context.ts)、[Controller](../src/support-controller.ts)、[Session候选接线](../src/support-session.ts)。已有C1/v9独立评分仍按v2合同校验，本片没有改历史分数或宣称v3通过旧机械证明；v3评分与线上费用合同另行版本化。
+源码入口：[解析合同与来源验证](../src/support-question-resolution.ts)、[中性查询v3](../src/support-evidence-context.ts)、[Controller](../src/support-controller.ts)、[Session候选接线](../src/support-session.ts)。第一片保留C1/v9的v2合同与历史分数；末节新评分显式区分v3，不宣称v3通过旧机械证明。
 
 ### 工程复现及下一步
 
@@ -138,4 +138,48 @@ npm run validate
 
 首次全量检查在旧`support-controller-check.ts`注入知识服务处失败：新构造函数复制services后，原有构建后替换knowledge不再生效。已保留原服务引用，只固定新增咨询合同与端口；原检查不改，Controller定向与最终全量重跑均通过。首次失败日志和最终日志分别留在忽略目录`.runtime/c1-question-v3-engineering-validate.log`、`.runtime/c1-question-v3-engineering-validate-final.log`，不作为真实模型或数据库验收。
 
-下一片先接真实有界解析客户端与角色配置，复用Pi原生请求、取消及用量记录，确保成功、无效输出、超时和失败请求均计入费用与执行证据；为v3增加独立评分/快照合同。在0远程工程验证通过后，再冻结新的完整/省略/合法续问题集、单次调用预算、误澄清分母与停止条件。真实验证同时固定主Agent和判别配置，以比较“新增解析请求的收益是否抵得过延迟、费用和误澄清”，不回跑本页16轮或模型选型12题追分。整体C1、完整O4/O5、共同79轮与常驻QQ重启仍待完成。
+第一片收尾时确定的下一步是接真实有界解析客户端、角色配置、用量记录及v3独立证明；这些工程工作已按下节完成。在0远程工程验证通过后，再冻结新的完整/省略/合法续问题集、单次调用预算、误澄清分母与停止条件。真实验证同时固定主Agent和判别配置，以比较“新增解析请求的收益是否抵得过延迟、费用和误澄清”，不回跑本页16轮或模型选型12题追分。整体C1、完整O4/O5、共同79轮与常驻QQ重启仍待完成。
+
+### 下一片P0工程合同（实施前，2026-10-06）
+
+- **真实约束与追问：** 已授权订单仍不能补全省略诉求；真实解析请求也可能超时、格式错误或没有用量。需要说明“一次解析新增多少请求和费用，取消后如何保留未知用量而不发布迟到结果，来源合法为何仍会语义判断错误”。
+- **实现与复用边界：** 一个无工具JSON解析请求，复用原Pi complete、独立角色凭据和既有USD/CNY价格函数；显式模型选择默认Flash、temperature0/思考关闭/SDK retry0/最多1024输出/超时不超过15秒。宿主添加版本和inputHash，模型只输出决策、当前原文引文和前序ID，不要求模型计算hash，不提供订单/资料/答案。沿用v3候选端口，不改变Pi核心、v2/QQ默认和旧评分合同。
+- **本轮验收：** 原生Pi替代HTTP逐次校验真实wire、身份、JSON、一次请求、无工具、取消、超时、无效响应和未知用量；Controller/Session保留成功及失败解析trace，转换为既有评测span，不能漏计无效输出的已知用量。独立v3证明重建输入/原问链、决策来源、查询与费用；测试注入的语义结果仍不记为真实业务改善。
+- **可用入口：** API显式传入候选client；CLI提供仅本地命令的v2/v3、解析模型与超时环境参数，拒绝atomic或v2下的无效组合。QQ、工作台默认及前端不自动接候选，新增解析费用用provider span分列，原仅汇总主Agent的指标不改称全链路费用。
+- **预算与停止：** 0远程模型、DB、QQ；完成定向、全量validate、独立审阅、文档和提交收尾。真实新题及单次预算在工程完成后另冻结；本片不运行任何已收尾manifest，也不通过重复固定题追分。
+
+### 真实解析客户端、费用与独立v3证明（2026-10-06，工程候选）
+
+已接入[单次解析客户端](../src/support-question-client.ts)：复用Pi原生complete与provider，不启动额外Agent进程或改Pi核心。默认解析角色为DeepSeek Flash，可显式使用Pro或固定千问快照；角色凭据与主Agent分开。一个解析最多发送1次HTTP，无工具、关闭思考、temperature0、retry0、输出最多1024 Token；默认超时10秒，范围1..15秒。模型只返回决策、当前引文、前序请求ID，版本及输入hash由宿主添加。事实、检索资料与旧回答不进入解析输入。
+
+Controller/Session保存成功与失败的解析trace，`onQuestionTrace`提供实际当前requestId、完成回调时间、固定输入与trace。范围修复重用一次解析，但两次订单读取仍独立取证。费用、配置和wire hash留在宿主证据及回调，不添加到主Agent的工具结果上下文；模型仍得到必要的问题出处和业务证据。回调故障标记采集不完整，不引发第二次请求或业务重试；取消后的迟到SDK结果不能变成新轮业务结果。
+
+[provider span适配器](../src/knowledge-evaluation.ts)供回调消费者将解析记录纳入既有EvalSpan，按实际HTTP0/1、已知Token覆盖及USD/CNY分列。无效JSON、禁止工具/思考或不完整字段的输出，在首完整SDK响应与实际wire用量核对成立时仍计费；拦截额外请求不抹掉首请求账本。缺usage或对账不成立保持未知。**部分流超时可能已经观察到usage，但完整SDK结果未闭合时，费用仍为null；原始独立记录保留已到片段，不代表零费用或供应商停止计费。**原`summarizeEvaluation`仍仅汇总Agent模型step，不能称其为全链路总费用。工作台/QQ尚未激活v3解析或新增其费用展示；本片只提供候选API与适配器。
+
+独立证明只在冻结`order-evidence-binding-v3`及`questionSettings`时启用，摘要标识`c1-session-validation-v10-question-v3`与`questionProofVersion=c1-question-evidence-v1`；旧v2仍v9且无新增摘要字段。评分从实际原问、完整合法前序历史、宿主候选、授权读取、SDK动作、独立HTTP body/原始SSE/SDK响应、完成时间、查询及价格重建，匹配自报hash不足以通过。0次FAQ的澄清/失败和取消也检查解析请求，不能绕过费用及来源核验。只有独立证明通过的完整重述才清除待澄清状态，旧话题清除后不能重新显示或复活。
+
+显式本机候选入口（此命令会使用本机业务库并实际请求模型，本片未执行）：
+
+```sh
+SUPPORT_ARCHITECTURE=controller CLI_QUESTION_CONTRACT=v3 \
+  CLI_QUESTION_MODEL=deepseek-flash CLI_QUESTION_TIMEOUT_MS=10000 npm start
+```
+
+省略这些CLI参数仍走v2；atomic下启用v3、v2下配置解析模型/超时、未知模型或非法超时直接拒绝。API使用`createSupportQuestionClient`并传入`createSupportSession`的`questionContract: "v3" / questionResolver / onQuestionTrace`。这些开关只作用于本机CLI候选，不改变QQ和工作台参数合同。
+
+工程复现使用合成订单、原创内存规则和原生Pi替代HTTP，不读取真实QQ消息或改线上corpus：
+
+```sh
+node scripts/support-question-client-check.ts
+node scripts/support-question-observation-check.ts
+node scripts/support-question-evidence-check.ts
+npm run validate
+```
+
+本片验收收尾后，下一步才冻结新的完整重述、省略、合法续问题集和单次预算，固定主Agent与证据判别配置，比较额外解析的真实收益、误澄清、延迟及费用。不重跑已关闭题集，不以工程固定分类冒充真实模型理解或C1准入。默认配置与旧失败结论均保留。
+
+本片已按0远程/DB/QQ预算收尾：**54项原生客户端控制、23项span/采集/CLI控制、16条实际Pi Session捕获及45项篡改负控通过**；独立审阅、最终`npm run validate`退出0，包含旧v2、原23项范围修复、6条旧证明/37项篡改及QQ/回复/评测离线回归。16条涵盖当前完整问题、合法previous、一次范围修复、澄清、无效输出已知费用、未知用量、HTTP失败、CNY、修复后澄清、取消、跨单完整咨询，以及“澄清→完整重述→合法续问”的实际恢复。所有模型HTTP与语义分类均使用固定工程输入，不是远程效果测试。
+
+独立审阅已复现并修复三类缺口：额外请求被拦截时错误清空首请求已知费用；参考评分器未镜像安全清除旧话题及完整重述后解除待澄清；普通SDK工具输出可被整体替换而未与宿主结果配对。现逐项保留负控，工具实际动作、成功位、回复、解析出处和业务投影均与宿主匹配，普通返回及范围错误都不把完整解析trace送入模型。被拦额外请求的特有事件尚无通用C1原始记录字段，独立评分对这种不完整录制保守拒绝；客户端专属检查仍证明只有1次HTTP及首账本未丢。
+
+首次全量通过后发现的SDK输出证明缺项已另做必要修复，再次全量通过；日志分别留在忽略目录`.runtime/c1-question-client-engineering-validate.log`及`.runtime/c1-question-client-engineering-validate-final.log`。本片未修改题集gold、历史成绩、线上规则、数据库或前端；本机已有`package.json`、锁文件和`.idea/`改动保留且不纳入本片。真实解析质量、额外请求净收益、v3线上执行runner/付费manifest及QQ/工作台激活仍未交付。

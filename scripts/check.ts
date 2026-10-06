@@ -94,3 +94,6 @@ await checkC1BusinessEvidenceAudit();
 const { loadC1SupportDevelopment } = await import("./c1-support-check.ts");
 await loadC1SupportDevelopment("expanded");
 await loadC1SupportDevelopment("language");
+await (await import("./support-question-client-check.ts")).checkSupportQuestionClient();
+await (await import("./support-question-observation-check.ts")).checkSupportQuestionObservation();
+await (await import("./support-question-evidence-check.ts")).checkSupportQuestionEvidence();

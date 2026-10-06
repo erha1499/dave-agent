@@ -4,7 +4,12 @@ import { isDeepStrictEqual } from "node:util";
 import { pathToFileURL } from "node:url";
 import { contentHash, rerankInstruction } from "../src/bailian.ts";
 import { merchantSourceKey } from "../src/after-sales.ts";
-import { buildSupportEvidenceBinding, evidenceBindingVersion } from "../src/support-evidence-context.ts";
+import { buildSupportEvidenceBinding, evidenceBindingVersion, evidenceBindingV3Version, type EvidenceBindingVersion } from "../src/support-evidence-context.ts";
+import type { AssistantMessage } from "@earendil-works/pi-ai";
+import { supportQuestionPrompt, supportQuestionPromptVersion } from "../src/support-question-client.ts";
+import { normalizeBailianGenerationBaseUrl } from "../src/model-selection.ts";
+import { validateSupportQuestionResolution, validateSupportQuestionResolutionInput, type SupportQuestionResolutionInput,
+  type SupportQuestionSettings, type SupportQuestionTrace } from "../src/support-question-resolution.ts";
 import { acceptEvidence } from "../src/evidence-acceptance.ts";
 import { applyEvidenceSupport, validateEvidenceSupportVerification, evidenceSupportInputHash, evidenceSupportRequestHash,
   evidenceSupportValidationVersion, evidenceSupportTypedPromptVersion, evidenceSupportTypedV6PromptVersion,
@@ -24,6 +29,8 @@ import { scoreC1ReferenceEvidence } from "./c1-reference-evidence.ts";
 
 // Pure contracts/scoring only. No executor, generated validation questions, I/O or model judge.
 export const c1ValidationScoringVersion = "c1-session-validation-v9";
+export const c1QuestionScoringVersion = "c1-question-evidence-v1";
+export const c1QuestionValidationScoringVersion = "c1-session-validation-v10-question-v3";
 export const c1Families = ["order_state", "paid_amount", "alternative_order", "policy_followup", "refund_time", "appointment_actor"] as const;
 export const c1Strata = ["known", "missing", "competing", "direct_missing_fact", "boundary"] as const;
 type Family = typeof c1Families[number];
@@ -50,7 +57,13 @@ export type C1ValidationManifest = { version: 1; frozenBeforeExecution: true; va
   corpusHashes: Record<"online" | "reference", string>;
   counts: { cases: number; turns: number; strata: Record<Stratum, number> } };
 // requestId is the actual ingress ID supplied to prepareSupportPrompt, not one inferred from a returned result.
-export type C1ValidationActual = SessionTurnActual & { caseId: string; turn: number; requestId: string | null; execution: "completed" | "failed" | "not_run";
+export type C1QuestionCall = { input: SupportQuestionResolutionInput; trace: SupportQuestionTrace; observedAt: string;
+  wire: { endpoint: string; method: "POST"; body: string; startedAt: string; rawResponse: string | null; status: number | null } | null;
+  response: AssistantMessage | null };
+export type C1ValidationActual = Omit<SessionTurnActual, "requests"> & {
+  requests: Array<Omit<SessionTurnActual["requests"][number], "operation"> & { operation: "agent" | "support" | "rerank" | "question" }>;
+  questionCalls?: C1QuestionCall[];
+  caseId: string; turn: number; requestId: string | null; execution: "completed" | "failed" | "not_run";
   // New recordings expose actual ingress; old traces remain replayable without inventing it.
   ingress?: { identity: QQIdentity; groupOpenid: string; messageId: string; requestId: string; observedAt?: string } | null;
   hostReceipt?: SupportHostReceipt };
@@ -66,7 +79,8 @@ export type C1ValidationKnowledgeConfiguration = { applicability?: KnowledgeAppl
   supportPrompt?: "v5" | "v6";
   supportSettings?: EvidenceSupportSettings;
   // Frozen candidate requirement, independent of a trace's own version label.
-  evidenceBindingVersion?: "order-evidence-binding-v2";
+  evidenceBindingVersion?: EvidenceBindingVersion;
+  questionSettings?: SupportQuestionSettings;
   policyScopeRepair?: { version: "policy-scope-repair-v1"; maxRepairs: 1; repairBudget: 1 | 2 } };
 const nonempty = (value: unknown): value is string => typeof value === "string" && Boolean(value.trim());
 const digest = (value: unknown) => typeof value === "string" && /^[a-f0-9]{64}$/.test(value);
@@ -149,6 +163,318 @@ const recordedObject = (value: unknown): Record<string, unknown> => {
   return value as Record<string, unknown>;
 };
 
+// A separate oracle preserves the actual consultation, then adds only neutral
+// facts. The production builder still checks facts/target shape below; it is not
+// the only source of the expected v3 query.
+function assertQuestionQuery(binding: ReturnType<typeof buildSupportEvidenceBinding>, action: ContextSupportAction,
+  originalQuery: string, order: Order | undefined, topic: TrustedPolicyTopic | null) {
+  assert.equal(binding.evidenceBindingVersion, evidenceBindingV3Version);
+  if (action.kind !== "policy" && action.kind !== "refund_eligibility") return;
+  let query = originalQuery.trim();
+  if (action.questionContext.kind === "previous") {
+    assert.ok(topic && action.orderRef?.kind !== "alternative");
+    query += `\n上轮已完成取证的问题（仅用于理解本轮指代）：${topic.originalQuery}`;
+    if (topic.priorQueries?.length) query += `\n更早的已取证原问（按先后顺序，仅用于理解本轮指代）：${topic.priorQueries.map(row => row.originalQuery).join("\n")}`;
+  }
+  if (order) query += `\n已核实订单商品：${order.items[0]!.productName}。`;
+  let retrieval = query;
+  if (binding.evidenceTarget.kind === "current_order") {
+    assert.ok(order);
+    const states = ["unused", "redeemed", "expired", "refunded"];
+    const counts = states.map(state => order.coupons.filter(coupon => coupon.status === state).length);
+    const groups = states.flatMap((state, index) => {
+      const coupons = order.coupons.filter(coupon => coupon.status === state);
+      return coupons.length ? [`${["未核销", "已核销", "已过期", "已退款"][index]}券：日期已过期${coupons.filter(coupon => coupon.expiresAt !== null && Date.parse(coupon.expiresAt) <= Date.parse(order.asOf)).length}张、未到期${coupons.filter(coupon => coupon.expiresAt !== null && Date.parse(coupon.expiresAt) > Date.parse(order.asOf)).length}张、截止时间未知${coupons.filter(coupon => coupon.expiresAt === null).length}张`] : [];
+    });
+    query += `\n已核实订单状态：${order.status}。`
+      + `\n已核实本单券数：共${order.coupons.length}张，未核销${counts[0]}张、已核销${counts[1]}张、已过期${counts[2]}张、已退款${counts[3]}张（按券状态字段计数）。`
+      + `\n有效期事实（截至${order.asOf}）：${groups.join("；")}。`
+      + "\n以上订单事实仅用于判断上述咨询的适用条件，不构成新的咨询问题。";
+  } else {
+    query += `\n仅解释所问规则条件${binding.evidenceTarget.basis ? `（原文依据：${binding.evidenceTarget.basis}）` : ""}，不证明当前订单已满足，也不构成退款批准。`;
+    retrieval = query;
+  }
+  const locator = (text: string) => order ? text.replaceAll(`订单 ${order.id}`, "该订单").replaceAll(`订单${order.id}`, "该订单").replaceAll(order.id, "该订单") : text;
+  assert.equal(binding.effectiveQuery, locator(query), "v3 evidence cannot manufacture another consultation from order status");
+  assert.equal(binding.retrievalQuery, locator(retrieval), "v3 ranking must retain only the actual current/prior consultation and fresh product");
+}
+
+// Only frozen v3 recordings use this contract. Native wire and SDK response are
+// independent observations; matching self-reported hashes alone is insufficient.
+export function assertC1QuestionEvidence(actual: C1ValidationActual, originalQuery: string, history: C1ValidationHistory,
+  corpus: readonly RetrievalDocument[], configuration: C1ValidationKnowledgeConfiguration) {
+  assert.equal(configuration.evidenceBindingVersion, evidenceBindingV3Version);
+  const settings = configuration.questionSettings;
+  assert.ok(settings && settings.api === "openai-completions" && settings.temperature === 0 && settings.maxRetries === 0
+    && Number.isSafeInteger(settings.timeoutMs) && settings.timeoutMs >= 1000 && settings.timeoutMs <= 15000
+    && Number.isSafeInteger(settings.maxTokens) && settings.maxTokens > 0 && settings.maxTokens <= 1024
+    && settings.promptVersion === supportQuestionPromptVersion && settings.promptHash === contentHash(supportQuestionPrompt)
+    && settings.serialization === "json-question-resolution-v1", "Freeze the actual reviewed question client settings");
+  assert.ok(settings.provider === "deepseek" || settings.provider === "bailian");
+  assert.deepEqual(Object.keys(settings).sort(), ["provider", "model", "api", "endpoint", "timeoutMs", "temperature", "maxTokens", "maxRetries", "promptVersion", "promptHash", "serialization", "pricing"].sort());
+  assert.ok(settings.provider === "bailian" ? settings.model === "qwen3.7-plus-2026-05-26" && settings.pricing.currency === "CNY"
+    : ["deepseek-flash", "deepseek-v4-pro"].includes(settings.model) && settings.pricing.currency === "USD");
+  const rows = actual.questionCalls ?? [], requests = actual.requests.filter(request => request.operation === "question");
+  assert.ok(rows.length <= 1, "The Controller caches one fixed parser input across a scope repair");
+  const result = actual.result, evidence = result?.evidence;
+  assert.notEqual(evidence?.traceDeliveryFailed, true);
+  const resolution = evidence?.questionResolution, trace = evidence?.questionTrace;
+  if (!rows.length) {
+    assert.equal(requests.length, 0); assert.equal(trace, undefined); assert.equal(resolution, undefined);
+    assert.ok(!actual.calls.some(call => call.name === "search_faq")
+      || result && !["policy", "refund_eligibility"].includes(result.action.kind), "A v3 consultation cannot omit its parser evidence");
+    assert.ok(!result || !["policy", "refund_eligibility"].includes(result.action.kind) || !actual.calls.some(call => call.name === "get_order" && !call.isError),
+      "A read-only consultation with a completed read needs its actual parser recording, even when it safely stops");
+    return undefined;
+  }
+  const row = rows[0]!, ingress = actual.ingress;
+  assert.ok(ingress && actual.requestId && ingress.requestId === actual.requestId && Number.isFinite(Date.parse(ingress.observedAt ?? ""))
+    && actual.durationMs !== null && Number.isFinite(actual.durationMs) && actual.durationMs >= 0);
+  const start = Date.parse(ingress.observedAt!), end = start + actual.durationMs;
+  const at = Date.parse(row.observedAt);
+  assert.ok(Number.isFinite(at) && at >= start && at <= end);
+  assert.ok(validateSupportQuestionResolutionInput(row.input));
+  const repair = evidence?.policyScopeRepair;
+  let pendingSdk: { id: string; name: string; arguments: unknown } | undefined;
+  const sdkIds = new Set<string>();
+  for (const [index, step] of actual.steps.entries()) {
+    assert.equal(step.index, index + 1);
+    if (step.type === "model") {
+      assert.equal(pendingSdk, undefined);
+      const content = recordedObject(step.output).content; assert.ok(Array.isArray(content));
+      const tools = content.filter(part => recordedObject(part).type === "toolCall");
+      assert.ok(tools.length <= 1, "A parser source cannot be attributed to an ambiguous model batch");
+      if (tools.length) {
+        const emitted = recordedObject(tools[0]);
+        assert.ok(nonempty(emitted.id) && nonempty(emitted.name) && !sdkIds.has(emitted.id)); sdkIds.add(emitted.id);
+        pendingSdk = { id: emitted.id, name: emitted.name, arguments: emitted.arguments };
+      }
+    } else {
+      assert.ok(pendingSdk && step.name === pendingSdk.name);
+      assert.deepEqual(step.input, pendingSdk.arguments, "SDK execution must match the actual emitted model action"); pendingSdk = undefined;
+    }
+  }
+  assert.equal(pendingSdk, undefined);
+  const rawTools = actual.steps.filter(step => step.type === "tool" && step.name === "support_action");
+  const targetAction = repair?.action ?? result?.action;
+  const tool = rawTools.find(step => {
+    try { const action = normalizeModelSupportAction(recordedObject(step.input).action);
+      return targetAction ? equal(action, targetAction) : action.kind === "policy" || action.kind === "refund_eligibility";
+    } catch { return false; }
+  });
+  assert.ok(tool, "Parser must originate inside the actual SDK support action");
+  if (result) {
+    const completedTool = rawTools.at(-1)!;
+    assert.equal(completedTool.isError, false, "A delivered Controller result requires the actual successful SDK tool output");
+    assert.deepEqual(normalizeModelSupportAction(recordedObject(completedTool.input).action), result.action);
+    const output = recordedObject(completedTool.output), details = recordedObject(output.details);
+    assert.deepEqual(details, { action: result.action, outcome: result.outcome });
+    assert.ok(Array.isArray(output.content) && output.content.length === 1);
+    const part = recordedObject(output.content[0]); assert.deepEqual(Object.keys(part).sort(), ["text", "type"]);
+    assert.equal(part.type, "text"); assert.ok(typeof part.text === "string");
+    const payload = recordedObject(JSON.parse(part.text)), sdkEvidence = recordedObject(payload.evidence);
+    assert.equal(sdkEvidence.questionTrace, undefined, "Full parser audit remains in the host evidence, outside the model tool payload");
+    const { order, rules, task, operation, knowledge, amountComparison, displayedPaidUnit } = result.evidence;
+    // Reconstruct only the documented model-visible projection from the real
+    // Controller result. The SDK result is an independent observation, not an
+    // alternative source of facts, parser decisions or the delivered reply.
+    assert.deepEqual(payload, JSON.parse(JSON.stringify({ outcome: result.outcome, reply: result.reply, needsAnswer: result.needsAnswer,
+      evidence: { order, rules, task, operation, ...(resolution ? { questionResolution: resolution } : {}),
+        knowledgeUse: knowledge.map(entry => ({ evidenceBindingVersion: entry.context.evidenceBindingVersion, evidenceUse: entry.context.evidenceUse })),
+        amountComparison: amountComparison ? { remainingCouponCount: amountComparison.remainingCouponCount,
+          remainingUnitPaidCents: amountComparison.remainingUnitPaidCents, referencePaidCents: amountComparison.referencePaidCents,
+          comparisonEqual: amountComparison.comparisonEqual, refundApproved: false } : undefined,
+        displayedPaidUnit: displayedPaidUnit ? { field: displayedPaidUnit.field, paidCents: displayedPaidUnit.paidCents, productId: displayedPaidUnit.productId } : undefined } })),
+    "SDK business data, parser resolution and host reply must equal the actual Controller result");
+  } else assert.equal(tool.isError, true, "Cancellation without a Controller result cannot invent a successful SDK action");
+  const action = normalizeModelSupportAction(recordedObject(tool.input).action);
+  assert.ok(action.kind === "policy" || action.kind === "refund_eligibility");
+  assert.equal(action.question, originalQuery.trim());
+  const reads = actual.calls.filter(call => call.name === "get_order" && !call.isError && Date.parse(call.observedAt) <= at);
+  const read = reads[0], order = read?.output as Order | undefined;
+  if (action.orderRef) {
+    assert.ok(read && order && read.parentSpanId === actual.requestId && read.input.orderId === order.id);
+    if (action.orderRef.kind === "explicit") { assert.equal(action.orderRef.orderId, order.id); assert.ok(originalQuery.includes(order.id)); }
+    else assert.equal(action.orderRef.kind === "alternative" ? actual.hostReference?.alternativeOrderId : actual.hostReference?.orderId, order.id);
+  } else assert.equal(read, undefined);
+  let topic: TrustedPolicyTopic | null = null;
+  if (action.questionContext.kind === "previous" && action.orderRef?.kind !== "alternative") {
+    const choices = recordedObject(actual.hostReference).policyChoices as TrustedReferenceChoices | undefined;
+    const selectedAt = read ? Date.parse(read.observedAt) + Math.floor(read.durationMs) : row.wire ? Date.parse(row.wire.startedAt) : at;
+    const selected = resolveReferenceChoice(choices, { sourceKey: merchantSourceKey(ingress.identity, ingress.groupOpenid), groupOpenid: ingress.groupOpenid }, selectedAt);
+    assert.ok(selected?.kind === "policy" && selected.topic.requestId === action.questionContext.requestId);
+    const scope = { shopId: order?.shop.id ?? null, productId: order?.items[0]?.productId ?? null };
+    if (equal(selected.topic.scope, scope)) {
+      topic = selected.topic;
+      const donors = history.filter(item => item.actual.caseId === actual.caseId && item.actual.turn < actual.turn && item.actual.requestId === topic!.requestId);
+      assert.equal(donors.length, 1); const donor = donors[0]!;
+      assert.ok(donor.actual.execution === "completed" && donor.actual.ingress && donor.actual.result?.outcome === "ready");
+      assert.deepEqual(donor.actual.ingress.identity, ingress.identity); assert.equal(donor.actual.ingress.groupOpenid, ingress.groupOpenid);
+      assert.deepEqual(donor.actual.result.verifiedPolicyTopic, topic);
+      assert.ok(knowledgeProofPassed(donor.actual, corpus, configuration, donor.question, history.filter(item => item.actual.turn < donor.actual.turn)));
+      assert.equal(topic.orderId, order?.id ?? null);
+    }
+  }
+  const previousQueries = topic ? [...(topic.priorQueries ?? []), { requestId: topic.requestId,
+    originalQuery: history.find(item => item.actual.caseId === actual.caseId && item.actual.requestId === topic!.requestId)!.question }] : null;
+  if (topic) for (const query of previousQueries!) {
+    const donors = history.filter(item => item.actual.caseId === actual.caseId && item.actual.turn < actual.turn && item.actual.requestId === query.requestId);
+    assert.equal(donors.length, 1); assert.equal(query.originalQuery, donors[0]!.question);
+  }
+  const input = { requestId: actual.requestId, originalQuery, previousTopic: topic ? { requestId: topic.requestId, queries: previousQueries! } : null };
+  assert.deepEqual(row.input, input, "Parser accepts only current raw text and a real same-scope donor; no facts/old answers");
+  const inputHash = contentHash(input), captured = row.trace;
+  assert.equal(captured.version, "support-question-trace-v1"); assert.equal(captured.inputHash, inputHash);
+  assert.deepEqual(captured.settings, settings); assert.equal(captured.requestHash, contentHash({ settings, payload: input }));
+  if (result) assert.deepEqual(trace, captured, "The actual callback trace must equal the delivered Controller evidence");
+  assert.ok(captured.attempts.length <= 1);
+  if (!result) assert.ok(captured.failure, "A completed parser decision cannot be used without the actual Controller result");
+  const attempt = captured.attempts[0], wire = row.wire, response = row.response;
+  assert.equal(requests.length, wire ? 1 : 0);
+  if (!attempt) {
+    assert.equal(captured.failure, "aborted"); assert.equal(wire, null); assert.equal(response, null); assert.equal(captured.value, null);
+  } else {
+    assert.equal(attempt.operation, "question"); assert.equal(attempt.provider, settings.provider); assert.equal(attempt.model, settings.model);
+    assert.equal(attempt.attempt, 1); assert.ok(Number.isFinite(attempt.durationMs) && attempt.durationMs >= 0 && attempt.durationMs <= actual.durationMs + 2);
+    assert.equal(attempt.httpRequests, wire ? 1 : 0);
+    assert.equal(attempt.wireHash, wire ? contentHash({ endpoint: wire.endpoint, method: "POST", body: wire.body }) : null);
+    let rawText = "", rawModels: unknown[] = [], rawUsage: Record<string, unknown> | undefined;
+    let wireInvalid = false, unexpected = false, done = false;
+    if (wire) {
+      assert.equal(wire.method, "POST"); assert.equal(wire.endpoint, `${settings.endpoint.replace(/\/$/u, "")}/chat/completions`);
+      const sent = Date.parse(wire.startedAt); assert.ok(Number.isFinite(sent) && sent >= start && sent <= at);
+      assert.equal(requests[0]!.caseId, actual.caseId); assert.equal(requests[0]!.turn, actual.turn);
+      assert.equal(requests[0]!.startedAt, wire.startedAt); assert.equal(requests[0]!.httpStatus, wire.status);
+      assert.equal(requests[0]!.error, wire.status === null ? "request_failed" : null);
+      const body = recordedObject(JSON.parse(wire.body)), qwen = settings.provider === "bailian";
+      const tokenField = qwen ? "max_completion_tokens" : "max_tokens", thinking = qwen ? "enable_thinking" : "thinking";
+      assert.deepEqual(Object.keys(body).sort(), ["model", "messages", "stream", "stream_options", "temperature", tokenField, thinking, "response_format"].sort());
+      assert.equal(body.model, settings.model); assert.equal(body.temperature, 0); assert.equal(body[tokenField], settings.maxTokens);
+      assert.equal(body.stream, true); assert.deepEqual(body.stream_options, { include_usage: true });
+      assert.deepEqual(body[thinking], qwen ? false : { type: "disabled" }); assert.deepEqual(body.response_format, { type: "json_object" });
+      assert.deepEqual(body.messages, [{ role: "system", content: supportQuestionPrompt }, { role: "user", content: JSON.stringify(input) }]);
+      for (const line of (wire.rawResponse ?? "").split(/\r?\n/u)) {
+        if (!line.startsWith("data:")) continue;
+        const data = line.slice(5).trim(); if (data === "[DONE]") { done = true; continue; } if (!data) continue;
+        try {
+          const chunk = recordedObject(JSON.parse(data)); if (typeof chunk.model === "string") rawModels.push(chunk.model);
+          if (chunk.usage != null) rawUsage = recordedObject(chunk.usage);
+          for (const choice of Array.isArray(chunk.choices) ? chunk.choices : []) {
+            const delta = recordedObject(recordedObject(choice).delta);
+            if (typeof delta.content === "string") rawText += delta.content;
+            unexpected ||= Boolean(delta.reasoning_content || delta.reasoning || delta.tool_calls);
+          }
+        } catch { wireInvalid = true; }
+      }
+    }
+    const text = response?.content.map(part => part.type === "text" ? part.text : "").join("");
+    assert.equal(attempt.outputHash, response ? contentHash(text) : null);
+    if (response) { assert.equal(response.provider, settings.provider); assert.equal(response.model, settings.model); assert.equal(response.api, settings.api); }
+    let tokens: number[] | undefined;
+    if (rawUsage) {
+      const details = rawUsage.prompt_tokens_details ? recordedObject(rawUsage.prompt_tokens_details) : undefined;
+      const cacheRead = details && details.cached_tokens != null ? details.cached_tokens : rawUsage.prompt_cache_hit_tokens ?? rawUsage.cached_tokens ?? 0;
+      const cacheWrite = details && details.cache_write_tokens != null ? details.cache_write_tokens : 0;
+      const values = [rawUsage.prompt_tokens, rawUsage.completion_tokens, cacheRead, cacheWrite, rawUsage.total_tokens];
+      if (values.every(value => typeof value === "number" && Number.isSafeInteger(value) && value >= 0)
+        && Number(values[4]) > 0 && Number(values[0]) >= Number(cacheRead) + Number(cacheWrite) && Number(values[0]) + Number(values[1]) === values[4])
+        tokens = [Number(values[0]) - Number(cacheRead) - Number(cacheWrite), Number(values[1]), Number(cacheRead), Number(cacheWrite), Number(values[4])];
+      else wireInvalid = true;
+    }
+    const known = Boolean(response && wire && !wireInvalid && rawModels.length && rawModels.every(model => model === settings.model) && tokens
+      && equal([response.usage.input, response.usage.output, response.usage.cacheRead, response.usage.cacheWrite, response.usage.totalTokens], tokens));
+    assert.deepEqual([attempt.inputTokens, attempt.outputTokens, attempt.cacheReadTokens, attempt.cacheWriteTokens, attempt.totalTokens], known ? tokens : [null, null, null, null, null]);
+    const pricing = settings.pricing, rates = pricing.rates;
+    let cost: number | null = null;
+    if (known && tokens && (pricing.currency !== "CNY" || tokens[0]! + tokens[2]! + tokens[3]! <= pricing.inputTierMaxTokens)) {
+      const calculated = (tokens[0]! * rates.input + tokens[1]! * rates.output + tokens[2]! * rates.cacheRead + tokens[3]! * rates.cacheWrite) / 1_000_000;
+      if (Number.isFinite(calculated) && calculated >= 0) cost = calculated;
+    }
+    const sameCost = (actualCost: unknown, expectedCost: number | null) => expectedCost === null ? actualCost === null
+      : typeof actualCost === "number" && Number.isFinite(actualCost) && Math.abs(actualCost - expectedCost) < 1e-12;
+    if (pricing.currency === "CNY") {
+      assert.equal(normalizeBailianGenerationBaseUrl(settings.endpoint), settings.endpoint);
+      assert.deepEqual(pricing, { currency: "CNY", estimated: true, source: "Alibaba Cloud Model Studio",
+        version: "bailian-beijing-2026-10-06-v1", region: "cn-beijing", inputTierMaxTokens: 256000, cacheDiscounts: false,
+        rates: { input: 2, output: 8, cacheRead: 2, cacheWrite: 2 } });
+      assert.equal(attempt.costUsd, null); assert.ok(sameCost(attempt.costCny, cost));
+    } else {
+      assert.equal(pricing.currency, "USD"); assert.equal(pricing.source, "Pi model catalog"); assert.equal(pricing.estimated, true);
+      if (known) assert.ok(sameCost(response!.usage.cost.total, cost), "USD comes from the frozen catalog rates and actual SDK tokens");
+      assert.ok(sameCost(attempt.costUsd, cost)); assert.equal(attempt.costCny, undefined);
+    }
+    assert.equal(captured.failure, attempt.outcome === "ok" ? null : attempt.outcome);
+    if (response && !["aborted", "timeout"].includes(attempt.outcome)) {
+      const nativeValid = wire?.status === 200 && !["error", "aborted"].includes(response.stopReason) && !wireInvalid
+        && done && rawModels.length > 0 && rawModels.every(model => model === settings.model) && rawText === text;
+      let valueValid = false;
+      try {
+        const parsed = recordedObject(JSON.parse(text!));
+        valueValid = equal(Object.keys(parsed).sort(), ["currentQuotes", "decision", "previousRequestId"])
+          && validateSupportQuestionResolution({ version: "support-question-resolution-v1", inputHash, ...parsed }, input);
+      } catch { /* Invalid raw JSON is a billed output, not an unavailable token report. */ }
+      assert.equal(attempt.outcome, !nativeValid ? "provider_error" : response.stopReason !== "stop" || unexpected
+        || response.content.some(part => part.type !== "text") || !valueValid ? "invalid_response" : "ok",
+      "Outcome must be reconstructed from actual HTTP/SDK output, not an edited success label");
+    }
+    if (attempt.outcome === "ok") {
+      assert.ok(wire?.status === 200 && response?.stopReason === "stop" && done && !wireInvalid && !unexpected
+        && rawModels.length && rawModels.every(model => model === settings.model) && rawText === text && response.content.every(part => part.type === "text"));
+      const parsed = recordedObject(JSON.parse(text!)); assert.deepEqual(Object.keys(parsed).sort(), ["currentQuotes", "decision", "previousRequestId"]);
+      assert.deepEqual(captured.value, { version: "support-question-resolution-v1", inputHash, ...parsed });
+      assert.ok(validateSupportQuestionResolution(captured.value, input));
+    } else assert.equal(captured.value, null);
+  }
+  if (captured.value) {
+    assert.deepEqual(resolution, { input, value: captured.value });
+    if (actual.calls.some(call => call.name === "search_faq")) {
+      assert.ok(captured.value.decision === "current_complete" && !topic
+        || captured.value.decision === "previous_resolved" && topic && action.questionContext.kind === "previous");
+      if (action.orderRef?.kind === "alternative") assert.ok(action.questionContext.kind === "standalone" && !topic,
+        "Only a complete current alternative-order question can proceed; no bounded old refund intent");
+      if (topic) {
+        const faq = actual.calls.find(call => call.name === "search_faq")!;
+        const choice = resolveReferenceChoice(recordedObject(actual.hostReference).policyChoices as TrustedReferenceChoices,
+          { sourceKey: merchantSourceKey(ingress.identity, ingress.groupOpenid), groupOpenid: ingress.groupOpenid }, Date.parse(faq.observedAt));
+        assert.ok(choice?.kind === "policy"); assert.deepEqual(choice.topic, topic, "The proven donor must still be live after parsing and before FAQ");
+      }
+    }
+  } else {
+    assert.equal(resolution, undefined); assert.ok(!actual.calls.some(call => call.name === "search_faq"));
+  }
+  if (result && (captured.failure || captured.value?.decision === "needs_clarification" || result.discardPolicyTopic)) {
+    assert.equal(result.outcome, "clarification"); assert.equal(result.referencePresentation, undefined);
+    assert.equal(result.pendingReferenceKind, "policy"); assert.equal(result.discardPolicyTopic, true);
+    assert.deepEqual(result.evidence.policyChoices, { version: "reference-choices-v1", kind: "policy",
+      sourceKey: merchantSourceKey(ingress.identity, ingress.groupOpenid), groupOpenid: ingress.groupOpenid,
+      candidates: [], overflow: false, selectionRequired: false });
+    assert.deepEqual(result.reply, { kind: "notice", text: (captured.failure ? "本轮咨询问题暂时无法可靠解析。" : "本轮尚未明确完整的咨询问题。")
+      + "请完整重述当前对象、条件和要确认的内容；旧话题不能补成当前商品的问题。本轮未检索规则或办理业务。" });
+    assert.deepEqual(actual.reply, result.reply);
+  }
+  return row;
+}
+
+function questionReferenceOptions(configuration: C1ValidationKnowledgeConfiguration, corpus: readonly RetrievalDocument[]) {
+  return configuration.evidenceBindingVersion === evidenceBindingV3Version ? {
+    verifyQuestionDiscard: (value: C1ValidationActual, question: string, previous: C1ValidationHistory) => {
+      try {
+        assert.equal(value.result?.discardPolicyTopic, true);
+        assert.ok(assertC1QuestionEvidence(value, question, previous, corpus, configuration));
+        return true;
+      } catch { return false; }
+    },
+    verifyQuestionCompletion: (value: C1ValidationActual, question: string, previous: C1ValidationHistory) => {
+      try {
+        assert.equal(value.result?.outcome, "ready");
+        const proof = assertC1QuestionEvidence(value, question, previous, corpus, configuration);
+        assert.ok(proof?.trace.value && proof.trace.value.decision !== "needs_clarification");
+        return knowledgeProofPassed(value, corpus, configuration, question, previous);
+      } catch { return false; }
+    },
+  } : {};
+}
+
 // An opt-in exception is reconstructed from SDK actions and authorized calls.
 // The first successful read explains a refusal; only the second read can supply
 // current facts for knowledge. No retry label or self-reported hash is authority.
@@ -161,7 +487,15 @@ export function assertC1PolicyScopeRepairEvidence(actual: C1ValidationActual, or
   assert.ok(result && ingress && actual.requestId && actual.execution === "completed");
   const repair: SupportPolicyScopeRepair | undefined = result.evidence.policyScopeRepair;
   assert.ok(repair && repair.version === frozen.version && repair.reason === "scope_changed" && repair.budget);
-  assert.ok(Object.keys(repair).every(key => ["version", "reason", "action", "topic", "call", "budget"].includes(key)));
+  const v3 = configuration.evidenceBindingVersion === evidenceBindingV3Version;
+  assert.ok(Object.keys(repair).every(key => ["version", "reason", "action", "topic", "call", "budget",
+    ...(v3 ? ["questionResolution", "questionTrace"] : [])].includes(key)));
+  if (v3) {
+    const parser = assertC1QuestionEvidence(actual, originalQuery, history, corpus, configuration);
+    assert.ok(parser?.trace.value && parser.trace.value.decision === "current_complete" && parser.input.previousTopic === null);
+    assert.deepEqual(repair.questionResolution, result.evidence.questionResolution);
+    assert.deepEqual(repair.questionTrace, result.evidence.questionTrace);
+  }
   const budget = repair.budget;
   assert.ok(equal(Object.keys(budget).sort(), ["limit", "toolCallId", "usedAfter", "usedBefore"]));
   assert.equal(budget.limit, frozen.repairBudget); assert.ok(nonempty(budget.toolCallId));
@@ -220,7 +554,8 @@ export function assertC1PolicyScopeRepairEvidence(actual: C1ValidationActual, or
   const unexpectedRead = async (): Promise<never> => { throw new Error("Pure protocol replay cannot execute business reads"); };
   // Only validate: the topic is already reconstructed below at its recorded
   // time. A bare snapshot here avoids consulting today's TTL during replay.
-  const preflight = new SupportController({ store: { getOrder: unexpectedRead, searchKnowledge: unexpectedRead } }).createTurn({
+  const preflight = new SupportController({ store: { getOrder: unexpectedRead, searchKnowledge: unexpectedRead },
+    ...(v3 ? { questionContract: "v3" as const, questionResolver: { resolve: unexpectedRead } } : {}) }).createTurn({
     requestId: ingress.requestId, identity: ingress.identity, sourceKey, userText: originalQuery,
     trustedRoute: { groupOpenid: ingress.groupOpenid, messageId: ingress.messageId }, policyTopic: repair.topic,
     ...(actual.hostReference?.orderId ? { focusOrderId: actual.hostReference.orderId } : {}) });
@@ -246,7 +581,10 @@ export function assertC1PolicyScopeRepairEvidence(actual: C1ValidationActual, or
         ? [{ id: tool.id, value: recordedObject(parsed) }] : [];
     });
   });
-  assert.equal(typed.length, 1); assert.equal(typed[0]!.id, failed.id); assert.deepEqual(typed[0]!.value.repair, repair,
+  const { questionTrace: _hostOnlyTrace, ...modelVisibleRepair } = repair;
+  assert.equal(typed.length, 1); assert.equal(typed[0]!.id, failed.id);
+  if (v3) assert.equal(recordedObject(typed[0]!.value.repair).questionTrace, undefined, "Scope tool errors cannot expose the host-only parser audit to the Agent");
+  assert.deepEqual(typed[0]!.value.repair, v3 ? modelVisibleRepair : repair,
     "The actual SDK typed error and final audit must be the same host evidence");
   const details = recordedObject(recordedObject(final.step.output).details);
   assert.deepEqual(details.action, finalAction); assert.equal(details.outcome, result.outcome);
@@ -274,7 +612,7 @@ export function assertC1PolicyScopeRepairEvidence(actual: C1ValidationActual, or
   assert.equal(repair.topic.sourceKey, binding.sourceKey); assert.equal(repair.topic.groupOpenid, binding.groupOpenid);
   assert.equal(repair.topic.orderId, initial.orderRef.orderId); assert.equal(repair.topic.requestId, initial.questionContext.requestId);
   const inputChoices = recordedObject(actual.hostReference).policyChoices as TrustedReferenceChoices | undefined;
-  assert.ok(inputChoices && result.evidence.policyChoices, "The actual host candidate list, not a bare historical topic, is required");
+  assert.ok(inputChoices && (v3 || result.evidence.policyChoices), "The actual host candidate list, not a bare historical topic, is required");
   const resolved = resolveReferenceChoice(inputChoices, binding, Date.parse(firstRead.observedAt) + Math.floor(firstRead.durationMs));
   assert.ok(resolved?.kind === "policy"); assert.deepEqual(resolved.topic, repair.topic, "TTL and actual user selection still apply after the first read");
   const donors = history.filter(row => row.actual.caseId === actual.caseId && row.actual.turn < actual.turn && row.actual.requestId === repair.topic.requestId);
@@ -285,6 +623,7 @@ export function assertC1PolicyScopeRepairEvidence(actual: C1ValidationActual, or
   assert.deepEqual(donor.actual.result.verifiedPolicyTopic, repair.topic);
   assert.ok(knowledgeProofPassed(donor.actual, corpus, configuration, donor.question, before), "Prior rules must have their own real source proof");
   const references = scoreC1ReferenceEvidence(actual, originalQuery, history, { required: true,
+    ...questionReferenceOptions(configuration, corpus),
     // The caller separately verifies final knowledge. Recursing into this same
     // current turn would create a proof cycle; every historical donor is checked.
     verifyPolicyTopic: (value, question, previous) => value === actual || knowledgeProofPassed(value, corpus, configuration, question, previous) });
@@ -298,7 +637,8 @@ export function assertC1PolicyScopeRepairEvidence(actual: C1ValidationActual, or
     assert.deepEqual(fresh.output, order); assert.equal(fresh.knowledge, undefined);
     assert.ok(search.knowledge); assert.deepEqual(result.evidence.knowledge, [{ callId: search.id, ...search.knowledge }]);
     const rebuilt = buildSupportEvidenceBinding({ action: finalAction, originalQuery, order, requestId: ingress.requestId,
-      verifiedTopic: null, binding: { ...binding, orderId: order.id } });
+      verifiedTopic: null, ...(v3 ? { version: evidenceBindingV3Version } : {}), binding: { ...binding, orderId: order.id } });
+    if (v3) assertQuestionQuery(rebuilt, finalAction, originalQuery, order, null);
     for (const key of ["evidenceBindingVersion", "evidenceTarget", "evidenceUse", "purpose", "facts", "effectiveQuery"] as const)
       assert.deepEqual(search.knowledge.context[key], rebuilt[key], `Final repair ${key} must use the second authorized read`);
     assert.deepEqual(search.knowledge.context.applicability, rebuilt.applicability); assert.equal(search.knowledge.context.policyTopic, null);
@@ -311,7 +651,8 @@ export function assertC1PolicyScopeRepairEvidence(actual: C1ValidationActual, or
     assert.deepEqual(result.evidence.rules, []); assert.deepEqual(result.evidence.knowledge, []);
     assert.equal(result.referencePresentation, undefined); assert.equal(result.pendingReferenceKind, "policy");
     assert.deepEqual(result.reply, { kind: "notice",
-      text: "本订单的商品或门店范围已变化。请完整重述当前对象、条件和要确认的问题；旧话题不能直接沿用。" },
+      text: v3 ? "本轮尚未明确完整的咨询问题。请完整重述当前对象、条件和要确认的内容；旧话题不能补成当前商品的问题。本轮未检索规则或办理业务。"
+        : "本订单的商品或门店范围已变化。请完整重述当前对象、条件和要确认的问题；旧话题不能直接沿用。" },
     "Scope repair clarification must request a new question instead of displaying the stale topic selector");
     assert.deepEqual(actual.reply, result.reply, "The notice must be the actual delivered host reply");
     const output = recordedObject(final.step.output); assert.ok(Array.isArray(output.content));
@@ -330,13 +671,14 @@ export function assertC1PolicyScopeRepairEvidence(actual: C1ValidationActual, or
 function reconstructKnowledgeBinding(actual: C1ValidationActual, call: SupportCall, corpus: readonly RetrievalDocument[],
   configuration: C1ValidationKnowledgeConfiguration, originalQuery: string | undefined, history: C1ValidationHistory) {
   const { context, trace } = call.knowledge!;
-  if (configuration.queryMode !== undefined) assert.equal(context.evidenceBindingVersion, evidenceBindingVersion, "Query plans require reconstructable current host context");
+  const version = configuration.evidenceBindingVersion ?? evidenceBindingVersion;
+  if (configuration.queryMode !== undefined) assert.equal(context.evidenceBindingVersion, version, "Query plans require reconstructable current host context");
   if (configuration.evidenceBindingVersion) assert.equal(context.evidenceBindingVersion, configuration.evidenceBindingVersion, "Frozen binding version cannot be omitted or downgraded");
   if (!context.evidenceBindingVersion) {
     assert.equal(context.evidenceTarget, undefined); assert.equal(context.evidenceUse, undefined);
     return undefined;
   }
-  assert.equal(context.evidenceBindingVersion, evidenceBindingVersion); assert.equal(context.protocol, "v2.2");
+  assert.equal(context.evidenceBindingVersion, version); assert.equal(context.protocol, "v2.2");
   const ingress = actual.ingress, result = actual.result;
   assert.ok(ingress && result && originalQuery !== undefined, "New binding requires actual ingress and the original planned message");
   assert.equal(ingress.requestId, actual.requestId); assert.equal(result.evidence.requestId, ingress.requestId);
@@ -408,8 +750,9 @@ function reconstructKnowledgeBinding(actual: C1ValidationActual, call: SupportCa
       "Oversized topic history requires clarification, never silently dropping earlier questions");
     assert.deepEqual(producedTopic.priorQueries, queries, "Topic chain must match completed earlier turns and bounded host history");
   }
-  const reconstructed = buildSupportEvidenceBinding({ action, originalQuery, order, requestId: ingress.requestId, verifiedTopic: topic,
+  const reconstructed = buildSupportEvidenceBinding({ action, originalQuery, order, requestId: ingress.requestId, verifiedTopic: topic, version,
     binding: { sourceKey, groupOpenid: ingress.groupOpenid, orderId: order?.id ?? null } });
+  if (version === evidenceBindingV3Version) assertQuestionQuery(reconstructed, action, originalQuery, order, topic);
   for (const key of ["evidenceBindingVersion", "evidenceTarget", "evidenceUse", "purpose", "facts", "effectiveQuery"] as const) assert.deepEqual(context[key], reconstructed[key], `Rebuilt ${key}`);
   assert.deepEqual(context.applicability ?? null, reconstructed.applicability ?? null);
   if (configuration.queryMode !== undefined) {
@@ -485,6 +828,14 @@ export function knowledgeProofPassed(actual: C1ValidationActual | undefined, cor
   originalQuery?: string, history: C1ValidationHistory = []): boolean {
   if (!actual) return false;
   try {
+    assert.ok([undefined, evidenceBindingVersion, evidenceBindingV3Version].includes(configuration.evidenceBindingVersion));
+    if (configuration.evidenceBindingVersion === evidenceBindingV3Version) {
+      assert.ok(originalQuery !== undefined); assertC1QuestionEvidence(actual, originalQuery, history, corpus, configuration);
+    } else {
+      assert.equal(configuration.questionSettings, undefined, "Parser settings require the explicit v3 contract");
+      assert.ok(!actual.questionCalls?.length && !actual.requests.some(request => request.operation === "question")
+        && !actual.result?.evidence.questionTrace && !actual.result?.evidence.questionResolution, "A v3 parser recording cannot downgrade to legacy/v2 scoring");
+    }
     const result = actual.result, calls = actual.calls, knowledgeCalls = calls.filter(call => call.knowledge);
     if (new Set(calls.map(call => call.id)).size !== calls.length || calls.some(call => call.name === "search_faq" && !call.knowledge)) return false;
     if (!result) return knowledgeCalls.length === 0;
@@ -671,13 +1022,15 @@ export function scoreC1ValidationTurn(turn: C1ValidationTurn, actual: C1Validati
   const actionCorrect = Boolean(result && e.allowedKinds.includes(result.action.kind as ReadKind) && reference);
   const first = actual?.steps.find(step => step.type === "tool" && step.name === "support_action")?.input as { action?: { kind?: ReadKind } } | undefined;
   const firstActionKindCorrect = Boolean(first?.action?.kind && e.allowedKinds.includes(first.action.kind));
-  const noKnowledge = traces.length === 0 && !calls.some(call => call.name === "search_faq") && actual?.requests.every(request => request.operation === "agent");
+  const noKnowledge = traces.length === 0 && !calls.some(call => call.name === "search_faq") && actual?.requests.every(request => request.operation === "agent"
+    || configuration.evidenceBindingVersion === evidenceBindingV3Version && evidenceProofPassed && request.operation === "question");
   const knowledge = e.knowledge === "none" ? Boolean(noKnowledge && !accepted.length)
     : e.knowledge === "rejected" ? evidenceProofPassed && traces.length === 1 && traces[0]!.status === "rejected" && !accepted.length && !invalid.length && !unavailable
     : evidenceProofPassed && traces.length === 1 && !unavailable && accepted.some(id => gold.includes(id)) && !extra.length;
   const amountEvidenceProofPassed = amountProofPassed(actual, turn.question, history, configuration);
   const referenceEvidence = actual ? scoreC1ReferenceEvidence(actual, turn.question, history, {
     required: configuration.referenceEvidenceRequired,
+    ...questionReferenceOptions(configuration, corpus),
     verifyPolicyTopic: (value, question, before) => knowledgeProofPassed(value, corpus, configuration, question, before),
   }) : { passed: false, issues: ["Missing actual turn"] };
   const referenceEvidenceProofPassed = referenceEvidence.passed;
@@ -745,7 +1098,9 @@ export function summarizeC1Validation(plan: C1ValidationPlan, actuals: C1Validat
   }));
   const finals = rows.filter(row => row.final), answerable = finals.filter(row => row.knowledge === "evidence"), rawHasGold = answerable.filter(row => row.rawHasGold);
   const casePassed = (id: string) => rows.filter(row => row.caseId === id).every(row => row.passed);
-  return { scoringVersion: c1ValidationScoringVersion, plannedCases: plan.cases.length, plannedTurns: rows.length,
+  return { scoringVersion: configuration.evidenceBindingVersion === evidenceBindingV3Version ? c1QuestionValidationScoringVersion : c1ValidationScoringVersion,
+    ...(configuration.evidenceBindingVersion === evidenceBindingV3Version ? { questionProofVersion: c1QuestionScoringVersion } : {}),
+    plannedCases: plan.cases.length, plannedTurns: rows.length,
     completedTurns: rows.filter(row => row.execution === "completed").length, passedCases: plan.cases.filter(item => casePassed(item.id)).length,
     strata: Object.fromEntries(c1Strata.map(stratum => [stratum, { planned: finals.filter(row => row.stratum === stratum).length,
       passed: finals.filter(row => row.stratum === stratum && casePassed(row.caseId)).length }])),

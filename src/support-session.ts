@@ -9,7 +9,7 @@ import { merchantSourceKey, type AfterSalesStore } from "./after-sales.ts";
 import type { CouponStore, QQIdentity } from "./coupon-store.ts";
 import type { KnowledgeService } from "./knowledge-service.ts";
 import type { RefundStore } from "./refunds.ts";
-import type { SupportQuestionResolver } from "./support-question-resolution.ts";
+import type { SupportQuestionResolver, SupportQuestionObservation } from "./support-question-resolution.ts";
 import type { SupportContextPort, SupportContextSnapshot, SupportContextValue } from "./conversation-state.ts";
 import type { Reply } from "./reply.ts";
 import { normalizeModelSupportAction, getModelSupportActionParameters, type TaskReferenceMode } from "./support-context-action.ts";
@@ -26,6 +26,7 @@ import { refreshTaskChoices, resolveTaskReference, selectTaskChoice, taskChoiceN
 export type SupportPrompt = {
   requestId: string; groupOpenid: string; messageId: string;
   onCall?: (call: SupportCall) => void;
+  onQuestionTrace?: (observation: SupportQuestionObservation) => void;
 };
 export type SupportFocus = {
   read: () => Promise<string | undefined>;
@@ -123,7 +124,8 @@ export async function createSupportSession(
   identity: QQIdentity, store: CouponStore, runtime: ModelRuntime, model: Model<Api>,
   afterSales?: { store: AfterSalesStore; sourceKey: string; refunds?: RefundStore },
   options: { groupOpenid?: string; focus?: SupportFocus; context?: SupportContextPort; onCall?: (call: SupportCall) => void; repairBudget?: number; knowledge?: KnowledgeService; taskReferenceMode?: TaskReferenceMode;
-    questionContract?: "v2" | "v3"; questionResolver?: SupportQuestionResolver } = {},
+    questionContract?: "v2" | "v3"; questionResolver?: SupportQuestionResolver;
+    onQuestionTrace?: (observation: SupportQuestionObservation) => void } = {},
 ) {
   if (options.focus && options.context) throw new Error("会话定位只能使用一个存储来源。");
   const taskReferenceMode = options.taskReferenceMode === undefined ? "id" : options.taskReferenceMode;
@@ -296,8 +298,8 @@ export async function createSupportSession(
             usedAfter: ++state.invalidActions, toolCallId };
           state.policyScopeRepair = repair;
           state.actionStarted = false;
-          // Pi receives the same audit (including the budget) that is later
-          // attached to the final result; no second loop or automatic rewrite.
+          // Pi receives the business repair evidence and budget. Parser fees
+          // stay in host audit; no second loop or automatic rewrite.
           throw new SupportPolicyScopeRepairError(repair);
         }
         if (isCurrent()) clearReferences(state);
@@ -642,7 +644,8 @@ export async function createSupportSession(
           taskChoices: state.taskChoices,
           policyChoices: state.policyChoices, orderReferenceChoices: state.orderReferenceChoices, pendingReferenceKind: state.pendingReferenceKind,
           allowPolicyScopeRepair: repairBudget > 0,
-          signal: abort.signal, onCall: current.onCall ?? options.onCall });
+          signal: abort.signal, onCall: current.onCall ?? options.onCall,
+          onQuestionTrace: current.onQuestionTrace ?? options.onQuestionTrace });
       } catch (error) {
         assertCurrent(); turn = undefined; state.turnError = true; clearReferences(state); throw error;
       }

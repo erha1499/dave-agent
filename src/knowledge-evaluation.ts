@@ -1,5 +1,29 @@
 import type { EvalSpan } from "./evaluation.ts";
 import type { EvidenceSupportAttempt } from "./evidence-support.ts";
+import type { SupportQuestionObservation } from "./support-question-resolution.ts";
+
+// The callback timestamp is completion time, not the HTTP start. Only an
+// observed HTTP dispatch contributes a provider request or cost.
+export function questionProviderSpans(observation: SupportQuestionObservation): EvalSpan[] {
+  const { trace, requestId, observedAt } = observation;
+  const base = { parentSpanId: requestId, actor: "host" as const, trigger: "user" as const,
+    component: "support-question", name: "parse_question", observedAt,
+    input: { inputHash: trace.inputHash, requestHash: trace.requestHash, timing: "completion-time/request-duration" } };
+  if (!trace.attempts.length) return [{ ...base, id: `${requestId}:question:preflight`, durationMs: null,
+    outcome: "error", output: { failure: trace.failure, requestAccounting: "not_sent" } }];
+  return trace.attempts.map((attempt, index) => {
+    const cny = trace.settings.pricing.currency === "CNY", amount = cny ? attempt.costCny : attempt.costUsd;
+    return { ...base, id: `${requestId}:question:${index + 1}`, durationMs: attempt.durationMs,
+      outcome: attempt.outcome === "ok" && trace.failure === null ? "ok" as const : "error" as const,
+      output: { failure: trace.failure, attempt: structuredClone(attempt) },
+      ...(attempt.httpRequests === 1 ? { usage: { provider: attempt.provider, model: attempt.model, kind: "llm" as const,
+        inputTokens: [attempt.inputTokens, attempt.cacheReadTokens, attempt.cacheWriteTokens].every(value => value !== null)
+          ? attempt.inputTokens! + attempt.cacheReadTokens! + attempt.cacheWriteTokens! : null,
+        outputTokens: attempt.outputTokens, totalTokens: attempt.totalTokens,
+        cost: amount == null ? null : { currency: cny ? "CNY" as const : "USD" as const, amount,
+          source: cny ? "price_estimate" as const : "sdk_estimate" as const } } } : {}) };
+  });
+}
 
 // Usage belongs only to provider children, never to both the service parent and Agent steps.
 export function knowledgeProviderSpans(parent: EvalSpan): EvalSpan[] {

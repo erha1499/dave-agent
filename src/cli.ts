@@ -16,6 +16,26 @@ import { cancelSupportTurn, createSupportSession, getSupportHostReceipt, getSupp
 import { ConversationStateStore } from "./conversation-state.ts";
 import { createKnowledgeService } from "./knowledge-service.ts";
 import { readKnowledgeParameters, resolveSupportRunParameters } from "./support-parameters.ts";
+import { modelSelections, type ModelSelection } from "./model-selection.ts";
+import { createSupportQuestionClient } from "./support-question-client.ts";
+
+export function readCliQuestionOptions(architecture: "atomic" | "controller", env: NodeJS.ProcessEnv = process.env):
+  { questionContract: "v2" } | { questionContract: "v3"; modelSelection: ModelSelection; timeoutMs: number } {
+  const mode = env.CLI_QUESTION_CONTRACT?.trim() || "v2";
+  if (mode !== "v2" && mode !== "v3") throw new Error("CLI_QUESTION_CONTRACT 仅支持 v2 或 v3。");
+  const model = env.CLI_QUESTION_MODEL?.trim(), timeout = env.CLI_QUESTION_TIMEOUT_MS?.trim();
+  if (mode === "v2") {
+    if (model || timeout) throw new Error("CLI咨询解析模型及超时参数仅适用于显式v3候选。");
+    return { questionContract: "v2" };
+  }
+  if (architecture !== "controller") throw new Error("CLI v3咨询候选需要 SUPPORT_ARCHITECTURE=controller。");
+  const modelSelection = (model || "deepseek-flash") as ModelSelection;
+  if (!modelSelections.includes(modelSelection)) throw new Error(`CLI_QUESTION_MODEL 仅支持 ${modelSelections.join("、")}。`);
+  if (timeout && !/^\d+$/u.test(timeout)) throw new Error("CLI_QUESTION_TIMEOUT_MS 应为1000..15000的整数。");
+  const timeoutMs = timeout ? Number(timeout) : 10_000;
+  if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1000 || timeoutMs > 15_000) throw new Error("CLI_QUESTION_TIMEOUT_MS 应为1000..15000的整数。");
+  return { questionContract: "v3", modelSelection, timeoutMs };
+}
 
 export function parseCliInput(text: string): { kind: "exit" } | { kind: "empty" } | { kind: "message"; text: string } {
   const command = text.trim();
@@ -53,6 +73,7 @@ export async function runCliPrompt(
 
 async function main() {
   const architecture = readSupportArchitecture();
+  const questionOptions = readCliQuestionOptions(architecture);
   const contextMode = readSupportContextMode(architecture);
   const parameters = resolveSupportRunParameters(architecture, readKnowledgeParameters());
   const senderId = process.env.CLI_DEMO_USER || "TEST_USER1";
@@ -78,11 +99,15 @@ async function main() {
     const identity = { appId: "TEST_APP", senderId };
     const sourceKey = merchantSourceKey(identity, "cli");
     const business = afterSales ? { store: afterSales, sourceKey, refunds } : undefined;
+    const questionResolver = questionOptions.questionContract === "v3" ? await createSupportQuestionClient({
+      modelSelection: questionOptions.modelSelection, timeoutMs: questionOptions.timeoutMs }) : undefined;
     const session = architecture === "controller"
-      ? await createSupportSession(identity, store, modelRuntime, model, business, { knowledge, context: contexts?.bind(identity, "cli") })
+      ? await createSupportSession(identity, store, modelRuntime, model, business, { knowledge, context: contexts?.bind(identity, "cli"),
+        questionContract: questionOptions.questionContract, questionResolver })
       : await createCouponSession(identity, store, modelRuntime, model, business);
     const input = createInterface({ input: stdin, output: stdout });
     console.log(`团购券客服演示（${senderId}）：券单 COUPON-1001${afterSales ? "；模拟协商 COUPON-2001 / 2002 / 2003" : "，只读咨询"}；输入 /exit 退出。全部是模拟数据。`);
+    if (questionResolver) console.log(`显式咨询候选 v3：${questionResolver.settings.provider}/${questionResolver.settings.model}，超时${questionResolver.settings.timeoutMs}ms；每次解析最多增加1个模型请求。尚未通过真实语义验收。`);
     try {
       while (true) {
         const line = parseCliInput(await input.question("你："));

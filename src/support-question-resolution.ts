@@ -1,6 +1,7 @@
 import { contentHash } from "./bailian.ts";
 import type { TrustedPolicyTopic } from "./support-controller.ts";
 import { policyTopicQueries } from "./support-evidence-context.ts";
+import type { ModelPricing } from "./model-selection.ts";
 
 export const supportQuestionResolutionVersion = "support-question-resolution-v1" as const;
 export type SupportQuestionResolutionInput = {
@@ -12,10 +13,35 @@ export type SupportQuestionResolution = {
   decision: "current_complete" | "previous_resolved" | "needs_clarification";
   currentQuotes: string[]; previousRequestId: string | null;
 };
-// This port has no default online client. The injected resolver makes the semantic
-// judgment; the helpers below verify only shape and literal source provenance.
+export type SupportQuestionSettings = {
+  provider: string; model: string; api: string; endpoint: string; timeoutMs: number;
+  temperature: 0; maxTokens: number; maxRetries: 0;
+  promptVersion: "support-question-prompt-v1"; promptHash: string;
+  serialization: "json-question-resolution-v1"; pricing: ModelPricing;
+};
+export type SupportQuestionAttempt = {
+  operation: "question"; provider: string; model: string; attempt: 1; durationMs: number;
+  outcome: "ok" | "invalid_response" | "provider_error" | "aborted" | "timeout";
+  httpRequests: 0 | 1; wireHash: string | null; outputHash: string | null;
+  totalTokens: number | null; inputTokens: number | null; outputTokens: number | null;
+  cacheReadTokens: number | null; cacheWriteTokens: number | null;
+  costUsd: number | null; costCny?: number | null;
+};
+export type SupportQuestionTrace = {
+  version: "support-question-trace-v1"; inputHash: string; requestHash: string;
+  settings: SupportQuestionSettings; attempts: SupportQuestionAttempt[];
+  value: SupportQuestionResolution | null;
+  failure: "invalid_response" | "provider_error" | "aborted" | "timeout" | null;
+};
+export type SupportQuestionObservation = {
+  requestId: string; observedAt: string; input: SupportQuestionResolutionInput; trace: SupportQuestionTrace;
+};
+// The resolver judges semantics. These helpers verify only shape and provenance.
 export type SupportQuestionResolver = {
-  resolve(input: SupportQuestionResolutionInput, options?: { signal?: AbortSignal }): Promise<SupportQuestionResolution>;
+  settings?: SupportQuestionSettings;
+  resolve(input: SupportQuestionResolutionInput, options?: {
+    signal?: AbortSignal; onTrace?: (trace: SupportQuestionTrace) => void;
+  }): Promise<SupportQuestionResolution>;
 };
 
 const text = (value: unknown, max: number): value is string => typeof value === "string" && Boolean(value.trim()) && value.length <= max;
