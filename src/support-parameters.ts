@@ -4,6 +4,9 @@ export type SupportExperimentParameters = {
   timeoutMs: number;
   repairBudget: number;
   agentModel: ModelSelection;
+  questionContract: "v2" | "v3";
+  questionModel: ModelSelection | null;
+  questionTimeoutMs: number | null;
   merchantEvents: "architecture" | "host" | "model";
   knowledgeMode: "lexical" | "m4-support";
   knowledgeSupport: "binary" | "typed";
@@ -17,10 +20,12 @@ export type SupportExperimentParameters = {
 
 export function resolveSupportParameters(input: Partial<SupportExperimentParameters> = {}): SupportExperimentParameters {
   if (!input || typeof input !== "object" || Array.isArray(input)
-    || Object.keys(input).some(key => !["timeoutMs", "repairBudget", "agentModel", "merchantEvents", "knowledgeMode", "knowledgeSupport", "knowledgeSupportModel", "knowledgeSupportPrompt", "knowledgeApplicability", "knowledgeQueryMode", "knowledgeThreshold", "knowledgeTimeoutMs"].includes(key))) {
-    throw new Error("业务实验参数仅支持 timeoutMs、repairBudget、agentModel、merchantEvents、knowledgeMode、knowledgeSupport、knowledgeSupportModel、knowledgeSupportPrompt、knowledgeApplicability、knowledgeQueryMode、knowledgeThreshold、knowledgeTimeoutMs。");
+    || Object.keys(input).some(key => !["timeoutMs", "repairBudget", "agentModel", "questionContract", "questionModel", "questionTimeoutMs", "merchantEvents", "knowledgeMode", "knowledgeSupport", "knowledgeSupportModel", "knowledgeSupportPrompt", "knowledgeApplicability", "knowledgeQueryMode", "knowledgeThreshold", "knowledgeTimeoutMs"].includes(key))) {
+    throw new Error("业务实验参数仅支持 timeoutMs、repairBudget、agentModel、questionContract、questionModel、questionTimeoutMs、merchantEvents、knowledgeMode、knowledgeSupport、knowledgeSupportModel、knowledgeSupportPrompt、knowledgeApplicability、knowledgeQueryMode、knowledgeThreshold、knowledgeTimeoutMs。");
   }
   const parameters = { timeoutMs: 60_000, repairBudget: 1, agentModel: "configured" as const, merchantEvents: "architecture" as const,
+    questionContract: "v2" as const, questionModel: input.questionContract === "v3" ? "configured" as const : null,
+    questionTimeoutMs: input.questionContract === "v3" ? 10_000 : null,
     knowledgeMode: "lexical" as const, knowledgeSupport: "binary" as const, knowledgeSupportModel: "configured" as const, knowledgeSupportPrompt: "v5" as const,
     knowledgeApplicability: "model_only" as const, knowledgeQueryMode: "combined" as const, knowledgeThreshold: .71, knowledgeTimeoutMs: 15_000, ...input };
   if (!Number.isInteger(parameters.timeoutMs) || parameters.timeoutMs < 10_000 || parameters.timeoutMs > 120_000) {
@@ -30,6 +35,15 @@ export function resolveSupportParameters(input: Partial<SupportExperimentParamet
     throw new Error("repairBudget 必须为 0..2 的整数。");
   }
   if (!modelSelections.includes(parameters.agentModel)) throw new Error(`agentModel 仅支持 ${modelSelections.join("、")}。`);
+  if (!["v2", "v3"].includes(parameters.questionContract)) throw new Error("questionContract 仅支持 v2 或 v3。");
+  if (parameters.questionContract === "v2" && (parameters.questionModel !== null || parameters.questionTimeoutMs !== null)) {
+    throw new Error("v2 的 questionModel 和 questionTimeoutMs 必须为 null；解析参数仅适用于显式 v3。");
+  }
+  if (parameters.questionContract === "v3") {
+    if (parameters.questionModel === null || !modelSelections.includes(parameters.questionModel)) throw new Error(`questionModel 仅支持 ${modelSelections.join("、")}。`);
+    if (typeof parameters.questionTimeoutMs !== "number" || !Number.isInteger(parameters.questionTimeoutMs) || parameters.questionTimeoutMs < 1000 || parameters.questionTimeoutMs > 15_000
+      || parameters.questionTimeoutMs > parameters.timeoutMs) throw new Error("questionTimeoutMs 必须为 1000..15000 的整数，且不超过 timeoutMs。");
+  }
   if (!["architecture", "host", "model"].includes(parameters.merchantEvents)) {
     throw new Error("merchantEvents 仅支持 architecture、host 或 model。");
   }
@@ -56,6 +70,7 @@ export function resolveSupportParameters(input: Partial<SupportExperimentParamet
 export function resolveSupportRunParameters(architecture: "atomic" | "controller", input?: Partial<SupportExperimentParameters>) {
   if (architecture !== "atomic" && architecture !== "controller") throw new Error("业务架构仅支持 atomic 或 controller。");
   const parameters = resolveSupportParameters(input);
+  if (architecture === "atomic" && parameters.questionContract === "v3") throw new Error("questionContract v3 仅支持 controller。");
   if (architecture === "atomic" && parameters.knowledgeMode !== "lexical") throw new Error("atomic 仅支持 lexical 知识检索；m4-support 请使用 controller。");
   if (architecture === "controller" && parameters.merchantEvents === "model") {
     throw new Error("controller 仅支持宿主处理商家通知，merchantEvents 请选择 architecture 或 host。");

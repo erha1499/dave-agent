@@ -2,6 +2,51 @@
 
 统一入口使用方案预设和参数白名单，不修改 `.env` 或运行中的 QQ。现有六项业务授权/确认约束始终生效。业务评测用隔离的模拟订单；M0–M6 与 A1 保留离线实验入口，C1 另提供 Controller 在线知识服务候选，默认配置不自动切换。
 
+## 本轮工作台接线合同（2026-10-06，实施前）
+
+- **业务约束：** 咨询问题出处v3只能显式用于Controller实验，默认v2和常驻QQ保持原配置。完整原始解析审计留在宿主，不进入主Agent工具上下文；身份、fresh范围、确认、幂等与失败关闭继续生效。解析失败和缺失用量不能显示为成功或免费。
+- **面试追问：** 如何证明表单参数真的进入运行时？为什么Agent、问题解析、重排和证据判别需分角色记账？怎样避免父子span重复计费，以及历史未采集费用被补成零？
+- **个人实现与复用：** 复用现有实验校验/执行器、Pi解析客户端、questionProviderSpans和工作台分析；只补三个候选参数、实际Session接线/快照与费用分析。前端由Kimi CLI K3 Max增量接入，不新建Harness、数据库表或观测平台。
+- **验收与演示：** `questionContract`默认v2；v2的`questionModel/questionTimeoutMs`为null且非空值拒绝，v3缺省解析模型configured、超时10000ms（1000..15000且不超过整轮），atomic+v3启动前拒绝。原生Pi替代HTTP证明显式v3实际调用、v2不调用、失败/取消不发布旧结果及费用保留；CLI/HTTP catalog/config/job透传、快照、历史兼容、四角色分币种及未知费用经工程检查。前端下载/回填、组合修复与折叠费用展示使用合成API检查，不提交远程业务实验。
+- **预算与停止：** 本片0付费业务模型、0数据库、0QQ调用；Kimi仅用于已授权的前端开发。定向检查、独审与全量validate通过后提交推送并收尾。原固定题/gold/manifest及9/12→11/12真实结果不改，不运行已关闭live预算；用户要求本轮完成后暂停目标，不启动后续实验或准入工作。
+
+### 咨询问题出处候选参数
+
+| 参数 | 默认值与边界 | 实际作用 |
+| --- | --- | --- |
+| `questionContract` | `v2` / `v3`，默认v2；v3仅Controller | v3使用原始当前问题或合法同范围前序解析咨询，再进行中性查询和重新取证；不改常驻QQ或业务授权。 |
+| `questionModel` | v2为null；v3省略键时configured，也可固定现有模型选项 | 独立选择问题解析模型，不自动跟随`agentModel`或`knowledgeSupportModel`的固定选择。configured仍取全局环境配置；v3显式null/undefined拒绝。 |
+| `questionTimeoutMs` | v2为null；v3省略键时10000；整数1000..15000且不超过整轮超时 | 解析阶段等待上限，失败关闭、无自动重试；取消不代表供应商未计费。v3显式null/undefined拒绝。 |
+
+`support-question-contract-ab`保持Flash主Agent、Pro typed v6、declared-v2、separated、0.5阈值与60000ms知识等待，仅显式切换v2/v3整套咨询出处方案。v3增加问题解析请求与相应延迟/费用；该预设使用通用业务开发题，不能把它当成已关闭六场景探针的复跑入口或成绩。v3也允许Controller+lexical，用于分离知识检索方案；atomic+v3在运行前拒绝。v2中任何非null解析参数均拒绝，避免开关关闭后仍静默保留无效选项。
+
+```sh
+# 仅预览参数，不读取业务库或调用模型。
+node scripts/experiment.ts --preset support-question-contract-ab --dry-run
+```
+
+实际解析settings和三个参数进入`snapshot.content.settings`，每轮精简提供商span和宿主解析记录用于回看；完整解析trace不进入主Agent工具上下文。Agent-only旧metrics继续保留，归因分析按Agent/解析/重排/支持判别分列，币种与未知费用见[评测API](./evaluation-api.md#v2-执行归因增量字段)。工程接线通过不等于新的真实模型效果或完整C1准入。
+
+## 工作台接线收尾与暂停（2026-10-07）
+
+三个参数已贯通共享校验、CLI/HTTP、实验任务配置和实际Session，新增`support-question-contract-ab`预设默认不允许远程调用。v2不创建解析客户端；v3独立使用实际解析模型和等待上限，保存安全settings快照。原生Pi替代HTTP检查使用与业务执行器相同的接线，覆盖成功、无效JSON、缺用量、取消后旧轮未知费用保留和晚结果不串轮。完整解析记录留在宿主，普通Agent工具结果不携带该审计。
+
+后端提供`providerUsage/providerTotals`，按已采集提供商叶子记录区分Agent、问题解析、重排和支持判别；USD/CNY分列，已知小计与完整金额分开。未知用量或币种不补零，父子重复记账报告异常且不相加；没有历史span不重建费用。该分母是已采集提供商记录，不是所有原始HTTP或账户账单。旧Agent-only指标继续独立展示。
+
+Kimi CLI实际请求为`model=k3`、`thinkingEffort=max`，完成既有页面的三个控件、配置下载/回填、非法组合修复和折叠费用表。两项UI回归分别18/17组通过；真实Chrome 1440px/390px以合成API验收费用、未知CNY、A/B控件和下载的v2/null、v3/configured参数，页面错误和横向溢出为0，实验POST为0。首个浏览器脚本等待折叠字段可见而超时，改为等待DOM存在并展开后通过，没有修改产品行为。
+
+后端定向、类型、独审及最终`npm run validate`退出0。前两次全量分别发现旧Session默认值断言漏三个参数、历史源码冻结校验不容新增费用归因；已补严格默认值，并独立固定原业务oracle的7651字节/hash及审阅后的归因尾段/全文件hash，明确整文件不等价。业务评分、题集、gold、reviews、结果和闭合manifest未变，篡改负控仍拒绝。失败与最终日志分别留在忽略目录`.runtime/question-workbench-validate.log`、`question-workbench-validate-final.log`、`question-workbench-validate-final2.log`；Chrome截图在`.runtime/question-workbench-preview/`。
+
+可复现的0远程入口：
+
+```sh
+node scripts/experiment.ts --preset support-question-contract-ab --dry-run
+node scripts/support-question-experiment-check.ts
+npm run validate
+```
+
+本片0付费业务模型、0数据库、0QQ调用；Kimi开发请求不计入业务评测成本。历史真实v2 9/12、v3 11/12不回写，不重新运行闭合预算。默认v2、atomic + lexical、memory/id、DeepSeek及QQ保持原配置；整体C1/O4/O5和共同业务验收仍未完成。按用户要求，本轮提交推送后暂停目标并冻结版本；后续开发或新付费实验待用户明确恢复后再定合同。
+
 ## 配置
 
 `src/experiment-config.ts` 是 CLI 与工作台共享的校验入口。旧格式 version 1 保留原始排名语义：
@@ -36,7 +81,7 @@
 | --- | --- | --- |
 | `knowledgeMode` | `lexical` / `m4-support`，默认 `lexical` | Controller 查询知识时采用词项排名或重排加支持性判别；atomic + m4-support 在启动前拒绝。 |
 | `knowledgeSupport` | `binary` / `typed`，默认 `binary` | binary 保持 A1 的二元判断；typed 区分事实/规则、明确边界问题、仅信息缺失和无关证据。typed 仅适用于 Controller + m4-support，非法组合启动前拒绝。实际 Prompt 版本写入 trace，类别不代表已获业务授权。 |
-| `knowledgeSupportModel` | `configured` / `deepseek-v4-pro`，默认 `configured` | 仅 Controller + m4-support 可固定支持判别模型；configured 跟随业务模型配置，固定 Pro 要求 DeepSeek provider。业务 Agent 的模型不因此改变；实际执行模型以 `trace.settings.support` 为准。 |
+| `knowledgeSupportModel` | 现有模型白名单，默认 `configured` | 仅 Controller + m4-support 可固定支持判别模型；configured 独立读取全局环境配置，固定模型使用各自凭据。业务 Agent 的固定选择不因此改变；实际执行模型以 `trace.settings.support` 为准。 |
 | `knowledgeSupportPrompt` | `v5` / `v6`，默认 `v5` | v6 仅 Controller + m4-support + typed，增加先确定用户所问命题的合同；选择只影响 typed，binary 继续使用 `fact-support-v1`。实际支持调用须核对版本和内容哈希，未发生调用只记录配置。 |
 | `knowledgeApplicability` | `model_only` / `declared` / `declared-v2`，默认 `model_only` | 声明模式仅 Controller + m4-support：在原分数 / Top5 后，用本轮可信事实检查必要前提，再交模型判断。`declared` 固定 v1 数量/状态规则，`declared-v2` 追加审阅的合成商品类别目录，未知类别不按名称猜测。匹配不证明全部适用或获批，不增加模型阶段。 |
 | `knowledgeQueryMode` | `combined` / `separated`，默认 `combined` | 仅 Controller + m4-support 可启用 separated：排序使用原问、可信前文、商品与简短订单状态；支持判别仍使用完整券数、按券状态关联的日期和原问。两者均由宿主构造，不增加模型改写阶段。 |
@@ -56,7 +101,7 @@ node --env-file-if-exists=.env scripts/experiment.ts --preset support-knowledge-
 
 2026-10-06 新增 `agentModel` 与扩展 `knowledgeSupportModel`，两者分别支持 `configured`、`deepseek-flash`、`deepseek-v4-pro`、`qwen3.7-plus-2026-05-26`。`configured` 始终沿用原全局模型配置，两个角色各自的固定选择互不改写。固定 DeepSeek 使用 DeepSeek 独立凭据，不能借用另一全局 provider 的 `MODEL_API_KEY`；固定千问只使用 `DASHSCOPE_API_KEY` 和已审阅的北京普通百炼接口。完整接入、币种限制及选型依据见 [模型候选说明](./model-selection.md)。
 
-新预设 `support-knowledge-qwen-ab` 固定主 Agent 为 Flash，在相同 typed v6 / declared-v2 / separated / 0.5 / 60000ms 下仅改变判别模型 Pro / Qwen。预设默认 `allowRemote=false`，目前仅完成本地工程检查，尚无真实模型效果成绩。需要单独冻结新题与调用预算；不使用已结束的 C1 manifest 续跑千问或重算旧成绩。工作台后端目录已提供参数，前端跨检索模式切换的固定模型清理逻辑仍由 Kimi 后续适配；CLI/JSON 可完整复现。
+新预设 `support-knowledge-qwen-ab` 固定主 Agent 为 Flash，在相同 typed v6 / declared-v2 / separated / 0.5 / 60000ms 下仅改变判别模型 Pro / Qwen。预设默认 `allowRemote=false`，该通用Session预设尚未执行真实模型。另一个独立typed v7组件对照已收尾、未证明千问收益，见[模型结果](./model-selection.md#单次真实结果与选型决定)；题集与角色不同，不合并成绩。以后执行Session对照仍需新问题与单次预算，不使用已结束的C1 manifest续跑千问或重算旧成绩。工作台非法组合应保留可修复控件，CLI/JSON与实际后端使用同一校验入口。
 
 ```sh
 # 仅配置预览，0 模型与数据库请求。

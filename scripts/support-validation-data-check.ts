@@ -206,18 +206,41 @@ function readImplementationContract(bytes: Buffer, sourceBytes: Buffer) {
   return revision;
 }
 
-// Preserve all unrevised business files while allowing this additive cost-source label.
-// The full normalized file must still match the original digest; business edits cannot pass.
+// This reviewed attribution revision is separate from the frozen business oracle.
+// The first 7651 bytes end at supportObjectivePlan and match the original source exactly.
+// Pin both ranges and the full new file: changing source + manifest still needs review.
+const attributionRevision = Object.freeze({
+  contract: "docs/experiment-controls.md#本轮工作台接线合同2026-10-06实施前",
+  frozenSha256: "216410320baf42fe24ce033780885342f486e810033e08c8e2295c1866bcb558",
+  actualSha256: "4bbedc28c9179bb902629a32d787b3330415dc93e70ac658fc5edede0b5614de",
+  businessOracleBytes: 7651,
+  businessOracleSha256: "10c4fbff6ca81e0ba46bb0d11808c68a830077b083749e9c54584a890dc373ba",
+  attributionSha256: "0bfb076f286a4952bd3a69bec52c315a047478aca105bdbf0e591552a80e1e0c",
+});
+
+// Other files remain frozen. Retain the earlier normalized price-label compatibility;
+// the provider ledger is an explicit reviewed change, never whole-file equivalence.
 function assertFrozenContract(path: string, bytes: Buffer, expected: string) {
   const actual = hash(bytes);
   if (actual === expected) return null;
-  const previous = '["sdk_estimate", "provider"].includes(cost.source)';
-  const current = '["sdk_estimate", "provider", "price_estimate"].includes(cost.source)';
   assert.equal(path, "src/support-evaluation.ts", `contract drift: ${path}`);
   const text = bytes.toString();
+  if (text.includes("export type ProviderUsageSummary = {")) {
+    assert.equal(expected, attributionRevision.frozenSha256, "attribution revision must name the original implementation");
+    assert.equal(hash(bytes.subarray(0, attributionRevision.businessOracleBytes)), attributionRevision.businessOracleSha256, "frozen business oracle drift");
+    assert.equal(hash(bytes.subarray(attributionRevision.businessOracleBytes)), attributionRevision.attributionSha256, "reviewed attribution drift");
+    assert.equal(actual, attributionRevision.actualSha256, "reviewed attribution implementation drift");
+    return { path, frozenSha256: expected, actualSha256: actual, byteEquivalent: false,
+      businessOracle: { bytes: attributionRevision.businessOracleBytes, sha256: attributionRevision.businessOracleSha256, byteEquivalent: true },
+      attributionRevision: { contract: attributionRevision.contract, sha256: attributionRevision.attributionSha256 },
+      change: "reviewed provider role/currency ledger analysis; fixed business oracle bytes unchanged, not executed" };
+  }
+  const previous = '["sdk_estimate", "provider"].includes(cost.source)';
+  const current = '["sdk_estimate", "provider", "price_estimate"].includes(cost.source)';
   assert.equal(text.split(current).length, 2, `contract drift: ${path}`);
   assert.equal(hash(text.replace(current, previous)), expected, `business contract drift: ${path}`);
-  return { path, frozenSha256: expected, actualSha256: actual, change: "additive price_estimate cost source; business checker byte-equivalent" };
+  return { path, frozenSha256: expected, actualSha256: actual, byteEquivalent: false,
+    change: "additive price_estimate cost source; business oracle unchanged, attribution revised" };
 }
 
 function assertRevisedContract(path: string, bytes: Buffer, expected: string, revision: ReturnType<typeof readImplementationContract>) {
@@ -257,6 +280,13 @@ const checkerPath = "src/support-evaluation.ts";
 const checkerBytes = await readFile(new URL(`../${checkerPath}`, import.meta.url));
 assert.throws(() => assertFrozenContract(checkerPath, Buffer.concat([checkerBytes, Buffer.from("\n// unexpected drift")]), source.contracts[checkerPath]));
 assert.throws(() => assertFrozenContract("src/refunds.ts", checkerBytes, source.contracts["src/refunds.ts"]));
+const businessDrift = Buffer.from(checkerBytes);
+businessDrift[0] = businessDrift[0]! ^ 1;
+assert.throws(() => assertFrozenContract(checkerPath, businessDrift, source.contracts[checkerPath]), /frozen business oracle drift/);
+assert.throws(() => assertFrozenContract(checkerPath,
+  Buffer.from(checkerBytes.toString().replace('"support-question" ? "question"', '"support-question" ? "other"')),
+  source.contracts[checkerPath]), /reviewed attribution drift/);
+assert.throws(() => assertFrozenContract(checkerPath, checkerBytes, "0".repeat(64)), /must name the original implementation/);
 const revisedBytes = await readFile(new URL(`../${revision.change.path}`, import.meta.url));
 assert.throws(() => assertRevisedContract(revision.change.path, Buffer.concat([revisedBytes, Buffer.from("\n// unexpected drift")]), source.contracts[revision.change.path], revision));
 assert.throws(() => assertRevisedContract(revision.change.path, revisedBytes, "0".repeat(64), revision));
@@ -275,7 +305,13 @@ for (const mutate of [
   assert.throws(() => readImplementationContract(Buffer.from(`${JSON.stringify(copy, null, 2)}\n`), sourceBytes));
 }
 assert.equal(compatibility.filter(item => "revision" in item).length, 1);
-console.log("Support validation keeps original gold/source hashes; implementation v2 explicitly changes task binding/notification semantics, not byte-equivalent. Cost-label compatibility remains separately checked.");
+const ledgerCompatibility = compatibility.find(item => "attributionRevision" in item);
+assert.ok(ledgerCompatibility && "businessOracle" in ledgerCompatibility && ledgerCompatibility.businessOracle
+  && "attributionRevision" in ledgerCompatibility && ledgerCompatibility.attributionRevision);
+assert.equal(ledgerCompatibility.byteEquivalent, false);
+assert.equal(ledgerCompatibility.businessOracle.byteEquivalent, true);
+assert.equal(ledgerCompatibility.attributionRevision.contract, attributionRevision.contract);
+console.log("Support validation keeps original gold/source hashes; implementation v2 changes task binding/notification semantics. Business oracle bytes remain frozen; provider role/currency ledger is a reviewed hash-pinned attribution revision, not whole-file equivalence or business execution.");
 function rejects(mutate: (copy: SupportValidationDataset) => void) {
   const copy = structuredClone(data); mutate(copy); assert.throws(() => validateSupportValidationDataset(copy));
 }

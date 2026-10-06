@@ -105,18 +105,57 @@ export function supportObjectivePlan(cases: Array<{ id: string; tags: string[]; 
     turns: item.turns.map(turn => ({ index: turn.index, source: "user", checks: supportCheckSpecs.map(({ id, category, basis }) => ({ id, category, basis })) })) })) };
 }
 
+export type ProviderUsageSummary = {
+  requests: number; knownTokenRequests: number; unknownTokenRequests: number;
+  knownTokens: number | null; completeTokens: number | null; unknownCurrencyRequests: number;
+  currencies: Array<{ currency: "USD" | "CNY"; requests: number; knownRequests: number; unknownRequests: number;
+    knownAmount: number | null; completeAmount: number | null }>;
+};
+export type SupportProviderRole = "agent" | "question" | "rerank" | "support" | "other";
 export type SupportTraceAnalysis = {
   spans: number; groups: Array<{ actor: string; trigger: string; component: string; calls: number; denied: number; errors: number }>;
   providers: Array<{ provider: string; model: string; kind: string; requests: number; usageReported: number; knownTokens: number | null;
     costs: Array<{ currency: string; source: string; reportedRequests: number; knownAmount: number }> }>;
+  providerUsage: Array<ProviderUsageSummary & { role: SupportProviderRole }>;
+  providerTotals: ProviderUsageSummary;
   issues: string[];
 };
+
+function emptyProviderUsage(): ProviderUsageSummary {
+  return { requests: 0, knownTokenRequests: 0, unknownTokenRequests: 0, knownTokens: null, completeTokens: null,
+    unknownCurrencyRequests: 0, currencies: (["USD", "CNY"] as const).map(currency => ({
+      currency, requests: 0, knownRequests: 0, unknownRequests: 0, knownAmount: null, completeAmount: null })) };
+}
+
+function addProviderUsage(summary: ProviderUsageSummary, usage: NonNullable<EvalSpan["usage"]>, validCost: boolean) {
+  summary.requests++;
+  if (usage.totalTokens === null) summary.unknownTokenRequests++;
+  else { summary.knownTokenRequests++; summary.knownTokens = (summary.knownTokens ?? 0) + usage.totalTokens; }
+  const currency = usage.currency ?? (validCost ? usage.cost!.currency : undefined);
+  const bucket = summary.currencies.find(item => item.currency === currency);
+  if (!bucket) { summary.unknownCurrencyRequests++; return; }
+  bucket.requests++;
+  if (validCost) { bucket.knownRequests++; bucket.knownAmount = (bucket.knownAmount ?? 0) + usage.cost!.amount; }
+  else bucket.unknownRequests++;
+}
 
 // Only spans supplied by the recorder are counted; never reinterpret missing legacy attribution.
 export function analyzeSupportSpans(spans: EvalSpan[]): SupportTraceAnalysis {
   const issues: string[] = [], ids = new Set<string>();
   const groups = new Map<string, SupportTraceAnalysis["groups"][number]>();
   const providers = new Map<string, SupportTraceAnalysis["providers"][number]>();
+  const roles = new Map<SupportProviderRole, ProviderUsageSummary & { role: SupportProviderRole }>();
+  const providerTotals = emptyProviderUsage();
+  const parents = new Map(spans.filter(span => span && typeof span.id === "string").map(span => [span.id, span.parentSpanId]));
+  // A provider child carries the bill; a service parent must never bill it again.
+  const billedParents = new Set<string>();
+  for (const span of spans) if (span?.usage) {
+    const path = new Set([span.id]);
+    let parent = span.parentSpanId;
+    while (typeof parent === "string" && parent && !path.has(parent)) {
+      billedParents.add(parent); path.add(parent); parent = parents.get(parent) ?? null;
+    }
+  }
   for (const span of spans) {
     if (!span || typeof span.id !== "string" || !span.id || ids.has(span.id)) { issues.push("span 标识缺失或重复"); continue; }
     ids.add(span.id);
@@ -130,8 +169,10 @@ export function analyzeSupportSpans(spans: EvalSpan[]): SupportTraceAnalysis {
     const group = groups.get(key) ?? { actor: span.actor, trigger: span.trigger, component: span.component, calls: 0, denied: 0, errors: 0 };
     group.calls++; if (span.outcome === "denied") group.denied++; if (span.outcome === "error") group.errors++; groups.set(key, group);
     if (!span.usage) continue;
+    if (billedParents.has(span.id)) { issues.push(`provider 用量在父子span重复记录：${span.id}`); continue; }
     const usage = span.usage;
     if (!object(usage) || !usage.provider || !usage.model || !["llm", "embedding", "rerank"].includes(usage.kind)
+      || (usage.currency !== undefined && !["USD", "CNY"].includes(usage.currency))
       || [usage.inputTokens, usage.outputTokens, usage.totalTokens].some(value => value !== null && (!Number.isSafeInteger(value) || value < 0))) {
       issues.push(`provider usage 无效：${span.id}`); continue;
     }
@@ -140,19 +181,28 @@ export function analyzeSupportSpans(spans: EvalSpan[]): SupportTraceAnalysis {
       requests: 0, usageReported: 0, knownTokens: null, costs: [] };
     provider.requests++;
     if (usage.totalTokens !== null) { provider.usageReported++; provider.knownTokens = (provider.knownTokens ?? 0) + usage.totalTokens; }
+    let validCost = false;
     if (usage.cost !== null) {
       const cost = usage.cost;
-      if (!object(cost) || !["USD", "CNY"].includes(cost.currency) || !["sdk_estimate", "provider", "price_estimate"].includes(cost.source) || !Number.isFinite(cost.amount) || cost.amount < 0) {
+      if (!object(cost) || !["USD", "CNY"].includes(cost.currency) || !["sdk_estimate", "provider", "price_estimate"].includes(cost.source) || !Number.isFinite(cost.amount) || cost.amount < 0
+        || (usage.currency !== undefined && usage.currency !== cost.currency)) {
         issues.push(`provider cost 无效：${span.id}`);
       } else {
+        validCost = true;
         let total = provider.costs.find(item => item.currency === cost.currency && item.source === cost.source);
         if (!total) { total = { currency: cost.currency, source: cost.source, reportedRequests: 0, knownAmount: 0 }; provider.costs.push(total); }
         total.reportedRequests++; total.knownAmount += cost.amount;
       }
     }
     providers.set(providerKey, provider);
+    const role: SupportProviderRole = span.actor === "agent" && span.component === "model" ? "agent"
+      : span.actor === "host" && span.component === "support-question" ? "question"
+        : span.actor === "host" && span.component === "knowledge-rerank" ? "rerank"
+          : span.actor === "host" && span.component === "knowledge-support" ? "support" : "other";
+    const ledger = roles.get(role) ?? { ...emptyProviderUsage(), role };
+    addProviderUsage(ledger, usage, validCost); roles.set(role, ledger);
+    addProviderUsage(providerTotals, usage, validCost);
   }
-  const parents = new Map(spans.filter(span => span && typeof span.id === "string").map(span => [span.id, span.parentSpanId]));
   for (const span of spans) {
     if (!span || typeof span.id !== "string") continue;
     const path = new Set([span.id]);
@@ -162,5 +212,11 @@ export function analyzeSupportSpans(spans: EvalSpan[]): SupportTraceAnalysis {
       path.add(parent); parent = parents.get(parent);
     }
   }
-  return { spans: spans.length, groups: [...groups.values()], providers: [...providers.values()], issues };
+  for (const summary of [...roles.values(), providerTotals]) {
+    summary.completeTokens = !issues.length && summary.requests > 0 && summary.unknownTokenRequests === 0 ? summary.knownTokens : null;
+    for (const bucket of summary.currencies) bucket.completeAmount = !issues.length && bucket.requests > 0
+      && bucket.unknownRequests === 0 && summary.unknownCurrencyRequests === 0 ? bucket.knownAmount : null;
+  }
+  return { spans: spans.length, groups: [...groups.values()], providers: [...providers.values()],
+    providerUsage: [...roles.values()], providerTotals, issues };
 }

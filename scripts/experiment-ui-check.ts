@@ -75,7 +75,8 @@ const T = "2026-01-01T00:00:00Z";
 const counts = (planned: number, passed: number, failed: number, skipped: number, missing: number): any =>
   ({ planned, passed, failed, skipped, missing, passRate: planned ? passed / planned : null });
 const supportParams = (over: Record<string, unknown> = {}): any => ({
-  timeoutMs: 60000, repairBudget: 1, merchantEvents: "architecture",
+  timeoutMs: 60000, repairBudget: 1, agentModel: "configured",
+  questionContract: "v2", questionModel: null, questionTimeoutMs: null, merchantEvents: "architecture",
   knowledgeMode: "lexical", knowledgeSupport: "binary", knowledgeSupportModel: "configured", knowledgeSupportPrompt: "v5", knowledgeApplicability: "model_only", knowledgeQueryMode: "combined",
   knowledgeThreshold: 0.71, knowledgeTimeoutMs: 15000, ...over,
 });
@@ -105,6 +106,9 @@ const catalog = (): any => ({
     { id: "support-knowledge-prompt-ab", name: "分类判别 Prompt A/B", config: { version: 1, kind: "support", label: "分类判别 Prompt A/B", repeat: 1, allowRemote: false, variants: [
       { id: "A", architecture: "controller", parameters: supportParams({ knowledgeMode: "m4-support", knowledgeSupport: "typed", knowledgeSupportModel: "deepseek-v4-pro", knowledgeSupportPrompt: "v5", knowledgeApplicability: "declared", knowledgeThreshold: 0.5 }) },
       { id: "B", architecture: "controller", parameters: supportParams({ knowledgeMode: "m4-support", knowledgeSupport: "typed", knowledgeSupportModel: "deepseek-v4-pro", knowledgeSupportPrompt: "v6", knowledgeApplicability: "declared", knowledgeThreshold: 0.5 }) }] } },
+    { id: "support-question-contract-ab", name: "咨询出处 v2 / v3（开发候选，未准入）", config: { version: 1, kind: "support", label: "咨询出处 v2 / v3（开发候选，未准入）", repeat: 1, allowRemote: false, variants: [
+      { id: "A", architecture: "controller", parameters: supportParams({ knowledgeMode: "m4-support", knowledgeSupport: "typed", knowledgeSupportModel: "deepseek-v4-pro", knowledgeThreshold: 0.5, questionContract: "v2", questionModel: null, questionTimeoutMs: null }) },
+      { id: "B", architecture: "controller", parameters: supportParams({ knowledgeMode: "m4-support", knowledgeSupport: "typed", knowledgeSupportModel: "deepseek-v4-pro", knowledgeThreshold: 0.5, questionContract: "v3", questionModel: "configured", questionTimeoutMs: 10000 }) }] } },
     { id: "retrieval-local", name: "本地检索 M0 / M1", config: { version: 1, kind: "retrieval", label: "本地检索 M0 / M1", repeat: 1, allowRemote: false, variants: [
       { id: "A", modes: ["M0", "M1"], parameters: retrievalParams() } ] } },
     { id: "retrieval-rerank", name: "词项 / 全候选重排", config: { version: 1, kind: "retrieval", label: "词项 / 全候选重排", repeat: 1, allowRemote: false, variants: [
@@ -118,8 +122,21 @@ const catalog = (): any => ({
   ],
   fields: {
     support: [
+      { key: "agentModel", label: "业务 Agent 模型", type: "select", options: [
+        { value: "configured", label: "跟随已配置模型" }, { value: "deepseek-flash", label: "DeepSeek Flash" },
+        { value: "deepseek-v4-pro", label: "DeepSeek V4 Pro" }, { value: "qwen3.7-plus-2026-05-26", label: "Qwen3.7 Plus（2026-05-26）" }],
+        note: "仅作用于本次实验；configured 保持环境模型，不改变支持判别模型选择" },
       { key: "timeoutMs", label: "每轮超时（ms）", type: "number", min: 10000, max: 120000, step: 1000 },
       { key: "repairBudget", label: "格式修复次数", type: "number", min: 0, max: 2, step: 1, note: "仅 Controller 生效" },
+      { key: "questionContract", label: "咨询问题出处", type: "select", options: [
+        { value: "v2", label: "v2 既有合同" }, { value: "v3", label: "v3 原问解析（开发候选）" }],
+        note: "默认 v2；v3 仅 Controller，整体 C1 未准入" },
+      { key: "questionModel", label: "咨询解析模型", type: "select", options: [
+        { value: "configured", label: "跟随已配置模型" }, { value: "deepseek-flash", label: "DeepSeek Flash" },
+        { value: "deepseek-v4-pro", label: "DeepSeek V4 Pro" }, { value: "qwen3.7-plus-2026-05-26", label: "Qwen3.7 Plus（2026-05-26）" }],
+        note: "仅 v3；省略时 configured，v2 必须为 null" },
+      { key: "questionTimeoutMs", label: "咨询解析超时（ms）", type: "number", min: 1000, max: 15000, step: 1000,
+        note: "仅 v3；省略时 10000，且不超过每轮超时；v2 必须为 null" },
       { key: "merchantEvents", label: "商家通知处理", type: "select", options: [
         { value: "architecture", label: "跟随架构" }, { value: "host", label: "宿主直接处理" }, { value: "model", label: "经过模型" }], note: "最终状态卡始终由宿主生成" },
       { key: "knowledgeMode", label: "知识检索", type: "select", options: [
@@ -128,11 +145,13 @@ const catalog = (): any => ({
       { key: "knowledgeSupport", label: "事实支持判别", type: "select", options: [
         { value: "binary", label: "二元基线 v1" }, { value: "typed", label: "分类候选 v3" }], note: "typed 仅用于 m4-support" },
       { key: "knowledgeSupportModel", label: "支持判别模型", type: "select", options: [
-        { value: "configured", label: "跟随已配置模型" }, { value: "deepseek-v4-pro", label: "DeepSeek V4 Pro" }], note: "仅 Controller + m4-support；Pro 只切换支持判别" },
+        { value: "configured", label: "跟随已配置模型" }, { value: "deepseek-flash", label: "DeepSeek Flash" },
+        { value: "deepseek-v4-pro", label: "DeepSeek V4 Pro" }, { value: "qwen3.7-plus-2026-05-26", label: "Qwen3.7 Plus（2026-05-26）" }],
+        note: "仅 Controller + m4-support；固定选项只切换支持判别" },
       { key: "knowledgeSupportPrompt", label: "分类判别 Prompt", type: "select", options: [
         { value: "v5", label: "v5 基线" }, { value: "v6", label: "v6 诉求合同" }], note: "v6 仅 Controller + m4-support + typed；服务端严格校验" },
       { key: "knowledgeApplicability", label: "规则适用条件", type: "select", options: [
-        { value: "model_only", label: "仅模型判断" }, { value: "declared", label: "已声明必要前提" }], note: "declared 仅 Controller + m4-support；binary/typed 均可" },
+        { value: "model_only", label: "仅模型判断" }, { value: "declared", label: "已声明必要前提" }, { value: "declared-v2", label: "已声明前提 v2（含类别目录）" }], note: "声明模式仅 Controller + m4-support；binary/typed 均可" },
       { key: "knowledgeTimeoutMs", label: "单次知识查询超时（ms）", type: "number", min: 1000, max: 60000, step: 1000, note: "包含读取、重排、支持判别和来源复检；无自动重试" },
     ],
     retrieval: [
@@ -1052,7 +1071,7 @@ const openExperiments = async (booted: Awaited<ReturnType<typeof boot>>, jobs: u
   modeA.value = "lexical";
   modeA.fire("change");
   await flush();
-  assert.match(content(root), /固定 Pro 判别模型需 Controller \+ m4-support 知识检索；请改回 configured 或调整组合/, "非法组合明确原因");
+  assert.match(content(root), /固定判别模型需 Controller \+ m4-support 知识检索；请改回 configured 或调整组合/, "非法组合明确原因");
   assert.equal(findClass(root, "primary-button")!.disabled, true, "lexical+Pro 禁提交");
   assert.equal(byField("knowledgeSupportModel", "A").disabled, false, "非法值保留可操作以修正");
   assert.equal(byField("knowledgeSupportModel", "A").value, "deepseek-v4-pro", "不暗改参数");
@@ -1060,7 +1079,7 @@ const openExperiments = async (booted: Awaited<ReturnType<typeof boot>>, jobs: u
   modelFix.value = "configured";
   modelFix.fire("change");
   await flush();
-  assert.ok(!content(root).includes("固定 Pro 判别模型需"), "改回 configured 后错误消失");
+  assert.ok(!content(root).includes("固定判别模型需"), "改回 configured 后错误消失");
   assert.equal(byField("knowledgeSupportModel", "A").disabled, true, "合法 lexical+configured 显示不适用");
   // 再置 Pro：atomic + Pro 同样命中同一非法规则。
   const modelA2 = byField("knowledgeSupportModel", "A");
@@ -1071,7 +1090,7 @@ const openExperiments = async (booted: Awaited<ReturnType<typeof boot>>, jobs: u
   archA.value = "atomic";
   archA.fire("change");
   await flush();
-  assert.match(content(root), /固定 Pro 判别模型需/, "atomic+Pro 同样禁提交");
+  assert.match(content(root), /固定判别模型需/, "atomic+Pro 同样禁提交");
   assert.equal(byField("knowledgeSupportModel", "A").value, "deepseek-v4-pro", "atomic 下参数仍保留");
   assert.equal(byField("knowledgeSupportModel", "A").disabled, false, "非法值仍可操作");
   const archA2 = byField("architecture", "A");
@@ -1082,7 +1101,7 @@ const openExperiments = async (booted: Awaited<ReturnType<typeof boot>>, jobs: u
   modeA3.value = "m4-support";
   modeA3.fire("change");
   await flush();
-  assert.ok(!content(root).includes("固定 Pro 判别模型需"), "回到合法组合错误消失");
+  assert.ok(!content(root).includes("固定判别模型需"), "回到合法组合错误消失");
   // 提交体带判别模型参数。
   const allow = findAttr(root, "data-field", "allow-remote")!;
   allow.checked = true;
@@ -1217,4 +1236,255 @@ const openExperiments = async (booted: Awaited<ReturnType<typeof boot>>, jobs: u
   assert.equal(byField("knowledgeApplicability", "A").value, "model_only", "旧配置缺省 model_only，不伪造历史生效值");
   assert.equal(byField("knowledgeApplicability", "A").disabled, true, "词项旧配置适用条件不适用");
   console.log("PASS 实验调试：knowledgeApplicability 非法组合禁提交可修复、binary 兼容、提交体参数、旧缺省 model_only。");
+}
+
+// 咨询出处 v2/v3：默认 v2 显式 null，切换回填缺省，atomic+v3 保留可修复，超时上下界与不超整轮，非法不发 POST。
+{
+  const booted = await boot();
+  const { element, find, context, flush, pendingCount } = booted;
+  await openExperiments(booted);
+  const root = element("experiments");
+  const byField = (field: string, variant: string) => findAllAttr(root, "data-field", field).find(item => item.attrs.get("data-variant") === variant)!;
+  const preset = findAttr(root, "data-field", "preset")!;
+  preset.value = "support-question-contract-ab";
+  preset.fire("change");
+  await flush();
+  // 默认 v2：两个解析控件不适用且禁用；B 为 v3 显式 configured/10000。
+  assert.equal(byField("questionContract", "A").value, "v2");
+  assert.equal(byField("questionModel", "A").disabled, true, "v2 解析模型不适用");
+  assert.equal(byField("questionTimeoutMs", "A").disabled, true, "v2 解析超时不适用");
+  assert.equal(byField("questionContract", "B").value, "v3");
+  assert.equal(byField("questionModel", "B").value, "configured", "v3 缺省 configured");
+  assert.equal(byField("questionTimeoutMs", "B").value, "10000", "v3 缺省 10000");
+  assert.equal(byField("questionModel", "B").disabled, false);
+  assert.match(content(root), /questionContract v2 → v3/, "差异含出处合同");
+  // 主动 v2→v3：仅空值填 configured/10000。
+  const contractA = byField("questionContract", "A");
+  contractA.value = "v3";
+  contractA.fire("change");
+  await flush();
+  assert.equal(byField("questionModel", "A").value, "configured", "切 v3 空值填 configured");
+  assert.equal(byField("questionTimeoutMs", "A").value, "10000", "切 v3 空值填 10000");
+  assert.equal(byField("questionModel", "A").disabled, false, "v3 解析控件启用");
+  // 主动 v3→v2：置显式 null，下载/提交带 null。
+  contractA.value = "v2";
+  byField("questionContract", "A").fire("change");
+  await flush();
+  assert.equal(byField("questionModel", "A").disabled, true, "回 v2 重新禁用");
+  // 往返同步回归：v3 选 Pro/5000 → v2 → v3，控件显示必须同步当前 params（configured/10000），不能残留旧显示值。
+  byField("questionContract", "A").value = "v3";
+  byField("questionContract", "A").fire("change");
+  await flush();
+  const qModel = byField("questionModel", "A");
+  qModel.value = "deepseek-v4-pro";
+  qModel.fire("change");
+  await flush();
+  const qT0 = byField("questionTimeoutMs", "A");
+  qT0.value = "5000";
+  qT0.fire("change");
+  await flush();
+  byField("questionContract", "A").value = "v2";
+  byField("questionContract", "A").fire("change");
+  await flush();
+  assert.equal(byField("questionModel", "A").value, "", "v2 的 null 显示为空");
+  byField("questionContract", "A").value = "v3";
+  byField("questionContract", "A").fire("change");
+  await flush();
+  assert.equal(byField("questionModel", "A").value, "configured", "往返后控件与 draft 一致，不是旧显示值 Pro");
+  assert.equal(byField("questionTimeoutMs", "A").value, "10000", "往返后超时显示 10000，不是旧显示值 5000");
+  // 超时边界：v3 下 500/16000/超整轮均非法，合法 10000 恢复。
+  byField("questionContract", "A").value = "v3";
+  byField("questionContract", "A").fire("change");
+  await flush();
+  const qTimeout = byField("questionTimeoutMs", "A");
+  qTimeout.value = "500";
+  qTimeout.fire("change");
+  await flush();
+  assert.match(content(root), /v3 解析超时应为 1000–15000 的整数毫秒，且不超过整轮超时/, "低于下界非法");
+  qTimeout.value = "16000";
+  byField("questionTimeoutMs", "A").fire("change");
+  await flush();
+  assert.match(content(root), /v3 解析超时应为/, "高于上界非法");
+  const wholeTimeout = byField("timeoutMs", "A");
+  wholeTimeout.value = "10000";
+  wholeTimeout.fire("change");
+  await flush();
+  const qTimeout2 = byField("questionTimeoutMs", "A");
+  qTimeout2.value = "15000";
+  qTimeout2.fire("change");
+  await flush();
+  assert.match(content(root), /不超过整轮超时/, "解析超时不得大于整轮超时");
+  qTimeout2.value = "10000";
+  byField("questionTimeoutMs", "A").fire("change");
+  await flush();
+  assert.ok(!content(root).includes("v3 解析超时应为"), "合法超时恢复");
+  // 真实非法不发送 POST：先勾选远程授权，再置非法 v3 超时提交，证明拒绝来自参数校验而非远程门控。
+  const allow = findAttr(root, "data-field", "allow-remote")!;
+  allow.checked = true;
+  allow.fire("change");
+  await flush();
+  const qTimeout3 = byField("questionTimeoutMs", "A");
+  qTimeout3.value = "500";
+  qTimeout3.fire("change");
+  await flush();
+  const beforeIllegal = pendingCount();
+  findClass(root, "primary-button")!.fire("click");
+  await flush();
+  assert.equal(pendingCount(), beforeIllegal, "已授权但非法 v3 超时不发出 POST");
+  assert.match(content(root), /v3 解析超时应为/, "非法参数错误保留在表单");
+  const qTimeoutFixed = byField("questionTimeoutMs", "A");
+  qTimeoutFixed.value = "10000";
+  qTimeoutFixed.fire("change");
+  await flush();
+  assert.ok(!content(root).includes("v3 解析超时应为"), "修复后恢复");
+  // atomic + v3：先把知识参数归位隔离 v3 规则，保留 v3 值可修复，不偷偷改合同。
+  const modeA0 = byField("knowledgeMode", "A");
+  modeA0.value = "lexical";
+  modeA0.fire("change");
+  await flush();
+  const profileA0 = byField("knowledgeSupport", "A");
+  profileA0.value = "binary";
+  profileA0.fire("change");
+  await flush();
+  const modelA0 = byField("knowledgeSupportModel", "A");
+  modelA0.value = "configured";
+  modelA0.fire("change");
+  await flush();
+  const archA = byField("architecture", "A");
+  archA.value = "atomic";
+  archA.fire("change");
+  await flush();
+  assert.match(content(root), /咨询出处 v3 仅 Controller 可用；请改回 v2 或改用 Controller/, "atomic+v3 明确原因");
+  assert.equal(byField("questionContract", "A").value, "v3", "v3 值保留不暗改");
+  assert.equal(byField("questionContract", "A").disabled, false, "合同 select 可修复");
+  const beforeAtomic = pendingCount();
+  findClass(root, "primary-button")!.fire("click");
+  await flush();
+  assert.equal(pendingCount(), beforeAtomic, "已授权但 atomic+v3 不发出 POST");
+  byField("questionContract", "A").value = "v2";
+  byField("questionContract", "A").fire("change");
+  await flush();
+  assert.ok(!content(root).includes("咨询出处 v3 仅 Controller"), "改回 v2 后错误消失");
+  // 固定判别模型跨 lexical 修复：flash 在 lexical 下同样非法。
+  const archA2 = byField("architecture", "A");
+  archA2.value = "controller";
+  archA2.fire("change");
+  await flush();
+  const modelA = byField("knowledgeSupportModel", "A");
+  modelA.value = "deepseek-flash";
+  modelA.fire("change");
+  await flush();
+  const modeA = byField("knowledgeMode", "A");
+  modeA.value = "lexical";
+  modeA.fire("change");
+  await flush();
+  assert.match(content(root), /固定判别模型需 Controller \+ m4-support 知识检索/, "固定 Flash 在 lexical 下同样非法");
+  assert.equal(byField("knowledgeSupportModel", "A").disabled, false, "非法固定值可改回");
+  byField("knowledgeSupportModel", "A").value = "configured";
+  byField("knowledgeSupportModel", "A").fire("change");
+  await flush();
+  assert.ok(!content(root).includes("固定判别模型需"), "改回 configured 后错误消失");
+  // 合法提交：A 为 v2 显式 null，B 为 v3。
+  allow.checked = true;
+  allow.fire("change");
+  await flush();
+  findClass(root, "primary-button")!.fire("click");
+  await flush(1);
+  const post = find(request => request.path === "/api/experiments" && request.options?.method === "POST", "question POST");
+  const body = JSON.parse(post.options?.body || "{}");
+  assert.ok("questionModel" in body.variants[0].parameters && body.variants[0].parameters.questionModel === null, "v2 提交体显式 null 解析模型");
+  assert.ok("questionTimeoutMs" in body.variants[0].parameters && body.variants[0].parameters.questionTimeoutMs === null, "v2 提交体显式 null 超时");
+  assert.equal(body.variants[1].questionModel ?? body.variants[1].parameters.questionModel, "configured", "v3 提交体 configured");
+  assert.equal(body.variants[1].parameters.questionTimeoutMs, 10000);
+  respond(post, job("job-q1", { status: "completed", config: body }));
+  await flush();
+  assert.equal(pendingCount(), 0);
+  // 历史省略键的合法配置按缺省规范化：v2 + 无解析键 → 显示 v2 且控件禁用，不报错。
+  const legacyJob = job("job-old-q", {
+    config: { version: 1, kind: "support", label: "旧出处配置", repeat: 1, allowRemote: false,
+      variants: [{ id: "A", architecture: "controller", parameters: { timeoutMs: 60000, repairBudget: 1, merchantEvents: "architecture" } }] },
+    results: [{ variantId: "A", repetition: 1, kind: "support", status: "completed", runId: "run-old-q", summary: supportSummary(3) }],
+  });
+  findAttr(root, "data-action", "refresh-jobs")!.fire("click");
+  await flush(1);
+  respond(find(request => request.path === "/api/experiments", "refresh legacy question"), { jobs: [legacyJob] });
+  await flush();
+  walk(root).find(item => item.className.split(" ").includes("exp-job"))!.fire("click");
+  await flush(1);
+  respond(find(request => request.path === "/api/experiments/job-old-q", "legacy question detail"), legacyJob);
+  await flush();
+  findAttr(root, "data-action", "load-config")!.fire("click");
+  await flush();
+  assert.equal(byField("questionContract", "A").value, "v2", "旧配置缺省 v2");
+  assert.equal(byField("questionModel", "A").disabled, true, "缺省 v2 解析控件禁用");
+  assert.ok(!content(root).includes("v2 出处不携带"), "省略键的合法配置不报错");
+  // 省略键规范化后下载/提交带显式 null。
+  assert.match(runInContext("JSON.stringify(expState.draft)", context), /"questionModel":null/, "下载 JSON 显式 null");
+  const legacyV3 = job("job-old-v3", {
+    config: { version: 1, kind: "support", label: "旧 v3 省略配置", repeat: 1, allowRemote: false,
+      variants: [{ id: "A", architecture: "controller", parameters: { timeoutMs: 60000, repairBudget: 1, merchantEvents: "architecture", questionContract: "v3" } }] },
+    results: [{ variantId: "A", repetition: 1, kind: "support", status: "completed", runId: "run-old-v3", summary: supportSummary(3) }],
+  });
+  findAttr(root, "data-action", "refresh-jobs")!.fire("click");
+  await flush(1);
+  respond(find(request => request.path === "/api/experiments", "refresh legacy v3"), { jobs: [legacyV3] });
+  await flush();
+  walk(root).find(item => item.className.split(" ").includes("exp-job"))!.fire("click");
+  await flush(1);
+  respond(find(request => request.path === "/api/experiments/job-old-v3", "legacy v3 detail"), legacyV3);
+  await flush();
+  findAttr(root, "data-action", "load-config")!.fire("click");
+  await flush();
+  assert.equal(byField("questionModel", "A").value, "configured", "合法旧 v3 省略键默认 configured");
+  assert.equal(byField("questionTimeoutMs", "A").value, "10000", "合法旧 v3 省略键默认 10000");
+  const allow2 = findAttr(root, "data-field", "allow-remote")!;
+  allow2.checked = true;
+  allow2.fire("change");
+  await flush();
+  findClass(root, "primary-button")!.fire("click");
+  await flush(1);
+  const postV3 = find(request => request.path === "/api/experiments" && request.options?.method === "POST", "legacy v3 POST");
+  const bodyV3 = JSON.parse(postV3.options?.body || "{}");
+  assert.equal(bodyV3.variants[0].parameters.questionModel, "configured", "v3 省略键规范化后提交 configured");
+  assert.equal(bodyV3.variants[0].parameters.questionTimeoutMs, 10000);
+  respond(postV3, job("job-q2", { status: "completed", config: bodyV3 }));
+  await flush();
+  // v3 显式 null：不偷偷缺省为合法，提示并禁提交。
+  const badV3 = job("job-bad-v3", {
+    config: { version: 1, kind: "support", label: "坏 v3 显式 null", repeat: 1, allowRemote: true,
+      variants: [{ id: "A", architecture: "controller", parameters: { timeoutMs: 60000, repairBudget: 1, merchantEvents: "architecture",
+        questionContract: "v3", questionModel: null, questionTimeoutMs: null } }] },
+    results: [{ variantId: "A", repetition: 1, kind: "support", status: "completed", runId: "run-bad-v3", summary: supportSummary(3) }],
+  });
+  findAttr(root, "data-action", "refresh-jobs")!.fire("click");
+  await flush(1);
+  respond(find(request => request.path === "/api/experiments", "refresh bad v3"), { jobs: [badV3] });
+  await flush();
+  walk(root).find(item => item.className.split(" ").includes("exp-job"))!.fire("click");
+  await flush(1);
+  respond(find(request => request.path === "/api/experiments/job-bad-v3", "bad v3 detail"), badV3);
+  await flush();
+  findAttr(root, "data-action", "load-config")!.fire("click");
+  await flush();
+  assert.match(content(root), /v3 出处需显式选择解析模型/, "v3 显式 null 提示错误");
+  assert.equal(findClass(root, "primary-button")!.disabled, true, "v3 显式 null 禁提交");
+  const beforeBad = pendingCount();
+  findClass(root, "primary-button")!.fire("click");
+  await flush();
+  assert.equal(pendingCount(), beforeBad, "v3 显式 null 不发出 POST");
+  assert.equal(byField("questionModel", "A").value, "", "显式 null 不偷偷填 configured");
+  // expComboError 直接合成校验（JSON 不表达 undefined，直接调用）：省略合法，显式 undefined/null/坏值拒绝。
+  const comboCheck = (paramsSource: string): string => runInContext(
+    `expComboError({ kind: "support", variants: [{ id: "A", architecture: "controller", parameters: ${paramsSource} }] })`, context) as string;
+  assert.equal(comboCheck("{}"), "", "省略 contract 与 v2 省略解析键合法");
+  assert.equal(comboCheck('{ questionContract: "v2", questionModel: null, questionTimeoutMs: null }'), "", "v2 显式 null 合法");
+  assert.match(comboCheck("{ questionContract: undefined }"), /仅支持 v2 或 v3/, "显式 undefined 合同拒绝");
+  assert.match(comboCheck("{ questionContract: null }"), /仅支持 v2 或 v3/, "显式 null 合同拒绝");
+  assert.match(comboCheck('{ questionContract: "v9" }'), /仅支持 v2 或 v3/, "未知合同值拒绝");
+  assert.match(comboCheck('{ questionContract: "v2", questionModel: undefined }'), /v2 出处不携带/, "v2 显式 undefined 模型拒绝");
+  assert.match(comboCheck('{ questionContract: "v2", questionTimeoutMs: undefined }'), /v2 出处不携带/, "v2 显式 undefined 超时拒绝");
+  assert.equal(comboCheck('{ questionContract: "v3" }'), "", "v3 省略解析键合法（规范化补缺省）");
+  assert.match(comboCheck('{ questionContract: "v3", questionModel: null }'), /v3 出处需显式选择解析模型/, "v3 显式 null 拒绝");
+  assert.match(comboCheck('{ questionContract: "v3", questionTimeoutMs: undefined }'), /v3 解析超时应为/, "v3 显式 undefined 超时拒绝");
+  console.log("PASS 实验调试：咨询出处 v2/v3 缺省与切换回填、atomic+v3 可修复、超时边界、非法不发 POST、旧缺省兼容。");
 }

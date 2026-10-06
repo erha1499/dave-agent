@@ -39,6 +39,8 @@ export type EvalSpan = {
   knowledge?: SupportCall["knowledge"];
   usage?: {
     provider: string; model: string; kind: "llm" | "embedding" | "rerank";
+    // The selected billing contract remains known even when usage/cost is missing.
+    currency?: "USD" | "CNY";
     inputTokens: number | null; outputTokens: number | null; totalTokens: number | null;
     cost: { currency: "USD" | "CNY"; amount: number; source: "sdk_estimate" | "provider" | "price_estimate" } | null;
   };

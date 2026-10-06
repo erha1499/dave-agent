@@ -124,7 +124,25 @@ function applyPreset(id) {
   if (!preset) return;
   expState.presetId = id;
   expState.draft = expCopy(preset.config);
+  normalizeDraftQuestionKeys(expState.draft);
   expState.formError = "";
+}
+
+// 旧配置省略解析键时规范化：仅补 Object.hasOwn 未有的键（contract 省略→v2；v2 省略→null；v3 省略→configured/10000）。
+// 显式 null 或坏 contract 值保留，由组合校验提示，不偷偷缺省为合法。
+function normalizeDraftQuestionKeys(config) {
+  if (config?.kind !== "support" || !Array.isArray(config.variants)) return;
+  for (const variant of config.variants) {
+    const params = variant.parameters || (variant.parameters = {});
+    if (!Object.hasOwn(params, "questionContract")) params.questionContract = "v2";
+    if (params.questionContract === "v2") {
+      if (!Object.hasOwn(params, "questionModel")) params.questionModel = null;
+      if (!Object.hasOwn(params, "questionTimeoutMs")) params.questionTimeoutMs = null;
+    } else if (params.questionContract === "v3") {
+      if (!Object.hasOwn(params, "questionModel")) params.questionModel = "configured";
+      if (!Object.hasOwn(params, "questionTimeoutMs")) params.questionTimeoutMs = 10000;
+    }
+  }
 }
 
 // 组合校验：support 的 atomic+m4-support 非法；v2 检索 score/support 仅 M4/M5/M6 且阈值显式填写。
@@ -132,18 +150,36 @@ function applyPreset(id) {
 function expComboError(config) {
   if (config.kind === "support") {
     for (const variant of config.variants) {
-      if (variant.architecture === "atomic" && variant.parameters?.knowledgeMode === "m4-support")
+      const params = variant.parameters || {};
+      const knowledgeApplicable = variant.architecture === "controller" && (params.knowledgeMode ?? "lexical") === "m4-support";
+      if (variant.architecture === "atomic" && params.knowledgeMode === "m4-support")
         return `方案 ${variant.id}：atomic 仅支持本地词项知识检索；m4-support 请使用 Controller。`;
-      // typed/固定 Pro 仅在 Controller + m4-support 合法；非法组合提示修正路径，不偷偷改参数。
-      if (variant.parameters?.knowledgeSupport === "typed"
-        && (variant.architecture !== "controller" || (variant.parameters?.knowledgeMode ?? "lexical") !== "m4-support"))
+      // typed/固定判别模型/声明前提仅在 Controller + m4-support 合法；非法组合提示修正路径，不偷偷改参数。
+      if (params.knowledgeSupport === "typed" && !knowledgeApplicable)
         return `方案 ${variant.id}：typed 事实支持判别需 Controller + m4-support 知识检索；请改回 binary 或调整组合。`;
-      if (variant.parameters?.knowledgeSupportModel === "deepseek-v4-pro"
-        && (variant.architecture !== "controller" || (variant.parameters?.knowledgeMode ?? "lexical") !== "m4-support"))
-        return `方案 ${variant.id}：固定 Pro 判别模型需 Controller + m4-support 知识检索；请改回 configured 或调整组合。`;
-      if (variant.parameters?.knowledgeApplicability === "declared"
-        && (variant.architecture !== "controller" || (variant.parameters?.knowledgeMode ?? "lexical") !== "m4-support"))
-        return `方案 ${variant.id}：declared 规则适用条件需 Controller + m4-support 知识检索；请改回 model_only 或调整组合。`;
+      if ((params.knowledgeSupportModel ?? "configured") !== "configured" && !knowledgeApplicable)
+        return `方案 ${variant.id}：固定判别模型需 Controller + m4-support 知识检索；请改回 configured 或调整组合。`;
+      const applicability = params.knowledgeApplicability ?? "model_only";
+      if ((applicability === "declared" || applicability === "declared-v2") && !knowledgeApplicable)
+        return `方案 ${variant.id}：${applicability} 规则适用条件需 Controller + m4-support 知识检索；请改回 model_only 或调整组合。`;
+      // 咨询出处：仅省略键由规范化补 v2；Object.hasOwn 存在时显式 undefined/null/坏值均非法，不偷偷缺省为合法。
+      const contract = Object.hasOwn(params, "questionContract") ? params.questionContract : "v2";
+      if (contract !== "v2" && contract !== "v3")
+        return `方案 ${variant.id}：咨询出处仅支持 v2 或 v3，请修正合同。`;
+      if (variant.architecture === "atomic" && contract === "v3")
+        return `方案 ${variant.id}：咨询出处 v3 仅 Controller 可用；请改回 v2 或改用 Controller。`;
+      // v2：省略键由规范化补 null；显式拥有则必须为 null（显式 undefined 同样非法）。
+      if (contract === "v2" && ["questionModel", "questionTimeoutMs"].some(key => Object.hasOwn(params, key) && params[key] !== null))
+        return `方案 ${variant.id}：v2 出处不携带解析模型与超时；请置空或切 v3。`;
+      // v3：省略键由规范化补 configured/10000；显式 null/undefined 拒绝。
+      if (contract === "v3") {
+        if (Object.hasOwn(params, "questionModel") && (params.questionModel === null || params.questionModel === undefined))
+          return `方案 ${variant.id}：v3 出处需显式选择解析模型。`;
+        if (Object.hasOwn(params, "questionTimeoutMs") && (params.questionTimeoutMs === null || params.questionTimeoutMs === undefined
+          || !Number.isInteger(params.questionTimeoutMs) || params.questionTimeoutMs < 1000 || params.questionTimeoutMs > 15000
+          || params.questionTimeoutMs > (params.timeoutMs ?? 60000)))
+          return `方案 ${variant.id}：v3 解析超时应为 1000–15000 的整数毫秒，且不超过整轮超时。`;
+      }
     }
     return "";
   }
@@ -248,9 +284,11 @@ function renderForm() {
 // 调参不重建表单：差异、远程提示与提交门控各自有稳定槽位，参数 change 只局部刷新，
 // 保留高级参数展开态、当前输入节点与焦点；切预设/改架构/复制方案仍走 renderExperiments 整建。
 function renderExpDiff() {
+  expState.formError = "";
   if (expState.diffSlot && expState.draft) expState.diffSlot.replaceChildren(...expDiffChildren(expState.draft));
 }
 function renderExpRemote() {
+  expState.formError = "";
   if (expState.remoteSlot && expState.draft) expState.remoteSlot.replaceChildren(...expRemoteChildren(expState.draft));
 }
 function renderExpActions() {
@@ -292,7 +330,6 @@ function expFormPanel() {
       diffSlot,
       remoteSlot,
       actionsSlot,
-      expState.formError ? text("p", expState.formError, "turn-error") : null,
       catalog.notes?.length ? node("details", { class: "conditions" }, node("summary", {}, "实验说明"),
         ...catalog.notes.map(item => text("p", item, "metric-note"))) : null));
 }
@@ -310,7 +347,7 @@ function expPresetSelect(catalog) {
 function expLabelInput(draft) {
   const el = node("input", { type: "text", maxlength: "80", "data-field": "exp-label", placeholder: "80 字以内" });
   el.value = draft.label;
-  el.addEventListener("input", () => { draft.label = el.value; });
+  el.addEventListener("input", () => { draft.label = el.value; expState.formError = ""; renderExpActions(); });
   return el;
 }
 
@@ -436,18 +473,24 @@ function expParamRow(draft, variant, field, controls) {
   const thresholdNA = field.key === "knowledgeThreshold" && draft.kind === "support" && (params.knowledgeMode ?? "lexical") !== "m4-support";
   const profileApplicable = variant.architecture === "controller" && (params.knowledgeMode ?? "lexical") === "m4-support";
   const profileNA = field.key === "knowledgeSupport" && draft.kind === "support" && !profileApplicable && (params.knowledgeSupport ?? "binary") !== "typed";
-  const modelNA = field.key === "knowledgeSupportModel" && draft.kind === "support" && !profileApplicable && (params.knowledgeSupportModel ?? "configured") !== "deepseek-v4-pro";
-  const applicabilityNA = field.key === "knowledgeApplicability" && draft.kind === "support" && !profileApplicable && (params.knowledgeApplicability ?? "model_only") !== "declared";
-  const notApplicable = repairNA || timeoutNA || thresholdNA || profileNA || modelNA || applicabilityNA;
+  const modelNA = field.key === "knowledgeSupportModel" && draft.kind === "support" && !profileApplicable && (params.knowledgeSupportModel ?? "configured") === "configured";
+  const applicabilityNA = field.key === "knowledgeApplicability" && draft.kind === "support" && !profileApplicable && (params.knowledgeApplicability ?? "model_only") === "model_only";
+  // 咨询出处：questionModel/questionTimeoutMs 仅 v3 生效；v2 显式 null，控件禁用。v2+非空属非法回填，经由合同 select 修复，不暗改。
+  const questionNA = (field.key === "questionModel" || field.key === "questionTimeoutMs")
+    && draft.kind === "support" && (params.questionContract ?? "v2") !== "v3";
+  const notApplicable = repairNA || timeoutNA || thresholdNA || profileNA || modelNA || applicabilityNA || questionNA;
   let control;
   if (field.type === "select") {
     control = node("select", { "data-field": field.key, "data-variant": variant.id });
     const options = (field.options || []).filter(option => !(field.key === "merchantEvents" && variant.architecture === "controller" && option.value === "model"));
     control.append(...options.map(option => node("option", { value: option.value }, option.label)));
-    control.value = params[field.key] ?? options[0]?.value ?? "";
+    control.value = params[field.key] === null ? "" : params[field.key] ?? options[0]?.value ?? "";
+    // 知识类固定值的非法判定：typed、非 configured 的判别模型、declared/declared-v2 均需 Controller + m4-support。
+    const illegalValue = { knowledgeSupport: value => value === "typed", knowledgeSupportModel: value => value !== "configured",
+      knowledgeApplicability: value => value === "declared" || value === "declared-v2" };
     control.addEventListener("change", () => {
       params[field.key] = control.value;
-      // knowledgeMode 即时驱动阈值/判别类型/判别模型适用性：只改 disabled 与行样式，不重建卡片，保留焦点与展开态。
+      // knowledgeMode 即时驱动阈值/判别类型/判别模型/适用条件适用性：只改 disabled 与行样式，不重建卡片，保留焦点与展开态。
       if (field.key === "knowledgeMode") {
         const applicable = variant.architecture === "controller" && control.value === "m4-support";
         const linkedThreshold = controls.get("knowledgeThreshold");
@@ -456,20 +499,38 @@ function expParamRow(draft, variant, field, controls) {
           linkedThreshold.control.disabled = na;
           linkedThreshold.row.className = `exp-param${na ? " disabled" : ""}`;
         }
-        for (const [key, illegalValue] of [["knowledgeSupport", "typed"], ["knowledgeSupportModel", "deepseek-v4-pro"], ["knowledgeApplicability", "declared"]]) {
+        for (const key of ["knowledgeSupport", "knowledgeSupportModel", "knowledgeApplicability"]) {
           const linked = controls.get(key);
           if (!linked) continue;
-          const na = !applicable && linked.control.value !== illegalValue;
+          const na = !applicable && !illegalValue[key](linked.control.value);
           linked.control.disabled = na;
           linked.row.className = `exp-param${na ? " disabled" : ""}`;
         }
       }
-      if (field.key === "knowledgeSupport" || field.key === "knowledgeSupportModel" || field.key === "knowledgeApplicability") {
+      if (field.key in illegalValue) {
         const applicable = variant.architecture === "controller" && (params.knowledgeMode ?? "lexical") === "m4-support";
-        const illegalValue = { knowledgeSupport: "typed", knowledgeSupportModel: "deepseek-v4-pro", knowledgeApplicability: "declared" }[field.key];
-        const na = !applicable && control.value !== illegalValue;
+        const na = !applicable && !illegalValue[field.key](control.value);
         control.disabled = na;
         row.className = `exp-param${na ? " disabled" : ""}`;
+      }
+      // 咨询出处切换：v2→v3 仅对空值填 configured/10000（不覆盖回填的既有值）；v3→v2 置显式 null。不偷偷改合同。
+      if (field.key === "questionContract") {
+        if (control.value === "v3") {
+          if (params.questionModel === null || params.questionModel === undefined) params.questionModel = "configured";
+          if (params.questionTimeoutMs === null || params.questionTimeoutMs === undefined) params.questionTimeoutMs = 10000;
+        } else {
+          params.questionModel = null;
+          params.questionTimeoutMs = null;
+        }
+        for (const key of ["questionModel", "questionTimeoutMs"]) {
+          const linked = controls.get(key);
+          if (!linked) continue;
+          const na = control.value !== "v3";
+          linked.control.disabled = na;
+          linked.row.className = `exp-param${na ? " disabled" : ""}`;
+          // 控件显示始终同步当前 params：v3 显示实际值，v2 的 null 显示为空（禁用且不适用）。
+          linked.control.value = na ? "" : String(params[key] ?? "");
+        }
       }
       renderExpDiff();
       renderExpRemote();
@@ -484,6 +545,7 @@ function expParamRow(draft, variant, field, controls) {
       else control.value = params[field.key] === undefined ? "" : String(params[field.key]);
       renderExpDiff();
       renderExpRemote();
+      renderExpActions();
     });
   }
   if (notApplicable) control.disabled = true;
@@ -550,6 +612,8 @@ function expActionsChildren(draft) {
     node("button", { class: "quiet-button", type: "button", onclick: () => downloadExpConfig() }, "下载 JSON 配置"),
     comboError ? text("span", comboError, "exp-hint")
       : submitBlocked ? text("span", "该方案调用付费模型，需先勾选允许", "exp-hint") : null,
+    // 提交级错误随编辑清除（renderExpDiff/renderExpRemote/名称编辑），不残留旧值的红条。
+    expState.formError ? text("p", expState.formError, "turn-error") : null,
   ].filter(Boolean);
 }
 
@@ -598,7 +662,7 @@ function expJobPanel() {
       job.error ? text("p", job.error, "turn-error") : null,
       node("div", { class: "exp-job-config" },
         text("p", `配置快照：${expConfigSummary(job.config)}`, "metric-note"),
-        node("button", { class: "quiet-button", type: "button", "data-action": "load-config", onclick: () => { expState.draft = expCopy(job.config); expState.presetId = null; expState.formError = ""; renderExperiments(); } }, "载入配置到表单")),
+        node("button", { class: "quiet-button", type: "button", "data-action": "load-config", onclick: () => { expState.draft = expCopy(job.config); normalizeDraftQuestionKeys(expState.draft); expState.presetId = null; expState.formError = ""; renderExperiments(); } }, "载入配置到表单")),
       ...job.results.map(result => expResultNode(job, result)),
       comparable.length >= 2
         ? node("div", {}, node("button", { class: "quiet-button", type: "button", "data-action": "compare-btn", onclick: () => expCompare(comparable) }, "带入 A/B 对比"))

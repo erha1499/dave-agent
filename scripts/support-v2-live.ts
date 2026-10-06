@@ -20,12 +20,15 @@ import { RefundBusinessError, RefundStore, readRefundDatabaseConfig } from "../s
 import type { RenderedReply } from "../src/reply.ts";
 import { checkSupportContract, supportCheckSpecs, type SupportExpectation, type SupportState } from "../src/support-evaluation.ts";
 import { createSupportSession, getSupportResult } from "../src/support-session.ts";
+import { createSupportQuestionClient } from "../src/support-question-client.ts";
+import { validateSupportQuestionResolution, validateSupportQuestionResolutionInput,
+  type SupportQuestionObservation, type SupportQuestionSettings } from "../src/support-question-resolution.ts";
 import { resolveSupportRunParameters, type SupportExperimentParameters } from "../src/support-parameters.ts";
 import { createKnowledgeService, knowledgeQueryPlanVersion } from "../src/knowledge-service.ts";
 import { evidenceSupportPrompt, evidenceSupportPromptVersion, evidenceSupportTypedPrompt, evidenceSupportTypedPromptVersion,
   evidenceSupportTypedV6PromptHash, evidenceSupportTypedV6PromptVersion } from "../src/evidence-support.ts";
-import { knowledgeProviderSpans } from "../src/knowledge-evaluation.ts";
-import type { SupportCall } from "../src/support-controller.ts";
+import { knowledgeProviderSpans, questionProviderSpans } from "../src/knowledge-evaluation.ts";
+import type { EvidenceBundle, SupportCall } from "../src/support-controller.ts";
 import { createMerchantFixture } from "./merchant-test-fixture.ts";
 import { createObjectiveSnapshot, hash } from "./objective-support.ts";
 
@@ -43,6 +46,52 @@ const common = [
 ] satisfies Array<Omit<EvalCheck, "status">>;
 const special = { id: "business.fixed-terminal", name: "达到固定通知或确认终态，原操作不串单且幂等", category: "business", basis: "state" } satisfies Omit<EvalCheck, "status">;
 const specs = (round: Round) => [...common, ...(round.mode === "contract" ? supportCheckSpecs : [special])];
+type QuestionExperimentTurn = { id: string; trigger: EvalSpan["trigger"]; spans: EvalSpan[]; questionObservations: SupportQuestionObservation[] };
+
+// This is the same bounded bridge used by the actual runner and native HTTP
+// engineering check. It supplies Session options, not another Agent loop.
+export async function createQuestionExperimentBridge(
+  parameters: Pick<SupportExperimentParameters, "questionContract" | "questionModel" | "questionTimeoutMs">,
+  current: () => QuestionExperimentTurn | undefined,
+  options: Omit<NonNullable<Parameters<typeof createSupportQuestionClient>[0]>, "modelSelection" | "timeoutMs"> = {},
+) {
+  const contract = parameters.questionContract;
+  assert.ok(contract === "v2" || contract === "v3");
+  if (contract === "v2") {
+    assert.equal(parameters.questionModel, null); assert.equal(parameters.questionTimeoutMs, null);
+    return { sessionOptions: { questionContract: contract }, snapshot: Object.freeze({ questionContract: contract,
+      questionModel: null, questionTimeoutMs: null, questionSettings: null }) };
+  }
+  assert.ok(parameters.questionModel && parameters.questionTimeoutMs !== null);
+  const inFlight = new Map<string, QuestionExperimentTurn>(), transport = options.fetch ?? globalThis.fetch;
+  const client = await createSupportQuestionClient({ ...options, modelSelection: parameters.questionModel, timeoutMs: parameters.questionTimeoutMs,
+    fetch: async (url, init) => {
+      // The client validates this wire before dispatch. Capture the actual
+      // request now, so an interrupted callback cannot erase billed traffic.
+      const payload = JSON.parse(String(init?.body)), input = JSON.parse(payload.messages[1].content), turn = inFlight.get(input.requestId);
+      assert.ok(turn, "Question HTTP has no matching actual experiment ingress");
+      turn.spans.push({ id: `${turn.id}:question:1`, parentSpanId: turn.id, actor: "host", trigger: turn.trigger, component: "support-question",
+        name: "parse_question", observedAt: new Date().toISOString(), durationMs: null, outcome: "error", input: { requestAccounting: "dispatched_pending_usage" },
+        usage: { provider: client.settings.provider, model: client.settings.model, currency: client.settings.pricing.currency, kind: "llm",
+          inputTokens: null, outputTokens: null, totalTokens: null, cost: null } });
+      return transport(url, init);
+    } });
+  const resolver = { settings: client.settings, resolve: (...args: Parameters<typeof client.resolve>) => {
+    const turn = current(); assert.ok(turn && turn.id === args[0].requestId, "Question parse requires the active experiment ingress");
+    inFlight.set(turn.id, turn); return client.resolve(...args).finally(() => inFlight.delete(turn.id));
+  } };
+  return { sessionOptions: { questionContract: contract, questionResolver: resolver, onQuestionTrace(observation: SupportQuestionObservation) {
+    const turn = inFlight.get(observation.requestId);
+    if (!turn) return; // Completed or unrelated callbacks cannot enter a later turn.
+    turn.questionObservations.push(structuredClone(observation));
+    for (const child of questionProviderSpans(observation)) {
+      const value = { ...child, trigger: turn.trigger }, pending = turn.spans.find(span => span.id === child.id);
+      if (pending) Object.assign(pending, value); else turn.spans.push(value);
+    }
+    inFlight.delete(observation.requestId);
+  } }, snapshot: Object.freeze({ questionContract: contract, questionModel: parameters.questionModel,
+    questionTimeoutMs: parameters.questionTimeoutMs, questionSettings: client.settings }) };
+}
 
 export async function checkSupportLiveDataset(selection: "legacy" | "development" = "development") {
   assert.ok(["legacy", "development"].includes(selection));
@@ -89,8 +138,9 @@ function skipped(round: Round): EvalTurn {
 }
 
 export function auditSupportKnowledgeCall(call: Pick<EvalSpan, "id" | "input" | "knowledge" | "output" | "usage">,
-  parameters: Pick<SupportExperimentParameters, "knowledgeMode" | "knowledgeSupport" | "knowledgeSupportModel" | "knowledgeSupportPrompt" | "knowledgeApplicability" | "knowledgeQueryMode">,
-  expectedDatabaseError = false) {
+  parameters: Pick<SupportExperimentParameters, "knowledgeMode" | "knowledgeSupport" | "knowledgeSupportModel" | "knowledgeSupportPrompt" | "knowledgeApplicability" | "knowledgeQueryMode">
+    & { questionContract?: SupportExperimentParameters["questionContract"] },
+  expectedDatabaseError = false, question?: { settings: SupportQuestionSettings | null; evidence: EvidenceBundle | undefined }) {
   const trace = call.knowledge?.trace, context = call.knowledge?.context, queries = trace?.queries;
   const input = call.input && typeof call.input === "object" && !Array.isArray(call.input) ? call.input as Record<string, unknown> : undefined;
   const queryPlan = typeof queries?.evidence === "string" && queries.evidence.trim().length > 0
@@ -108,17 +158,27 @@ export function auditSupportKnowledgeCall(call: Pick<EvalSpan, "id" | "input" | 
       : { version: evidenceSupportTypedPromptVersion, hash: hash(evidenceSupportTypedPrompt) };
   const supportPrompt = !trace?.calls.some(provider => provider.operation === "support") ? "not_called"
     : trace.settings?.support?.promptVersion === expectedPrompt.version && trace.settings.support.promptHash === expectedPrompt.hash ? "matched" : "mismatched";
+  const v3 = parameters.questionContract === "v3", prerequisite = context?.purpose === "business_prerequisite";
+  const resolution = question?.evidence?.questionResolution, parserTrace = question?.evidence?.questionTrace;
+  const questionBinding = !v3 ? context?.evidenceBindingVersion === "order-evidence-binding-v3" ? "incomplete" : "legacy_v2"
+    : context?.evidenceBindingVersion !== "order-evidence-binding-v3" ? "incomplete"
+    : prerequisite ? !resolution && !parserTrace ? "business_prerequisite" : "incomplete" : resolution && parserTrace && question?.settings
+      && validateSupportQuestionResolutionInput(resolution.input) && validateSupportQuestionResolution(resolution.value, resolution.input)
+      && resolution.input.requestId === question.evidence?.requestId && resolution.input.originalQuery === context.originalQuery
+      && context.modelQuestion === context.originalQuery.trim() && parserTrace.failure === null
+      && isDeepStrictEqual(parserTrace.settings, question.settings) && isDeepStrictEqual(parserTrace.value, resolution.value)
+      && parserTrace.inputHash === resolution.value.inputHash && question.evidence?.traceDeliveryFailed !== true ? "matched" : "incomplete";
   const passed = queryPlan === "complete" && trace?.mode === parameters.knowledgeMode && trace.applicability?.mode === parameters.knowledgeApplicability
     && trace.supportProfile === parameters.knowledgeSupport && trace.supportModel === parameters.knowledgeSupportModel && Array.isArray(call.output)
     && trace.supportPrompt === parameters.knowledgeSupportPrompt && supportPrompt !== "mismatched"
     && (expectedDatabaseError ? trace.status === "unavailable" && trace.reason === "database_unavailable" && call.output.length === 0
         && trace.calls.length === 0
       : trace.status !== "unavailable" && applicability !== "incomplete" && trace.calls.every(provider => provider.status === "ok"))
-    && !call.usage;
+    && !call.usage && questionBinding !== "incomplete";
   // A plan fingerprint distinguishes inputs/configuration; it is not a substitute
   // for the corpus-backed provider-request proofs in the semantic evidence audit.
   return { spanId: call.id, kind: expectedDatabaseError ? "expected_database_error" : "knowledge_query", applicability,
-    queryPlan, queryPlanHash: queries ? hash(queries) : null, supportPrompt, configuredSupportPrompt: parameters.knowledgeSupportPrompt, passed };
+    queryPlan, queryPlanHash: queries ? hash(queries) : null, supportPrompt, configuredSupportPrompt: parameters.knowledgeSupportPrompt, questionBinding, passed };
 }
 
 // Explicit call only. Importing this module performs no model call, DB connection, or fixture mutation.
@@ -131,15 +191,16 @@ export async function runSupportV2Live({ architecture, label, batch, parameters,
   const resolved = resolveSupportRunParameters(architecture, parameters);
   if (experiment) assert.ok([experiment.id, experiment.variantId].every(value => typeof value === "string" && value.trim() && value.length <= 128), "experiment id/variantId 无效");
   const { dataset, plan, path: datasetPath } = await checkSupportLiveDataset(selection);
+  let current: QuestionExperimentTurn & { observedAt: string; stepTimes: Map<number, string> } | undefined;
   const configs = { order: readDatabaseConfig(), merchant: readAfterSalesDatabaseConfig(), refund: readRefundDatabaseConfig(), history: readEvalDatabaseConfig() };
   const { modelRuntime, model } = await createConfiguredModelRuntime(process.env, resolved.agentModel);
+  const questionBridge = await createQuestionExperimentBridge(resolved, () => current), agentPricing = modelPricing(model);
   const pool = createPool(configs.order), store = new CouponStore(pool), merchant = new AfterSalesStore(createPool(configs.merchant));
   const refunds = new RefundStore(createPool(configs.refund)), history = new EvalStore(createPool(configs.history));
   let fixture: Awaited<ReturnType<typeof createMerchantFixture>> | undefined, run: EvalRun | undefined;
   let foreignFixture: Awaited<ReturnType<typeof createMerchantFixture>> | undefined;
   let knowledgeFault: "normal" | "empty" | "error" = "normal";
   let session: Session | undefined, agent: QQAgent | undefined, capture: ReturnType<typeof captureEvaluationTurn> | undefined;
-  let current: { id: string; trigger: EvalSpan["trigger"]; observedAt: string; spans: EvalSpan[]; stepTimes: Map<number, string> } | undefined;
   let group = "", sourceKey = "", hostConfirmCalls = 0, started = false, finished = false;
   const cases: EvalCase[] = [], attemptedSaves = new Set<string>();
   const receipts: Array<{ target: ReplyTarget; reply: RenderedReply; requester: string }> = [];
@@ -201,7 +262,7 @@ export async function runSupportV2Live({ architecture, label, batch, parameters,
     const afterSales = { store: sales, sourceKey, refunds: refundTools };
     session = architecture === "controller"
       ? await createSupportSession(fixture!.identity, read, modelRuntime, model, afterSales,
-        { groupOpenid: group, repairBudget: resolved.repairBudget!, knowledge, onCall: onControllerCall })
+        { groupOpenid: group, repairBudget: resolved.repairBudget!, knowledge, onCall: onControllerCall, ...questionBridge.sessionOptions })
       : await createCouponSession(fixture!.identity, read, modelRuntime, model, afterSales);
     session.subscribe(event => {
       capture?.receive(event);
@@ -253,13 +314,13 @@ export async function runSupportV2Live({ architecture, label, batch, parameters,
       files: ["scripts/support-v2-live.ts", datasetPath, "data/support-v2-development.json", "scripts/merchant-test-fixture.ts", "src/support-evaluation.ts", "src/support-controller.ts", "src/support-action.ts", "src/support-context-action.ts", "src/support-session.ts", "src/support-parameters.ts",
         "src/support-context.ts", "src/support-reference-selection.ts", "src/support-evidence-context.ts", "prompts/customer-service-v2.md", "skills/shop-support-v2/SKILL.md",
         "src/knowledge-service.ts", "src/knowledge-applicability.ts", "data/knowledge-applicability.json", ...(resolved.knowledgeApplicability === "declared-v2" ? ["data/knowledge-applicability-v2.json"] : []), "src/knowledge-evaluation.ts", "src/bailian.ts", "src/evidence-support.ts", "src/evidence-acceptance.ts", "src/retrieval-ranking.ts",
-        "src/agent.ts", "src/model-selection.ts", "src/qq-agent.ts", "src/coupon-store.ts", "src/knowledge-retrieval.ts", "src/refunds.ts", "src/refund-entry.ts", "src/after-sales.ts", "src/after-sales-entry.ts", "src/merchant-notifications.ts", "src/reply.ts", "src/reply-from-tools.ts"],
+        "src/agent.ts", "src/model-selection.ts", "src/support-question-client.ts", "src/support-question-resolution.ts", "src/qq-agent.ts", "src/coupon-store.ts", "src/knowledge-retrieval.ts", "src/refunds.ts", "src/refund-entry.ts", "src/after-sales.ts", "src/after-sales-entry.ts", "src/merchant-notifications.ts", "src/reply.ts", "src/reply-from-tools.ts"],
       business: { knowledge, shops, products, identityBindings, scenarios: initialOrders.map(order => ({ source: order.source, status: order.status, amounts: order.amounts,
         shop: order.shop, items: order.items.map(({ productId, productName, quantity, unitPriceCents, totalCents }) => ({ productId, productName, quantity, unitPriceCents, totalCents })),
         coupons: order.coupons.map(coupon => ({ status: coupon.status, valid: Boolean(coupon.expiresAt && Date.parse(coupon.expiresAt) > Date.parse(order.asOf)) })),
         payments: order.payments.map(({ status, amountCents }) => ({ status, amountCents })), refunds: order.refunds })) },
       settings: { architecture, ...resolved,
-        agentPricing: modelPricing(model), agentEndpoint: model.baseUrl,
+        agentPricing, agentEndpoint: model.baseUrl, ...questionBridge.snapshot,
         retries: 2, knowledgeRetries: 0, compaction: false, merchantDelayMs: 5000, merchantHoldMs: 180_000, qqSend: "local substitute", fixturePreparationMeasured: false,
         datasetSelection: selection, foreignOrder: foreignFixture?.orders[0] ?? null, knowledgeFaults: "explicit case setup only; not natural outage rates" },
       measurement: "QQAgent complete turn, excluding nonce fixture preparation/state readback/restart; actual model and service spans; local QQ send substitute; 180-second fixture-only waiting window is not production SLA; no natural-language scoring." });
@@ -299,7 +360,7 @@ export async function runSupportV2Live({ architecture, label, batch, parameters,
         const before = await state(watchedOrders), question = round.question.replaceAll("{orderId}", orderId).replaceAll("{otherOrderId}", otherOrderId).replaceAll("{operationId}", operationId ?? "missing-operation");
         const msg = inbound(question, fixture.identity.senderId, group), receiptStart = receipts.length, logStart = logs.length, confirmsBefore = hostConfirmCalls;
         const startedAt = new Date().toISOString();
-        current = { id: msg.messageId!, trigger: round.source === "host" ? "confirmation" : round.source, observedAt: startedAt, spans: [], stepTimes: new Map() };
+        current = { id: msg.messageId!, trigger: round.source === "host" ? "confirmation" : round.source, observedAt: startedAt, spans: [], questionObservations: [], stepTimes: new Map() };
         capture = captureEvaluationTurn(`${model.provider}/${model.id}`);
         current.spans.push({ id: current.id, parentSpanId: null, actor: "host", trigger: current.trigger, component: "qq-ingress", name: "turn", observedAt: startedAt, durationMs: null, outcome: "ok" });
         let failure = false;
@@ -323,6 +384,7 @@ export async function runSupportV2Live({ architecture, label, batch, parameters,
             component: step.type === "model" ? "model" : "agent-tool", name: step.name, observedAt,
             durationMs: step.durationMs, outcome: step.isError ? (step.type === "tool" && serviceDenied ? "denied" : "error") : "ok", input: step.input, output: step.output,
             ...(step.type === "model" ? { usage: { provider: provider!, model: id.join("/"), kind: "llm" as const,
+              ...(provider === model.provider && id.join("/") === model.id ? { currency: agentPricing.currency } : {}),
               inputTokens: step.usage ? step.usage.input + step.usage.cacheRead + step.usage.cacheWrite : null,
               outputTokens: step.usage?.output ?? null, totalTokens: step.usage?.totalTokens ?? null,
               cost: step.usage?.estimatedCostCny !== undefined ? step.usage.estimatedCostCny === null ? null
@@ -331,10 +393,12 @@ export async function runSupportV2Live({ architecture, label, batch, parameters,
                 : { currency: "USD" as const, amount: step.usage.estimatedCostUsd, source: "sdk_estimate" as const } } } : {}) });
         }
         spans[0]!.durationMs = measured.durationMs;
+        const questionObservations = current.questionObservations;
         current = undefined;
         const after = await state(watchedOrders), receipt = receipts[receiptStart], calls = spans.filter(span => span.component === "business-service");
         const knowledgeAudits = architecture !== "controller" ? [] : calls.filter(call => call.name === "search_faq")
-          .map(call => auditSupportKnowledgeCall(call, resolved, example.knowledge === "error"));
+          .map(call => auditSupportKnowledgeCall(call, resolved, example.knowledge === "error",
+            { settings: questionBridge.snapshot.questionSettings, evidence: getSupportResult(session!)?.evidence }));
         const knowledgeComplete = knowledgeAudits.every(audit => audit.passed);
         const completed = !failure && knowledgeComplete && !measured.failed && !measured.steps.some(step => step.type === "model" && step.isError)
           && !logs.slice(logStart).some(line => line.includes("model_failed") || line.includes("回复发送或确认登记失败"));
@@ -375,7 +439,7 @@ export async function runSupportV2Live({ architecture, label, batch, parameters,
         const turn: EvalTurn = { index: round.index, question, reply: receipt?.reply.text ?? "", status: passed ? "passed" : "failed", startedAt,
           durationMs: measured.durationMs, firstTextMs: measured.firstTextMs,
           evidenceIds: [...new Set(calls.filter(call => call.name === "search_faq" && Array.isArray(call.output)).flatMap(call => (call.output as Array<{ sourceId: string }>).map(doc => doc.sourceId)))],
-          checks, steps: measured.steps, spans, observations: { before, after, protocol: { rendered: receipt?.reply, route: receipt?.target, knowledgeAudits,
+          checks, steps: measured.steps, spans, observations: { before, after, protocol: { rendered: receipt?.reply, route: receipt?.target, knowledgeAudits, questionObservations,
             action: architecture === "controller" ? getSupportResult(session!)?.action : undefined, hostConfirmCalls: hostConfirmCalls - confirmsBefore } } };
         item.turns.push(turn);
         console.log(`[support-v2] ${example.id}/${round.index} ${turn.status}`);
@@ -414,13 +478,27 @@ export async function runSupportV2Live({ architecture, label, batch, parameters,
   }
 }
 
+export function readSupportQuestionFlags(args: string[]): Partial<SupportExperimentParameters> {
+  const fields = { "--question-contract": "questionContract", "--question-model": "questionModel", "--question-timeout-ms": "questionTimeoutMs" } as const;
+  const values: Partial<SupportExperimentParameters> = {};
+  for (const [flag, key] of Object.entries(fields)) {
+    assert.ok(args.filter(arg => arg === flag).length <= 1, `${flag} 不能重复`);
+    const index = args.indexOf(flag); if (index < 0) continue;
+    const value = args[index + 1]; assert.ok(value && !value.startsWith("--"), `${flag} 缺少参数`);
+    if (key === "questionTimeoutMs") { assert.match(value, /^\d+$/); values.questionTimeoutMs = Number(value); }
+    else if (key === "questionContract") values.questionContract = value as SupportExperimentParameters["questionContract"];
+    else values.questionModel = value as SupportExperimentParameters["questionModel"];
+  }
+  return values;
+}
+
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const args = process.argv.slice(2);
   if (!args.includes("--live")) {
     const { plan } = await checkSupportLiveDataset();
     console.log(`v2真实入口就绪：${plan.cases.length}案例/${plan.cases.reduce((sum, item) => sum + item.turns.length, 0)}轮；未连接数据库或调用模型。需显式 --live --architecture atomic|controller --repeat 3。`);
   } else {
-    const flags = ["--architecture", "--repeat", "--label", "--dataset", "--agent-model", "--knowledge-mode", "--knowledge-support", "--knowledge-support-model", "--knowledge-support-prompt", "--applicability", "--query-mode", "--knowledge-threshold", "--knowledge-timeout-ms"];
+    const flags = ["--architecture", "--repeat", "--label", "--dataset", "--agent-model", "--question-contract", "--question-model", "--question-timeout-ms", "--knowledge-mode", "--knowledge-support", "--knowledge-support-model", "--knowledge-support-prompt", "--applicability", "--query-mode", "--knowledge-threshold", "--knowledge-timeout-ms"];
     assert.ok(args.every((arg, index) => arg === "--live" || flags.includes(arg) || flags.includes(args[index - 1] ?? "")), "未知参数");
     const value = (name: string) => args[args.indexOf(name) + 1];
     const architecture = value("--architecture"); assert.ok(architecture === "atomic" || architecture === "controller", "必须明确选择architecture");
@@ -428,6 +506,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     const label = args.includes("--label") ? value("--label")! : `v2 ${architecture} 开发验收`;
     const dataset = args.includes("--dataset") ? value("--dataset") : "development"; assert.ok(dataset === "legacy" || dataset === "development");
     const parameters: Partial<SupportExperimentParameters> = {
+      ...readSupportQuestionFlags(args),
       ...(args.includes("--agent-model") ? { agentModel: value("--agent-model") as SupportExperimentParameters["agentModel"] } : {}),
       ...(args.includes("--knowledge-mode") ? { knowledgeMode: value("--knowledge-mode") as SupportExperimentParameters["knowledgeMode"] } : {}),
       ...(args.includes("--knowledge-support") ? { knowledgeSupport: value("--knowledge-support") as SupportExperimentParameters["knowledgeSupport"] } : {}),

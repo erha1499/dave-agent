@@ -68,6 +68,15 @@ export const experimentFields: Record<"support" | "retrieval", Field[]> = {
     note: "仅作用于本次实验；configured 保持环境模型，不改变支持判别模型选择" },
     { key: "timeoutMs", label: "每轮超时（ms）", type: "number", min: 10000, max: 120000, step: 1000 },
     { key: "repairBudget", label: "动作修复次数", type: "number", min: 0, max: 2, step: 1, note: "仅 Controller；格式与只读范围修复共用，范围修复最多一次" },
+    { key: "questionContract", label: "咨询问题出处", type: "select", options: [
+      { value: "v2", label: "v2 既有合同" }, { value: "v3", label: "v3 原问解析（开发候选）" }],
+    note: "默认 v2；v3 仅 Controller，按原问与合法前序解析并使用中性查询，额外一次无工具请求；整体 C1 未准入" },
+    { key: "questionModel", label: "咨询解析模型", type: "select", options: [
+      { value: "configured", label: "跟随已配置模型" }, { value: "deepseek-flash", label: "DeepSeek Flash" },
+      { value: "deepseek-v4-pro", label: "DeepSeek V4 Pro" }, { value: "qwen3.7-plus-2026-05-26", label: "Qwen3.7 Plus（2026-05-26）" }],
+    note: "仅 v3；省略时 configured，v2 必须为 null；独立选择解析角色，不改变业务 Agent 或支持判别模型" },
+    { key: "questionTimeoutMs", label: "咨询解析超时（ms）", type: "number", min: 1000, max: 15000, step: 1000,
+    note: "仅 v3；省略时 10000，且不超过每轮超时；v2 必须为 null，无重试，失败请求和未知费用仍记录" },
     { key: "merchantEvents", label: "商家通知处理", type: "select", options: [
       { value: "architecture", label: "跟随架构" }, { value: "host", label: "宿主直接处理" }, { value: "model", label: "经过模型" }], note: "最终状态卡始终由宿主生成" },
     { key: "knowledgeMode", label: "知识检索", type: "select", options: [
@@ -125,6 +134,10 @@ export function experimentCatalog() {
       preset("support-knowledge-qwen-ab", "固定 Flash：Pro / Qwen 判别候选", "support", [
         { id: "A", architecture: "controller", parameters: { ...judgeParameters, knowledgeSupportModel: "deepseek-v4-pro" } },
         { id: "B", architecture: "controller", parameters: { ...judgeParameters, knowledgeSupportModel: "qwen3.7-plus-2026-05-26" } },
+      ]),
+      preset("support-question-contract-ab", "咨询出处 v2 / v3（开发候选，未准入）", "support", [
+        { id: "A", architecture: "controller", parameters: { ...judgeParameters, knowledgeSupportModel: "deepseek-v4-pro", questionContract: "v2" } },
+        { id: "B", architecture: "controller", parameters: { ...judgeParameters, knowledgeSupportModel: "deepseek-v4-pro", questionContract: "v3" } },
       ]),
       preset("support-knowledge-applicability-ab", "已声明必要前提 A/B", "support", [
         { id: "A", architecture: "controller", parameters: { knowledgeMode: "m4-support", knowledgeSupport: "typed", knowledgeSupportModel: "deepseek-v4-pro", knowledgeThreshold: .5, knowledgeApplicability: "model_only" } },

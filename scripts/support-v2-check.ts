@@ -115,6 +115,36 @@ assert.equal(attribution.providers[0]!.costs[0]!.currency, "USD"); assert.equal(
 assert.ok(analyzeSupportSpans([root, { ...host, parentSpanId: "missing" }]).issues.length);
 assert.ok(analyzeSupportSpans([root, root]).issues.length);
 assert.ok(analyzeSupportSpans([{ ...root, parentSpanId: "service" }, host]).issues.length);
+// Four roles are charged once from provider leaves, separately from Agent-only metrics.
+const parser: EvalSpan = { ...host, id: "parser", parentSpanId: "service", outcome: "error", component: "support-question", usage: {
+  provider: "bailian", model: "qwen", kind: "llm", currency: "CNY", inputTokens: 20, outputTokens: 5, totalTokens: 25,
+  cost: { currency: "CNY", amount: .003, source: "price_estimate" } } };
+const support: EvalSpan = { ...host, id: "support", parentSpanId: "service", outcome: "ok", component: "knowledge-support", usage: {
+  provider: "deepseek", model: "pro", kind: "llm", currency: "USD", inputTokens: 30, outputTokens: 10, totalTokens: 40,
+  cost: { currency: "USD", amount: .004, source: "sdk_estimate" } } };
+const rank = { ...rerank, parentSpanId: "service", component: "knowledge-rerank", usage: { ...rerank.usage!, currency: "CNY" as const } };
+const ledger = analyzeSupportSpans([root, host, llm, parser, rank, support]);
+assert.deepEqual(ledger.issues, []);
+assert.deepEqual(ledger.providerUsage.map(row => row.role), ["agent", "question", "rerank", "support"]);
+assert.equal(ledger.providerTotals.requests, 4); assert.equal(ledger.providerTotals.knownTokens, 175);
+assert.equal(ledger.providerTotals.unknownTokenRequests, 1); assert.equal(ledger.providerTotals.completeTokens, null);
+assert.deepEqual(ledger.providerTotals.currencies.map(row => [row.currency, row.requests, row.knownAmount, row.completeAmount]),
+  [["USD", 2, .005, .005], ["CNY", 2, .005, .005]]);
+const missingUsage = { ...parser, usage: { ...parser.usage!, totalTokens: null, inputTokens: null, outputTokens: null, cost: null } };
+const partialLedger = analyzeSupportSpans([root, host, llm, missingUsage, rank, support]).providerTotals;
+assert.equal(partialLedger.requests, 4); assert.equal(partialLedger.currencies[1]!.unknownRequests, 1);
+assert.equal(partialLedger.currencies[1]!.knownAmount, .002); assert.equal(partialLedger.currencies[1]!.completeAmount, null);
+assert.equal(partialLedger.currencies[0]!.completeAmount, .005, "Known CNY contract does not contaminate USD coverage");
+const unknownCurrency = { ...missingUsage, usage: { ...missingUsage.usage, currency: undefined } };
+const unpriced = analyzeSupportSpans([root, host, llm, unknownCurrency]).providerTotals;
+assert.equal(unpriced.unknownCurrencyRequests, 1); assert.equal(unpriced.currencies[0]!.completeAmount, null);
+assert.equal(analyzeSupportSpans([]).providerTotals.knownTokens, null);
+assert.ok(analyzeSupportSpans([]).providerTotals.currencies.every(row => row.knownAmount === null && row.completeAmount === null));
+const duplicated = analyzeSupportSpans([root, { ...host, usage: support.usage }, llm, parser, rank, support]);
+assert.ok(duplicated.issues.some(issue => issue.includes("父子span"))); assert.equal(duplicated.providerTotals.requests, 4);
+assert.ok(duplicated.providerTotals.currencies.every(row => row.completeAmount === null));
+const mixedCurrency = analyzeSupportSpans([root, host, { ...support, usage: { ...support.usage!, currency: "CNY" } }]);
+assert.ok(mixedCurrency.issues.some(issue => issue.includes("cost"))); assert.equal(mixedCurrency.providerTotals.currencies[1]!.unknownRequests, 1);
 assert.equal(plan.version, 2);
 const live = await checkSupportLiveDataset("legacy");
 assert.equal(live.plan.cases.length, 3); assert.equal(live.plan.cases.reduce((sum, item) => sum + item.turns.length, 0), 8);

@@ -1036,3 +1036,78 @@ for (const outcome of ["success", "detail-failure", "analysis-failure"]) {
   assert.equal(knowledgeRegions.length, 2, "旧记录无 knowledge 不渲染取证区");
   console.log("PASS 评测前端：知识取证三态展示、本轮版本来源、scope 拒绝不作幻觉、成本分列、旧记录与坏条目兼容。");
 }
+
+// 提供商分角色费用：四角色分列、USD/CNY 独立、部分 null、未知币种、旧缺字段、0 请求角色不列、父子不重复汇总。
+{
+  const { element, take, find, context, flush } = await boot();
+  respond(take(), { runs: [runRecord("pv-run", { plannedCases: 1, plannedTurns: 1 }), runRecord("pv-old", { plannedCases: 1, plannedTurns: 1 })] });
+  await flush();
+  const currency = (currency: string, over: Record<string, unknown> = {}): any =>
+    ({ currency, requests: 1, knownRequests: 1, unknownRequests: 0, knownAmount: null, completeAmount: null, ...over });
+  const usageRow = (role: string, over: Record<string, unknown> = {}): any => ({
+    role, requests: 1, knownTokenRequests: 1, unknownTokenRequests: 0, knownTokens: null, completeTokens: null,
+    currencies: [], unknownCurrencyRequests: 0, ...over,
+  });
+  respond(find(path => path === "/api/runs/pv-run/analysis", "provider analysis"), analysisResult("pv-run", {
+    scope: "objective", issues: [],
+    counts: { cases: counts(1, 1, 0, 0, 0), turns: counts(1, 1, 0, 0, 0), checks: counts(1, 1, 0, 0, 0) },
+    cases: [{ id: "p1", tags: [], status: "passed", turns: counts(1, 1, 0, 0, 0), checks: counts(1, 1, 0, 0, 0) }],
+    attribution: {
+      spans: 40, groups: [], providers: [], issues: [],
+      providerUsage: [
+        usageRow("agent", { requests: 30, knownTokenRequests: 28, unknownTokenRequests: 2, knownTokens: 61200, completeTokens: null,
+          currencies: [currency("USD", { requests: 30, knownRequests: 28, unknownRequests: 2, knownAmount: 0.0041 }),
+            currency("CNY", { requests: 0 })] }),
+        usageRow("question", { requests: 10, knownTokens: 8500, completeTokens: 8500,
+          currencies: [currency("USD", { requests: 10, knownAmount: "oops", completeAmount: -1 })] }),
+        usageRow("rerank", { requests: 20, knownTokens: 1450000, completeTokens: 1450000,
+          currencies: [currency("CNY", { requests: 20, knownAmount: 0.012, completeAmount: 0.012 })] }),
+        usageRow("support", { requests: 12,
+          currencies: [currency("USD", { requests: 10, knownAmount: null, completeAmount: null }),
+            currency("CNY", { requests: 0 })], unknownCurrencyRequests: 2 }),
+        usageRow("other", { requests: 0 }),
+      ],
+      providerTotals: { requests: 72, knownTokenRequests: 68, unknownTokenRequests: 4, knownTokens: 1533700, completeTokens: null,
+        currencies: [currency("USD", { requests: 50, knownRequests: 48, unknownRequests: 2, knownAmount: 0.00551 }),
+          currency("CNY", { requests: 20, knownAmount: 0.012, completeAmount: null })], unknownCurrencyRequests: 2 },
+    },
+  }));
+  respond(find(path => path === "/api/runs/pv-run", "provider detail"), {
+    run: runRecord("pv-run", { plannedCases: 1, plannedTurns: 1 }),
+    cases: [evalCase("p1", { name: "费用场景" })],
+  });
+  await flush();
+  const html = content(element("run-detail"));
+  assert.match(html, /已采集提供商请求/, "提供商分角色费用区块");
+  assert.match(html, /用量与费用为 Agent 口径/, "既有 usage 明确 Agent 口径，不冠全链路");
+  assert.match(html, /问题解析/, "question 角色");
+  assert.match(html, /支持判别/, "support 角色");
+  assert.match(html, /\$0\.004100 \/ 未采全 · 缺报 2/, "USD 部分费用不补零");
+  assert.match(html, /¥0\.012000 \/ ¥0\.012000/, "CNY 完整费用独立成行");
+  assert.match(html, /未知币种 2/, "未知币种显式");
+  assert.match(html, /未知 \/ 未采全/, "Tokens 部分 null 不补零");
+  assert.match(html, /合计/, "providerTotals 合计行取后端值");
+  assert.match(html, /数据异常 \/ 数据异常/, "坏金额（string/负数）标数据异常不崩溃");
+  assert.match(html, /不适用/, "零请求且无未知币种的桶不适用");
+  assert.match(html, /未知（币种未采集）/, "有未知币种请求但桶零请求显示未采集");
+  assert.match(html, /¥0\.012000 \/ 未采全/, "有未知币种请求时合计 CNY 完整费用不补值");
+  const table = walk(element("run-detail")).find(item => item.className.split(" ").includes("exp-table"))!;
+  const body = table.children.find(item => item.children.length > 1)!;
+  assert.equal(body.children.length, 5, "0 请求角色不列出：4 角色 + 合计行");
+  assert.ok(!html.includes("￥"), "不换汇不混币种符号");
+  // 旧记录缺 providerUsage：未采集，不补 0。
+  runInContext('selectRun("pv-old")', context);
+  await flush();
+  respond(find(path => path === "/api/runs/pv-old/analysis", "old analysis"), analysisResult("pv-old", {
+    scope: "objective", issues: [],
+    counts: { cases: counts(1, 1, 0, 0, 0), turns: counts(1, 1, 0, 0, 0), checks: counts(1, 1, 0, 0, 0) },
+    cases: [{ id: "p1", tags: [], status: "passed", turns: counts(1, 1, 0, 0, 0), checks: counts(1, 1, 0, 0, 0) }],
+    attribution: { spans: 10, groups: [], providers: [], issues: [] },
+  }));
+  respond(find(path => path === "/api/runs/pv-old", "old detail"), {
+    run: runRecord("pv-old", { plannedCases: 1, plannedTurns: 1 }), cases: [evalCase("p1", { name: "旧场景" })],
+  });
+  await flush();
+  assert.match(content(element("run-detail")), /提供商请求：未采集（旧记录无此字段）/, "旧缺字段显示未采集不补 0");
+  console.log("PASS 评测前端：提供商分角色费用四角色分列、币种独立、部分 null、未知币种、旧缺字段未采集。");
+}

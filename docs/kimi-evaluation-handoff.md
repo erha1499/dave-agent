@@ -40,4 +40,12 @@ A1 增量已接入 version 2 数据集/接收策略/阈值，保持 version 1 �
 
 后续 Kimi K3 Max 增量显示 `supportVerification.validation` 的 partial / 全项 invalid、失败 code/hash、实际 parser 版本和逐项无效原因。无效项不显示为 supported=false 或正确拒收；status/ID/code/有效无效重叠异常时显示数据异常并保留原始 trace。16 组评测 UI、15 组实验 UI 和完整 validate 通过。Codex 使用真实 MySQL run `0082f06e-60d5-43c1-a797-488e84b461d4` 验证 1440px / 390px 取证明细及调参下载，页面错误和横向溢出为 0；该实际 DB run 没有 partial，partial/全项无效与坏记录由合成前端检查覆盖，不能混称真实服务故障验收。
 
+## 2026-10-07 咨询出处与费用交付、暂停
+
+沿用Kimi CLI K3 Max，实际请求核对`model=k3/thinkingEffort=max`，只修改既有`app.js/experiments.js`和两项UI检查。接入v2/v3、独立解析模型及超时，省略与显式null/undefined严格区分，下载/回填保留实际参数，切换架构或方案后同步控件并允许修正非法组合。费用表直接使用后端`providerUsage/providerTotals`，四角色与USD/CNY分列；旧记录不补造，未知、不适用和坏金额分别展示，不与Agent steps重复相加。
+
+独立UI检查为18组实验、17组评测，类型与最终完整validate退出0。Codex使用真实Chrome及合成API检查1440px/390px费用、未知CNY、A/B控件禁用/启用和JSON下载，页面错误及横向溢出0、实验POST0；未读取真实业务库或消息，没有业务模型/QQ调用。截图在忽略的`.runtime/question-workbench-preview/`；首次折叠字段等待超时已修正预览脚本，产品行为未放宽。
+
+默认与QQ不切换，旧真实结果不改。用户要求完成本轮后暂停，交付后不继续前端或其他优化；后续仅在用户恢复目标后再确定范围。
+
 2026-10-06：同一 Kimi K3 / Max 会话接入 `knowledgeApplicability` 参数及 A/B 预设，保留非法组合以便修复，不暗改配置；取证详情以简短汇总和折叠表展示“已声明必要前提”、原 rank、五类状态及版本哈希。未检查 / 未声明不显示通过，未知与模型 unsupported / parser invalid 分开。16 组实验 UI、16 组评测 UI 工程检查通过；Codex 在 1440px / 390px 检查下载配置、组合修复和实际 run `d2f23c5b-48ff-43b3-8241-c8bfe029cebb` 的门控明细，页面错误及横向溢出为 0。浏览器没有提交付费实验；真实运行整体仍有业务动作失败，界面展示成功不能替代业务准入。

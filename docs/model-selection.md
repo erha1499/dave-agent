@@ -55,7 +55,7 @@ Pi的cost字段原生假设USD，本轮仅在原生内存中使用NaN表示未�
 
 独立审阅先发现lazy调用改写全局provider绕过凭据隔离、Bailian价格合同未强绑定，以及缺usage请求从CNY费用分母消失；修复与对应负控完成后再全量验证。保留这些失败原因用于说明“OpenAI兼容”不等于可直接换模型；本轮个人贡献是角色与宿主接线、可信价格和评测完整性，工具循环/SSE仍来自Pi。
 
-源码入口：[模型选择与费用](../src/model-selection.ts)、[Pi注册与凭据](../src/agent.ts)、[判别请求与证据绑定](../src/evidence-support.ts)、[知识服务](../src/knowledge-service.ts)、[原生wire检查](../scripts/bailian-model-wire-check.ts)。工作台前端跨模式选项清理和主Agent CNY汇总展示仍待Kimi适配，CLI/JSON和provider span已可核对。本片按0远程预算收尾；下一片先冻结新的12输入、两臂判别对照及总请求/费用上限，再运行一次。没有真实效果证据时，不宣布优于DeepSeek或切换线上配置。
+源码入口：[模型选择与费用](../src/model-selection.ts)、[Pi注册与凭据](../src/agent.ts)、[判别请求与证据绑定](../src/evidence-support.ts)、[知识服务](../src/knowledge-service.ts)、[原生wire检查](../scripts/bailian-model-wire-check.ts)。工作台前端跨模式选项清理及分角色CNY费用已由Kimi K3 Max在[后续接线片](./experiment-controls.md#工作台接线收尾与暂停2026-10-07)完成，CLI/JSON与provider span可核对。模型接入片按0远程预算收尾；其后冻结的新12输入、两臂判别对照已单次执行，结果见下文；当前按用户要求暂停。没有真实效果证据时，不宣布优于DeepSeek或切换线上配置。
 
 ## 真实判别对照合同（2026-10-06，执行前冻结，已单次执行）
 

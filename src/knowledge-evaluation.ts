@@ -19,7 +19,7 @@ export function questionProviderSpans(observation: SupportQuestionObservation): 
       ...(attempt.httpRequests === 1 ? { usage: { provider: attempt.provider, model: attempt.model, kind: "llm" as const,
         inputTokens: [attempt.inputTokens, attempt.cacheReadTokens, attempt.cacheWriteTokens].every(value => value !== null)
           ? attempt.inputTokens! + attempt.cacheReadTokens! + attempt.cacheWriteTokens! : null,
-        outputTokens: attempt.outputTokens, totalTokens: attempt.totalTokens,
+        outputTokens: attempt.outputTokens, totalTokens: attempt.totalTokens, currency: cny ? "CNY" as const : "USD" as const,
         cost: amount == null ? null : { currency: cny ? "CNY" as const : "USD" as const, amount,
           source: cny ? "price_estimate" as const : "sdk_estimate" as const } } } : {}) };
   });
@@ -39,7 +39,9 @@ export function knowledgeProviderSpans(parent: EvalSpan): EvalSpan[] {
       usage: { provider: call.operation === "support" ? trace.settings?.support?.provider ?? "unknown" : trace.settings?.rerank ? "bailian" : "unknown",
         model: call.operation === "support" ? trace.settings?.support?.model ?? "unknown" : trace.settings?.rerank?.rerankModel ?? "unknown",
         kind: call.operation === "support" ? "llm" as const : "rerank" as const,
-        inputTokens: null, outputTokens: null, totalTokens: null, cost: null } }];
+        inputTokens: null, outputTokens: null, totalTokens: null, cost: null,
+        ...(call.operation === "support" ? trace.settings?.support?.pricing.currency ? { currency: trace.settings.support.pricing.currency } : {}
+          : trace.settings?.rerank ? { currency: "CNY" as const } : {}) } }];
     return call.attempts.map((attempt, index) => {
       const support = call.operation === "support" ? attempt as EvidenceSupportAttempt : null;
       const cnyRate = trace.pricing.rerankCnyPerMillionTokens;
@@ -54,7 +56,9 @@ export function knowledgeProviderSpans(parent: EvalSpan): EvalSpan[] {
         usage: { provider: support?.provider ?? "bailian", model: attempt.model, kind: support ? "llm" as const : "rerank" as const,
           inputTokens: support && [support.inputTokens, support.cacheReadTokens, support.cacheWriteTokens].every(value => value !== null)
             ? support.inputTokens! + support.cacheReadTokens! + support.cacheWriteTokens! : null,
-          outputTokens: support?.outputTokens ?? null, totalTokens: attempt.totalTokens, cost } };
+          outputTokens: support?.outputTokens ?? null, totalTokens: attempt.totalTokens, cost,
+          ...(support ? trace.settings?.support?.pricing.currency ? { currency: trace.settings.support.pricing.currency } : {}
+            : { currency: "CNY" as const }) } };
     });
   });
 }

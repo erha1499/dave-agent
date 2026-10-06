@@ -91,6 +91,7 @@ type EvalSpan = {
   knowledge?: { context: SupportKnowledgeContext; trace: KnowledgeTrace };
   usage?: {
     provider: string; model: string; kind: "llm" | "embedding" | "rerank";
+    currency?: "USD" | "CNY";
     inputTokens: number | null; outputTokens: number | null; totalTokens: number | null;
     cost: { currency: "USD" | "CNY"; amount: number; source: "sdk_estimate" | "provider" | "price_estimate" } | null;
   };
@@ -102,7 +103,15 @@ type SupportTraceAnalysis = {
   providers: Array<{ provider: string; model: string; kind: string;
     requests: number; usageReported: number; knownTokens: number | null;
     costs: Array<{ currency: string; source: string; reportedRequests: number; knownAmount: number }> }>;
+  providerUsage: Array<ProviderUsageSummary & { role: "agent" | "question" | "rerank" | "support" | "other" }>;
+  providerTotals: ProviderUsageSummary;
   issues: string[];
+};
+type ProviderUsageSummary = {
+  requests: number; knownTokenRequests: number; unknownTokenRequests: number;
+  knownTokens: number | null; completeTokens: number | null; unknownCurrencyRequests: number;
+  currencies: Array<{ currency: "USD" | "CNY"; requests: number; knownRequests: number; unknownRequests: number;
+    knownAmount: number | null; completeAmount: number | null }>;
 };
 ```
 
@@ -125,6 +134,8 @@ v2.2 的 `context.facts.couponCounts` 来自本轮授权订单的券状态字段
 轮次类型优先依据可信入口 span 的 `trigger`：`event` 是商家事件，`confirmation` 是用户精确确认经宿主执行，`user` 是普通用户请求。v2 的事件和确认回执应标为宿主；其他轮不因含 host 服务 span 就改标宿主。这里标的是最终回执生成方：atomic 商家事件仍可能调用模型，但发送的是宿主固定状态卡，模型步骤仍保留展示。旧轮无 spans 时保留原展示。spans 为空表示显式没有归因记录，不等于模型调用必为零；零模型需依据该轮实际 `steps`。无效归因记录应保留原始文本与诊断，不能让页面崩溃或显示为正常执行。
 
 `denied` 是服务的已知业务拒绝，`error` 是执行错误；两者不决定案例得分。Controller 的正常 `blocked` 不一定产生 denied，不要将 denied 数当全部拦截数。provider 的 requests 只覆盖带有效 usage 对象的 span，缺整个 usage 的 span 不在该分母；宜标“归因中已记录请求”，不可据此声称所有请求用量完整。Tokens 与 costs 都是已知部分，USD/CNY 及 `sdk_estimate`/`provider` 分别显示、不换汇合计，缺价格显示未知。首屏继续使用原 `analysis.usage` 口径，归因明细默认折叠。
+
+本轮新增`support-question`（宿主咨询解析）及上述四角色账本；旧`providers`保留。新`providerTotals`仅汇总归因中已采集的提供商请求，不能与Agent-only的`analysis.usage`相加，也不替代原始HTTP审计。缺整个span或usage不会被反推为零；没有请求时known/complete值为null。`usage.currency`来自实际选型价格合同，费用缺失时仍保留币种；旧记录无币种且无有效cost时计入unknownCurrencyRequests，两币种完整费用均为null。某币种部分缺费时展示该桶已知部分和缺失请求，其completeAmount为null。父服务与提供商后代重复带usage时拒绝父项、保留子项并列issues，不显示完整合计；币种冲突或无效归因同样不生成完整值。失败、取消但已发出的请求仍在账本，没有发HTTP的preflight解析不增加请求。界面只展示有实际请求的角色，不补造历史解析或重排；已知0费用和未知费用明确区分。
 
 M0–M6 的完整百炼检索报告位于 `.runtime/retrieval-v2/`，未导入旧历史运行 API。新实验入口仅在任务结果中提供其关联报告的实际摘要；不扫描导入旧离线报告，不凭开发报告写死 Recall/MRR，也不暗示在线业务已使用 rerank。
 

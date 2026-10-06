@@ -32,6 +32,38 @@ try {
     }), /没有可回读记录/);
     assert.deepEqual(actual?.parameters, variant.parameters, "actual business runner receives the resolved applicability variant; no DB/API in this check");
   }
+  const questionConfig = experimentCatalog().presets.find(p => p.id === "support-question-contract-ab")!.config;
+  if (questionConfig.kind !== "support") throw new Error("support question preset expected");
+  const questionOptions: Parameters<typeof runSupportV2Live>[0][] = [];
+  for (const variant of questionConfig.variants) {
+    const runId = randomUUID(), jobId = randomUUID();
+    await assert.rejects(executeExperiment({ config: { ...questionConfig, allowRemote: true }, variant,
+      jobId, repetition: 1, batch: { id: jobId, repetition: 1, plannedRepetitions: 1 } }, {
+      runSupport: async options => { questionOptions.push(structuredClone(options)); return runId; },
+      readSupport: async id => { assert.equal(id, runId); return undefined; },
+    }), /没有可回读记录/);
+    assert.deepEqual(questionOptions.at(-1)!.parameters, variant.parameters, "the actual jobs executor passes v2/v3 and parser defaults to the injected business runner");
+    assert.equal(questionOptions.at(-1)!.architecture, "controller");
+  }
+  assert.deepEqual(questionOptions.map(options => [options.parameters?.questionContract, options.parameters?.questionModel, options.parameters?.questionTimeoutMs]),
+    [["v2", null, null], ["v3", "configured", 10000]]);
+  assert.equal(questionOptions[0]!.parameters?.agentModel, questionOptions[1]!.parameters?.agentModel);
+  assert.equal(questionOptions[0]!.parameters?.knowledgeSupportModel, questionOptions[1]!.parameters?.knowledgeSupportModel);
+  const questionExecutions: ExperimentExecution[] = [];
+  const questionJobs = service("question-config", async input => {
+    questionExecutions.push(structuredClone(input)); throw new Error("synthetic runner stop before providers");
+  });
+  await assert.rejects(questionJobs.start(questionConfig), /付费模型/);
+  assert.equal(questionExecutions.length, 0, "candidate opt-in is still required before execution or credentials");
+  const questionStarted = await questionJobs.start({ ...questionConfig, allowRemote: true, variants: [questionConfig.variants[1]!] });
+  await questionJobs.close();
+  const questionSaved = (await questionJobs.get(questionStarted.id))!;
+  assert.equal(questionSaved.status, "failed", "the injected stop is retained, not called a successful model run");
+  assert.deepEqual(questionSaved.config, questionStarted.config);
+  assert.deepEqual(questionExecutions.at(-1)?.variant.parameters, questionConfig.variants[1]!.parameters);
+  assert.deepEqual(JSON.parse(await readFile(join(questionJobs.directory, `${questionSaved.id}.json`), "utf8")).config, questionStarted.config,
+    "persisted snapshots preserve the actual v3 contract, independent parser selection and timeout");
+  assert.equal(questionSaved.configHash, questionStarted.configHash);
   let unblock!: () => void;
   const blocked = new Promise<void>(resolve => { unblock = resolve; });
   const order: ExperimentExecution[] = []; let executing = 0, maxExecuting = 0;

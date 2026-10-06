@@ -1,9 +1,11 @@
 # C1：可信上下文与可配置知识服务
 
-更新：2026-10-06。v2.2、逐候选隔离、typed v5、已声明必要前提门控及 Pi 原生动作工具选择已实现。早期开发记录为真实 Pi Session **10/10 对话、20/20 轮**、MySQL **14/14、24/24、172/172**，见 [Session 结果](./c1-session-results.md) 与 [业务结果](./c1-business-results.md)。**首次新固定验证15/24对话、36/45轮，C1未准入**；后续已曝光 Flash 开发为 **14/24、35/45**，Pro 单变量对照为 **17/24、36/45，另2轮未执行**，仍保留 Flash，见[新验证结果](./c1-session-validation-results.md)、[迭代结果](./c1-next-iteration-results.md)、[模型对照](./c1-agent-model-ablation.md)。竞争引用与精确选择恢复已完成[工程候选](./c1-reference-selection.md#已实现与可复现演示)，不能用工程通过更新上述真实模型成绩。语言诊断7/8、商品类别映射歧义、旧失败与评分修订保留，见 [首次审计](./c1-context-results.md)、[评分合同](./c1-runner-contract.md)。默认仍为 atomic + lexical，没有自动切换 QQ。
+更新：2026-10-07。v2.2、逐候选隔离、typed v5、已声明必要前提门控及 Pi 原生动作工具选择已实现。早期开发记录为真实 Pi Session **10/10 对话、20/20 轮**、MySQL **14/14、24/24、172/172**，见 [Session 结果](./c1-session-results.md) 与 [业务结果](./c1-business-results.md)。**首次新固定验证15/24对话、36/45轮，C1未准入**；后续已曝光 Flash 开发为 **14/24、35/45**，Pro 单变量对照为 **17/24、36/45，另2轮未执行**，仍保留 Flash，见[新验证结果](./c1-session-validation-results.md)、[迭代结果](./c1-next-iteration-results.md)、[模型对照](./c1-agent-model-ablation.md)。竞争引用与精确选择恢复已完成[工程候选](./c1-reference-selection.md#已实现与可复现演示)，不能用工程通过更新上述真实模型成绩。语言诊断7/8、商品类别映射歧义、旧失败与评分修订保留，见 [首次审计](./c1-context-results.md)、[评分合同](./c1-runner-contract.md)。默认仍为 atomic + lexical，没有自动切换 QQ。
 
 
 最新候选是[咨询问题出处v3](./c1-policy-scope-repair.md#新题真实结果与预算收尾2026-10-06)：在同一Flash主Agent/Pro判别配置下，新6场景、两臂24轮实际全执行，严格业务 **v2 9/12、4/6场景 → v3 11/12、5/6场景**；全轮P50 **4064→5391ms**。107次真实HTTP、四角色合计USD0.0479253/CNY0.0121745，来源/费用和24回复92判据独审通过。这是非盲合成题的整套中性查询、问题解析及恢复对照，只支持下一次有界候选验证；整体C1未准入，默认仍atomic + lexical、memory/id与DeepSeek。两臂005首轮共同宿主提示失败保留；随后共享提示已按下节工程路径修复，但不回写原9/12和11/12、不重跑闭合manifest认领12/12。
+
+2026-10-07，[工作台接线片](./experiment-controls.md#工作台接线收尾与暂停2026-10-07)已完成v3显式候选参数、实际Session/配置快照与已采集四角色费用展示；原生Pi替代HTTP、Kimi K3 Max前端、Chrome合成宽/窄屏和全量validate通过，0业务远程/DB/QQ。这是工程入口交付，不增加真实模型或QQ验收。按用户要求，本轮提交推送后暂停，未完成准入项保留。
 
 ## 要解决的问题
 
@@ -96,9 +98,10 @@ flowchart LR
 node scripts/support-clarification-check.ts
 node scripts/support-question-session-check.ts
 node scripts/support-question-evidence-check.ts
+node scripts/support-question-experiment-check.ts
 ```
 
-第一条检查默认v2/显式v3的实际宿主完整重述提示，模型即使生成完整说明及伪造退款也不能替代固定Reply；澄清阶段业务/FAQ/解析均0。后两条通过原生Pi替代HTTP演示合法续问、完整重述恢复、跨单/过期范围及费用/来源篡改拒绝。这些固定工程输入不评价模型自然语言能力，不连接数据库或QQ。真实语义证据只能引用上述已关闭新题结果，不能重新运行它的live命令；显式本机CLI候选另见[客户端与费用入口](./c1-policy-scope-repair.md#真实解析客户端费用与独立v3证明2026-10-06工程候选)，该入口会使用本机业务库并实际请求模型。
+第一条检查默认v2/显式v3的实际宿主完整重述提示，模型即使生成完整说明及伪造退款也不能替代固定Reply；澄清阶段业务/FAQ/解析均0。第二、三条通过原生Pi替代HTTP演示合法续问、完整重述恢复、跨单/过期范围及费用/来源篡改拒绝；第四条验证通用实验执行器同一接线的参数生效、取消账本与跨轮隔离。这些固定工程输入不评价模型自然语言能力，不连接数据库或QQ。真实语义证据只能引用上述已关闭新题结果，不能重新运行它的live命令；显式本机CLI候选另见[客户端与费用入口](./c1-policy-scope-repair.md#真实解析客户端费用与独立v3证明2026-10-06工程候选)，该入口会使用本机业务库并实际请求模型。
 
 ## 保留的限制与下一阶段
 

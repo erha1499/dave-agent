@@ -428,7 +428,7 @@ function metricsPanel(run, analysis, cases) {
       text("span", `执行：工具调用 ${number(execution.toolCalls)} · 非预期工具错误 ${number(execution.toolErrors)} · 预期身份拒绝 ${number(execution.expectedDenials)} · 模型错误 ${number(execution.modelErrors)}`),
       text("span", `耗时：样本 ${timing.samples} · P50 ${duration(timing.durationP50Ms)} · P95 ${duration(timing.durationP95Ms)} · 采集口径 ${timing.measurement || "未记录"}`),
       ...legacyLines),
-    text("p", "完整量要求全部模型请求均已上报，未知时不补零；耗时按原采集口径展示，不代表 QQ 平台端到端送达；费用按已报告用量和 SDK 目录单价估算。", "metric-note")));
+    text("p", "完整量要求全部模型请求均已上报，未知时不补零；耗时按原采集口径展示，不代表 QQ 平台端到端送达；费用按已报告用量和 SDK 目录单价估算。用量与费用为 Agent 口径，不代表全链路提供商请求（提供商分角色见执行分工）。", "metric-note")));
   return panel;
 }
 
@@ -449,6 +449,43 @@ function retrievalPanel(retrieval) {
       text("p", "检索指标与工程检查、模型行为分列展示，不合成总分。", "metric-note")));
 }
 
+const providerRoleNames = { agent: "Agent", question: "问题解析", rerank: "重排", support: "支持判别", other: "其他" };
+// 提供商分角色费用：仅列有实际 usage 请求的角色；已知/完整分列，USD/CNY 独立不换汇，缺报与未知币种显式，不补零。
+// 数据仅取后端 providerUsage/providerTotals，不从旧 providers 或 steps 重建，父子 span 不重复相加。
+function providerUsageNode(attribution) {
+  if (!attribution || !Array.isArray(attribution.providerUsage)) return text("p", "提供商请求：未采集（旧记录无此字段）。", "metric-note");
+  const rows = attribution.providerUsage.filter(row => row && typeof row === "object" && row.requests > 0);
+  if (!rows.length) return text("p", "提供商请求：无实际 usage 请求。", "metric-note");
+  // 金额为 null 属未采集；非有限非负数值（string/NaN/Infinity/负数）属数据异常，只标该格不崩溃。
+  const fmtAmount = (value, symbol, nullText) => value === null || value === undefined ? nullText
+    : typeof value === "number" && Number.isFinite(value) && value >= 0 ? `${symbol}${value.toFixed(6)}` : "数据异常";
+  const fmtCount = value => value === null || value === undefined ? "未知"
+    : typeof value === "number" && Number.isFinite(value) && value >= 0 ? number(value) : "数据异常";
+  // 桶零请求且无未知币种请求时不适用；有未知币种请求但桶零请求时该桶未采集。
+  const moneyCell = (row, entry) => {
+    if (!entry || !entry.requests) return row.unknownCurrencyRequests > 0 ? "未知（币种未采集）" : "不适用";
+    return `${fmtAmount(entry.knownAmount, entry.currency === "CNY" ? "¥" : "$", "未知")} / ${fmtAmount(entry.completeAmount, entry.currency === "CNY" ? "¥" : "$", "未采全")}${entry.unknownRequests ? ` · 缺报 ${entry.unknownRequests}` : ""}`;
+  };
+  const rowNode = (row, label) => {
+    const currencies = Array.isArray(row.currencies) ? row.currencies : [];
+    const noRequests = !row.requests;
+    return node("tr", {},
+      text("td", label),
+      text("td", noRequests ? "不适用" : `${fmtCount(row.requests)}${row.unknownTokenRequests ? `（缺 Tokens ${fmtCount(row.unknownTokenRequests)}）` : ""}`, "mono"),
+      text("td", noRequests ? "不适用" : `${row.knownTokens === null || row.knownTokens === undefined ? "未知" : fmtCount(row.knownTokens)} / ${row.completeTokens === null || row.completeTokens === undefined ? "未采全" : fmtCount(row.completeTokens)}`, "mono"),
+      text("td", moneyCell(row, currencies.find(item => item && item.currency === "USD")), "mono"),
+      text("td", moneyCell(row, currencies.find(item => item && item.currency === "CNY")), "mono"),
+      text("td", row.unknownCurrencyRequests ? `未知币种 ${row.unknownCurrencyRequests}` : "—", "mono"));
+  };
+  return node("div", { class: "provider-usage" },
+    text("p", "已采集提供商请求：按角色分列，币种独立不换汇；仅计带 usage 的记录，父子 span 不重复相加。", "metric-note"),
+    node("div", { class: "retrieval-scroll" }, node("table", { class: "retrieval-table exp-table" },
+      node("thead", {}, node("tr", {}, ...["角色", "请求", "Tokens 已知 / 完整", "USD 已知 / 完整", "CNY 已知 / 完整", "异常"].map(label => text("th", label)))),
+      node("tbody", {},
+        ...rows.map(row => rowNode(row, providerRoleNames[row.role] || row.role || "其他")),
+        attribution.providerTotals && typeof attribution.providerTotals === "object" ? rowNode(attribution.providerTotals, "合计") : null))));
+}
+
 // 运行级执行分工：归因是同一次执行的另一视角，默认折叠放场景之后。
 // groups 按执行方/触发/组件逐项列出，不造合计，不与 steps 的调用量、Tokens、费用相加。
 // 旧记录 attribution 为 null 或省略时显示未采集，不补零。
@@ -465,6 +502,7 @@ function attributionPanel(analysis) {
             text("span", String(group.calls), "mono"),
             text("span", String(group.denied), "mono"),
             text("span", String(group.errors), "mono")))) : null,
+        providerUsageNode(attribution),
         text("p", "入口与嵌套服务分别计数，不是可相加的总数；不与执行轨迹的调用量、Tokens、费用重复相加。", "metric-note"),
         ...(attribution.issues?.length ? [node("ul", { class: "issues-list" }, ...attribution.issues.map(issue => node("li", {}, issue)))] : []),
       ].filter(Boolean)

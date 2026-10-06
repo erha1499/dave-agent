@@ -32,7 +32,7 @@ assert.ok(knowledgeAB.variants.every(variant => variant.parameters.knowledgeThre
 assert.deepEqual(resolveExperimentConfig(JSON.parse(await readFile("configs/experiments/support-knowledge-ab.json", "utf8"))), knowledgeAB);
 assert.throws(() => requireExperimentExecution(knowledgeAB));
 assert.throws(() => resolveExperimentConfig({ ...support, variants: [{ id: "A", architecture: "atomic", parameters: { knowledgeMode: "m4-support" } }] }));
-for (const key of ["agentModel", "knowledgeMode", "knowledgeSupport", "knowledgeSupportModel", "knowledgeSupportPrompt", "knowledgeApplicability", "knowledgeQueryMode", "knowledgeThreshold", "knowledgeTimeoutMs"]) assert.ok(catalog.fields.support.some(field => field.key === key));
+for (const key of ["agentModel", "questionContract", "questionModel", "questionTimeoutMs", "knowledgeMode", "knowledgeSupport", "knowledgeSupportModel", "knowledgeSupportPrompt", "knowledgeApplicability", "knowledgeQueryMode", "knowledgeThreshold", "knowledgeTimeoutMs"]) assert.ok(catalog.fields.support.some(field => field.key === key));
 const profileAB = catalog.presets.find(preset => preset.id === "support-knowledge-profile-ab")!.config;
 assert.equal(profileAB.kind, "support");
 if (profileAB.kind !== "support") throw new Error("profile preset kind");
@@ -45,6 +45,42 @@ assert.deepEqual(modelAB.variants.map(v => [v.architecture, v.parameters.knowled
   [["controller", "m4-support", "typed", "configured", .5], ["controller", "m4-support", "typed", "deepseek-v4-pro", .5]]);
 assert.deepEqual(resolveExperimentConfig(JSON.parse(await readFile("configs/experiments/support-knowledge-model-ab.json", "utf8"))), modelAB);
 assert.equal(resolveSupportParameters().agentModel, "configured");
+const questionDefaults = { questionContract: "v2", questionModel: null, questionTimeoutMs: null };
+const questionParameters = (value: Pick<ReturnType<typeof resolveSupportParameters>, "questionContract" | "questionModel" | "questionTimeoutMs">) => ({ questionContract: value.questionContract, questionModel: value.questionModel, questionTimeoutMs: value.questionTimeoutMs });
+assert.deepEqual(questionParameters(resolveSupportParameters()), questionDefaults, "old configurations retain v2 without creating parser settings");
+assert.deepEqual(questionParameters(resolveSupportParameters({ questionContract: "v2", questionModel: null, questionTimeoutMs: null })), questionDefaults);
+assert.deepEqual(questionParameters(resolveSupportParameters({ questionContract: "v3" })), { questionContract: "v3", questionModel: "configured", questionTimeoutMs: 10_000 });
+for (const questionContract of [null, undefined, "", "V3", "v4", 3, [], {}]) {
+  assert.throws(() => resolveSupportParameters({ questionContract } as Parameters<typeof resolveSupportParameters>[0]), /questionContract/);
+}
+for (const parameters of [{ questionModel: "configured" }, { questionTimeoutMs: 10000 }, { questionModel: undefined }, { questionTimeoutMs: undefined },
+  { questionContract: "v3", questionModel: null }, { questionContract: "v3", questionModel: undefined },
+  { questionContract: "v3", questionTimeoutMs: null }, { questionContract: "v3", questionTimeoutMs: undefined },
+  ...[0, 999, 15001, 1000.5, "10000", NaN, Infinity].map(questionTimeoutMs => ({ questionContract: "v3", questionTimeoutMs })),
+  { questionContract: "v3", timeoutMs: 10000, questionTimeoutMs: 10001 }]) {
+  assert.throws(() => resolveExperimentConfig({ ...support, variants: [{ id: "A", architecture: "controller", parameters }] }), ExperimentInputError);
+}
+assert.throws(() => resolveSupportRunParameters("atomic", { questionContract: "v3" }), /v3.*controller/);
+for (const questionModel of modelSelections) for (const knowledgeMode of ["lexical", "m4-support"] as const) for (const questionTimeoutMs of [1000, 15000]) {
+  const value = resolveSupportRunParameters("controller", { questionContract: "v3", questionModel, questionTimeoutMs, knowledgeMode });
+  assert.deepEqual(questionParameters(value), { questionContract: "v3", questionModel, questionTimeoutMs });
+  assert.equal(value.agentModel, "configured"); assert.equal(value.knowledgeSupportModel, "configured");
+}
+for (const questionModel of ["", "Configured", "deepseek", "qwen3.7-plus", " deepseek-flash", 0, {}, []]) {
+  assert.throws(() => resolveSupportParameters({ questionContract: "v3", questionModel } as Parameters<typeof resolveSupportParameters>[0]), /questionModel/);
+}
+assert.deepEqual(catalog.fields.support.find(field => field.key === "questionModel")!.options!.map(option => option.value), modelSelections);
+const questionAB = catalog.presets.find(preset => preset.id === "support-question-contract-ab")!.config;
+if (questionAB.kind !== "support") throw new Error("question contract preset kind");
+assert.deepEqual(questionAB.variants.map(variant => questionParameters(variant.parameters)), [questionDefaults,
+  { questionContract: "v3", questionModel: "configured", questionTimeoutMs: 10000 }]);
+assert.deepEqual(questionAB.variants.map(({ parameters: { questionContract, questionModel, questionTimeoutMs, ...rest } }) => rest)[0],
+  questionAB.variants.map(({ parameters: { questionContract, questionModel, questionTimeoutMs, ...rest } }) => rest)[1], "only the question contract and its derived parser defaults differ");
+assert.ok(questionAB.variants.every(variant => variant.architecture === "controller" && variant.parameters.agentModel === "deepseek-flash"
+  && variant.parameters.knowledgeSupportModel === "deepseek-v4-pro" && variant.parameters.knowledgeSupport === "typed"
+  && variant.parameters.knowledgeSupportPrompt === "v6" && variant.parameters.knowledgeApplicability === "declared-v2"
+  && variant.parameters.knowledgeQueryMode === "separated" && variant.parameters.knowledgeThreshold === .5 && variant.parameters.knowledgeTimeoutMs === 60_000));
+assert.equal(questionAB.allowRemote, false); assert.equal(questionAB.repeat, 1); assert.throws(() => requireExperimentExecution(questionAB));
 for (const key of ["agentModel", "knowledgeSupportModel"] as const) {
   assert.deepEqual(catalog.fields.support.find(field => field.key === key)!.options!.map(option => option.value), modelSelections);
   for (const invalid of [null, undefined, 0, [], {}, "", "Configured", "deepseek", "qwen3.7-plus", " qwen3.7-plus-2026-05-26"]) {
@@ -87,7 +123,7 @@ assert.ok(qwenAB.variants.every(variant => variant.parameters.knowledgeMode === 
   && variant.parameters.knowledgeSupportPrompt === "v6" && variant.parameters.knowledgeApplicability === "declared-v2"
   && variant.parameters.knowledgeQueryMode === "separated" && variant.parameters.knowledgeThreshold === .5));
 assert.equal(qwenAB.repeat, 1); assert.equal(qwenAB.allowRemote, false); assert.throws(() => requireExperimentExecution(qwenAB), ExperimentInputError);
-for (const preset of catalog.presets.filter(preset => preset.id !== "support-knowledge-qwen-ab")) {
+for (const preset of catalog.presets.filter(preset => !["support-knowledge-qwen-ab", "support-question-contract-ab"].includes(preset.id))) {
   if (preset.config.kind === "support") assert.ok(preset.config.variants.every(variant => variant.parameters.agentModel === "configured"), "existing presets retain the configured agent");
 }
 assert.equal(readKnowledgeParameters({}).knowledgeSupportModel, "configured");
@@ -372,6 +408,10 @@ const qwenCli = await promisify(execFile)(process.execPath, ["scripts/experiment
 });
 assert.deepEqual(JSON.parse(qwenCli.stdout).config, qwenAB, "Pro / Qwen preview resolves without model/DB credentials or a provider call");
 assert.equal(JSON.parse(qwenCli.stdout).remoteRequired, true);
+const questionCli = await promisify(execFile)(process.execPath, ["scripts/experiment.ts", "--preset", "support-question-contract-ab", "--dry-run"], {
+  env: { PATH: process.env.PATH }, maxBuffer: 100_000,
+});
+assert.deepEqual(JSON.parse(questionCli.stdout).config, questionAB, "question v2/v3 preview resolves the actual candidate without model/DB credentials");
 
 let starts = 0, busy = false;
 const job: ExperimentJob = {
@@ -389,7 +429,9 @@ try {
   const post = (body: string, headers: Record<string, string> = {}) => fetch(`${base}/api/experiments`, { method: "POST", headers: {
     "Content-Type": "application/json", "X-Experiment-Request": "1", ...headers,
   }, body });
-  assert.equal((await fetch(`${base}/api/experiments/catalog`)).status, 200);
+  const httpCatalog = await (await fetch(`${base}/api/experiments/catalog`)).json() as ReturnType<typeof experimentCatalog>;
+  assert.deepEqual(httpCatalog.presets.find(preset => preset.id === "support-question-contract-ab")!.config, questionAB);
+  assert.ok(httpCatalog.fields.support.some(field => field.key === "questionTimeoutMs" && field.max === 15000), "HTTP catalog exposes the same parser limit");
   assert.deepEqual(await (await fetch(`${base}/api/experiments`)).json(), { jobs: [job] });
   assert.equal((await fetch(`${base}/api/experiments/${job.id}`)).status, 200);
   assert.equal((await fetch(`${base}/api/experiments/nope`)).status, 400);
@@ -404,6 +446,9 @@ try {
   assert.equal((await post(JSON.stringify(supportValidation))).status, 400);
   assert.equal((await post(JSON.stringify({ ...supportValidation, allowRemote: true }))).status, 202);
   assert.equal((await post(JSON.stringify({ ...supportValidation, allowRemote: true, variants: [{ ...supportVariant, modes: ["M0"] }] }))).status, 400);
+  assert.equal((await post(JSON.stringify(questionAB))).status, 400, "question candidate preserves explicit remote permission");
+  assert.equal((await post(JSON.stringify({ ...questionAB, allowRemote: true }))).status, 202);
+  assert.equal((await post(JSON.stringify({ ...questionAB, allowRemote: true, variants: [{ id: "A", architecture: "atomic", parameters: { questionContract: "v3" } }] }))).status, 400);
   assert.equal((await post(JSON.stringify(local), { "X-Experiment-Request": "" })).status, 400);
   assert.equal((await post(JSON.stringify(local), { "Content-Type": "text/plain" })).status, 400);
   assert.equal((await post("not json")).status, 400);
@@ -424,6 +469,6 @@ try {
   assert.match(malformedUrl, /^HTTP\/1.1 400 /, "malformed URL is rejected without exiting the server");
   assert.equal((await fetch(`${base}/api/experiments`)).status, 200);
   assert.equal((await fetch(`${base}/api/runs`, { method: "POST" })).status, 405);
-  assert.equal(starts, 3, "only valid v1/v2 requests reach execution; invalid or cross-origin requests never do");
+  assert.equal(starts, 4, "only valid v1/v2 requests reach execution; invalid or cross-origin requests never do");
 } finally { server.closeAllConnections(); await new Promise<void>(resolve => server.close(() => resolve())); }
 console.log("PASS 实验配置/CLI预览与HTTP执行边界：白名单、组合、远程许可、body上限、同源、串行忙态及历史只读。");

@@ -208,7 +208,19 @@ assert.deepEqual(multiSummary.retrieval?.groups[0], { corpus: "full", suite: "ha
 assert.equal(analyzeEvaluation(multiRelevant).scope, "invalid", "one relevant hit is not complete multi-document recall");
 
 const unavailableId = randomUUID();
-const byId = new Map([original, repeat, legacy].map(detail => [detail.run.id, detail]));
+const providerDetail = fixture();
+const providerTurn = providerDetail.cases[0]!.turns[0]!;
+const spanBase = { parentSpanId: "provider-turn", trigger: "user" as const, name: "request", observedAt: providerTurn.startedAt,
+  durationMs: 1, outcome: "ok" as const };
+providerTurn.spans = [
+  { ...spanBase, id: "provider-turn", parentSpanId: null, actor: "host", component: "qq-ingress" },
+  { ...spanBase, id: "provider-agent", actor: "agent", component: "model", usage: { provider: "deepseek", model: "flash", kind: "llm",
+    currency: "USD", inputTokens: 10, outputTokens: 2, totalTokens: 12, cost: { currency: "USD", amount: .001, source: "sdk_estimate" } } },
+  { ...spanBase, id: "provider-parser", actor: "host", component: "support-question", outcome: "error", usage: {
+    provider: "bailian", model: "qwen", kind: "llm", currency: "CNY", inputTokens: null, outputTokens: null, totalTokens: null, cost: null } },
+];
+assert.equal(analyzeEvaluation(original).attribution, null, "No spans in historical record cannot prove zero provider costs");
+const byId = new Map([original, repeat, legacy, providerDetail].map(detail => [detail.run.id, detail]));
 const server = createEvaluationServer({ ping: async () => {}, listRuns: async () => [],
   getRun: async id => { if (id === unavailableId) throw new Error("synthetic database error"); return byId.get(id); },
   getBatch: async id => id === batchId ? [original, repeat] : [] });
@@ -216,6 +228,13 @@ try {
   await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve));
   const address = server.address(); assert.ok(address && typeof address === "object");
   const base = `http://127.0.0.1:${address.port}`;
+  const providerResponse = await (await fetch(`${base}/api/runs/${providerDetail.run.id}/analysis`)).json() as ReturnType<typeof analyzeEvaluation>;
+  assert.equal(providerResponse.usage.modelRequests, 1, "Existing summary remains Agent-only");
+  assert.equal(providerResponse.attribution?.providerTotals.requests, 2, "Provider summary counts spans once, not plus model steps");
+  assert.equal(providerResponse.attribution?.providerTotals.currencies[0]!.completeAmount, .001);
+  assert.equal(providerResponse.attribution?.providerTotals.currencies[1]!.unknownRequests, 1);
+  assert.equal(providerResponse.attribution?.providerTotals.currencies[1]!.knownAmount, null);
+  assert.equal(providerResponse.attribution?.providerTotals.currencies[1]!.completeAmount, null);
   assert.deepEqual(await (await fetch(`${base}/api/runs/${original.run.id}/analysis`)).json(), analyzeEvaluation(original));
   assert.deepEqual(await (await fetch(`${base}/api/compare?baseline=${original.run.id}&candidate=${repeat.run.id}`)).json(), compareEvaluations(original, repeat));
   assert.deepEqual(await (await fetch(`${base}/api/batches/${batchId}`)).json(), analyzeBatch(batchId, [original, repeat]));
