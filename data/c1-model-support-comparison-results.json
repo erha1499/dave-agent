@@ -1,0 +1,3133 @@
+{
+  "version": 1,
+  "runId": "bd85183b-a59c-4c09-a0c6-dcc38f14bfef",
+  "sourceCommit": "b8e8b4b",
+  "stage": "fresh-fixed-input-model-comparison-not-blind",
+  "scope": "Support-only fixed synthetic inputs; no Agent, retrieval/rerank, database, QQ, writes or final reply evaluation.",
+  "rawArtifact": {
+    "path": ".runtime/c1-model-support-comparison/bd85183b-a59c-4c09-a0c6-dcc38f14bfef.json",
+    "sha256": "12474f74a281a73a8dccd6193f5fb61cc2fdc56ce883dc341b23896f16f14022",
+    "contentHash": "1f56839b5f458fd59dc63cf26c49ed3a65764132400329bb5a9b2c29acc1409e"
+  },
+  "datasetSha256": "e46afaaf46234d57205611c3de8ead68023595b7bb575ce8a45a7e0bcd1d3549",
+  "manifestSha256": "d44e15c6c05dc94a1a2fdb822a55c04141063742913aac6052a26a6556d2ae20",
+  "manifestContentHash": "707e3a0ddda8a7ab2207c82551fd4961dcb191b1efc720322b39dc962d265106",
+  "startedAt": "2026-10-06T09:56:28.574Z",
+  "finishedAt": "2026-10-06T09:57:50.759Z",
+  "wallMs": 82185,
+  "integrityPassed": true,
+  "codeStable": true,
+  "recordingComplete": true,
+  "executionComplete": true,
+  "usageComplete": true,
+  "stopReason": null,
+  "nextSessionCandidateEligible": false,
+  "actualSettings": {
+    "A": {
+      "provider": "deepseek",
+      "model": "deepseek-v4-pro",
+      "api": "openai-completions",
+      "endpoint": "https://api.deepseek.com",
+      "timeoutMs": 60000,
+      "temperature": 0,
+      "maxTokens": 2048,
+      "maxRetries": 0,
+      "promptVersion": "fact-support-typed-v7",
+      "promptHash": "c2d8e1f3de93d86ef658a0d691fe753138efcab7240c9a13f20f499d41937a9c",
+      "serialization": "json-query-id-title-tags-body-v1",
+      "serializationHash": "1d16c5e3ef4647c120fe6ddce72417c9ec618ee41dc77faa447ec214e5749c4a",
+      "pricing": {
+        "currency": "USD",
+        "estimated": true,
+        "source": "Pi model catalog",
+        "rates": {
+          "input": 1.32,
+          "output": 3.96,
+          "cacheRead": 0.044,
+          "cacheWrite": 0
+        }
+      },
+      "profile": "typed",
+      "validationVersion": "typed-candidate-isolation-v1"
+    },
+    "B": {
+      "provider": "bailian",
+      "model": "qwen3.7-plus-2026-05-26",
+      "api": "openai-completions",
+      "endpoint": "https://ws-tiy939iiusj2254o.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
+      "timeoutMs": 60000,
+      "temperature": 0,
+      "maxTokens": 2048,
+      "maxRetries": 0,
+      "promptVersion": "fact-support-typed-v7",
+      "promptHash": "c2d8e1f3de93d86ef658a0d691fe753138efcab7240c9a13f20f499d41937a9c",
+      "serialization": "json-query-id-title-tags-body-v1",
+      "serializationHash": "1d16c5e3ef4647c120fe6ddce72417c9ec618ee41dc77faa447ec214e5749c4a",
+      "pricing": {
+        "currency": "CNY",
+        "estimated": true,
+        "source": "Alibaba Cloud Model Studio",
+        "version": "bailian-beijing-2026-10-06-v1",
+        "region": "cn-beijing",
+        "inputTierMaxTokens": 256000,
+        "cacheDiscounts": false,
+        "rates": {
+          "input": 2,
+          "output": 8,
+          "cacheRead": 2,
+          "cacheWrite": 2
+        }
+      },
+      "profile": "typed",
+      "validationVersion": "typed-candidate-isolation-v1"
+    }
+  },
+  "summary": {
+    "A": {
+      "selection": "deepseek-v4-pro",
+      "exactInputs": {
+        "planned": 12,
+        "completed": 12,
+        "passed": 9,
+        "exactAcceptanceSet": 12,
+        "wholeNoAnswerPlanned": 4,
+        "wholeNoAnswerCorrect": 4,
+        "wholeNoAnswerFalseAccepted": 0,
+        "errors": 0,
+        "notRun": 0
+      },
+      "candidates": {
+        "planned": 24,
+        "positivePlanned": 12,
+        "negativePlanned": 12,
+        "valid": 24,
+        "passed": 20,
+        "falseAccepted": 0,
+        "falseRejected": 0,
+        "invalid": 0,
+        "missing": 0,
+        "newFalseRejectedKeys": [],
+        "falseRejectedKeys": []
+      },
+      "http": {
+        "planned": 12,
+        "sent": 12,
+        "knownCosts": 12,
+        "unknownCosts": 0,
+        "currency": "USD",
+        "knownEstimatedCost": 0.013868976000000002,
+        "estimatedCost": 0.013868976000000002,
+        "estimatedCostPerActualHttp": 0.001155748,
+        "estimatedCostPerSuccessfulInput": 0.0015409973333333335,
+        "totalTokens": 26878
+      },
+      "latency": {
+        "observed": 12,
+        "p50Ms": 2297.7397920000003,
+        "p95Ms": 3127.9146249999976
+      }
+    },
+    "B": {
+      "selection": "qwen3.7-plus-2026-05-26",
+      "exactInputs": {
+        "planned": 12,
+        "completed": 12,
+        "passed": 9,
+        "exactAcceptanceSet": 10,
+        "wholeNoAnswerPlanned": 4,
+        "wholeNoAnswerCorrect": 2,
+        "wholeNoAnswerFalseAccepted": 2,
+        "errors": 0,
+        "notRun": 0
+      },
+      "candidates": {
+        "planned": 24,
+        "positivePlanned": 12,
+        "negativePlanned": 12,
+        "valid": 24,
+        "passed": 19,
+        "falseAccepted": 3,
+        "falseRejected": 0,
+        "invalid": 0,
+        "missing": 0,
+        "newFalseRejectedKeys": [],
+        "falseRejectedKeys": []
+      },
+      "http": {
+        "planned": 12,
+        "sent": 12,
+        "knownCosts": 12,
+        "unknownCosts": 0,
+        "currency": "CNY",
+        "knownEstimatedCost": 0.069084,
+        "estimatedCost": 0.069084,
+        "estimatedCostPerActualHttp": 0.005757000000000001,
+        "estimatedCostPerSuccessfulInput": 0.0076760000000000005,
+        "totalTokens": 27036
+      },
+      "latency": {
+        "observed": 12,
+        "p50Ms": 4427.2302500000005,
+        "p95Ms": 4957.838292
+      }
+    }
+  },
+  "measurementBoundary": "Public synthetic decisions, raw typed text and request/usage digests. Full native request bodies and local SSE digests remain in ignored raw artifact; this summary alone cannot prove those HTTP bodies. Not a blind test, no Session/C1/production admission.",
+  "decision": "Keep DeepSeek and all current defaults. Qwen is not eligible for the next Session candidate: three false-accepted negative candidates, exact acceptance sets 10/12 versus 12/12. This one-run budget is closed.",
+  "rows": [
+    {
+      "id": "model-001",
+      "group": "channel",
+      "arm": "A",
+      "selection": "deepseek-v4-pro",
+      "sequence": 1,
+      "execution": "completed",
+      "inputHash": "0825458afa3c94f055bcd0f5b311691018fb1e1075dcd01c662912bc463808bb",
+      "score": {
+        "candidates": [
+          {
+            "id": "MODEL-D001",
+            "expectedPositive": false,
+            "state": "valid",
+            "category": "limitation_only",
+            "supported": false,
+            "passed": true,
+            "falseAccepted": false,
+            "falseRejected": false
+          },
+          {
+            "id": "MODEL-D002",
+            "expectedPositive": false,
+            "state": "valid",
+            "category": "unrelated",
+            "supported": false,
+            "passed": false,
+            "falseAccepted": false,
+            "falseRejected": false
+          }
+        ],
+        "passed": false,
+        "exactAcceptanceSet": true
+      },
+      "output": {
+        "text": "{\n  \"decisions\": [\n    {\n      \"id\": \"MODEL-D001\",\n      \"category\": \"limitation_only\",\n      \"quote\": \"多数普通支付渠道在退款单提交后预计2至4个银行工作日入账。这份通则明确不涵盖青砾钱包和月签卡；这两种渠道须分别查阅其清算手册，本页未载青砾钱包时限。\",\n      \"reason\": \"原文明确不涵盖青砾钱包，且未载其时限，无法回答所问渠道的到账时间。\"\n    },\n    {\n      \"id\": \"MODEL-D002\",\n      \"category\": \"unrelated\",\n      \"quote\": null,\n      \"reason\": \"原文仅说明月签卡，与青砾钱包无关，也未提供青砾钱包到账信息。\"\n    }\n  ]\n}",
+        "stopReason": "stop",
+        "outputHash": "9187d9d33261a5f04fc343f776400bf2b0c35f2c69c6d056f5a3354d39e523d4",
+        "truncated": false
+      },
+      "verificationHash": "81902f39319a67b532dd331c963c642d4ad19c234792f2f9492c17eaaf9c5142",
+      "verificationInputHash": "68707aaa684c8524bedf17aef42cfc6fc793ef0aef813dc14ff14e5c31f639aa",
+      "requestHash": "617bbe7ed1a9e7222d9e0f1de24f84494855a2e4d4b7e9ad36c4bbb18741b04b",
+      "decisions": [
+        {
+          "id": "MODEL-D001",
+          "category": "limitation_only",
+          "quote": "多数普通支付渠道在退款单提交后预计2至4个银行工作日入账。这份通则明确不涵盖青砾钱包和月签卡；这两种渠道须分别查阅其清算手册，本页未载青砾钱包时限。",
+          "reason": "原文明确不涵盖青砾钱包，且未载其时限，无法回答所问渠道的到账时间。",
+          "supported": false
+        },
+        {
+          "id": "MODEL-D002",
+          "category": "unrelated",
+          "quote": null,
+          "reason": "原文仅说明月签卡，与青砾钱包无关，也未提供青砾钱包到账信息。",
+          "supported": false
+        }
+      ],
+      "validation": {
+        "status": "complete",
+        "outputHash": "9187d9d33261a5f04fc343f776400bf2b0c35f2c69c6d056f5a3354d39e523d4",
+        "invalidDecisions": []
+      },
+      "attempts": [
+        {
+          "operation": "support",
+          "provider": "deepseek",
+          "model": "deepseek-v4-pro",
+          "attempt": 1,
+          "durationMs": 2174.544458,
+          "outcome": "ok",
+          "totalTokens": 2220,
+          "inputTokens": 253,
+          "outputTokens": 175,
+          "cacheReadTokens": 1792,
+          "cacheWriteTokens": 0,
+          "costUsd": 0.001105808
+        }
+      ]
+    },
+    {
+      "id": "model-001",
+      "group": "channel",
+      "arm": "B",
+      "selection": "qwen3.7-plus-2026-05-26",
+      "sequence": 2,
+      "execution": "completed",
+      "inputHash": "0825458afa3c94f055bcd0f5b311691018fb1e1075dcd01c662912bc463808bb",
+      "score": {
+        "candidates": [
+          {
+            "id": "MODEL-D001",
+            "expectedPositive": false,
+            "state": "valid",
+            "category": "limitation_only",
+            "supported": false,
+            "passed": true,
+            "falseAccepted": false,
+            "falseRejected": false
+          },
+          {
+            "id": "MODEL-D002",
+            "expectedPositive": false,
+            "state": "valid",
+            "category": "limitation_only",
+            "supported": false,
+            "passed": true,
+            "falseAccepted": false,
+            "falseRejected": false
+          }
+        ],
+        "passed": true,
+        "exactAcceptanceSet": true
+      },
+      "output": {
+        "text": "{\n\"decisions\": [\n{\n\"id\": \"MODEL-D001\",\n\"category\": \"limitation_only\",\n\"quote\": \"这份通则明确不涵盖青砾钱包和月签卡；这两种渠道须分别查阅其清算手册，本页未载青砾钱包时限。\",\n\"reason\": \"原文明确排除青砾钱包适用，并声明本页未记载该渠道时限，无法回答具体到账天数，仅能说明资料缺失。\"\n},\n{\n\"id\": \"MODEL-D002\",\n\"category\": \"limitation_only\",\n\"quote\": \"月签卡与青砾钱包是两个独立结算渠道，本条不包含青砾钱包到账安排。\",\n\"reason\": \"原文仅规定月签卡规则，明确声明不包含青砾钱包到账安排，与所问对象不符，无法提供依据。\"\n}\n]\n}",
+        "stopReason": "stop",
+        "outputHash": "e62045efb7c408102e44b48cca775f51ce13f4d43a62222ee1944110f1f601c3",
+        "truncated": false
+      },
+      "verificationHash": "354c60a6948cf240773f1171f0f08b6a818341a1acd258968e6e8d150564ec11",
+      "verificationInputHash": "a065f7b8a486c677a0a36541a1dd99dc9695b55982b9c51f72f2da3afe0756d5",
+      "requestHash": "aa070498bf5fd18658fa8e257e314368ec88a780d50cfcc8eb1b196684f4672d",
+      "decisions": [
+        {
+          "id": "MODEL-D001",
+          "category": "limitation_only",
+          "quote": "这份通则明确不涵盖青砾钱包和月签卡；这两种渠道须分别查阅其清算手册，本页未载青砾钱包时限。",
+          "reason": "原文明确排除青砾钱包适用，并声明本页未记载该渠道时限，无法回答具体到账天数，仅能说明资料缺失。",
+          "supported": false
+        },
+        {
+          "id": "MODEL-D002",
+          "category": "limitation_only",
+          "quote": "月签卡与青砾钱包是两个独立结算渠道，本条不包含青砾钱包到账安排。",
+          "reason": "原文仅规定月签卡规则，明确声明不包含青砾钱包到账安排，与所问对象不符，无法提供依据。",
+          "supported": false
+        }
+      ],
+      "validation": {
+        "status": "complete",
+        "outputHash": "e62045efb7c408102e44b48cca775f51ce13f4d43a62222ee1944110f1f601c3",
+        "invalidDecisions": []
+      },
+      "attempts": [
+        {
+          "operation": "support",
+          "provider": "bailian",
+          "model": "qwen3.7-plus-2026-05-26",
+          "attempt": 1,
+          "durationMs": 4513.0634580000005,
+          "outcome": "ok",
+          "totalTokens": 2220,
+          "inputTokens": 2031,
+          "outputTokens": 189,
+          "cacheReadTokens": 0,
+          "cacheWriteTokens": 0,
+          "costUsd": null,
+          "costCny": 0.005574
+        }
+      ]
+    },
+    {
+      "id": "model-002",
+      "group": "channel",
+      "arm": "B",
+      "selection": "qwen3.7-plus-2026-05-26",
+      "sequence": 3,
+      "execution": "completed",
+      "inputHash": "5529e9501cf12bd2ebd46e4d34e8a40a5497f93ad95f2d7a5603fe470d7ac4d7",
+      "score": {
+        "candidates": [
+          {
+            "id": "MODEL-D003",
+            "expectedPositive": false,
+            "state": "valid",
+            "category": "limitation_only",
+            "supported": false,
+            "passed": true,
+            "falseAccepted": false,
+            "falseRejected": false
+          },
+          {
+            "id": "MODEL-D004",
+            "expectedPositive": true,
+            "state": "valid",
+            "category": "direct_fact",
+            "supported": true,
+            "passed": true,
+            "falseAccepted": false,
+            "falseRejected": false
+          }
+        ],
+        "passed": true,
+        "exactAcceptanceSet": true
+      },
+      "output": {
+        "text": "{\n\"decisions\": [\n{\n\"id\": \"MODEL-D003\",\n\"category\": \"limitation_only\",\n\"quote\": \"本条没有组合支付拆分规则，不能据此确定余额与银行卡混用订单的退回路径。\",\n\"reason\": \"原文明确指出该规则仅适用于单银行卡支付，且声明无法确定组合支付（余额+银行卡）的退款路径，故无法回答用户关于混合支付退款去向的问题。\"\n},\n{\n\"id\": \"MODEL-D004\",\n\"category\": \"direct_fact\",\n\"quote\": \"桅木联付由钱包余额与绑定银行卡共同支付时，获准退款的券款按两路实际扣款金额分别原路退回，不合并转入银行卡。例如余额扣40元、银行卡扣20元，全额退款时分别退40元至余额和20元至原银行卡。\",\n\"reason\": \"原文直接规定了桅木联付（余额+银行卡）的退款规则为分别原路退回，并明确说明不合并转入银行卡，直接回答了用户假设场景下的退款去向问题。\"\n}\n]\n}",
+        "stopReason": "stop",
+        "outputHash": "b5726c0aa75ef2bdbd5a274e1d74d96ef2f45ae138eb1ed915cf9f550a8588a6",
+        "truncated": false
+      },
+      "verificationHash": "52ad19d625581e86c5e8dc26941f2d8b72139aa22b9ac25240679a4cda89c63c",
+      "verificationInputHash": "fe6578529bc5d85a90509ca7aee0983b9540563d5689c87be7083f796863a2f8",
+      "requestHash": "374940444db6d4300e9bb793c7664c0a5b1ccd063d29b7609ae494b26181ecad",
+      "decisions": [
+        {
+          "id": "MODEL-D003",
+          "category": "limitation_only",
+          "quote": "本条没有组合支付拆分规则，不能据此确定余额与银行卡混用订单的退回路径。",
+          "reason": "原文明确指出该规则仅适用于单银行卡支付，且声明无法确定组合支付（余额+银行卡）的退款路径，故无法回答用户关于混合支付退款去向的问题。",
+          "supported": false
+        },
+        {
+          "id": "MODEL-D004",
+          "category": "direct_fact",
+          "quote": "桅木联付由钱包余额与绑定银行卡共同支付时，获准退款的券款按两路实际扣款金额分别原路退回，不合并转入银行卡。例如余额扣40元、银行卡扣20元，全额退款时分别退40元至余额和20元至原银行卡。",
+          "reason": "原文直接规定了桅木联付（余额+银行卡）的退款规则为分别原路退回，并明确说明不合并转入银行卡，直接回答了用户假设场景下的退款去向问题。",
+          "supported": true
+        }
+      ],
+      "validation": {
+        "status": "complete",
+        "outputHash": "b5726c0aa75ef2bdbd5a274e1d74d96ef2f45ae138eb1ed915cf9f550a8588a6",
+        "invalidDecisions": []
+      },
+      "attempts": [
+        {
+          "operation": "support",
+          "provider": "bailian",
+          "model": "qwen3.7-plus-2026-05-26",
+          "attempt": 1,
+          "durationMs": 4957.838292,
+          "outcome": "ok",
+          "totalTokens": 2303,
+          "inputTokens": 395,
+          "outputTokens": 244,
+          "cacheReadTokens": 1664,
+          "cacheWriteTokens": 0,
+          "costUsd": null,
+          "costCny": 0.00607
+        }
+      ]
+    },
+    {
+      "id": "model-002",
+      "group": "channel",
+      "arm": "A",
+      "selection": "deepseek-v4-pro",
+      "sequence": 4,
+      "execution": "completed",
+      "inputHash": "5529e9501cf12bd2ebd46e4d34e8a40a5497f93ad95f2d7a5603fe470d7ac4d7",
+      "score": {
+        "candidates": [
+          {
+            "id": "MODEL-D003",
+            "expectedPositive": false,
+            "state": "valid",
+            "category": "limitation_only",
+            "supported": false,
+            "passed": true,
+            "falseAccepted": false,
+            "falseRejected": false
+          },
+          {
+            "id": "MODEL-D004",
+            "expectedPositive": true,
+            "state": "valid",
+            "category": "direct_fact",
+            "supported": true,
+            "passed": true,
+            "falseAccepted": false,
+            "falseRejected": false
+          }
+        ],
+        "passed": true,
+        "exactAcceptanceSet": true
+      },
+      "output": {
+        "text": "{\n  \"decisions\": [\n    {\n      \"id\": \"MODEL-D003\",\n      \"category\": \"limitation_only\",\n      \"quote\": \"仅以一张银行卡完成整笔支付的券单，获准退款的券款退回该银行卡。本条没有组合支付拆分规则，不能据此确定余额与银行卡混用订单的退回路径。\",\n      \"reason\": \"原文仅适用于单银行卡支付，明确不适用于余额与银行卡混用订单，无法回答所问组合支付退款路径。\"\n    },\n    {\n      \"id\": \"MODEL-D004\",\n      \"category\": \"direct_fact\",\n      \"quote\": \"桅木联付由钱包余额与绑定银行卡共同支付时，获准退款的券款按两路实际扣款金额分别原路退回，不合并转入银行卡。例如余额扣40元、银行卡扣20元，全额退款时分别退40元至余额和20元至原银行卡。\",\n      \"reason\": \"原文直接规定组合支付退款按原路分别退回，不合并转入银行卡，并给出与所问金额一致的示例，直接回答所问。\"\n    }\n  ]\n}",
+        "stopReason": "stop",
+        "outputHash": "3667073f584a5b60447402add4fed47e9c08b0d95a1d551662631491df0a5f0c",
+        "truncated": false
+      },
+      "verificationHash": "9902b8e46d24bdcdad9fd490587ebae2c7d2c8f70e96401da2f5cff2a65ea337",
+      "verificationInputHash": "a585addff7958a25348f90395962a1fdf563cca6fde76eb5a479c7cb96d42c54",
+      "requestHash": "0bc1ddb16fde405488f2fe6e203c1e62c555399e53d89c9d925655b708f69fac",
+      "decisions": [
+        {
+          "id": "MODEL-D003",
+          "category": "limitation_only",
+          "quote": "仅以一张银行卡完成整笔支付的券单，获准退款的券款退回该银行卡。本条没有组合支付拆分规则，不能据此确定余额与银行卡混用订单的退回路径。",
+          "reason": "原文仅适用于单银行卡支付，明确不适用于余额与银行卡混用订单，无法回答所问组合支付退款路径。",
+          "supported": false
+        },
+        {
+          "id": "MODEL-D004",
+          "category": "direct_fact",
+          "quote": "桅木联付由钱包余额与绑定银行卡共同支付时，获准退款的券款按两路实际扣款金额分别原路退回，不合并转入银行卡。例如余额扣40元、银行卡扣20元，全额退款时分别退40元至余额和20元至原银行卡。",
+          "reason": "原文直接规定组合支付退款按原路分别退回，不合并转入银行卡，并给出与所问金额一致的示例，直接回答所问。",
+          "supported": true
+        }
+      ],
+      "validation": {
+        "status": "complete",
+        "outputHash": "3667073f584a5b60447402add4fed47e9c08b0d95a1d551662631491df0a5f0c",
+        "invalidDecisions": []
+      },
+      "attempts": [
+        {
+          "operation": "support",
+          "provider": "deepseek",
+          "model": "deepseek-v4-pro",
+          "attempt": 1,
+          "durationMs": 2829.376375,
+          "outcome": "ok",
+          "totalTokens": 2308,
+          "inputTokens": 273,
+          "outputTokens": 243,
+          "cacheReadTokens": 1792,
+          "cacheWriteTokens": 0,
+          "costUsd": 0.001401488
+        }
+      ]
+    },
+    {
+      "id": "model-003",
+      "group": "channel",
+      "arm": "A",
+      "selection": "deepseek-v4-pro",
+      "sequence": 5,
+      "execution": "completed",
+      "inputHash": "313fc8965ba4181e3fbebbceb685425f3854bde891b5657e0627607c7858de3e",
+      "score": {
+        "candidates": [
+          {
+            "id": "MODEL-D005",
+            "expectedPositive": true,
+            "state": "valid",
+            "category": "direct_fact",
+            "supported": true,
+            "passed": true,
+            "falseAccepted": false,
+            "falseRejected": false
+          },
+          {
+            "id": "MODEL-D006",
+            "expectedPositive": true,
+            "state": "valid",
+            "category": "direct_fact",
+            "supported": true,
+            "passed": true,
+            "falseAccepted": false,
+            "falseRejected": false
+          }
+        ],
+        "passed": true,
+        "exactAcceptanceSet": true
+      },
+      "output": {
+        "text": "{\n  \"decisions\": [\n    {\n      \"id\": \"MODEL-D005\",\n      \"category\": \"direct_fact\",\n      \"quote\": \"星汀预付账户支付的体验券获准退款时，按该券结算实付额原路回到预付账户，不收取支付通道手续费。\",\n      \"reason\": \"原文明确星汀预付账户退券获准退款时不收取支付通道手续费，直接回答所问规则。\"\n    },\n    {\n      \"id\": \"MODEL-D006\",\n      \"category\": \"direct_fact\",\n      \"quote\": \"本平台所有储值支付渠道的体验券退款均不加收支付通道费，星汀预付账户属于本条覆盖的储值渠道。\",\n      \"reason\": \"原文明确星汀预付账户属于储值渠道，退款不加收支付通道费，直接回答所问规则。\"\n    }\n  ]\n}",
+        "stopReason": "stop",
+        "outputHash": "3d86bd46315ef87735af50b2d8981c601daa7ae000302b3399d25938ebb91221",
+        "truncated": false
+      },
+      "verificationHash": "c7744b272792525e1fd570b6819e92899200753fceeadad1283e2067cbb0a10e",
+      "verificationInputHash": "2c1f1c9f97e11f854c68b3021dd75f2df610873c413410656f8890c2a22c8e17",
+      "requestHash": "994f9bd2fbfe3cf4724fd30f7c953d726e1ef60cdc353eee7cb73f4ecedd48dd",
+      "decisions": [
+        {
+          "id": "MODEL-D005",
+          "category": "direct_fact",
+          "quote": "星汀预付账户支付的体验券获准退款时，按该券结算实付额原路回到预付账户，不收取支付通道手续费。",
+          "reason": "原文明确星汀预付账户退券获准退款时不收取支付通道手续费，直接回答所问规则。",
+          "supported": true
+        },
+        {
+          "id": "MODEL-D006",
+          "category": "direct_fact",
+          "quote": "本平台所有储值支付渠道的体验券退款均不加收支付通道费，星汀预付账户属于本条覆盖的储值渠道。",
+          "reason": "原文明确星汀预付账户属于储值渠道，退款不加收支付通道费，直接回答所问规则。",
+          "supported": true
+        }
+      ],
+      "validation": {
+        "status": "complete",
+        "outputHash": "3d86bd46315ef87735af50b2d8981c601daa7ae000302b3399d25938ebb91221",
+        "invalidDecisions": []
+      },
+      "attempts": [
+        {
+          "operation": "support",
+          "provider": "deepseek",
+          "model": "deepseek-v4-pro",
+          "attempt": 1,
+          "durationMs": 1796.189624999999,
+          "outcome": "ok",
+          "totalTokens": 2248,
+          "inputTokens": 268,
+          "outputTokens": 188,
+          "cacheReadTokens": 1792,
+          "cacheWriteTokens": 0,
+          "costUsd": 0.0011770880000000002
+        }
+      ]
+    },
+    {
+      "id": "model-003",
+      "group": "channel",
+      "arm": "B",
+      "selection": "qwen3.7-plus-2026-05-26",
+      "sequence": 6,
+      "execution": "completed",
+      "inputHash": "313fc8965ba4181e3fbebbceb685425f3854bde891b5657e0627607c7858de3e",
+      "score": {
+        "candidates": [
+          {
+            "id": "MODEL-D005",
+            "expectedPositive": true,
+            "state": "valid",
+            "category": "direct_fact",
+            "supported": true,
+            "passed": true,
+            "falseAccepted": false,
+            "falseRejected": false
+          },
+          {
+            "id": "MODEL-D006",
+            "expectedPositive": true,
+            "state": "valid",
+            "category": "direct_fact",
+            "supported": true,
+            "passed": true,
+            "falseAccepted": false,
+            "falseRejected": false
+          }
+        ],
+        "passed": true,
+        "exactAcceptanceSet": true
+      },
+      "output": {
+        "text": "{\n\"decisions\": [\n{\n\"id\": \"MODEL-D005\",\n\"category\": \"direct_fact\",\n\"quote\": \"星汀预付账户支付的体验券获准退款时，按该券结算实付额原路回到预付账户，不收取支付通道手续费。\",\n\"reason\": \"原文明确规定星汀预付账户购券获准退款时不收取支付通道手续费，直接回答了用户关于是否另扣手续费的规则咨询。\"\n},\n{\n\"id\": \"MODEL-D006\",\n\"category\": \"direct_fact\",\n\"quote\": \"本平台所有储值支付渠道的体验券退款均不加收支付通道费，星汀预付账户属于本条覆盖的储值渠道。\",\n\"reason\": \"原文确认星汀预付账户属于不加收支付通道费的储值渠道，直接支持了退券时不另扣手续费的规则结论。\"\n}\n]\n}",
+        "stopReason": "stop",
+        "outputHash": "edf1fab252b5fbfe0946cda0af1f91335c3acd13f1fd55f29500bcc563c91dbf",
+        "truncated": false
+      },
+      "verificationHash": "b9c7be338afc395aa5139db7b4c20a3af8c7ae17edc30df2bff107bbf61cd789",
+      "verificationInputHash": "f241a57c3bff00b45fcbecbd418942e922c30604dcdb0d8dedfa7532fe77adfa",
+      "requestHash": "2e34af4f586dd15e3b44f3d4a6ef41f471c64a1db11fa3510b59f5149a6c88fc",
+      "decisions": [
+        {
+          "id": "MODEL-D005",
+          "category": "direct_fact",
+          "quote": "星汀预付账户支付的体验券获准退款时，按该券结算实付额原路回到预付账户，不收取支付通道手续费。",
+          "reason": "原文明确规定星汀预付账户购券获准退款时不收取支付通道手续费，直接回答了用户关于是否另扣手续费的规则咨询。",
+          "supported": true
+        },
+        {
+          "id": "MODEL-D006",
+          "category": "direct_fact",
+          "quote": "本平台所有储值支付渠道的体验券退款均不加收支付通道费，星汀预付账户属于本条覆盖的储值渠道。",
+          "reason": "原文确认星汀预付账户属于不加收支付通道费的储值渠道，直接支持了退券时不另扣手续费的规则结论。",
+          "supported": true
+        }
+      ],
+      "validation": {
+        "status": "complete",
+        "outputHash": "edf1fab252b5fbfe0946cda0af1f91335c3acd13f1fd55f29500bcc563c91dbf",
+        "invalidDecisions": []
+      },
+      "attempts": [
+        {
+          "operation": "support",
+          "provider": "bailian",
+          "model": "qwen3.7-plus-2026-05-26",
+          "attempt": 1,
+          "durationMs": 4294.867209,
+          "outcome": "ok",
+          "totalTokens": 2238,
+          "inputTokens": 378,
+          "outputTokens": 196,
+          "cacheReadTokens": 1664,
+          "cacheWriteTokens": 0,
+          "costUsd": null,
+          "costCny": 0.005652
+        }
+      ]
+    },
+    {
+      "id": "model-004",
+      "group": "actor",
+      "arm": "B",
+      "selection": "qwen3.7-plus-2026-05-26",
+      "sequence": 7,
+      "execution": "completed",
+      "inputHash": "32a61a05f47a88043c9466c9e7bf616f4804b5ffb2f7b6a9e488200f0fbbdea2",
+      "score": {
+        "candidates": [
+          {
+            "id": "MODEL-D007",
+            "expectedPositive": false,
+            "state": "valid",
+            "category": "boundary_answer",
+            "supported": true,
+            "passed": false,
+            "falseAccepted": true,
+            "falseRejected": false
+          },
+          {
+            "id": "MODEL-D008",
+            "expectedPositive": false,
+            "state": "valid",
+            "category": "boundary_answer",
+            "supported": true,
+            "passed": false,
+            "falseAccepted": true,
+            "falseRejected": false
+          }
+        ],
+        "passed": false,
+        "exactAcceptanceSet": false
+      },
+      "output": {
+        "text": "{\n\"decisions\": [\n{\n\"id\": \"MODEL-D007\",\n\"category\": \"boundary_answer\",\n\"quote\": \"本表仅记录商家预约权限，没有平台券款退款批准角色或签发流程。\",\n\"reason\": \"用户询问平台券款退款的批准主体（元边界/文档覆盖问题）。原文明确声明该文档未记载平台券款退款批准角色或签发流程，直接回答了“资料是否记载”这一元问题，属于boundary_answer。\"\n},\n{\n\"id\": \"MODEL-D008\",\n\"category\": \"boundary_answer\",\n\"quote\": \"本页未列审核队列中正式批准的签发角色。\",\n\"reason\": \"用户询问批准主体。原文明确指出该页面未列出正式批准的签发角色，直接回答了文档覆盖范围的元问题，说明资料中无此信息，属于boundary_answer。\"\n}\n]\n}",
+        "stopReason": "stop",
+        "outputHash": "2f7ff36ee2c4b40f95b6b7095e9608587117889760075f5043aa6481ce045612",
+        "truncated": false
+      },
+      "verificationHash": "4612465f52e1068af1955c00a24db35c010dd7fc40e141d338bbe017d219f114",
+      "verificationInputHash": "c71410e9ead7fc9fcf74e52257bc8c19263abb923446b5649030bbecece14cb9",
+      "requestHash": "882e904bd6c3a3744688c97f61564563b893ec89f2a90f52a4b2df5a458cb4cc",
+      "decisions": [
+        {
+          "id": "MODEL-D007",
+          "category": "boundary_answer",
+          "quote": "本表仅记录商家预约权限，没有平台券款退款批准角色或签发流程。",
+          "reason": "用户询问平台券款退款的批准主体（元边界/文档覆盖问题）。原文明确声明该文档未记载平台券款退款批准角色或签发流程，直接回答了“资料是否记载”这一元问题，属于boundary_answer。",
+          "supported": true
+        },
+        {
+          "id": "MODEL-D008",
+          "category": "boundary_answer",
+          "quote": "本页未列审核队列中正式批准的签发角色。",
+          "reason": "用户询问批准主体。原文明确指出该页面未列出正式批准的签发角色，直接回答了文档覆盖范围的元问题，说明资料中无此信息，属于boundary_answer。",
+          "supported": true
+        }
+      ],
+      "validation": {
+        "status": "complete",
+        "outputHash": "2f7ff36ee2c4b40f95b6b7095e9608587117889760075f5043aa6481ce045612",
+        "invalidDecisions": []
+      },
+      "attempts": [
+        {
+          "operation": "support",
+          "provider": "bailian",
+          "model": "qwen3.7-plus-2026-05-26",
+          "attempt": 1,
+          "durationMs": 4157.474290999999,
+          "outcome": "ok",
+          "totalTokens": 2215,
+          "inputTokens": 355,
+          "outputTokens": 196,
+          "cacheReadTokens": 1664,
+          "cacheWriteTokens": 0,
+          "costUsd": null,
+          "costCny": 0.005606
+        }
+      ]
+    },
+    {
+      "id": "model-004",
+      "group": "actor",
+      "arm": "A",
+      "selection": "deepseek-v4-pro",
+      "sequence": 8,
+      "execution": "completed",
+      "inputHash": "32a61a05f47a88043c9466c9e7bf616f4804b5ffb2f7b6a9e488200f0fbbdea2",
+      "score": {
+        "candidates": [
+          {
+            "id": "MODEL-D007",
+            "expectedPositive": false,
+            "state": "valid",
+            "category": "limitation_only",
+            "supported": false,
+            "passed": true,
+            "falseAccepted": false,
+            "falseRejected": false
+          },
+          {
+            "id": "MODEL-D008",
+            "expectedPositive": false,
+            "state": "valid",
+            "category": "limitation_only",
+            "supported": false,
+            "passed": true,
+            "falseAccepted": false,
+            "falseRejected": false
+          }
+        ],
+        "passed": true,
+        "exactAcceptanceSet": true
+      },
+      "output": {
+        "text": "{\n  \"decisions\": [\n    {\n      \"id\": \"MODEL-D007\",\n      \"category\": \"limitation_only\",\n      \"quote\": \"本表仅记录商家预约权限，没有平台券款退款批准角色或签发流程。\",\n      \"reason\": \"原文明确未记录平台券款退款批准角色，无法回答所问的正式批准由哪个角色签发。\"\n    },\n    {\n      \"id\": \"MODEL-D008\",\n      \"category\": \"limitation_only\",\n      \"quote\": \"本页未列审核队列中正式批准的签发角色。\",\n      \"reason\": \"原文仅说明坐席无批准权限，且未列正式批准签发角色，不能回答所问的批准主体。\"\n    }\n  ]\n}",
+        "stopReason": "stop",
+        "outputHash": "f0c0707274284c1413741a049e4dd5b9dc32c668787b33a65120c97cccc2b37f",
+        "truncated": false
+      },
+      "verificationHash": "20d5e12086b3b5c645c50f611fb5a41d85de28591189a493b8e5dbfcfa3fb2ce",
+      "verificationInputHash": "681c547987d68a8ac02874b2408fc61aa051451d7b449ac5735ba2f22a8e0d6c",
+      "requestHash": "611afd73bf013d06e90995ab93aaf5a79211b791145b3a8a80082762709e493a",
+      "decisions": [
+        {
+          "id": "MODEL-D007",
+          "category": "limitation_only",
+          "quote": "本表仅记录商家预约权限，没有平台券款退款批准角色或签发流程。",
+          "reason": "原文明确未记录平台券款退款批准角色，无法回答所问的正式批准由哪个角色签发。",
+          "supported": false
+        },
+        {
+          "id": "MODEL-D008",
+          "category": "limitation_only",
+          "quote": "本页未列审核队列中正式批准的签发角色。",
+          "reason": "原文仅说明坐席无批准权限，且未列正式批准签发角色，不能回答所问的批准主体。",
+          "supported": false
+        }
+      ],
+      "validation": {
+        "status": "complete",
+        "outputHash": "f0c0707274284c1413741a049e4dd5b9dc32c668787b33a65120c97cccc2b37f",
+        "invalidDecisions": []
+      },
+      "attempts": [
+        {
+          "operation": "support",
+          "provider": "deepseek",
+          "model": "deepseek-v4-pro",
+          "attempt": 1,
+          "durationMs": 2297.7397920000003,
+          "outcome": "ok",
+          "totalTokens": 2187,
+          "inputTokens": 236,
+          "outputTokens": 159,
+          "cacheReadTokens": 1792,
+          "cacheWriteTokens": 0,
+          "costUsd": 0.001020008
+        }
+      ]
+    },
+    {
+      "id": "model-005",
+      "group": "actor",
+      "arm": "A",
+      "selection": "deepseek-v4-pro",
+      "sequence": 9,
+      "execution": "completed",
+      "inputHash": "18bb31137ab4f1a71f626ae3c2c57a7203a1328d0cf38ef53de357d45b86e23f",
+      "score": {
+        "candidates": [
+          {
+            "id": "MODEL-D009",
+            "expectedPositive": true,
+            "state": "valid",
+            "category": "direct_fact",
+            "supported": true,
+            "passed": true,
+            "falseAccepted": false,
+            "falseRejected": false
+          },
+          {
+            "id": "MODEL-D010",
+            "expectedPositive": false,
+            "state": "valid",
+            "category": "limitation_only",
+            "supported": false,
+            "passed": true,
+            "falseAccepted": false,
+            "falseRejected": false
+          }
+        ],
+        "passed": true,
+        "exactAcceptanceSet": true
+      },
+      "output": {
+        "text": "{\n  \"decisions\": [\n    {\n      \"id\": \"MODEL-D009\",\n      \"category\": \"direct_fact\",\n      \"quote\": \"待商家复核的退券协商任务，批准或拒绝结论由经商家身份认证、拥有售后审核权限的审核员写入。用户确认提交仅表示申请意愿；平台客服登记工单也不能代写商家结论。\",\n      \"reason\": \"原文直接规定待商家复核的退券协商任务，批准或拒绝结论由经认证且拥有售后审核权限的审核员写入，并明确用户确认提交不能当商家结论。\"\n    },\n    {\n      \"id\": \"MODEL-D010\",\n      \"category\": \"limitation_only\",\n      \"quote\": \"平台坐席可创建退券协商工单、编辑用户提供的原因并发送商家催办提醒。这些是工单操作权限，商家复核批准或拒绝的写入角色未在本页定义。\",\n      \"reason\": \"原文仅说明坐席的工单操作权限，并明确商家复核结论的写入角色未定义，不能回答所问角色。\"\n    }\n  ]\n}",
+        "stopReason": "stop",
+        "outputHash": "ae894c224569be9ab984bceab30906de915189c1903124fa7548505cb739954c",
+        "truncated": false
+      },
+      "verificationHash": "d86696fb6713d1c988c1bfb35038fc955b64dc20efe331401921d3552f736bc4",
+      "verificationInputHash": "cc62ca86098d9c83e80d1679743d005d6f7266d6648835c99861959c031ab8ca",
+      "requestHash": "3b3270855b7deca795c199cbf29cbf50f382ab0a32a684f5f404da73138c2cb9",
+      "decisions": [
+        {
+          "id": "MODEL-D009",
+          "category": "direct_fact",
+          "quote": "待商家复核的退券协商任务，批准或拒绝结论由经商家身份认证、拥有售后审核权限的审核员写入。用户确认提交仅表示申请意愿；平台客服登记工单也不能代写商家结论。",
+          "reason": "原文直接规定待商家复核的退券协商任务，批准或拒绝结论由经认证且拥有售后审核权限的审核员写入，并明确用户确认提交不能当商家结论。",
+          "supported": true
+        },
+        {
+          "id": "MODEL-D010",
+          "category": "limitation_only",
+          "quote": "平台坐席可创建退券协商工单、编辑用户提供的原因并发送商家催办提醒。这些是工单操作权限，商家复核批准或拒绝的写入角色未在本页定义。",
+          "reason": "原文仅说明坐席的工单操作权限，并明确商家复核结论的写入角色未定义，不能回答所问角色。",
+          "supported": false
+        }
+      ],
+      "validation": {
+        "status": "complete",
+        "outputHash": "ae894c224569be9ab984bceab30906de915189c1903124fa7548505cb739954c",
+        "invalidDecisions": []
+      },
+      "attempts": [
+        {
+          "operation": "support",
+          "provider": "deepseek",
+          "model": "deepseek-v4-pro",
+          "attempt": 1,
+          "durationMs": 2724.057499999999,
+          "outcome": "ok",
+          "totalTokens": 2283,
+          "inputTokens": 255,
+          "outputTokens": 236,
+          "cacheReadTokens": 1792,
+          "cacheWriteTokens": 0,
+          "costUsd": 0.0013500080000000002
+        }
+      ]
+    },
+    {
+      "id": "model-005",
+      "group": "actor",
+      "arm": "B",
+      "selection": "qwen3.7-plus-2026-05-26",
+      "sequence": 10,
+      "execution": "completed",
+      "inputHash": "18bb31137ab4f1a71f626ae3c2c57a7203a1328d0cf38ef53de357d45b86e23f",
+      "score": {
+        "candidates": [
+          {
+            "id": "MODEL-D009",
+            "expectedPositive": true,
+            "state": "valid",
+            "category": "direct_fact",
+            "supported": true,
+            "passed": true,
+            "falseAccepted": false,
+            "falseRejected": false
+          },
+          {
+            "id": "MODEL-D010",
+            "expectedPositive": false,
+            "state": "valid",
+            "category": "limitation_only",
+            "supported": false,
+            "passed": true,
+            "falseAccepted": false,
+            "falseRejected": false
+          }
+        ],
+        "passed": true,
+        "exactAcceptanceSet": true
+      },
+      "output": {
+        "text": "{\n\"decisions\": [\n{\n\"id\": \"MODEL-D009\",\n\"category\": \"direct_fact\",\n\"quote\": \"待商家复核的退券协商任务，批准或拒绝结论由经商家身份认证、拥有售后审核权限的审核员写入。用户确认提交仅表示申请意愿；平台客服登记工单也不能代写商家结论。\",\n\"reason\": \"原文明确规定待商家复核任务的批准或拒绝结论由经认证且拥有权限的审核员写入，并排除用户提交和客服代写，直接回答了应由哪个角色写入的问题。\"\n},\n{\n\"id\": \"MODEL-D010\",\n\"category\": \"limitation_only\",\n\"quote\": \"这些是工单操作权限，商家复核批准或拒绝的写入角色未在本页定义。\",\n\"reason\": \"原文仅说明坐席的工单操作权限，并明确声明未定义商家复核结论的写入角色，无法回答用户关于具体写入角色的诉求。\"\n}\n]\n}",
+        "stopReason": "stop",
+        "outputHash": "9fab12ef4066c1421a3fd2411ac0f17c13e8a82a98066a4e19bab5497657a5b6",
+        "truncated": false
+      },
+      "verificationHash": "0d4616bc6745490df5219edc730fbef575a31d3cda531ad574e7c6d72aa4b584",
+      "verificationInputHash": "37d2c4c3d0cc42f7e262d3aaa495eaa505e495c1c911db0a95b792bb5974789f",
+      "requestHash": "d7317a7d2855a1f3480a0d289568977ba90eef9fb046dc62384791a0947d01dd",
+      "decisions": [
+        {
+          "id": "MODEL-D009",
+          "category": "direct_fact",
+          "quote": "待商家复核的退券协商任务，批准或拒绝结论由经商家身份认证、拥有售后审核权限的审核员写入。用户确认提交仅表示申请意愿；平台客服登记工单也不能代写商家结论。",
+          "reason": "原文明确规定待商家复核任务的批准或拒绝结论由经认证且拥有权限的审核员写入，并排除用户提交和客服代写，直接回答了应由哪个角色写入的问题。",
+          "supported": true
+        },
+        {
+          "id": "MODEL-D010",
+          "category": "limitation_only",
+          "quote": "这些是工单操作权限，商家复核批准或拒绝的写入角色未在本页定义。",
+          "reason": "原文仅说明坐席的工单操作权限，并明确声明未定义商家复核结论的写入角色，无法回答用户关于具体写入角色的诉求。",
+          "supported": false
+        }
+      ],
+      "validation": {
+        "status": "complete",
+        "outputHash": "9fab12ef4066c1421a3fd2411ac0f17c13e8a82a98066a4e19bab5497657a5b6",
+        "invalidDecisions": []
+      },
+      "attempts": [
+        {
+          "operation": "support",
+          "provider": "bailian",
+          "model": "qwen3.7-plus-2026-05-26",
+          "attempt": 1,
+          "durationMs": 4541.829958999999,
+          "outcome": "ok",
+          "totalTokens": 2258,
+          "inputTokens": 375,
+          "outputTokens": 219,
+          "cacheReadTokens": 1664,
+          "cacheWriteTokens": 0,
+          "costUsd": null,
+          "costCny": 0.00583
+        }
+      ]
+    },
+    {
+      "id": "model-006",
+      "group": "actor",
+      "arm": "B",
+      "selection": "qwen3.7-plus-2026-05-26",
+      "sequence": 11,
+      "execution": "completed",
+      "inputHash": "fe55bb6302cb9e0f026fe2dbfa63c8b1cf133c4fc1f46d34f18f26485d44221a",
+      "score": {
+        "candidates": [
+          {
+            "id": "MODEL-D011",
+            "expectedPositive": true,
+            "state": "valid",
+            "category": "direct_fact",
+            "supported": true,
+            "passed": true,
+            "falseAccepted": false,
+            "falseRejected": false
+          },
+          {
+            "id": "MODEL-D012",
+            "expectedPositive": true,
+            "state": "valid",
+            "category": "direct_fact",
+            "supported": true,
+            "passed": true,
+            "falseAccepted": false,
+            "falseRejected": false
+          }
+        ],
+        "passed": true,
+        "exactAcceptanceSet": true
+      },
+      "output": {
+        "text": "{\n\"decisions\": [\n{\n\"id\": \"MODEL-D011\",\n\"category\": \"direct_fact\",\n\"quote\": \"平台资金流程因风控暂停后，解除暂停由平台风控审核员批准；商家售后审核员和用户确认均不能解除该暂停。\",\n\"reason\": \"原文明确规定在平台风控导致资金流程暂停的情况下，解除暂停的批准权限属于平台风控审核员，直接回答了用户关于批准主体归属的假设性规则问题。\"\n},\n{\n\"id\": \"MODEL-D012\",\n\"category\": \"direct_fact\",\n\"quote\": \"所有平台退券资金的风控暂停状态都归平台风控审核岗位负责。该岗位完成复核并批准解除后，资金流程才可继续\",\n\"reason\": \"原文指出所有平台退券资金的风控暂停状态由平台风控审核岗位负责，且需该岗位批准解除，直接明确了该类情形下的批准权限归属，符合用户对一般规则或假设条件的询问。\"\n}\n]\n}",
+        "stopReason": "stop",
+        "outputHash": "2629db1d8856cb91a40f9cd6ba30156f13eae0de52f7dc718d404e15dc8dd93c",
+        "truncated": false
+      },
+      "verificationHash": "3d5189af678cd61dcd159db6e74b77ae98e8450ebdadbf9f052b084f5b16d537",
+      "verificationInputHash": "dd374b69c0d7e0d49a3459f9b135d2ae5a9df0b2599a7e86dd4547d1a9ce518c",
+      "requestHash": "2e9d84e4bacb5ba93831a076658352c73aafa9ed09cc3b509b6ef13992e243eb",
+      "decisions": [
+        {
+          "id": "MODEL-D011",
+          "category": "direct_fact",
+          "quote": "平台资金流程因风控暂停后，解除暂停由平台风控审核员批准；商家售后审核员和用户确认均不能解除该暂停。",
+          "reason": "原文明确规定在平台风控导致资金流程暂停的情况下，解除暂停的批准权限属于平台风控审核员，直接回答了用户关于批准主体归属的假设性规则问题。",
+          "supported": true
+        },
+        {
+          "id": "MODEL-D012",
+          "category": "direct_fact",
+          "quote": "所有平台退券资金的风控暂停状态都归平台风控审核岗位负责。该岗位完成复核并批准解除后，资金流程才可继续",
+          "reason": "原文指出所有平台退券资金的风控暂停状态由平台风控审核岗位负责，且需该岗位批准解除，直接明确了该类情形下的批准权限归属，符合用户对一般规则或假设条件的询问。",
+          "supported": true
+        }
+      ],
+      "validation": {
+        "status": "complete",
+        "outputHash": "2629db1d8856cb91a40f9cd6ba30156f13eae0de52f7dc718d404e15dc8dd93c",
+        "invalidDecisions": []
+      },
+      "attempts": [
+        {
+          "operation": "support",
+          "provider": "bailian",
+          "model": "qwen3.7-plus-2026-05-26",
+          "attempt": 1,
+          "durationMs": 4427.2302500000005,
+          "outcome": "ok",
+          "totalTokens": 2246,
+          "inputTokens": 364,
+          "outputTokens": 218,
+          "cacheReadTokens": 1664,
+          "cacheWriteTokens": 0,
+          "costUsd": null,
+          "costCny": 0.0058
+        }
+      ]
+    },
+    {
+      "id": "model-006",
+      "group": "actor",
+      "arm": "A",
+      "selection": "deepseek-v4-pro",
+      "sequence": 12,
+      "execution": "completed",
+      "inputHash": "fe55bb6302cb9e0f026fe2dbfa63c8b1cf133c4fc1f46d34f18f26485d44221a",
+      "score": {
+        "candidates": [
+          {
+            "id": "MODEL-D011",
+            "expectedPositive": true,
+            "state": "valid",
+            "category": "direct_fact",
+            "supported": true,
+            "passed": true,
+            "falseAccepted": false,
+            "falseRejected": false
+          },
+          {
+            "id": "MODEL-D012",
+            "expectedPositive": true,
+            "state": "valid",
+            "category": "direct_fact",
+            "supported": true,
+            "passed": true,
+            "falseAccepted": false,
+            "falseRejected": false
+          }
+        ],
+        "passed": true,
+        "exactAcceptanceSet": true
+      },
+      "output": {
+        "text": "{\"decisions\":[{\"id\":\"MODEL-D011\",\"category\":\"direct_fact\",\"quote\":\"解除暂停由平台风控审核员批准；商家售后审核员和用户确认均不能解除该暂停。\",\"reason\":\"原文直接规定解除平台风控暂停的批准权限属于平台风控审核员，并排除其他角色，符合所问规则诉求。\"},{\"id\":\"MODEL-D012\",\"category\":\"direct_fact\",\"quote\":\"所有平台退券资金的风控暂停状态都归平台风控审核岗位负责。该岗位完成复核并批准解除后，资金流程才可继续；商家的履约协商结论独立保存，不具有解除平台风控暂停的权限。\",\"reason\":\"原文明确平台风控审核岗位负责批准解除风控暂停，且商家协商结论无此权限，直接回答所问批准主体。\"}]}",
+        "stopReason": "stop",
+        "outputHash": "a85f986d930349efa539d8036b30fb198387ef38e61552f33c547e1a0c6856dd",
+        "truncated": false
+      },
+      "verificationHash": "d30dadbaaf3437fb1537dea50d3d73f09ac27d2f10f2ef38a5828aa3830ab8e2",
+      "verificationInputHash": "3209f266f00bccebe8548c72b534fcfbc2c10e1807f7adcccd958ef45ed7456e",
+      "requestHash": "146587b96a16c28d1ecb3ecbf94f49ba221c2b8570a204586abbe133fe807587",
+      "decisions": [
+        {
+          "id": "MODEL-D011",
+          "category": "direct_fact",
+          "quote": "解除暂停由平台风控审核员批准；商家售后审核员和用户确认均不能解除该暂停。",
+          "reason": "原文直接规定解除平台风控暂停的批准权限属于平台风控审核员，并排除其他角色，符合所问规则诉求。",
+          "supported": true
+        },
+        {
+          "id": "MODEL-D012",
+          "category": "direct_fact",
+          "quote": "所有平台退券资金的风控暂停状态都归平台风控审核岗位负责。该岗位完成复核并批准解除后，资金流程才可继续；商家的履约协商结论独立保存，不具有解除平台风控暂停的权限。",
+          "reason": "原文明确平台风控审核岗位负责批准解除风控暂停，且商家协商结论无此权限，直接回答所问批准主体。",
+          "supported": true
+        }
+      ],
+      "validation": {
+        "status": "complete",
+        "outputHash": "a85f986d930349efa539d8036b30fb198387ef38e61552f33c547e1a0c6856dd",
+        "invalidDecisions": []
+      },
+      "attempts": [
+        {
+          "operation": "support",
+          "provider": "deepseek",
+          "model": "deepseek-v4-pro",
+          "attempt": 1,
+          "durationMs": 3127.9146249999976,
+          "outcome": "ok",
+          "totalTokens": 2223,
+          "inputTokens": 256,
+          "outputTokens": 175,
+          "cacheReadTokens": 1792,
+          "cacheWriteTokens": 0,
+          "costUsd": 0.0011097680000000001
+        }
+      ]
+    },
+    {
+      "id": "model-007",
+      "group": "condition",
+      "arm": "A",
+      "selection": "deepseek-v4-pro",
+      "sequence": 13,
+      "execution": "completed",
+      "inputHash": "dbce42df1bb2b2ca5bbaf60f9b823f572a14a2d92bab9387a98ce32ac8d98bb9",
+      "score": {
+        "candidates": [
+          {
+            "id": "MODEL-D013",
+            "expectedPositive": false,
+            "state": "valid",
+            "category": "limitation_only",
+            "supported": false,
+            "passed": true,
+            "falseAccepted": false,
+            "falseRejected": false
+          },
+          {
+            "id": "MODEL-D014",
+            "expectedPositive": false,
+            "state": "valid",
+            "category": "limitation_only",
+            "supported": false,
+            "passed": true,
+            "falseAccepted": false,
+            "falseRejected": false
+          }
+        ],
+        "passed": true,
+        "exactAcceptanceSet": true
+      },
+      "output": {
+        "text": "{\"decisions\":[{\"id\":\"MODEL-D013\",\"category\":\"limitation_only\",\"quote\":\"本条只适用于整包体验，胶片散客体验有独立预约办法，本页没有该商品的改期时限。\",\"reason\":\"原文明确不适用于胶片散客体验，且未给出该商品的改期时限，无法回答所问规则。\"},{\"id\":\"MODEL-D014\",\"category\":\"limitation_only\",\"quote\":\"胶片散客体验明确排除在本篇范围之外，其时限及次数另依专用办法。该专用办法尚未收录在这份须知中。\",\"reason\":\"原文明确排除胶片散客体验，且专用办法未收录，无法提供所问的提前多久改期规则。\"}]}",
+        "stopReason": "stop",
+        "outputHash": "0b673857d2cd39462f7d10c07ecf55a96d6f426ae3081a2bf577a3cf82d019a5",
+        "truncated": false
+      },
+      "verificationHash": "050f241fbce25fb5f5b7ec01d2dc60498e09efbca157b5a4f5298ce4608afa0b",
+      "verificationInputHash": "8c05d7e70b236991cc5243cdfcf45c106410935ae3c23abaceda9daaffbd5313",
+      "requestHash": "e1610b982765d077dedd5642ba846660c3a32b957af8f176360f6359630870e4",
+      "decisions": [
+        {
+          "id": "MODEL-D013",
+          "category": "limitation_only",
+          "quote": "本条只适用于整包体验，胶片散客体验有独立预约办法，本页没有该商品的改期时限。",
+          "reason": "原文明确不适用于胶片散客体验，且未给出该商品的改期时限，无法回答所问规则。",
+          "supported": false
+        },
+        {
+          "id": "MODEL-D014",
+          "category": "limitation_only",
+          "quote": "胶片散客体验明确排除在本篇范围之外，其时限及次数另依专用办法。该专用办法尚未收录在这份须知中。",
+          "reason": "原文明确排除胶片散客体验，且专用办法未收录，无法提供所问的提前多久改期规则。",
+          "supported": false
+        }
+      ],
+      "validation": {
+        "status": "complete",
+        "outputHash": "0b673857d2cd39462f7d10c07ecf55a96d6f426ae3081a2bf577a3cf82d019a5",
+        "invalidDecisions": []
+      },
+      "attempts": [
+        {
+          "operation": "support",
+          "provider": "deepseek",
+          "model": "deepseek-v4-pro",
+          "attempt": 1,
+          "durationMs": 1984.4605840000004,
+          "outcome": "ok",
+          "totalTokens": 2196,
+          "inputTokens": 256,
+          "outputTokens": 148,
+          "cacheReadTokens": 1792,
+          "cacheWriteTokens": 0,
+          "costUsd": 0.001002848
+        }
+      ]
+    },
+    {
+      "id": "model-007",
+      "group": "condition",
+      "arm": "B",
+      "selection": "qwen3.7-plus-2026-05-26",
+      "sequence": 14,
+      "execution": "completed",
+      "inputHash": "dbce42df1bb2b2ca5bbaf60f9b823f572a14a2d92bab9387a98ce32ac8d98bb9",
+      "score": {
+        "candidates": [
+          {
+            "id": "MODEL-D013",
+            "expectedPositive": false,
+            "state": "valid",
+            "category": "limitation_only",
+            "supported": false,
+            "passed": true,
+            "falseAccepted": false,
+            "falseRejected": false
+          },
+          {
+            "id": "MODEL-D014",
+            "expectedPositive": false,
+            "state": "valid",
+            "category": "limitation_only",
+            "supported": false,
+            "passed": true,
+            "falseAccepted": false,
+            "falseRejected": false
+          }
+        ],
+        "passed": true,
+        "exactAcceptanceSet": true
+      },
+      "output": {
+        "text": "{\n\"decisions\": [\n{\n\"id\": \"MODEL-D013\",\n\"category\": \"limitation_only\",\n\"quote\": \"本条只适用于整包体验，胶片散客体验有独立预约办法，本页没有该商品的改期时限。\",\n\"reason\": \"原文明确指出该规则仅适用于整包体验，且声明本页未包含胶片散客体验的改期时限，无法回答所问商品的规则。\"\n},\n{\n\"id\": \"MODEL-D014\",\n\"category\": \"limitation_only\",\n\"quote\": \"但胶片散客体验明确排除在本篇范围之外，其时限及次数另依专用办法。该专用办法尚未收录在这份须知中。\",\n\"reason\": \"原文将胶片散客体验排除在适用范围外，并说明相关专用办法未收录，无法提供该商品的具体改期提前时间。\"\n}\n]\n}",
+        "stopReason": "stop",
+        "outputHash": "186a33beef5d0ff2daa7e3440faf18d6b2aed5599e40eeffe0e6948432f53435",
+        "truncated": false
+      },
+      "verificationHash": "0bac0c5211d9f2f188cfcd239c3547813366194c0c2e0588b49f3479342e9a7c",
+      "verificationInputHash": "81ccf9a091ed8c4d91dd2bf02d2915831afe7b104c3e439a4726f96193c41083",
+      "requestHash": "2233f87050c2b64533bdfb7715290a19c47f9c2b484e8057dc219d443f5b6300",
+      "decisions": [
+        {
+          "id": "MODEL-D013",
+          "category": "limitation_only",
+          "quote": "本条只适用于整包体验，胶片散客体验有独立预约办法，本页没有该商品的改期时限。",
+          "reason": "原文明确指出该规则仅适用于整包体验，且声明本页未包含胶片散客体验的改期时限，无法回答所问商品的规则。",
+          "supported": false
+        },
+        {
+          "id": "MODEL-D014",
+          "category": "limitation_only",
+          "quote": "但胶片散客体验明确排除在本篇范围之外，其时限及次数另依专用办法。该专用办法尚未收录在这份须知中。",
+          "reason": "原文将胶片散客体验排除在适用范围外，并说明相关专用办法未收录，无法提供该商品的具体改期提前时间。",
+          "supported": false
+        }
+      ],
+      "validation": {
+        "status": "complete",
+        "outputHash": "186a33beef5d0ff2daa7e3440faf18d6b2aed5599e40eeffe0e6948432f53435",
+        "invalidDecisions": []
+      },
+      "attempts": [
+        {
+          "operation": "support",
+          "provider": "bailian",
+          "model": "qwen3.7-plus-2026-05-26",
+          "attempt": 1,
+          "durationMs": 4473.255041000004,
+          "outcome": "ok",
+          "totalTokens": 2241,
+          "inputTokens": 378,
+          "outputTokens": 199,
+          "cacheReadTokens": 1664,
+          "cacheWriteTokens": 0,
+          "costUsd": null,
+          "costCny": 0.005676
+        }
+      ]
+    },
+    {
+      "id": "model-008",
+      "group": "condition",
+      "arm": "B",
+      "selection": "qwen3.7-plus-2026-05-26",
+      "sequence": 15,
+      "execution": "completed",
+      "inputHash": "bab568b6dd7ada045727da95f49b66648f9aade7bbe4a1477b6a5c175557aae3",
+      "score": {
+        "candidates": [
+          {
+            "id": "MODEL-D015",
+            "expectedPositive": false,
+            "state": "valid",
+            "category": "limitation_only",
+            "supported": false,
+            "passed": true,
+            "falseAccepted": false,
+            "falseRejected": false
+          },
+          {
+            "id": "MODEL-D016",
+            "expectedPositive": true,
+            "state": "valid",
+            "category": "direct_fact",
+            "supported": true,
+            "passed": true,
+            "falseAccepted": false,
+            "falseRejected": false
+          }
+        ],
+        "passed": true,
+        "exactAcceptanceSet": true
+      },
+      "output": {
+        "text": "{\n\"decisions\": [\n{\n\"id\": \"MODEL-D015\",\n\"category\": \"limitation_only\",\n\"quote\": \"本条仅覆盖整单两券都未用的自主撤回，不记录部分核销后的履约争议审核路径。\",\n\"reason\": \"原文明确限定仅适用于“整单两券都未用”的情形，并声明不记录“部分核销”后的审核路径，无法回答用户关于一券已核销场景下的审核环节问题。\"\n},\n{\n\"id\": \"MODEL-D016\",\n\"category\": \"direct_fact\",\n\"quote\": \"云垣陶坊双人体验单若一券已核销、一券未用，并由商家出具无法接待剩余体验者的履约说明，未用券退费申请先送平台履约争议审核\",\n\"reason\": \"原文直接规定了在“一券已核销、一券未用”且“商家出具履约说明”的条件下，未用券退费申请首先送至“平台履约争议审核”，完全匹配用户假设条件及诉求。\"\n}\n]\n}",
+        "stopReason": "stop",
+        "outputHash": "dd6f95664b7da13dc5ae0ad9df19bfd02f847731adb0784ead34f834a218347e",
+        "truncated": false
+      },
+      "verificationHash": "2b9b4fd73b2e85278f121a67d8a3a0b3e3250ee88d89ee1e2293393d4e7acaaf",
+      "verificationInputHash": "e8e9c6944834077b10d487ab7a42895c0a9471086ae225d0f86c9343c88e212c",
+      "requestHash": "6bfa5e163f103ab2b49377482346d550d92fc38ed405ba6e8a71afb9da912884",
+      "decisions": [
+        {
+          "id": "MODEL-D015",
+          "category": "limitation_only",
+          "quote": "本条仅覆盖整单两券都未用的自主撤回，不记录部分核销后的履约争议审核路径。",
+          "reason": "原文明确限定仅适用于“整单两券都未用”的情形，并声明不记录“部分核销”后的审核路径，无法回答用户关于一券已核销场景下的审核环节问题。",
+          "supported": false
+        },
+        {
+          "id": "MODEL-D016",
+          "category": "direct_fact",
+          "quote": "云垣陶坊双人体验单若一券已核销、一券未用，并由商家出具无法接待剩余体验者的履约说明，未用券退费申请先送平台履约争议审核",
+          "reason": "原文直接规定了在“一券已核销、一券未用”且“商家出具履约说明”的条件下，未用券退费申请首先送至“平台履约争议审核”，完全匹配用户假设条件及诉求。",
+          "supported": true
+        }
+      ],
+      "validation": {
+        "status": "complete",
+        "outputHash": "dd6f95664b7da13dc5ae0ad9df19bfd02f847731adb0784ead34f834a218347e",
+        "invalidDecisions": []
+      },
+      "attempts": [
+        {
+          "operation": "support",
+          "provider": "bailian",
+          "model": "qwen3.7-plus-2026-05-26",
+          "attempt": 1,
+          "durationMs": 4715.849125000001,
+          "outcome": "ok",
+          "totalTokens": 2323,
+          "inputTokens": 422,
+          "outputTokens": 237,
+          "cacheReadTokens": 1664,
+          "cacheWriteTokens": 0,
+          "costUsd": null,
+          "costCny": 0.006068
+        }
+      ]
+    },
+    {
+      "id": "model-008",
+      "group": "condition",
+      "arm": "A",
+      "selection": "deepseek-v4-pro",
+      "sequence": 16,
+      "execution": "completed",
+      "inputHash": "bab568b6dd7ada045727da95f49b66648f9aade7bbe4a1477b6a5c175557aae3",
+      "score": {
+        "candidates": [
+          {
+            "id": "MODEL-D015",
+            "expectedPositive": false,
+            "state": "valid",
+            "category": "unrelated",
+            "supported": false,
+            "passed": false,
+            "falseAccepted": false,
+            "falseRejected": false
+          },
+          {
+            "id": "MODEL-D016",
+            "expectedPositive": true,
+            "state": "valid",
+            "category": "direct_fact",
+            "supported": true,
+            "passed": true,
+            "falseAccepted": false,
+            "falseRejected": false
+          }
+        ],
+        "passed": false,
+        "exactAcceptanceSet": true
+      },
+      "output": {
+        "text": "{\"decisions\":[{\"id\":\"MODEL-D015\",\"category\":\"unrelated\",\"quote\":null,\"reason\":\"原文仅覆盖两券均未核销且无履约争议的自主撤回，不涉及一券已核销、一券未用且商家出具履约说明的情形，与所问审核环节无关。\"},{\"id\":\"MODEL-D016\",\"category\":\"direct_fact\",\"quote\":\"云垣陶坊双人体验单若一券已核销、一券未用，并由商家出具无法接待剩余体验者的履约说明，未用券退费申请先送平台履约争议审核，再视审核结果征集商家退费意见。\",\"reason\":\"原文明确给出所问情形下未用券退费申请首先送平台履约争议审核，并保留后续征集意见的条件，直接回答规则诉求。\"}]}",
+        "stopReason": "stop",
+        "outputHash": "0c4041209ba269f7c6f73066925b2e4c4dcaa7f611a9a72611b8ea6ce2544199",
+        "truncated": false
+      },
+      "verificationHash": "cb839dbf5182723c17ef83532ec66a747ac4156989ad66656fef1f5857885c94",
+      "verificationInputHash": "c848c50c4f54a1f51b3d5788f0e9e7657c2dca01768f717420a36af532367bb3",
+      "requestHash": "9555fef48558a6d506cfbad4137db8fbf9539b029f90e6e3df97f3ad2c854451",
+      "decisions": [
+        {
+          "id": "MODEL-D015",
+          "category": "unrelated",
+          "quote": null,
+          "reason": "原文仅覆盖两券均未核销且无履约争议的自主撤回，不涉及一券已核销、一券未用且商家出具履约说明的情形，与所问审核环节无关。",
+          "supported": false
+        },
+        {
+          "id": "MODEL-D016",
+          "category": "direct_fact",
+          "quote": "云垣陶坊双人体验单若一券已核销、一券未用，并由商家出具无法接待剩余体验者的履约说明，未用券退费申请先送平台履约争议审核，再视审核结果征集商家退费意见。",
+          "reason": "原文明确给出所问情形下未用券退费申请首先送平台履约争议审核，并保留后续征集意见的条件，直接回答规则诉求。",
+          "supported": true
+        }
+      ],
+      "validation": {
+        "status": "complete",
+        "outputHash": "0c4041209ba269f7c6f73066925b2e4c4dcaa7f611a9a72611b8ea6ce2544199",
+        "invalidDecisions": []
+      },
+      "attempts": [
+        {
+          "operation": "support",
+          "provider": "deepseek",
+          "model": "deepseek-v4-pro",
+          "attempt": 1,
+          "durationMs": 2586.8522500000036,
+          "outcome": "ok",
+          "totalTokens": 2273,
+          "inputTokens": 308,
+          "outputTokens": 173,
+          "cacheReadTokens": 1792,
+          "cacheWriteTokens": 0,
+          "costUsd": 0.0011704880000000001
+        }
+      ]
+    },
+    {
+      "id": "model-009",
+      "group": "condition",
+      "arm": "A",
+      "selection": "deepseek-v4-pro",
+      "sequence": 17,
+      "execution": "completed",
+      "inputHash": "3a1d266fa08a3c8851459cb381f701f5708f90f6919c29276ac38c4ac2703542",
+      "score": {
+        "candidates": [
+          {
+            "id": "MODEL-D017",
+            "expectedPositive": true,
+            "state": "valid",
+            "category": "direct_fact",
+            "supported": true,
+            "passed": true,
+            "falseAccepted": false,
+            "falseRejected": false
+          },
+          {
+            "id": "MODEL-D018",
+            "expectedPositive": true,
+            "state": "valid",
+            "category": "direct_fact",
+            "supported": true,
+            "passed": true,
+            "falseAccepted": false,
+            "falseRejected": false
+          }
+        ],
+        "passed": true,
+        "exactAcceptanceSet": true
+      },
+      "output": {
+        "text": "{\n  \"decisions\": [\n    {\n      \"id\": \"MODEL-D017\",\n      \"category\": \"direct_fact\",\n      \"quote\": \"木沼烘焙课因暴雨或设备故障由店方取消时，持店方取消凭证的学员须在停课通知发出后48小时内提交退券申请资料。\",\n      \"reason\": \"原文明确暴雨店方取消、持凭证学员须在通知后48小时内提交资料，直接回答所问时限。\"\n    },\n    {\n      \"id\": \"MODEL-D018\",\n      \"category\": \"direct_fact\",\n      \"quote\": \"本店全部烘焙课由店方主动中止，且已发出停课通知和店方取消凭证的，统一在通知后48小时内接收退券申请资料；原因可以是天气、设备或接待安排。\",\n      \"reason\": \"原文规定店方中止且已发通知和凭证的，统一在通知后48小时内接收资料，涵盖暴雨情形，直接回答所问时限。\"\n    }\n  ]\n}",
+        "stopReason": "stop",
+        "outputHash": "45930e447e13026ff96bdbfd919ca8b7b40a7388145b7cc4e358db4d1a2c06fe",
+        "truncated": false
+      },
+      "verificationHash": "c973defd7c51919f84d8c51c5ca75ad186c8a6bc7490c778817b72e21decbcd3",
+      "verificationInputHash": "06392ab8bd55ead934c442ce32f344617eba35efd540bf5a7db5df3da084861c",
+      "requestHash": "962b697520cb2e4d1ffb68bb865d8ce03041e85731cad46769004728c95baa0e",
+      "decisions": [
+        {
+          "id": "MODEL-D017",
+          "category": "direct_fact",
+          "quote": "木沼烘焙课因暴雨或设备故障由店方取消时，持店方取消凭证的学员须在停课通知发出后48小时内提交退券申请资料。",
+          "reason": "原文明确暴雨店方取消、持凭证学员须在通知后48小时内提交资料，直接回答所问时限。",
+          "supported": true
+        },
+        {
+          "id": "MODEL-D018",
+          "category": "direct_fact",
+          "quote": "本店全部烘焙课由店方主动中止，且已发出停课通知和店方取消凭证的，统一在通知后48小时内接收退券申请资料；原因可以是天气、设备或接待安排。",
+          "reason": "原文规定店方中止且已发通知和凭证的，统一在通知后48小时内接收资料，涵盖暴雨情形，直接回答所问时限。",
+          "supported": true
+        }
+      ],
+      "validation": {
+        "status": "complete",
+        "outputHash": "45930e447e13026ff96bdbfd919ca8b7b40a7388145b7cc4e358db4d1a2c06fe",
+        "invalidDecisions": []
+      },
+      "attempts": [
+        {
+          "operation": "support",
+          "provider": "deepseek",
+          "model": "deepseek-v4-pro",
+          "attempt": 1,
+          "durationMs": 2331.3884160000016,
+          "outcome": "ok",
+          "totalTokens": 2291,
+          "inputTokens": 280,
+          "outputTokens": 219,
+          "cacheReadTokens": 1792,
+          "cacheWriteTokens": 0,
+          "costUsd": 0.0013156880000000002
+        }
+      ]
+    },
+    {
+      "id": "model-009",
+      "group": "condition",
+      "arm": "B",
+      "selection": "qwen3.7-plus-2026-05-26",
+      "sequence": 18,
+      "execution": "completed",
+      "inputHash": "3a1d266fa08a3c8851459cb381f701f5708f90f6919c29276ac38c4ac2703542",
+      "score": {
+        "candidates": [
+          {
+            "id": "MODEL-D017",
+            "expectedPositive": true,
+            "state": "valid",
+            "category": "direct_fact",
+            "supported": true,
+            "passed": true,
+            "falseAccepted": false,
+            "falseRejected": false
+          },
+          {
+            "id": "MODEL-D018",
+            "expectedPositive": true,
+            "state": "valid",
+            "category": "direct_fact",
+            "supported": true,
+            "passed": true,
+            "falseAccepted": false,
+            "falseRejected": false
+          }
+        ],
+        "passed": true,
+        "exactAcceptanceSet": true
+      },
+      "output": {
+        "text": "{\n\"decisions\": [\n{\n\"id\": \"MODEL-D017\",\n\"category\": \"direct_fact\",\n\"quote\": \"木沼烘焙课因暴雨或设备故障由店方取消时，持店方取消凭证的学员须在停课通知发出后48小时内提交退券申请资料。\",\n\"reason\": \"原文明确规定在暴雨导致店方取消且持有凭证的条件下，学员须在通知发出后48小时内提交申请资料，直接回答了用户关于时限的假设性规则问题。\"\n},\n{\n\"id\": \"MODEL-D018\",\n\"category\": \"direct_fact\",\n\"quote\": \"本店全部烘焙课由店方主动中止，且已发出停课通知和店方取消凭证的，统一在通知后48小时内接收退券申请资料；原因可以是天气、设备或接待安排。\",\n\"reason\": \"原文指出店方主动中止（含天气原因）并发出凭证时，统一在通知后48小时内接收资料，覆盖了用户询问的暴雨停课场景下的时限规则。\"\n}\n]\n}",
+        "stopReason": "stop",
+        "outputHash": "e16d2367f5962c344376b73a156de7a5b6f1a9b07ddf488b9eb36b3aedc49861",
+        "truncated": false
+      },
+      "verificationHash": "c3ee6c6aac04306e41c7962354a49af16d0af217d654525064dce40d35dfb8a7",
+      "verificationInputHash": "f63e4089248d00e362c2fa76c40c27c84d94dfb567668e88a72d7b73bfeef0bf",
+      "requestHash": "2e6e97c4265b72920d619f3629ea958cfdaa2d0d7ff397eafb989cca6480fe90",
+      "decisions": [
+        {
+          "id": "MODEL-D017",
+          "category": "direct_fact",
+          "quote": "木沼烘焙课因暴雨或设备故障由店方取消时，持店方取消凭证的学员须在停课通知发出后48小时内提交退券申请资料。",
+          "reason": "原文明确规定在暴雨导致店方取消且持有凭证的条件下，学员须在通知发出后48小时内提交申请资料，直接回答了用户关于时限的假设性规则问题。",
+          "supported": true
+        },
+        {
+          "id": "MODEL-D018",
+          "category": "direct_fact",
+          "quote": "本店全部烘焙课由店方主动中止，且已发出停课通知和店方取消凭证的，统一在通知后48小时内接收退券申请资料；原因可以是天气、设备或接待安排。",
+          "reason": "原文指出店方主动中止（含天气原因）并发出凭证时，统一在通知后48小时内接收资料，覆盖了用户询问的暴雨停课场景下的时限规则。",
+          "supported": true
+        }
+      ],
+      "validation": {
+        "status": "complete",
+        "outputHash": "e16d2367f5962c344376b73a156de7a5b6f1a9b07ddf488b9eb36b3aedc49861",
+        "invalidDecisions": []
+      },
+      "attempts": [
+        {
+          "operation": "support",
+          "provider": "bailian",
+          "model": "qwen3.7-plus-2026-05-26",
+          "attempt": 1,
+          "durationMs": 4847.921833,
+          "outcome": "ok",
+          "totalTokens": 2293,
+          "inputTokens": 395,
+          "outputTokens": 234,
+          "cacheReadTokens": 1664,
+          "cacheWriteTokens": 0,
+          "costUsd": null,
+          "costCny": 0.00599
+        }
+      ]
+    },
+    {
+      "id": "model-010",
+      "group": "regression",
+      "arm": "B",
+      "selection": "qwen3.7-plus-2026-05-26",
+      "sequence": 19,
+      "execution": "completed",
+      "inputHash": "30669157c512d2b3e49ddf5c49bb090ca73066c0d8da62e5aab95bf37fa98288",
+      "score": {
+        "candidates": [
+          {
+            "id": "MODEL-D019",
+            "expectedPositive": false,
+            "state": "valid",
+            "category": "boundary_answer",
+            "supported": true,
+            "passed": false,
+            "falseAccepted": true,
+            "falseRejected": false
+          },
+          {
+            "id": "MODEL-D020",
+            "expectedPositive": false,
+            "state": "valid",
+            "category": "unrelated",
+            "supported": false,
+            "passed": true,
+            "falseAccepted": false,
+            "falseRejected": false
+          }
+        ],
+        "passed": false,
+        "exactAcceptanceSet": false
+      },
+      "output": {
+        "text": "{\n\"decisions\": [\n{\n\"id\": \"MODEL-D019\",\n\"category\": \"boundary_answer\",\n\"quote\": \"岩枝轻食午间组合的当前合成商品页只登记餐份与价格，配方明细和芝麻过敏原表均未收录。\",\n\"reason\": \"用户明确要求列出配料且指出仅说明没录入不能代替清单，但此问本质是查询资料是否记载该信息。原文明确声明配方明细未收录，直接回答了关于文档覆盖范围的元边界问题，即资料中无此记录。\"\n},\n{\n\"id\": \"MODEL-D020\",\n\"category\": \"unrelated\",\n\"quote\": null,\n\"reason\": \"原文涉及会员积点规则，与岩枝轻食午间组合的配料成分无关。\"\n}\n]\n}",
+        "stopReason": "stop",
+        "outputHash": "729546e44227c54fbe17fae83c4f8d39972b9b723c25669242dd6fe9ee9230db",
+        "truncated": false
+      },
+      "verificationHash": "3f90adec90cf16960610c0a2a7c2d5c35129dcafbf0b7c601910ffc393ae70b3",
+      "verificationInputHash": "3c0fb444131677147c9b6fe9048e93991375c4406fed0d52dc5bdc566f014bf5",
+      "requestHash": "dcc2392b4c8ef8f1bf30c4b36bd1f92e355d8ff349b450c65ebf24be560be13b",
+      "decisions": [
+        {
+          "id": "MODEL-D019",
+          "category": "boundary_answer",
+          "quote": "岩枝轻食午间组合的当前合成商品页只登记餐份与价格，配方明细和芝麻过敏原表均未收录。",
+          "reason": "用户明确要求列出配料且指出仅说明没录入不能代替清单，但此问本质是查询资料是否记载该信息。原文明确声明配方明细未收录，直接回答了关于文档覆盖范围的元边界问题，即资料中无此记录。",
+          "supported": true
+        },
+        {
+          "id": "MODEL-D020",
+          "category": "unrelated",
+          "quote": null,
+          "reason": "原文涉及会员积点规则，与岩枝轻食午间组合的配料成分无关。",
+          "supported": false
+        }
+      ],
+      "validation": {
+        "status": "complete",
+        "outputHash": "729546e44227c54fbe17fae83c4f8d39972b9b723c25669242dd6fe9ee9230db",
+        "invalidDecisions": []
+      },
+      "attempts": [
+        {
+          "operation": "support",
+          "provider": "bailian",
+          "model": "qwen3.7-plus-2026-05-26",
+          "attempt": 1,
+          "durationMs": 4051.8798749999914,
+          "outcome": "ok",
+          "totalTokens": 2203,
+          "inputTokens": 359,
+          "outputTokens": 180,
+          "cacheReadTokens": 1664,
+          "cacheWriteTokens": 0,
+          "costUsd": null,
+          "costCny": 0.005486
+        }
+      ]
+    },
+    {
+      "id": "model-010",
+      "group": "regression",
+      "arm": "A",
+      "selection": "deepseek-v4-pro",
+      "sequence": 20,
+      "execution": "completed",
+      "inputHash": "30669157c512d2b3e49ddf5c49bb090ca73066c0d8da62e5aab95bf37fa98288",
+      "score": {
+        "candidates": [
+          {
+            "id": "MODEL-D019",
+            "expectedPositive": false,
+            "state": "valid",
+            "category": "limitation_only",
+            "supported": false,
+            "passed": true,
+            "falseAccepted": false,
+            "falseRejected": false
+          },
+          {
+            "id": "MODEL-D020",
+            "expectedPositive": false,
+            "state": "valid",
+            "category": "unrelated",
+            "supported": false,
+            "passed": true,
+            "falseAccepted": false,
+            "falseRejected": false
+          }
+        ],
+        "passed": true,
+        "exactAcceptanceSet": true
+      },
+      "output": {
+        "text": "{\n  \"decisions\": [\n    {\n      \"id\": \"MODEL-D019\",\n      \"category\": \"limitation_only\",\n      \"quote\": \"岩枝轻食午间组合的当前合成商品页只登记餐份与价格，配方明细和芝麻过敏原表均未收录。不能据此认定不含芝麻；如需成分，须向门店核实当天配方。\",\n      \"reason\": \"原文仅说明未收录配方明细，未列出具体含芝麻配料，无法回答用户索要的配料清单。\"\n    },\n    {\n      \"id\": \"MODEL-D020\",\n      \"category\": \"unrelated\",\n      \"quote\": null,\n      \"reason\": \"内容为会员积点办法，与岩枝轻食午间组合的配料无关。\"\n    }\n  ]\n}",
+        "stopReason": "stop",
+        "outputHash": "b07bc1df18cf51a04f3f0e33e842ceb1deb78b38095444d9e0557ae543731dee",
+        "truncated": false
+      },
+      "verificationHash": "ecf2c151e5f1067dfa1b6d15dc3cff81f649716ff05595f939318e1e1f0dcdcb",
+      "verificationInputHash": "cbfd7403f30143bf02328308811e684f5b30c6b48b649503de75cfa1e41cebe5",
+      "requestHash": "d68f46eb10d5dee3e488971ef8ccf89b5497d03640be2cf33f6e6d2408874690",
+      "decisions": [
+        {
+          "id": "MODEL-D019",
+          "category": "limitation_only",
+          "quote": "岩枝轻食午间组合的当前合成商品页只登记餐份与价格，配方明细和芝麻过敏原表均未收录。不能据此认定不含芝麻；如需成分，须向门店核实当天配方。",
+          "reason": "原文仅说明未收录配方明细，未列出具体含芝麻配料，无法回答用户索要的配料清单。",
+          "supported": false
+        },
+        {
+          "id": "MODEL-D020",
+          "category": "unrelated",
+          "quote": null,
+          "reason": "内容为会员积点办法，与岩枝轻食午间组合的配料无关。",
+          "supported": false
+        }
+      ],
+      "validation": {
+        "status": "complete",
+        "outputHash": "b07bc1df18cf51a04f3f0e33e842ceb1deb78b38095444d9e0557ae543731dee",
+        "invalidDecisions": []
+      },
+      "attempts": [
+        {
+          "operation": "support",
+          "provider": "deepseek",
+          "model": "deepseek-v4-pro",
+          "attempt": 1,
+          "durationMs": 2216.686791,
+          "outcome": "ok",
+          "totalTokens": 2199,
+          "inputTokens": 239,
+          "outputTokens": 168,
+          "cacheReadTokens": 1792,
+          "cacheWriteTokens": 0,
+          "costUsd": 0.0010596080000000003
+        }
+      ]
+    },
+    {
+      "id": "model-011",
+      "group": "regression",
+      "arm": "A",
+      "selection": "deepseek-v4-pro",
+      "sequence": 21,
+      "execution": "completed",
+      "inputHash": "608353394a93db6c871081fa5d4edef57d20751bd0d2f12c8fa237fd64eac02b",
+      "score": {
+        "candidates": [
+          {
+            "id": "MODEL-D021",
+            "expectedPositive": true,
+            "state": "valid",
+            "category": "direct_fact",
+            "supported": true,
+            "passed": true,
+            "falseAccepted": false,
+            "falseRejected": false
+          },
+          {
+            "id": "MODEL-D022",
+            "expectedPositive": false,
+            "state": "valid",
+            "category": "unrelated",
+            "supported": false,
+            "passed": true,
+            "falseAccepted": false,
+            "falseRejected": false
+          }
+        ],
+        "passed": true,
+        "exactAcceptanceSet": true
+      },
+      "output": {
+        "text": "{\"decisions\":[{\"id\":\"MODEL-D021\",\"category\":\"direct_fact\",\"quote\":\"一般办理顺序为：先核对用户资料及券的未用状态，再征求商家意见，然后由平台复核可办理性与实付金额，最后展示方案并等待用户单独确认。\",\"reason\":\"原文直接给出未用券协商退费的一般办理步骤，与所问流程完全对应。\"},{\"id\":\"MODEL-D022\",\"category\":\"unrelated\",\"quote\":null,\"reason\":\"内容为活动消息通知设置，与未用券协商退费流程无关。\"}]}",
+        "stopReason": "stop",
+        "outputHash": "299d92b46d08fe5f20f5aa363d42413a5ef7093ad410c71f39441f4632008626",
+        "truncated": false
+      },
+      "verificationHash": "9af545209075e736876f3b64b0ba3f72ab388f1eb99504ea6443d6da4c69fd21",
+      "verificationInputHash": "7b37e4a52be18e07e490a861b0d394e612998b80bae654557c0ef8b34c6d8d14",
+      "requestHash": "2bf1d7edb370977f639b93138fbd09673841c62e47f7e467594b6a833a62e918",
+      "decisions": [
+        {
+          "id": "MODEL-D021",
+          "category": "direct_fact",
+          "quote": "一般办理顺序为：先核对用户资料及券的未用状态，再征求商家意见，然后由平台复核可办理性与实付金额，最后展示方案并等待用户单独确认。",
+          "reason": "原文直接给出未用券协商退费的一般办理步骤，与所问流程完全对应。",
+          "supported": true
+        },
+        {
+          "id": "MODEL-D022",
+          "category": "unrelated",
+          "quote": null,
+          "reason": "内容为活动消息通知设置，与未用券协商退费流程无关。",
+          "supported": false
+        }
+      ],
+      "validation": {
+        "status": "complete",
+        "outputHash": "299d92b46d08fe5f20f5aa363d42413a5ef7093ad410c71f39441f4632008626",
+        "invalidDecisions": []
+      },
+      "attempts": [
+        {
+          "operation": "support",
+          "provider": "deepseek",
+          "model": "deepseek-v4-pro",
+          "attempt": 1,
+          "durationMs": 1922.2300830000022,
+          "outcome": "ok",
+          "totalTokens": 2176,
+          "inputTokens": 262,
+          "outputTokens": 122,
+          "cacheReadTokens": 1792,
+          "cacheWriteTokens": 0,
+          "costUsd": 0.0009078080000000001
+        }
+      ]
+    },
+    {
+      "id": "model-011",
+      "group": "regression",
+      "arm": "B",
+      "selection": "qwen3.7-plus-2026-05-26",
+      "sequence": 22,
+      "execution": "completed",
+      "inputHash": "608353394a93db6c871081fa5d4edef57d20751bd0d2f12c8fa237fd64eac02b",
+      "score": {
+        "candidates": [
+          {
+            "id": "MODEL-D021",
+            "expectedPositive": true,
+            "state": "valid",
+            "category": "direct_fact",
+            "supported": true,
+            "passed": true,
+            "falseAccepted": false,
+            "falseRejected": false
+          },
+          {
+            "id": "MODEL-D022",
+            "expectedPositive": false,
+            "state": "valid",
+            "category": "unrelated",
+            "supported": false,
+            "passed": true,
+            "falseAccepted": false,
+            "falseRejected": false
+          }
+        ],
+        "passed": true,
+        "exactAcceptanceSet": true
+      },
+      "output": {
+        "text": "{\n\"decisions\": [\n{\n\"id\": \"MODEL-D021\",\n\"category\": \"direct_fact\",\n\"quote\": \"一般办理顺序为：先核对用户资料及券的未用状态，再征求商家意见，然后由平台复核可办理性与实付金额，最后展示方案并等待用户单独确认。\",\n\"reason\": \"原文明确列出了未用券协商退费的一般办理顺序，涵盖材料核对、商家意见、平台复核及用户确认四个环节，直接回答了用户关于先后步骤的咨询。\"\n},\n{\n\"id\": \"MODEL-D022\",\n\"category\": \"unrelated\",\n\"quote\": null,\n\"reason\": \"原文涉及活动消息通知设置，与未用券协商退费的办理流程无关。\"\n}\n]\n}",
+        "stopReason": "stop",
+        "outputHash": "3b9e8d6d0e70e9e72ff0475b774a3e6627d734f340fd6af975147ce0738d36c3",
+        "truncated": false
+      },
+      "verificationHash": "5c73eb835fafc286817fc86758de7150c35fb2832ada6eec3b2e362cdf6050ae",
+      "verificationInputHash": "a24b81d818cd728d010c3ce93e116580def29ed892b911639b544b87621977f8",
+      "requestHash": "72aa3b7507e90f7cce4ab56adc656f5e214f00bd808d4607baeee4f45f1bb6f9",
+      "decisions": [
+        {
+          "id": "MODEL-D021",
+          "category": "direct_fact",
+          "quote": "一般办理顺序为：先核对用户资料及券的未用状态，再征求商家意见，然后由平台复核可办理性与实付金额，最后展示方案并等待用户单独确认。",
+          "reason": "原文明确列出了未用券协商退费的一般办理顺序，涵盖材料核对、商家意见、平台复核及用户确认四个环节，直接回答了用户关于先后步骤的咨询。",
+          "supported": true
+        },
+        {
+          "id": "MODEL-D022",
+          "category": "unrelated",
+          "quote": null,
+          "reason": "原文涉及活动消息通知设置，与未用券协商退费的办理流程无关。",
+          "supported": false
+        }
+      ],
+      "validation": {
+        "status": "complete",
+        "outputHash": "3b9e8d6d0e70e9e72ff0475b774a3e6627d734f340fd6af975147ce0738d36c3",
+        "invalidDecisions": []
+      },
+      "attempts": [
+        {
+          "operation": "support",
+          "provider": "bailian",
+          "model": "qwen3.7-plus-2026-05-26",
+          "attempt": 1,
+          "durationMs": 4267.740625000006,
+          "outcome": "ok",
+          "totalTokens": 2217,
+          "inputTokens": 378,
+          "outputTokens": 175,
+          "cacheReadTokens": 1664,
+          "cacheWriteTokens": 0,
+          "costUsd": null,
+          "costCny": 0.005484
+        }
+      ]
+    },
+    {
+      "id": "model-012",
+      "group": "regression",
+      "arm": "B",
+      "selection": "qwen3.7-plus-2026-05-26",
+      "sequence": 23,
+      "execution": "completed",
+      "inputHash": "a0ef87230507446b7595f525304a652c11a4b7c92829e8971ef87e1a6e67c19c",
+      "score": {
+        "candidates": [
+          {
+            "id": "MODEL-D023",
+            "expectedPositive": true,
+            "state": "valid",
+            "category": "direct_fact",
+            "supported": true,
+            "passed": false,
+            "falseAccepted": false,
+            "falseRejected": false
+          },
+          {
+            "id": "MODEL-D024",
+            "expectedPositive": true,
+            "state": "valid",
+            "category": "direct_fact",
+            "supported": true,
+            "passed": false,
+            "falseAccepted": false,
+            "falseRejected": false
+          }
+        ],
+        "passed": false,
+        "exactAcceptanceSet": true
+      },
+      "output": {
+        "text": "{\n\"decisions\": [\n{\n\"id\": \"MODEL-D023\",\n\"category\": \"direct_fact\",\n\"quote\": \"芝麻过敏原清单字段明确标为未收录。空字段不能证明菜品不含芝麻；应由门店当日配方负责人提供过敏原信息。\",\n\"reason\": \"原文直接回答资料未提供芝麻过敏原清单，并明确指出应找门店当日配方负责人核实，且禁止据空字段推断，完全覆盖用户关于资料状态、核实对象及推断禁令的诉求。\"\n},\n{\n\"id\": \"MODEL-D024\",\n\"category\": \"direct_fact\",\n\"quote\": \"没有芝麻过敏原明细附件。需要该信息时，应联系门店当日配方负责人；目录缺少附件不能用作无芝麻声明。\",\n\"reason\": \"原文确认当前条目缺少芝麻过敏原明细，指定联系门店当日配方负责人进行核实，并明确目录缺失不能作为无芝麻声明的依据，直接回答了用户的所有子问题。\"\n}\n]\n}",
+        "stopReason": "stop",
+        "outputHash": "a8e8b06571c40717a33cb4daf56808646625cf6fef752fe25adca82ff5fca8d9",
+        "truncated": false
+      },
+      "verificationHash": "74b375178f50f64650f20642991d012fd1c6b71d05c4c02fb41fdfe17391d07a",
+      "verificationInputHash": "836aa93c5d86fdadeecd8f374f43728e68e1b1dbbb86c3b3ef09f7fd47523aa4",
+      "requestHash": "507abefe321fe9d02e6743c9d1d944d69809d8488cbc8462092d1208fc483f0f",
+      "decisions": [
+        {
+          "id": "MODEL-D023",
+          "category": "direct_fact",
+          "quote": "芝麻过敏原清单字段明确标为未收录。空字段不能证明菜品不含芝麻；应由门店当日配方负责人提供过敏原信息。",
+          "reason": "原文直接回答资料未提供芝麻过敏原清单，并明确指出应找门店当日配方负责人核实，且禁止据空字段推断，完全覆盖用户关于资料状态、核实对象及推断禁令的诉求。",
+          "supported": true
+        },
+        {
+          "id": "MODEL-D024",
+          "category": "direct_fact",
+          "quote": "没有芝麻过敏原明细附件。需要该信息时，应联系门店当日配方负责人；目录缺少附件不能用作无芝麻声明。",
+          "reason": "原文确认当前条目缺少芝麻过敏原明细，指定联系门店当日配方负责人进行核实，并明确目录缺失不能作为无芝麻声明的依据，直接回答了用户的所有子问题。",
+          "supported": true
+        }
+      ],
+      "validation": {
+        "status": "complete",
+        "outputHash": "a8e8b06571c40717a33cb4daf56808646625cf6fef752fe25adca82ff5fca8d9",
+        "invalidDecisions": []
+      },
+      "attempts": [
+        {
+          "operation": "support",
+          "provider": "bailian",
+          "model": "qwen3.7-plus-2026-05-26",
+          "attempt": 1,
+          "durationMs": 4377.248833999998,
+          "outcome": "ok",
+          "totalTokens": 2279,
+          "inputTokens": 400,
+          "outputTokens": 215,
+          "cacheReadTokens": 1664,
+          "cacheWriteTokens": 0,
+          "costUsd": null,
+          "costCny": 0.005848
+        }
+      ]
+    },
+    {
+      "id": "model-012",
+      "group": "regression",
+      "arm": "A",
+      "selection": "deepseek-v4-pro",
+      "sequence": 24,
+      "execution": "completed",
+      "inputHash": "a0ef87230507446b7595f525304a652c11a4b7c92829e8971ef87e1a6e67c19c",
+      "score": {
+        "candidates": [
+          {
+            "id": "MODEL-D023",
+            "expectedPositive": true,
+            "state": "valid",
+            "category": "direct_fact",
+            "supported": true,
+            "passed": false,
+            "falseAccepted": false,
+            "falseRejected": false
+          },
+          {
+            "id": "MODEL-D024",
+            "expectedPositive": true,
+            "state": "valid",
+            "category": "direct_fact",
+            "supported": true,
+            "passed": false,
+            "falseAccepted": false,
+            "falseRejected": false
+          }
+        ],
+        "passed": false,
+        "exactAcceptanceSet": true
+      },
+      "output": {
+        "text": "{\n  \"decisions\": [\n    {\n      \"id\": \"MODEL-D023\",\n      \"category\": \"direct_fact\",\n      \"quote\": \"芝麻过敏原清单字段明确标为未收录。空字段不能证明菜品不含芝麻；应由门店当日配方负责人提供过敏原信息。\",\n      \"reason\": \"原文直接回答：资料未提供芝麻过敏原清单，且明确应由门店当日配方负责人核实，不能据空字段推断不含芝麻。\"\n    },\n    {\n      \"id\": \"MODEL-D024\",\n      \"category\": \"direct_fact\",\n      \"quote\": \"当前条目仅包含份量及售价，没有芝麻过敏原明细附件。需要该信息时，应联系门店当日配方负责人；目录缺少附件不能用作无芝麻声明。\",\n      \"reason\": \"原文直接回答：资料缺少芝麻过敏原明细，应联系门店当日配方负责人，且不能据缺少附件推断无芝麻。\"\n    }\n  ]\n}",
+        "stopReason": "stop",
+        "outputHash": "c7e5d17bb9b7a802f7fcfc8c170cfa7be8ac29952670c26dfaafb58e79f55a6d",
+        "truncated": false
+      },
+      "verificationHash": "5c0b298c54ac907867b4a8486b0af0561bb11fa018d141d1bf70a233a33a46da",
+      "verificationInputHash": "9eea0689841a2bff9ebf58860a0820516d2cf4ac159c41b69660b4cc126f2e13",
+      "requestHash": "7c41d5ddb07922363b6ae03073166090a98cc63c7073dbeea0150a7f751bf706",
+      "decisions": [
+        {
+          "id": "MODEL-D023",
+          "category": "direct_fact",
+          "quote": "芝麻过敏原清单字段明确标为未收录。空字段不能证明菜品不含芝麻；应由门店当日配方负责人提供过敏原信息。",
+          "reason": "原文直接回答：资料未提供芝麻过敏原清单，且明确应由门店当日配方负责人核实，不能据空字段推断不含芝麻。",
+          "supported": true
+        },
+        {
+          "id": "MODEL-D024",
+          "category": "direct_fact",
+          "quote": "当前条目仅包含份量及售价，没有芝麻过敏原明细附件。需要该信息时，应联系门店当日配方负责人；目录缺少附件不能用作无芝麻声明。",
+          "reason": "原文直接回答：资料缺少芝麻过敏原明细，应联系门店当日配方负责人，且不能据缺少附件推断无芝麻。",
+          "supported": true
+        }
+      ],
+      "validation": {
+        "status": "complete",
+        "outputHash": "c7e5d17bb9b7a802f7fcfc8c170cfa7be8ac29952670c26dfaafb58e79f55a6d",
+        "invalidDecisions": []
+      },
+      "attempts": [
+        {
+          "operation": "support",
+          "provider": "deepseek",
+          "model": "deepseek-v4-pro",
+          "attempt": 1,
+          "durationMs": 2442.498790999991,
+          "outcome": "ok",
+          "totalTokens": 2274,
+          "inputTokens": 280,
+          "outputTokens": 202,
+          "cacheReadTokens": 1792,
+          "cacheWriteTokens": 0,
+          "costUsd": 0.0012483680000000001
+        }
+      ]
+    }
+  ],
+  "requests": [
+    {
+      "index": 0,
+      "operation": "support",
+      "arm": "A",
+      "caseId": "model-001",
+      "inputHash": "0825458afa3c94f055bcd0f5b311691018fb1e1075dcd01c662912bc463808bb",
+      "sequence": 1,
+      "requestId": "bd85183b-a59c-4c09-a0c6-dcc38f14bfef:model-001:A",
+      "settingsHash": "272c7619d4ef0a29c6a9c4bbfa7a6b8775ee61dbaadf2f71ab47a02fb7796dae",
+      "provider": "deepseek",
+      "model": "deepseek-v4-pro",
+      "endpoint": "https://api.deepseek.com/chat/completions",
+      "method": "POST",
+      "bodyHash": "dbc12b24a78bdabdb714d1805c437562ad515500e6af7abeea4b6e6ea56ab1a4",
+      "requestHash": "b9dc7cd46649be2958936f1d2b15a9d01713d497b454b49b3810795511f21b9e",
+      "sentAt": "2026-10-06T09:56:28.613Z",
+      "httpStatus": 200,
+      "httpError": null,
+      "responseHash": "11de717f3a30dc71bcd3e8fa12387258533b39ae8abf0cb90a4c8e886827484e",
+      "responseModels": [
+        "deepseek-v4-pro"
+      ],
+      "rawUsage": {
+        "prompt_tokens": 2045,
+        "completion_tokens": 175,
+        "total_tokens": 2220,
+        "prompt_tokens_details": {
+          "cached_tokens": 1792
+        },
+        "prompt_cache_hit_tokens": 1792
+      },
+      "durationMs": 2174.544458,
+      "attempt": 1,
+      "totalTokens": 2220,
+      "inputTokens": 253,
+      "outputTokens": 175,
+      "cacheReadTokens": 1792,
+      "cacheWriteTokens": 0,
+      "currency": "USD",
+      "estimatedCost": 0.001105808,
+      "usageRecorded": true
+    },
+    {
+      "index": 1,
+      "operation": "support",
+      "arm": "B",
+      "caseId": "model-001",
+      "inputHash": "0825458afa3c94f055bcd0f5b311691018fb1e1075dcd01c662912bc463808bb",
+      "sequence": 2,
+      "requestId": "bd85183b-a59c-4c09-a0c6-dcc38f14bfef:model-001:B",
+      "settingsHash": "91e372d95c01f0ed40c0def3aa44b33074a715a9ed5c6f49d5469e814a56d937",
+      "provider": "bailian",
+      "model": "qwen3.7-plus-2026-05-26",
+      "endpoint": "https://ws-tiy939iiusj2254o.cn-beijing.maas.aliyuncs.com/compatible-mode/v1/chat/completions",
+      "method": "POST",
+      "bodyHash": "b5fa371ef879edb3d943fc464409606551969f7fac06d6282fc955957b443432",
+      "requestHash": "a9603faa2cf8a3dc6ee34a8da84b0f99edc8ee061bf09d6ddbcc646dd695f66c",
+      "sentAt": "2026-10-06T09:56:30.761Z",
+      "httpStatus": 200,
+      "httpError": null,
+      "responseHash": "87761517e7beb7afdcc41ed26b922e0ec80f2a055a98a2cd2946d9654ef51250",
+      "responseModels": [
+        "qwen3.7-plus-2026-05-26"
+      ],
+      "rawUsage": {
+        "prompt_tokens": 2031,
+        "completion_tokens": 189,
+        "total_tokens": 2220,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        }
+      },
+      "durationMs": 4513.0634580000005,
+      "attempt": 1,
+      "totalTokens": 2220,
+      "inputTokens": 2031,
+      "outputTokens": 189,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "currency": "CNY",
+      "estimatedCost": 0.005574,
+      "usageRecorded": true
+    },
+    {
+      "index": 2,
+      "operation": "support",
+      "arm": "B",
+      "caseId": "model-002",
+      "inputHash": "5529e9501cf12bd2ebd46e4d34e8a40a5497f93ad95f2d7a5603fe470d7ac4d7",
+      "sequence": 3,
+      "requestId": "bd85183b-a59c-4c09-a0c6-dcc38f14bfef:model-002:B",
+      "settingsHash": "91e372d95c01f0ed40c0def3aa44b33074a715a9ed5c6f49d5469e814a56d937",
+      "provider": "bailian",
+      "model": "qwen3.7-plus-2026-05-26",
+      "endpoint": "https://ws-tiy939iiusj2254o.cn-beijing.maas.aliyuncs.com/compatible-mode/v1/chat/completions",
+      "method": "POST",
+      "bodyHash": "2a835553b3a021bb78d4eb98eca58f32376db867fda27e1ed03dde6a52497291",
+      "requestHash": "1d015c9fe5ddf87de646b2e43b7fa4b852e2a7021b5771f19b0fb86cc808d04b",
+      "sentAt": "2026-10-06T09:56:35.276Z",
+      "httpStatus": 200,
+      "httpError": null,
+      "responseHash": "c629342cf803b87b7ab4a68fdbdde7e15b5ce610d7615fc9f2c79ee1f8cf0866",
+      "responseModels": [
+        "qwen3.7-plus-2026-05-26"
+      ],
+      "rawUsage": {
+        "prompt_tokens": 2059,
+        "completion_tokens": 244,
+        "total_tokens": 2303,
+        "prompt_tokens_details": {
+          "cached_tokens": 1664
+        }
+      },
+      "durationMs": 4957.838292,
+      "attempt": 1,
+      "totalTokens": 2303,
+      "inputTokens": 395,
+      "outputTokens": 244,
+      "cacheReadTokens": 1664,
+      "cacheWriteTokens": 0,
+      "currency": "CNY",
+      "estimatedCost": 0.00607,
+      "usageRecorded": true
+    },
+    {
+      "index": 3,
+      "operation": "support",
+      "arm": "A",
+      "caseId": "model-002",
+      "inputHash": "5529e9501cf12bd2ebd46e4d34e8a40a5497f93ad95f2d7a5603fe470d7ac4d7",
+      "sequence": 4,
+      "requestId": "bd85183b-a59c-4c09-a0c6-dcc38f14bfef:model-002:A",
+      "settingsHash": "272c7619d4ef0a29c6a9c4bbfa7a6b8775ee61dbaadf2f71ab47a02fb7796dae",
+      "provider": "deepseek",
+      "model": "deepseek-v4-pro",
+      "endpoint": "https://api.deepseek.com/chat/completions",
+      "method": "POST",
+      "bodyHash": "fab1e0b7c8fcb14154673b8377f8548dc7303ed23638bdd530818761e5cb1456",
+      "requestHash": "0fce95493b6327c6b99c530fc23c41c77b916e00567e7bdc297cc513ba478bba",
+      "sentAt": "2026-10-06T09:56:40.237Z",
+      "httpStatus": 200,
+      "httpError": null,
+      "responseHash": "dbd2e91c2318e0efad19f5b42701b3f5e026263c374da32d6bfed215dbccd12f",
+      "responseModels": [
+        "deepseek-v4-pro"
+      ],
+      "rawUsage": {
+        "prompt_tokens": 2065,
+        "completion_tokens": 243,
+        "total_tokens": 2308,
+        "prompt_tokens_details": {
+          "cached_tokens": 1792
+        },
+        "prompt_cache_hit_tokens": 1792
+      },
+      "durationMs": 2829.376375,
+      "attempt": 1,
+      "totalTokens": 2308,
+      "inputTokens": 273,
+      "outputTokens": 243,
+      "cacheReadTokens": 1792,
+      "cacheWriteTokens": 0,
+      "currency": "USD",
+      "estimatedCost": 0.001401488,
+      "usageRecorded": true
+    },
+    {
+      "index": 4,
+      "operation": "support",
+      "arm": "A",
+      "caseId": "model-003",
+      "inputHash": "313fc8965ba4181e3fbebbceb685425f3854bde891b5657e0627607c7858de3e",
+      "sequence": 5,
+      "requestId": "bd85183b-a59c-4c09-a0c6-dcc38f14bfef:model-003:A",
+      "settingsHash": "272c7619d4ef0a29c6a9c4bbfa7a6b8775ee61dbaadf2f71ab47a02fb7796dae",
+      "provider": "deepseek",
+      "model": "deepseek-v4-pro",
+      "endpoint": "https://api.deepseek.com/chat/completions",
+      "method": "POST",
+      "bodyHash": "06c601c5aced426cdde130d2d543cc925fde13605af5364412b13120380e4888",
+      "requestHash": "45fe607749a1154d6e54541ac6e7957f040c81be6a5dcc435f4e069802e8a8b2",
+      "sentAt": "2026-10-06T09:56:43.069Z",
+      "httpStatus": 200,
+      "httpError": null,
+      "responseHash": "0150c6be281b839ded8cbaff720ee701f57bf66c876d623c8c151d26ef7570ae",
+      "responseModels": [
+        "deepseek-v4-pro"
+      ],
+      "rawUsage": {
+        "prompt_tokens": 2060,
+        "completion_tokens": 188,
+        "total_tokens": 2248,
+        "prompt_tokens_details": {
+          "cached_tokens": 1792
+        },
+        "prompt_cache_hit_tokens": 1792
+      },
+      "durationMs": 1796.189624999999,
+      "attempt": 1,
+      "totalTokens": 2248,
+      "inputTokens": 268,
+      "outputTokens": 188,
+      "cacheReadTokens": 1792,
+      "cacheWriteTokens": 0,
+      "currency": "USD",
+      "estimatedCost": 0.0011770880000000002,
+      "usageRecorded": true
+    },
+    {
+      "index": 5,
+      "operation": "support",
+      "arm": "B",
+      "caseId": "model-003",
+      "inputHash": "313fc8965ba4181e3fbebbceb685425f3854bde891b5657e0627607c7858de3e",
+      "sequence": 6,
+      "requestId": "bd85183b-a59c-4c09-a0c6-dcc38f14bfef:model-003:B",
+      "settingsHash": "91e372d95c01f0ed40c0def3aa44b33074a715a9ed5c6f49d5469e814a56d937",
+      "provider": "bailian",
+      "model": "qwen3.7-plus-2026-05-26",
+      "endpoint": "https://ws-tiy939iiusj2254o.cn-beijing.maas.aliyuncs.com/compatible-mode/v1/chat/completions",
+      "method": "POST",
+      "bodyHash": "dd671ce4258915b81c2473f85619e3e7276176d720bb3002164fde78036e461c",
+      "requestHash": "3c4e6ce511d36cdb82a2ad730b16eec6b44f771f54194bd39f24a891a3fc2702",
+      "sentAt": "2026-10-06T09:56:44.869Z",
+      "httpStatus": 200,
+      "httpError": null,
+      "responseHash": "1dc0a76a32432f0f62414d00689fc6d3196f5bc5f29fee10ff43bf226a295acf",
+      "responseModels": [
+        "qwen3.7-plus-2026-05-26"
+      ],
+      "rawUsage": {
+        "prompt_tokens": 2042,
+        "completion_tokens": 196,
+        "total_tokens": 2238,
+        "prompt_tokens_details": {
+          "cached_tokens": 1664
+        }
+      },
+      "durationMs": 4294.867209,
+      "attempt": 1,
+      "totalTokens": 2238,
+      "inputTokens": 378,
+      "outputTokens": 196,
+      "cacheReadTokens": 1664,
+      "cacheWriteTokens": 0,
+      "currency": "CNY",
+      "estimatedCost": 0.005652,
+      "usageRecorded": true
+    },
+    {
+      "index": 6,
+      "operation": "support",
+      "arm": "B",
+      "caseId": "model-004",
+      "inputHash": "32a61a05f47a88043c9466c9e7bf616f4804b5ffb2f7b6a9e488200f0fbbdea2",
+      "sequence": 7,
+      "requestId": "bd85183b-a59c-4c09-a0c6-dcc38f14bfef:model-004:B",
+      "settingsHash": "91e372d95c01f0ed40c0def3aa44b33074a715a9ed5c6f49d5469e814a56d937",
+      "provider": "bailian",
+      "model": "qwen3.7-plus-2026-05-26",
+      "endpoint": "https://ws-tiy939iiusj2254o.cn-beijing.maas.aliyuncs.com/compatible-mode/v1/chat/completions",
+      "method": "POST",
+      "bodyHash": "afb7a2cf91b91b560e4cb4890e8aa469b1aaa4ab51a0041c96d1de34d5f40521",
+      "requestHash": "29da42dd3192715ddf4b0d266fed070e730e33dfa0341a6f0d067b2624f918c9",
+      "sentAt": "2026-10-06T09:56:49.167Z",
+      "httpStatus": 200,
+      "httpError": null,
+      "responseHash": "b1f0449410bc005464648aceb6155e7e7fc88e93f0b71673bb7926f1b9212be1",
+      "responseModels": [
+        "qwen3.7-plus-2026-05-26"
+      ],
+      "rawUsage": {
+        "prompt_tokens": 2019,
+        "completion_tokens": 196,
+        "total_tokens": 2215,
+        "prompt_tokens_details": {
+          "cached_tokens": 1664
+        }
+      },
+      "durationMs": 4157.474290999999,
+      "attempt": 1,
+      "totalTokens": 2215,
+      "inputTokens": 355,
+      "outputTokens": 196,
+      "cacheReadTokens": 1664,
+      "cacheWriteTokens": 0,
+      "currency": "CNY",
+      "estimatedCost": 0.005606,
+      "usageRecorded": true
+    },
+    {
+      "index": 7,
+      "operation": "support",
+      "arm": "A",
+      "caseId": "model-004",
+      "inputHash": "32a61a05f47a88043c9466c9e7bf616f4804b5ffb2f7b6a9e488200f0fbbdea2",
+      "sequence": 8,
+      "requestId": "bd85183b-a59c-4c09-a0c6-dcc38f14bfef:model-004:A",
+      "settingsHash": "272c7619d4ef0a29c6a9c4bbfa7a6b8775ee61dbaadf2f71ab47a02fb7796dae",
+      "provider": "deepseek",
+      "model": "deepseek-v4-pro",
+      "endpoint": "https://api.deepseek.com/chat/completions",
+      "method": "POST",
+      "bodyHash": "f7321bdc925ed0c8c4be5288bb008535f5d051e7a7fc1fc1f43fcba5c1cf48ad",
+      "requestHash": "ff03d6a850e97f98bdb43fac92cd32c3a4f82c32030cb3206df4771f64dc92f0",
+      "sentAt": "2026-10-06T09:56:53.328Z",
+      "httpStatus": 200,
+      "httpError": null,
+      "responseHash": "5449d1acd4e636fbc272b457dc1eb4e05872b4b170f52916f525a02e797b513f",
+      "responseModels": [
+        "deepseek-v4-pro"
+      ],
+      "rawUsage": {
+        "prompt_tokens": 2028,
+        "completion_tokens": 159,
+        "total_tokens": 2187,
+        "prompt_tokens_details": {
+          "cached_tokens": 1792
+        },
+        "prompt_cache_hit_tokens": 1792
+      },
+      "durationMs": 2297.7397920000003,
+      "attempt": 1,
+      "totalTokens": 2187,
+      "inputTokens": 236,
+      "outputTokens": 159,
+      "cacheReadTokens": 1792,
+      "cacheWriteTokens": 0,
+      "currency": "USD",
+      "estimatedCost": 0.001020008,
+      "usageRecorded": true
+    },
+    {
+      "index": 8,
+      "operation": "support",
+      "arm": "A",
+      "caseId": "model-005",
+      "inputHash": "18bb31137ab4f1a71f626ae3c2c57a7203a1328d0cf38ef53de357d45b86e23f",
+      "sequence": 9,
+      "requestId": "bd85183b-a59c-4c09-a0c6-dcc38f14bfef:model-005:A",
+      "settingsHash": "272c7619d4ef0a29c6a9c4bbfa7a6b8775ee61dbaadf2f71ab47a02fb7796dae",
+      "provider": "deepseek",
+      "model": "deepseek-v4-pro",
+      "endpoint": "https://api.deepseek.com/chat/completions",
+      "method": "POST",
+      "bodyHash": "4b3bfd9c0fe09570ec60429c9e5ce12913794117b2b5d97e8470f46d8c61dce0",
+      "requestHash": "21b0aa3be2253c89c28cd26190bd59928c4292ec6f85dd49707ada8067e0d3aa",
+      "sentAt": "2026-10-06T09:56:55.634Z",
+      "httpStatus": 200,
+      "httpError": null,
+      "responseHash": "229b9382d80b3c481fdcb4e19525033bdf28b49d450616b5bd3bf53922082711",
+      "responseModels": [
+        "deepseek-v4-pro"
+      ],
+      "rawUsage": {
+        "prompt_tokens": 2047,
+        "completion_tokens": 236,
+        "total_tokens": 2283,
+        "prompt_tokens_details": {
+          "cached_tokens": 1792
+        },
+        "prompt_cache_hit_tokens": 1792
+      },
+      "durationMs": 2724.057499999999,
+      "attempt": 1,
+      "totalTokens": 2283,
+      "inputTokens": 255,
+      "outputTokens": 236,
+      "cacheReadTokens": 1792,
+      "cacheWriteTokens": 0,
+      "currency": "USD",
+      "estimatedCost": 0.0013500080000000002,
+      "usageRecorded": true
+    },
+    {
+      "index": 9,
+      "operation": "support",
+      "arm": "B",
+      "caseId": "model-005",
+      "inputHash": "18bb31137ab4f1a71f626ae3c2c57a7203a1328d0cf38ef53de357d45b86e23f",
+      "sequence": 10,
+      "requestId": "bd85183b-a59c-4c09-a0c6-dcc38f14bfef:model-005:B",
+      "settingsHash": "91e372d95c01f0ed40c0def3aa44b33074a715a9ed5c6f49d5469e814a56d937",
+      "provider": "bailian",
+      "model": "qwen3.7-plus-2026-05-26",
+      "endpoint": "https://ws-tiy939iiusj2254o.cn-beijing.maas.aliyuncs.com/compatible-mode/v1/chat/completions",
+      "method": "POST",
+      "bodyHash": "de7b43964fbb5f35a9c8a12c0f0107ac67a959c1f6228ebdbbb6baf1de89ee92",
+      "requestHash": "3fd2b03ca8855b1539ef511e425de360f04dc7f34758b12b22209738282e2e46",
+      "sentAt": "2026-10-06T09:56:58.362Z",
+      "httpStatus": 200,
+      "httpError": null,
+      "responseHash": "415e839b860f647756515ef03b37338413472b0f1ef931f2c665df7cea621f2c",
+      "responseModels": [
+        "qwen3.7-plus-2026-05-26"
+      ],
+      "rawUsage": {
+        "prompt_tokens": 2039,
+        "completion_tokens": 219,
+        "total_tokens": 2258,
+        "prompt_tokens_details": {
+          "cached_tokens": 1664
+        }
+      },
+      "durationMs": 4541.829958999999,
+      "attempt": 1,
+      "totalTokens": 2258,
+      "inputTokens": 375,
+      "outputTokens": 219,
+      "cacheReadTokens": 1664,
+      "cacheWriteTokens": 0,
+      "currency": "CNY",
+      "estimatedCost": 0.00583,
+      "usageRecorded": true
+    },
+    {
+      "index": 10,
+      "operation": "support",
+      "arm": "B",
+      "caseId": "model-006",
+      "inputHash": "fe55bb6302cb9e0f026fe2dbfa63c8b1cf133c4fc1f46d34f18f26485d44221a",
+      "sequence": 11,
+      "requestId": "bd85183b-a59c-4c09-a0c6-dcc38f14bfef:model-006:B",
+      "settingsHash": "91e372d95c01f0ed40c0def3aa44b33074a715a9ed5c6f49d5469e814a56d937",
+      "provider": "bailian",
+      "model": "qwen3.7-plus-2026-05-26",
+      "endpoint": "https://ws-tiy939iiusj2254o.cn-beijing.maas.aliyuncs.com/compatible-mode/v1/chat/completions",
+      "method": "POST",
+      "bodyHash": "62c04b27fbb922198658139135c93b1fd3aefb4f3bf886a3457d207dc910521d",
+      "requestHash": "9bab3ad38c6f20b9595a92cb2f2ab3bc3170348841c3a33e1ace1653ff0a0272",
+      "sentAt": "2026-10-06T09:57:02.907Z",
+      "httpStatus": 200,
+      "httpError": null,
+      "responseHash": "e358391b6ff168c17075e179ade639c051f5544bc42e6c87cf32d70e860af306",
+      "responseModels": [
+        "qwen3.7-plus-2026-05-26"
+      ],
+      "rawUsage": {
+        "prompt_tokens": 2028,
+        "completion_tokens": 218,
+        "total_tokens": 2246,
+        "prompt_tokens_details": {
+          "cached_tokens": 1664
+        }
+      },
+      "durationMs": 4427.2302500000005,
+      "attempt": 1,
+      "totalTokens": 2246,
+      "inputTokens": 364,
+      "outputTokens": 218,
+      "cacheReadTokens": 1664,
+      "cacheWriteTokens": 0,
+      "currency": "CNY",
+      "estimatedCost": 0.0058,
+      "usageRecorded": true
+    },
+    {
+      "index": 11,
+      "operation": "support",
+      "arm": "A",
+      "caseId": "model-006",
+      "inputHash": "fe55bb6302cb9e0f026fe2dbfa63c8b1cf133c4fc1f46d34f18f26485d44221a",
+      "sequence": 12,
+      "requestId": "bd85183b-a59c-4c09-a0c6-dcc38f14bfef:model-006:A",
+      "settingsHash": "272c7619d4ef0a29c6a9c4bbfa7a6b8775ee61dbaadf2f71ab47a02fb7796dae",
+      "provider": "deepseek",
+      "model": "deepseek-v4-pro",
+      "endpoint": "https://api.deepseek.com/chat/completions",
+      "method": "POST",
+      "bodyHash": "f7905da8d19bf0385ac6713752d3e2dc009534d27c9c3d6272fddaa623cb8784",
+      "requestHash": "eda37da0bd593fa1152c0387c5764882293afffd3388e0b4bbe4b617648c96c3",
+      "sentAt": "2026-10-06T09:57:07.339Z",
+      "httpStatus": 200,
+      "httpError": null,
+      "responseHash": "bf113986ef3b4016d6e30caf45819f526a10f2c2b7093c9a78187aa1f6189a79",
+      "responseModels": [
+        "deepseek-v4-pro"
+      ],
+      "rawUsage": {
+        "prompt_tokens": 2048,
+        "completion_tokens": 175,
+        "total_tokens": 2223,
+        "prompt_tokens_details": {
+          "cached_tokens": 1792
+        },
+        "prompt_cache_hit_tokens": 1792
+      },
+      "durationMs": 3127.9146249999976,
+      "attempt": 1,
+      "totalTokens": 2223,
+      "inputTokens": 256,
+      "outputTokens": 175,
+      "cacheReadTokens": 1792,
+      "cacheWriteTokens": 0,
+      "currency": "USD",
+      "estimatedCost": 0.0011097680000000001,
+      "usageRecorded": true
+    },
+    {
+      "index": 12,
+      "operation": "support",
+      "arm": "A",
+      "caseId": "model-007",
+      "inputHash": "dbce42df1bb2b2ca5bbaf60f9b823f572a14a2d92bab9387a98ce32ac8d98bb9",
+      "sequence": 13,
+      "requestId": "bd85183b-a59c-4c09-a0c6-dcc38f14bfef:model-007:A",
+      "settingsHash": "272c7619d4ef0a29c6a9c4bbfa7a6b8775ee61dbaadf2f71ab47a02fb7796dae",
+      "provider": "deepseek",
+      "model": "deepseek-v4-pro",
+      "endpoint": "https://api.deepseek.com/chat/completions",
+      "method": "POST",
+      "bodyHash": "edd8eb913e2d57616f00dc49181fd7e1276c3e2df22d1f7fc28c06a074dffdd8",
+      "requestHash": "40516220c6905efc01a02b187b748a65c3e66cebec7860804ebda4fb87f499e8",
+      "sentAt": "2026-10-06T09:57:10.471Z",
+      "httpStatus": 200,
+      "httpError": null,
+      "responseHash": "5ffd71c2866df3cbea5c6b2666d966b83b44d2dbab9236545a39ae9b89a34adb",
+      "responseModels": [
+        "deepseek-v4-pro"
+      ],
+      "rawUsage": {
+        "prompt_tokens": 2048,
+        "completion_tokens": 148,
+        "total_tokens": 2196,
+        "prompt_tokens_details": {
+          "cached_tokens": 1792
+        },
+        "prompt_cache_hit_tokens": 1792
+      },
+      "durationMs": 1984.4605840000004,
+      "attempt": 1,
+      "totalTokens": 2196,
+      "inputTokens": 256,
+      "outputTokens": 148,
+      "cacheReadTokens": 1792,
+      "cacheWriteTokens": 0,
+      "currency": "USD",
+      "estimatedCost": 0.001002848,
+      "usageRecorded": true
+    },
+    {
+      "index": 13,
+      "operation": "support",
+      "arm": "B",
+      "caseId": "model-007",
+      "inputHash": "dbce42df1bb2b2ca5bbaf60f9b823f572a14a2d92bab9387a98ce32ac8d98bb9",
+      "sequence": 14,
+      "requestId": "bd85183b-a59c-4c09-a0c6-dcc38f14bfef:model-007:B",
+      "settingsHash": "91e372d95c01f0ed40c0def3aa44b33074a715a9ed5c6f49d5469e814a56d937",
+      "provider": "bailian",
+      "model": "qwen3.7-plus-2026-05-26",
+      "endpoint": "https://ws-tiy939iiusj2254o.cn-beijing.maas.aliyuncs.com/compatible-mode/v1/chat/completions",
+      "method": "POST",
+      "bodyHash": "e92b2a048be58f1311b3e948686cc5c534b9087ff1dc3ec6dc7820e4395edfbd",
+      "requestHash": "b0cb6056180a8854d262b0651238606cd9d8791f22024488bb2b7aaa388f930c",
+      "sentAt": "2026-10-06T09:57:12.460Z",
+      "httpStatus": 200,
+      "httpError": null,
+      "responseHash": "84b103646b98d1fcb9ef4e6f1f263335c265aaf2370f44278b6c42157b96d873",
+      "responseModels": [
+        "qwen3.7-plus-2026-05-26"
+      ],
+      "rawUsage": {
+        "prompt_tokens": 2042,
+        "completion_tokens": 199,
+        "total_tokens": 2241,
+        "prompt_tokens_details": {
+          "cached_tokens": 1664
+        }
+      },
+      "durationMs": 4473.255041000004,
+      "attempt": 1,
+      "totalTokens": 2241,
+      "inputTokens": 378,
+      "outputTokens": 199,
+      "cacheReadTokens": 1664,
+      "cacheWriteTokens": 0,
+      "currency": "CNY",
+      "estimatedCost": 0.005676,
+      "usageRecorded": true
+    },
+    {
+      "index": 14,
+      "operation": "support",
+      "arm": "B",
+      "caseId": "model-008",
+      "inputHash": "bab568b6dd7ada045727da95f49b66648f9aade7bbe4a1477b6a5c175557aae3",
+      "sequence": 15,
+      "requestId": "bd85183b-a59c-4c09-a0c6-dcc38f14bfef:model-008:B",
+      "settingsHash": "91e372d95c01f0ed40c0def3aa44b33074a715a9ed5c6f49d5469e814a56d937",
+      "provider": "bailian",
+      "model": "qwen3.7-plus-2026-05-26",
+      "endpoint": "https://ws-tiy939iiusj2254o.cn-beijing.maas.aliyuncs.com/compatible-mode/v1/chat/completions",
+      "method": "POST",
+      "bodyHash": "f651e149e385ccf2f5ea4af23c0774f9fb805845a909c2734483b67050b6b66e",
+      "requestHash": "8bb50e7b14d4bb781fbd0483c21d19898d02b5ffe925e7d31239df0f29ff2452",
+      "sentAt": "2026-10-06T09:57:16.938Z",
+      "httpStatus": 200,
+      "httpError": null,
+      "responseHash": "9c02fe882f02cf68f9b7fac72414c967e108aecbb241c34e810c24fbe70e1bac",
+      "responseModels": [
+        "qwen3.7-plus-2026-05-26"
+      ],
+      "rawUsage": {
+        "prompt_tokens": 2086,
+        "completion_tokens": 237,
+        "total_tokens": 2323,
+        "prompt_tokens_details": {
+          "cached_tokens": 1664
+        }
+      },
+      "durationMs": 4715.849125000001,
+      "attempt": 1,
+      "totalTokens": 2323,
+      "inputTokens": 422,
+      "outputTokens": 237,
+      "cacheReadTokens": 1664,
+      "cacheWriteTokens": 0,
+      "currency": "CNY",
+      "estimatedCost": 0.006068,
+      "usageRecorded": true
+    },
+    {
+      "index": 15,
+      "operation": "support",
+      "arm": "A",
+      "caseId": "model-008",
+      "inputHash": "bab568b6dd7ada045727da95f49b66648f9aade7bbe4a1477b6a5c175557aae3",
+      "sequence": 16,
+      "requestId": "bd85183b-a59c-4c09-a0c6-dcc38f14bfef:model-008:A",
+      "settingsHash": "272c7619d4ef0a29c6a9c4bbfa7a6b8775ee61dbaadf2f71ab47a02fb7796dae",
+      "provider": "deepseek",
+      "model": "deepseek-v4-pro",
+      "endpoint": "https://api.deepseek.com/chat/completions",
+      "method": "POST",
+      "bodyHash": "fd7dcb90c21bc6d235e2333ca5fb530b145e4500ea000efe965fdbba5fb1c547",
+      "requestHash": "80b36c9dfdfa5191c8edf0c5aef8e52eeb93cce4c6b0a6b8f47594a383429624",
+      "sentAt": "2026-10-06T09:57:21.658Z",
+      "httpStatus": 200,
+      "httpError": null,
+      "responseHash": "c6e58b7c2b1ca7a7cf0056454e8f26c224db78f7bfea58065f7871b463fc8070",
+      "responseModels": [
+        "deepseek-v4-pro"
+      ],
+      "rawUsage": {
+        "prompt_tokens": 2100,
+        "completion_tokens": 173,
+        "total_tokens": 2273,
+        "prompt_tokens_details": {
+          "cached_tokens": 1792
+        },
+        "prompt_cache_hit_tokens": 1792
+      },
+      "durationMs": 2586.8522500000036,
+      "attempt": 1,
+      "totalTokens": 2273,
+      "inputTokens": 308,
+      "outputTokens": 173,
+      "cacheReadTokens": 1792,
+      "cacheWriteTokens": 0,
+      "currency": "USD",
+      "estimatedCost": 0.0011704880000000001,
+      "usageRecorded": true
+    },
+    {
+      "index": 16,
+      "operation": "support",
+      "arm": "A",
+      "caseId": "model-009",
+      "inputHash": "3a1d266fa08a3c8851459cb381f701f5708f90f6919c29276ac38c4ac2703542",
+      "sequence": 17,
+      "requestId": "bd85183b-a59c-4c09-a0c6-dcc38f14bfef:model-009:A",
+      "settingsHash": "272c7619d4ef0a29c6a9c4bbfa7a6b8775ee61dbaadf2f71ab47a02fb7796dae",
+      "provider": "deepseek",
+      "model": "deepseek-v4-pro",
+      "endpoint": "https://api.deepseek.com/chat/completions",
+      "method": "POST",
+      "bodyHash": "2d035537a2c76c4e4218f6ce66f8a9d314c0b574e923830495e7e6ed364d81df",
+      "requestHash": "5d32b62a3f393f2a09eedd595935e1c0b2f010cd7a8356842265bbb8929b7fa8",
+      "sentAt": "2026-10-06T09:57:24.250Z",
+      "httpStatus": 200,
+      "httpError": null,
+      "responseHash": "baeee18652459fe91e120f92ef783bd0d8c4c6a55fafa39f9bbf304a965f121f",
+      "responseModels": [
+        "deepseek-v4-pro"
+      ],
+      "rawUsage": {
+        "prompt_tokens": 2072,
+        "completion_tokens": 219,
+        "total_tokens": 2291,
+        "prompt_tokens_details": {
+          "cached_tokens": 1792
+        },
+        "prompt_cache_hit_tokens": 1792
+      },
+      "durationMs": 2331.3884160000016,
+      "attempt": 1,
+      "totalTokens": 2291,
+      "inputTokens": 280,
+      "outputTokens": 219,
+      "cacheReadTokens": 1792,
+      "cacheWriteTokens": 0,
+      "currency": "USD",
+      "estimatedCost": 0.0013156880000000002,
+      "usageRecorded": true
+    },
+    {
+      "index": 17,
+      "operation": "support",
+      "arm": "B",
+      "caseId": "model-009",
+      "inputHash": "3a1d266fa08a3c8851459cb381f701f5708f90f6919c29276ac38c4ac2703542",
+      "sequence": 18,
+      "requestId": "bd85183b-a59c-4c09-a0c6-dcc38f14bfef:model-009:B",
+      "settingsHash": "91e372d95c01f0ed40c0def3aa44b33074a715a9ed5c6f49d5469e814a56d937",
+      "provider": "bailian",
+      "model": "qwen3.7-plus-2026-05-26",
+      "endpoint": "https://ws-tiy939iiusj2254o.cn-beijing.maas.aliyuncs.com/compatible-mode/v1/chat/completions",
+      "method": "POST",
+      "bodyHash": "0dce0318979e95513bc1c838772fe65a58d1cdb58f5c5e15427bfa04dabb16b9",
+      "requestHash": "d1f28a5aba4270fb0c46cf19deaf902b47287cd65d37439993d5261ddbd065cc",
+      "sentAt": "2026-10-06T09:57:26.587Z",
+      "httpStatus": 200,
+      "httpError": null,
+      "responseHash": "7af9adf5f073ccd3ef942dc97bbef04bf17743adb94c45c2d4fcd78d50270068",
+      "responseModels": [
+        "qwen3.7-plus-2026-05-26"
+      ],
+      "rawUsage": {
+        "prompt_tokens": 2059,
+        "completion_tokens": 234,
+        "total_tokens": 2293,
+        "prompt_tokens_details": {
+          "cached_tokens": 1664
+        }
+      },
+      "durationMs": 4847.921833,
+      "attempt": 1,
+      "totalTokens": 2293,
+      "inputTokens": 395,
+      "outputTokens": 234,
+      "cacheReadTokens": 1664,
+      "cacheWriteTokens": 0,
+      "currency": "CNY",
+      "estimatedCost": 0.00599,
+      "usageRecorded": true
+    },
+    {
+      "index": 18,
+      "operation": "support",
+      "arm": "B",
+      "caseId": "model-010",
+      "inputHash": "30669157c512d2b3e49ddf5c49bb090ca73066c0d8da62e5aab95bf37fa98288",
+      "sequence": 19,
+      "requestId": "bd85183b-a59c-4c09-a0c6-dcc38f14bfef:model-010:B",
+      "settingsHash": "91e372d95c01f0ed40c0def3aa44b33074a715a9ed5c6f49d5469e814a56d937",
+      "provider": "bailian",
+      "model": "qwen3.7-plus-2026-05-26",
+      "endpoint": "https://ws-tiy939iiusj2254o.cn-beijing.maas.aliyuncs.com/compatible-mode/v1/chat/completions",
+      "method": "POST",
+      "bodyHash": "27d7f2ac34763c85167fe8e8b940badd3264f520b47314a45623e7d6c3c2f4aa",
+      "requestHash": "9028103d3efd64ce785e59152dee2986fa7458e7de287d6819122fa355aa3b34",
+      "sentAt": "2026-10-06T09:57:31.442Z",
+      "httpStatus": 200,
+      "httpError": null,
+      "responseHash": "9e8806a1f89cae85810278f20d6084d5802ad5369b649acc0292cccbc8d93809",
+      "responseModels": [
+        "qwen3.7-plus-2026-05-26"
+      ],
+      "rawUsage": {
+        "prompt_tokens": 2023,
+        "completion_tokens": 180,
+        "total_tokens": 2203,
+        "prompt_tokens_details": {
+          "cached_tokens": 1664
+        }
+      },
+      "durationMs": 4051.8798749999914,
+      "attempt": 1,
+      "totalTokens": 2203,
+      "inputTokens": 359,
+      "outputTokens": 180,
+      "cacheReadTokens": 1664,
+      "cacheWriteTokens": 0,
+      "currency": "CNY",
+      "estimatedCost": 0.005486,
+      "usageRecorded": true
+    },
+    {
+      "index": 19,
+      "operation": "support",
+      "arm": "A",
+      "caseId": "model-010",
+      "inputHash": "30669157c512d2b3e49ddf5c49bb090ca73066c0d8da62e5aab95bf37fa98288",
+      "sequence": 20,
+      "requestId": "bd85183b-a59c-4c09-a0c6-dcc38f14bfef:model-010:A",
+      "settingsHash": "272c7619d4ef0a29c6a9c4bbfa7a6b8775ee61dbaadf2f71ab47a02fb7796dae",
+      "provider": "deepseek",
+      "model": "deepseek-v4-pro",
+      "endpoint": "https://api.deepseek.com/chat/completions",
+      "method": "POST",
+      "bodyHash": "99aca19df5572472d2fbf6b1532cd51fd8e3773ecd95c23e3f1a3e2632742a20",
+      "requestHash": "92c1f93901f2750fded4665a733100dc58b0f6b100f5231cefd21bf73f3b4d42",
+      "sentAt": "2026-10-06T09:57:35.499Z",
+      "httpStatus": 200,
+      "httpError": null,
+      "responseHash": "a9ac4cfbabcd7054bb469aea3a70d90b85e3c9c2736d32d3eaa14dad878218d1",
+      "responseModels": [
+        "deepseek-v4-pro"
+      ],
+      "rawUsage": {
+        "prompt_tokens": 2031,
+        "completion_tokens": 168,
+        "total_tokens": 2199,
+        "prompt_tokens_details": {
+          "cached_tokens": 1792
+        },
+        "prompt_cache_hit_tokens": 1792
+      },
+      "durationMs": 2216.686791,
+      "attempt": 1,
+      "totalTokens": 2199,
+      "inputTokens": 239,
+      "outputTokens": 168,
+      "cacheReadTokens": 1792,
+      "cacheWriteTokens": 0,
+      "currency": "USD",
+      "estimatedCost": 0.0010596080000000003,
+      "usageRecorded": true
+    },
+    {
+      "index": 20,
+      "operation": "support",
+      "arm": "A",
+      "caseId": "model-011",
+      "inputHash": "608353394a93db6c871081fa5d4edef57d20751bd0d2f12c8fa237fd64eac02b",
+      "sequence": 21,
+      "requestId": "bd85183b-a59c-4c09-a0c6-dcc38f14bfef:model-011:A",
+      "settingsHash": "272c7619d4ef0a29c6a9c4bbfa7a6b8775ee61dbaadf2f71ab47a02fb7796dae",
+      "provider": "deepseek",
+      "model": "deepseek-v4-pro",
+      "endpoint": "https://api.deepseek.com/chat/completions",
+      "method": "POST",
+      "bodyHash": "25c7c48a362986da7e0f5d171f2601ae8f9405b6b53dca6f55aa958cb2f2d4b2",
+      "requestHash": "86e0b7ba507d22cae1196449e49cb5ba3642da419fdb0d81016b9fcfc580ed7e",
+      "sentAt": "2026-10-06T09:57:37.724Z",
+      "httpStatus": 200,
+      "httpError": null,
+      "responseHash": "b602bee216d857371ad38155aabfa776b3cd30e608ec9bf62dd5ec743858a10f",
+      "responseModels": [
+        "deepseek-v4-pro"
+      ],
+      "rawUsage": {
+        "prompt_tokens": 2054,
+        "completion_tokens": 122,
+        "total_tokens": 2176,
+        "prompt_tokens_details": {
+          "cached_tokens": 1792
+        },
+        "prompt_cache_hit_tokens": 1792
+      },
+      "durationMs": 1922.2300830000022,
+      "attempt": 1,
+      "totalTokens": 2176,
+      "inputTokens": 262,
+      "outputTokens": 122,
+      "cacheReadTokens": 1792,
+      "cacheWriteTokens": 0,
+      "currency": "USD",
+      "estimatedCost": 0.0009078080000000001,
+      "usageRecorded": true
+    },
+    {
+      "index": 21,
+      "operation": "support",
+      "arm": "B",
+      "caseId": "model-011",
+      "inputHash": "608353394a93db6c871081fa5d4edef57d20751bd0d2f12c8fa237fd64eac02b",
+      "sequence": 22,
+      "requestId": "bd85183b-a59c-4c09-a0c6-dcc38f14bfef:model-011:B",
+      "settingsHash": "91e372d95c01f0ed40c0def3aa44b33074a715a9ed5c6f49d5469e814a56d937",
+      "provider": "bailian",
+      "model": "qwen3.7-plus-2026-05-26",
+      "endpoint": "https://ws-tiy939iiusj2254o.cn-beijing.maas.aliyuncs.com/compatible-mode/v1/chat/completions",
+      "method": "POST",
+      "bodyHash": "433c44ccfe165b571447abde48f77b4f6bdb854034bc282969f5584b39bd969a",
+      "requestHash": "c18d87a37c8b6dd923b6121c46c770166d836f87312994e389e6be721a99bf0f",
+      "sentAt": "2026-10-06T09:57:39.653Z",
+      "httpStatus": 200,
+      "httpError": null,
+      "responseHash": "524c25f8b87406c16d53905b7c8a0ddfc0a65e837a830dba571d65b5991250d5",
+      "responseModels": [
+        "qwen3.7-plus-2026-05-26"
+      ],
+      "rawUsage": {
+        "prompt_tokens": 2042,
+        "completion_tokens": 175,
+        "total_tokens": 2217,
+        "prompt_tokens_details": {
+          "cached_tokens": 1664
+        }
+      },
+      "durationMs": 4267.740625000006,
+      "attempt": 1,
+      "totalTokens": 2217,
+      "inputTokens": 378,
+      "outputTokens": 175,
+      "cacheReadTokens": 1664,
+      "cacheWriteTokens": 0,
+      "currency": "CNY",
+      "estimatedCost": 0.005484,
+      "usageRecorded": true
+    },
+    {
+      "index": 22,
+      "operation": "support",
+      "arm": "B",
+      "caseId": "model-012",
+      "inputHash": "a0ef87230507446b7595f525304a652c11a4b7c92829e8971ef87e1a6e67c19c",
+      "sequence": 23,
+      "requestId": "bd85183b-a59c-4c09-a0c6-dcc38f14bfef:model-012:B",
+      "settingsHash": "91e372d95c01f0ed40c0def3aa44b33074a715a9ed5c6f49d5469e814a56d937",
+      "provider": "bailian",
+      "model": "qwen3.7-plus-2026-05-26",
+      "endpoint": "https://ws-tiy939iiusj2254o.cn-beijing.maas.aliyuncs.com/compatible-mode/v1/chat/completions",
+      "method": "POST",
+      "bodyHash": "fa8f3f5968fc5e8677818caec52c1175b211aeb2a541955dd298ae74bd00fbcf",
+      "requestHash": "004931c9138aa78d7456524901d49799eb26d5f962b7463c99214e4613fee0f3",
+      "sentAt": "2026-10-06T09:57:43.927Z",
+      "httpStatus": 200,
+      "httpError": null,
+      "responseHash": "d22881ab62997d4cd3e8b18107c548c172699af27d07c8126973308a2561aad0",
+      "responseModels": [
+        "qwen3.7-plus-2026-05-26"
+      ],
+      "rawUsage": {
+        "prompt_tokens": 2064,
+        "completion_tokens": 215,
+        "total_tokens": 2279,
+        "prompt_tokens_details": {
+          "cached_tokens": 1664
+        }
+      },
+      "durationMs": 4377.248833999998,
+      "attempt": 1,
+      "totalTokens": 2279,
+      "inputTokens": 400,
+      "outputTokens": 215,
+      "cacheReadTokens": 1664,
+      "cacheWriteTokens": 0,
+      "currency": "CNY",
+      "estimatedCost": 0.005848,
+      "usageRecorded": true
+    },
+    {
+      "index": 23,
+      "operation": "support",
+      "arm": "A",
+      "caseId": "model-012",
+      "inputHash": "a0ef87230507446b7595f525304a652c11a4b7c92829e8971ef87e1a6e67c19c",
+      "sequence": 24,
+      "requestId": "bd85183b-a59c-4c09-a0c6-dcc38f14bfef:model-012:A",
+      "settingsHash": "272c7619d4ef0a29c6a9c4bbfa7a6b8775ee61dbaadf2f71ab47a02fb7796dae",
+      "provider": "deepseek",
+      "model": "deepseek-v4-pro",
+      "endpoint": "https://api.deepseek.com/chat/completions",
+      "method": "POST",
+      "bodyHash": "24dc5290896ecb7b5dde34530491b149894c1b4c1e00a60f346a072fac524a24",
+      "requestHash": "14f88730dc119f69eb1297807e9267d7d9b9be767c59d80cd8dcbe4bdd2e15da",
+      "sentAt": "2026-10-06T09:57:48.311Z",
+      "httpStatus": 200,
+      "httpError": null,
+      "responseHash": "7ed09353647c7ec3cf1543a62b16491e03898f10d1042c61b155120cd46cffe9",
+      "responseModels": [
+        "deepseek-v4-pro"
+      ],
+      "rawUsage": {
+        "prompt_tokens": 2072,
+        "completion_tokens": 202,
+        "total_tokens": 2274,
+        "prompt_tokens_details": {
+          "cached_tokens": 1792
+        },
+        "prompt_cache_hit_tokens": 1792
+      },
+      "durationMs": 2442.498790999991,
+      "attempt": 1,
+      "totalTokens": 2274,
+      "inputTokens": 280,
+      "outputTokens": 202,
+      "cacheReadTokens": 1792,
+      "cacheWriteTokens": 0,
+      "currency": "USD",
+      "estimatedCost": 0.0012483680000000001,
+      "usageRecorded": true
+    }
+  ]
+}
