@@ -1,0 +1,1529 @@
+{
+  "version": 1,
+  "runId": "9c007117-96a0-4364-b009-65a876025f4e",
+  "sourceCommit": "fd01746",
+  "stage": "exposed-development-fixed-input-support-prompt-ablation",
+  "scope": "Real fixed-input support classification; no retrieval, Agent, SQL, QQ, business actions or final reply evaluation.",
+  "rawPath": ".runtime/c1-support-conditions-development/9c007117-96a0-4364-b009-65a876025f4e.json",
+  "rawSha256": "47300cac86405e55fe7d926c8d020f19bca212c1c83d40439188273e7472caeb",
+  "datasetSha256": "779073de82045e7c9643012c689d62a4f8b92ab5ce76035423375f46e476c7da",
+  "manifestSha256": "f2e8d3634ff8fa6532250b0a01cb9552e32a61c1a34cf88799b3502713ae66b4",
+  "startedAt": "2026-10-06T00:06:43.277Z",
+  "finishedAt": "2026-10-06T00:07:26.147Z",
+  "wallMs": 42870,
+  "integrityPassed": true,
+  "codeStable": true,
+  "recordingComplete": true,
+  "executionComplete": true,
+  "usageComplete": true,
+  "stopReason": null,
+  "actualSettings": {
+    "fact-support-typed-v6": {
+      "provider": "deepseek",
+      "model": "deepseek-v4-pro",
+      "api": "openai-completions",
+      "endpoint": "https://api.deepseek.com",
+      "timeoutMs": 60000,
+      "temperature": 0,
+      "maxTokens": 2048,
+      "maxRetries": 0,
+      "promptVersion": "fact-support-typed-v6",
+      "promptHash": "889596997b27deccf91339f46b7a3825aa239a50fbcde92ce5109b67a77f19fa",
+      "serialization": "json-query-id-title-tags-body-v1",
+      "serializationHash": "1d16c5e3ef4647c120fe6ddce72417c9ec618ee41dc77faa447ec214e5749c4a",
+      "pricing": {
+        "currency": "USD",
+        "estimated": true,
+        "source": "Pi model catalog",
+        "rates": {
+          "input": 1.32,
+          "output": 3.96,
+          "cacheRead": 0.044,
+          "cacheWrite": 0
+        }
+      },
+      "profile": "typed",
+      "validationVersion": "typed-candidate-isolation-v1"
+    },
+    "fact-support-typed-v7": {
+      "provider": "deepseek",
+      "model": "deepseek-v4-pro",
+      "api": "openai-completions",
+      "endpoint": "https://api.deepseek.com",
+      "timeoutMs": 60000,
+      "temperature": 0,
+      "maxTokens": 2048,
+      "maxRetries": 0,
+      "promptVersion": "fact-support-typed-v7",
+      "promptHash": "c2d8e1f3de93d86ef658a0d691fe753138efcab7240c9a13f20f499d41937a9c",
+      "serialization": "json-query-id-title-tags-body-v1",
+      "serializationHash": "1d16c5e3ef4647c120fe6ddce72417c9ec618ee41dc77faa447ec214e5749c4a",
+      "pricing": {
+        "currency": "USD",
+        "estimated": true,
+        "source": "Pi model catalog",
+        "rates": {
+          "input": 1.32,
+          "output": 3.96,
+          "cacheRead": 0.044,
+          "cacheWrite": 0
+        }
+      },
+      "profile": "typed",
+      "validationVersion": "typed-candidate-isolation-v1"
+    }
+  },
+  "summary": {
+    "fact-support-typed-v6": {
+      "exactInputs": {
+        "planned": 12,
+        "completed": 12,
+        "passed": 8,
+        "failed": 4,
+        "errors": 0,
+        "notRun": 0
+      },
+      "candidates": {
+        "planned": 15,
+        "positivePlanned": 9,
+        "negativePlanned": 6,
+        "positiveEvaluated": 9,
+        "negativeEvaluated": 6,
+        "passed": 11,
+        "falseAccepted": 2,
+        "falseRejected": 1,
+        "invalid": 0,
+        "missing": 0
+      },
+      "http": {
+        "requests": 12,
+        "unknownCosts": 0,
+        "knownEstimatedUsd": 0.00912032,
+        "estimatedUsd": 0.00912032,
+        "totalTokens": 23178
+      },
+      "latency": {
+        "observed": 12,
+        "p50Ms": 1806.4595840000038,
+        "p95Ms": 2628.4855420000004
+      }
+    },
+    "fact-support-typed-v7": {
+      "exactInputs": {
+        "planned": 12,
+        "completed": 12,
+        "passed": 10,
+        "failed": 2,
+        "errors": 0,
+        "notRun": 0
+      },
+      "candidates": {
+        "planned": 15,
+        "positivePlanned": 9,
+        "negativePlanned": 6,
+        "positiveEvaluated": 9,
+        "negativeEvaluated": 6,
+        "passed": 13,
+        "falseAccepted": 1,
+        "falseRejected": 1,
+        "invalid": 0,
+        "missing": 0
+      },
+      "http": {
+        "requests": 12,
+        "unknownCosts": 0,
+        "knownEstimatedUsd": 0.01427888,
+        "estimatedUsd": 0.01427888,
+        "totalTokens": 25422
+      },
+      "latency": {
+        "observed": 12,
+        "p50Ms": 1617.6389579999995,
+        "p95Ms": 2789.947166000001
+      }
+    }
+  },
+  "costsAndIndependentScore": {
+    "fact-support-typed-v6": {
+      "exact": 8,
+      "classified": 11,
+      "falseAccepted": 2,
+      "falseRejected": 1,
+      "categoryOnly": 1,
+      "totalTokens": 23178,
+      "costUsd": 0.00912032,
+      "inputTokens": 1883,
+      "outputTokens": 1455,
+      "cacheReadTokens": 19840,
+      "cacheWriteTokens": 0
+    },
+    "fact-support-typed-v7": {
+      "exact": 10,
+      "classified": 13,
+      "falseAccepted": 1,
+      "falseRejected": 1,
+      "categoryOnly": 0,
+      "totalTokens": 25422,
+      "costUsd": 0.01427888,
+      "inputTokens": 6143,
+      "outputTokens": 1359,
+      "cacheReadTokens": 17920,
+      "cacheWriteTokens": 0
+    }
+  },
+  "usage": {
+    "agent": {
+      "requests": 0,
+      "unknownCosts": 0,
+      "knownEstimatedCost": 0,
+      "estimatedCost": 0,
+      "totalTokens": 0
+    },
+    "rerank": {
+      "requests": 0,
+      "unknownCosts": 0,
+      "knownEstimatedCost": 0,
+      "estimatedCost": 0,
+      "totalTokens": 0
+    },
+    "support": {
+      "requests": 24,
+      "unknownCosts": 0,
+      "knownEstimatedCost": 0.0233992,
+      "estimatedCost": 0.0233992,
+      "totalTokens": 48600
+    }
+  },
+  "comparison": {
+    "improved": [
+      "conditions-001",
+      "conditions-004"
+    ],
+    "regressions": [],
+    "gates": {
+      "completeExecutionAndUsage": true,
+      "bankcardTarget001And002": false,
+      "positiveControls": true,
+      "noRegression": true,
+      "observedTargetImprovement": true
+    },
+    "promotionPassed": false,
+    "decision": "Retain as a development result; do not wire v7 into Session or change defaults. Single-document bankcard false acceptance remains; no repeat of this manifest."
+  },
+  "rows": [
+    {
+      "id": "conditions-001",
+      "group": "target",
+      "version": "fact-support-typed-v6",
+      "execution": "completed",
+      "passed": false,
+      "inputHash": "c50bcdb85d048e1d514d8bc1647bd35b9747619c78415594f180fa733962d2fd",
+      "verificationHash": "fc5e840bba1d5d22b45844cc46b1f4855144b9fd32cb47b3194ffe37c65fbadf",
+      "requestHash": "abd1485332e0ff671c147078d04a07c829e43f55624969d21bf198abdd398a82",
+      "verificationInputHash": "ee8b78133c24bdd6161f499a9b08e90f91bf31db372414345096d64eab2fab2f",
+      "candidateResults": [
+        {
+          "id": "RF005",
+          "passed": true,
+          "expectedCategory": "direct_fact",
+          "expectedSupported": true,
+          "actualCategory": "direct_fact",
+          "actualSupported": true
+        },
+        {
+          "id": "RF001",
+          "passed": false,
+          "expectedCategory": "limitation_only",
+          "expectedSupported": false,
+          "actualCategory": "direct_fact",
+          "actualSupported": true
+        }
+      ],
+      "decisions": [
+        {
+          "id": "RF005",
+          "category": "direct_fact",
+          "quote": "退款审核通过后即发起退回,资金到账时间取决于支付渠道:余额与零钱通常实时到账,银行卡1-3个工作日,信用卡3-7个工作日。",
+          "reason": "原文直接给出银行卡支付的退款审核通过后通常1-3个工作日到账，符合所问规则条件。",
+          "supported": true
+        },
+        {
+          "id": "RF001",
+          "category": "direct_fact",
+          "quote": "退款将原路退回至原支付账户,一般1-3个工作日到账,具体到账时间以支付渠道为准。",
+          "reason": "原文直接给出退款一般1-3个工作日到账，适用于银行卡支付，符合所问规则条件。",
+          "supported": true
+        }
+      ],
+      "validation": {
+        "status": "complete",
+        "outputHash": "ac8e39a5a271053a7f8c6c0743884be6a085a14937146d0785ebedf794258db2",
+        "invalidDecisions": []
+      },
+      "attempts": [
+        {
+          "operation": "support",
+          "provider": "deepseek",
+          "model": "deepseek-v4-pro",
+          "attempt": 1,
+          "durationMs": 2333.300875,
+          "outcome": "ok",
+          "totalTokens": 2068,
+          "inputTokens": 86,
+          "outputTokens": 190,
+          "cacheReadTokens": 1792,
+          "cacheWriteTokens": 0,
+          "costUsd": 0.000944768
+        }
+      ]
+    },
+    {
+      "id": "conditions-002",
+      "group": "target",
+      "version": "fact-support-typed-v6",
+      "execution": "completed",
+      "passed": false,
+      "inputHash": "f39ab9a1c80630753414106054f73ba023caef202542ef10de29afc2cc9d23cf",
+      "verificationHash": "9f90ca40c224888f989fb5f70ad4d940f12256e2ce65cbac464415e4b6107580",
+      "requestHash": "89824582d54430c2bf7f0a9e2fdb9557bfb9bc090af5fdf4835ac9e30eeaecde",
+      "verificationInputHash": "70702ef2e001cb23c86df94d75da50c92b4cf0ad58fb57812f7c501e5f8b9526",
+      "candidateResults": [
+        {
+          "id": "RF001",
+          "passed": false,
+          "expectedCategory": "limitation_only",
+          "expectedSupported": false,
+          "actualCategory": "direct_fact",
+          "actualSupported": true
+        }
+      ],
+      "decisions": [
+        {
+          "id": "RF001",
+          "category": "direct_fact",
+          "quote": "退款将原路退回至原支付账户,一般1-3个工作日到账,具体到账时间以支付渠道为准。",
+          "reason": "原文直接给出银行卡支付团购券退款审核通过后的一般到账时间为1-3个工作日，符合所问规则条件。",
+          "supported": true
+        }
+      ],
+      "validation": {
+        "status": "complete",
+        "outputHash": "b237b7c523d6bd23c174a308ec2322bc0fc6f7b3bdba36d83ab69f57f11e8ee5",
+        "invalidDecisions": []
+      },
+      "attempts": [
+        {
+          "operation": "support",
+          "provider": "deepseek",
+          "model": "deepseek-v4-pro",
+          "attempt": 1,
+          "durationMs": 2628.4855420000004,
+          "outcome": "ok",
+          "totalTokens": 1876,
+          "inputTokens": 241,
+          "outputTokens": 99,
+          "cacheReadTokens": 1536,
+          "cacheWriteTokens": 0,
+          "costUsd": 0.000777744
+        }
+      ]
+    },
+    {
+      "id": "conditions-003",
+      "group": "target",
+      "version": "fact-support-typed-v6",
+      "execution": "completed",
+      "passed": true,
+      "inputHash": "5d6a1be3d0935587ec9ded0963c63eccfdf193f6ced29f3185f0064ae97e157a",
+      "verificationHash": "ed71691f610baa1bedbbb16bff58aca915690a5ad890c1984671228585f18ca8",
+      "requestHash": "95adb70b7e0052bcfc357f375c5a194f06fdc9528891172b6bab80638dc609b9",
+      "verificationInputHash": "6cece1577817057d449c5c7a80151dadb14d5b6b096e7d4646e6a4ab0e8e2b24",
+      "candidateResults": [
+        {
+          "id": "RF005",
+          "passed": true,
+          "expectedCategory": "direct_fact",
+          "expectedSupported": true,
+          "actualCategory": "direct_fact",
+          "actualSupported": true
+        }
+      ],
+      "decisions": [
+        {
+          "id": "RF005",
+          "category": "direct_fact",
+          "quote": "退款审核通过后即发起退回,资金到账时间取决于支付渠道:余额与零钱通常实时到账,银行卡1-3个工作日,信用卡3-7个工作日。",
+          "reason": "原文直接给出银行卡支付的团购券退款审核通过后的通常到账时间为1-3个工作日，符合用户所问规则条件。",
+          "supported": true
+        }
+      ],
+      "validation": {
+        "status": "complete",
+        "outputHash": "90815060b98349944f45063184f532c3688684f50033dfdc577af8af23bb8cb8",
+        "invalidDecisions": []
+      },
+      "attempts": [
+        {
+          "operation": "support",
+          "provider": "deepseek",
+          "model": "deepseek-v4-pro",
+          "attempt": 1,
+          "durationMs": 1567.410833,
+          "outcome": "ok",
+          "totalTokens": 1888,
+          "inputTokens": 113,
+          "outputTokens": 111,
+          "cacheReadTokens": 1664,
+          "cacheWriteTokens": 0,
+          "costUsd": 0.000661936
+        }
+      ]
+    },
+    {
+      "id": "conditions-004",
+      "group": "target",
+      "version": "fact-support-typed-v6",
+      "execution": "completed",
+      "passed": false,
+      "inputHash": "971b7e0ec6da6efcfc253b5608431a635ad4491f5fc059261815e92400731117",
+      "verificationHash": "b704d4eda805b15d05c956138ead5d45920d1c4a4494849e18bab5f850bfe1b4",
+      "requestHash": "99ec7f40500edbf315d8d4b0d6b156e10ca346716c8a1d818c0c4edb4efb0612",
+      "verificationInputHash": "3d89a59541787e82b7b2a4100dc3e212cf28b6e29582af96ef693f2992d8aad8",
+      "candidateResults": [
+        {
+          "id": "RF005",
+          "passed": true,
+          "expectedCategory": "direct_fact",
+          "expectedSupported": true,
+          "actualCategory": "direct_fact",
+          "actualSupported": true
+        },
+        {
+          "id": "RF001",
+          "passed": false,
+          "expectedCategory": "limitation_only",
+          "expectedSupported": false,
+          "actualCategory": "unrelated",
+          "actualSupported": false
+        }
+      ],
+      "decisions": [
+        {
+          "id": "RF005",
+          "category": "direct_fact",
+          "quote": "退款审核通过后即发起退回,资金到账时间取决于支付渠道:余额与零钱通常实时到账,银行卡1-3个工作日,信用卡3-7个工作日。",
+          "reason": "原文明确给出信用卡支付的退款审核通过后通常3-7个工作日到账，直接回答所问规则条件。",
+          "supported": true
+        },
+        {
+          "id": "RF001",
+          "category": "unrelated",
+          "quote": null,
+          "reason": "原文仅涉及未核销团购券的一般退款到账时间，未提及信用卡支付渠道，与所问信用卡退款到账时间无关。",
+          "supported": false
+        }
+      ],
+      "validation": {
+        "status": "complete",
+        "outputHash": "b1638145ca3c705580bf6c8580610840e6665bb1952b66ca76d202c36aee0907",
+        "invalidDecisions": []
+      },
+      "attempts": [
+        {
+          "operation": "support",
+          "provider": "deepseek",
+          "model": "deepseek-v4-pro",
+          "attempt": 1,
+          "durationMs": 1993.5429579999982,
+          "outcome": "ok",
+          "totalTokens": 2048,
+          "inputTokens": 342,
+          "outputTokens": 170,
+          "cacheReadTokens": 1536,
+          "cacheWriteTokens": 0,
+          "costUsd": 0.0011922240000000002
+        }
+      ]
+    },
+    {
+      "id": "conditions-005",
+      "group": "target",
+      "version": "fact-support-typed-v6",
+      "execution": "completed",
+      "passed": true,
+      "inputHash": "42f8713c14a2ab85672c7a69aee3c363e361da8f70bd409d37946dcb663dc03e",
+      "verificationHash": "f737e5246b020d8ea134330812cc26775e9e5f417778f9a3386d84e47afd8a6d",
+      "requestHash": "a0d4959d56abe2033d2d49a95f6ec2f0a10b5b7b290050d18f83ac05081bcbd6",
+      "verificationInputHash": "ceeb207891a3be9de344d042106f1c41ebfd32f0b054747e0fb9df2a52f86751",
+      "candidateResults": [
+        {
+          "id": "RF005",
+          "passed": true,
+          "expectedCategory": "direct_fact",
+          "expectedSupported": true,
+          "actualCategory": "direct_fact",
+          "actualSupported": true
+        },
+        {
+          "id": "RF001",
+          "passed": true,
+          "expectedCategory": "limitation_only",
+          "expectedSupported": false,
+          "actualCategory": "limitation_only",
+          "actualSupported": false
+        }
+      ],
+      "decisions": [
+        {
+          "id": "RF005",
+          "category": "direct_fact",
+          "quote": "退款审核通过后即发起退回,资金到账时间取决于支付渠道:余额与零钱通常实时到账,银行卡1-3个工作日,信用卡3-7个工作日。",
+          "reason": "原文直接给出余额支付退款审核通过后通常实时到账的规则，符合所问规则条件。",
+          "supported": true
+        },
+        {
+          "id": "RF001",
+          "category": "limitation_only",
+          "quote": "退款将原路退回至原支付账户,一般1-3个工作日到账,具体到账时间以支付渠道为准。",
+          "reason": "原文给出一般到账时间，但未区分余额支付，且以支付渠道为准，不能直接回答余额支付通常多久到账。",
+          "supported": false
+        }
+      ],
+      "validation": {
+        "status": "complete",
+        "outputHash": "2637c3a15da0ab6ef95bec2bd9d33c76e45c1dd1a761a82f9fef3bc7562eaea3",
+        "invalidDecisions": []
+      },
+      "attempts": [
+        {
+          "operation": "support",
+          "provider": "deepseek",
+          "model": "deepseek-v4-pro",
+          "attempt": 1,
+          "durationMs": 2102.2912079999987,
+          "outcome": "ok",
+          "totalTokens": 2072,
+          "inputTokens": 342,
+          "outputTokens": 194,
+          "cacheReadTokens": 1536,
+          "cacheWriteTokens": 0,
+          "costUsd": 0.001287264
+        }
+      ]
+    },
+    {
+      "id": "conditions-006",
+      "group": "target",
+      "version": "fact-support-typed-v6",
+      "execution": "completed",
+      "passed": true,
+      "inputHash": "9716c75c9dd4f562ca74fc5d57f81bfb5d7e779111d89da970f800d39da998f9",
+      "verificationHash": "b93e8755a426de1b46a29435e41827dc7c3991c9856e875c1271ae26533ec1e9",
+      "requestHash": "92f880fecf04f08f1830b62742d64997b141ee91d5fcde0faf81754b841b288c",
+      "verificationInputHash": "b21a63f3c3e39b3e7b46d9610203d64d43c5dd28773fe613973cc78394632df6",
+      "candidateResults": [
+        {
+          "id": "RF001",
+          "passed": true,
+          "expectedCategory": "direct_fact",
+          "expectedSupported": true,
+          "actualCategory": "direct_fact",
+          "actualSupported": true
+        }
+      ],
+      "decisions": [
+        {
+          "id": "RF001",
+          "category": "direct_fact",
+          "quote": "退款将原路退回至原支付账户,一般1-3个工作日到账,具体到账时间以支付渠道为准。",
+          "reason": "原文直接给出一般到账时限为1-3个工作日，并明确具体到账时间以支付渠道为准，完整回答用户所问规则。",
+          "supported": true
+        }
+      ],
+      "validation": {
+        "status": "complete",
+        "outputHash": "e22e813329e0c92aaf04cad630e6984cb95fa16f04a506b0eb01a9e22de9df23",
+        "invalidDecisions": []
+      },
+      "attempts": [
+        {
+          "operation": "support",
+          "provider": "deepseek",
+          "model": "deepseek-v4-pro",
+          "attempt": 1,
+          "durationMs": 1376.732415999999,
+          "outcome": "ok",
+          "totalTokens": 1850,
+          "inputTokens": 211,
+          "outputTokens": 103,
+          "cacheReadTokens": 1536,
+          "cacheWriteTokens": 0,
+          "costUsd": 0.000753984
+        }
+      ]
+    },
+    {
+      "id": "conditions-007",
+      "group": "regression",
+      "version": "fact-support-typed-v6",
+      "execution": "completed",
+      "passed": true,
+      "inputHash": "f1b25f2396aff2d3e62a3ef10454f432092d5da906214ccd27a27fe86ca00bc3",
+      "verificationHash": "9004d69e6bce961a3592f470e864049417b3525d05d29c7ffe1b85e442badd62",
+      "requestHash": "634e202212b904fb20dd55692c37c02286335c2de4a130beffc79d0f42a1fb32",
+      "verificationInputHash": "cf7aa7b14d27f517bd3c207ab82c10f38c24b345bea0395202c28b51a54c9a35",
+      "candidateResults": [
+        {
+          "id": "RF001",
+          "passed": true,
+          "expectedCategory": "direct_fact",
+          "expectedSupported": true,
+          "actualCategory": "direct_fact",
+          "actualSupported": true
+        }
+      ],
+      "decisions": [
+        {
+          "id": "RF001",
+          "category": "direct_fact",
+          "quote": "退款将原路退回至原支付账户",
+          "reason": "原文明确未核销且在有效期内的团购券退款原路退回至原支付账户，直接回答所问退款账户。",
+          "supported": true
+        }
+      ],
+      "validation": {
+        "status": "complete",
+        "outputHash": "fbfd7edf56f3982703ce47e3206c83e73a27fcbfbbc80bcedbb508a336de310a",
+        "invalidDecisions": []
+      },
+      "attempts": [
+        {
+          "operation": "support",
+          "provider": "deepseek",
+          "model": "deepseek-v4-pro",
+          "attempt": 1,
+          "durationMs": 1367.2177919999995,
+          "outcome": "ok",
+          "totalTokens": 1821,
+          "inputTokens": 206,
+          "outputTokens": 79,
+          "cacheReadTokens": 1536,
+          "cacheWriteTokens": 0,
+          "costUsd": 0.000652344
+        }
+      ]
+    },
+    {
+      "id": "conditions-008",
+      "group": "regression",
+      "version": "fact-support-typed-v6",
+      "execution": "completed",
+      "passed": true,
+      "inputHash": "3bf9f04031a2793d98bc26b61589e4e726541b1aa6eadfe3d905b270b0d3a6da",
+      "verificationHash": "0cf05fd501a2cdff335d5c12377f86feb865d0fe668f38cd3a83eb0d23aa8e8f",
+      "requestHash": "a241e9f6f154ae775770f1b85a087fa809367a573f078f1fd679b1635222ee15",
+      "verificationInputHash": "bf0b8193b7c23e62af29bafc71bfb34d8ceb47e6525b0e20c89a0723dfbd323c",
+      "candidateResults": [
+        {
+          "id": "KB-REFUND-EXPIRED",
+          "passed": true,
+          "expectedCategory": "direct_fact",
+          "expectedSupported": true,
+          "actualCategory": "direct_fact",
+          "actualSupported": true
+        }
+      ],
+      "decisions": [
+        {
+          "id": "KB-REFUND-EXPIRED",
+          "category": "direct_fact",
+          "quote": "已过期但未核销的券需要商家确认能否退款、延期以及金额。",
+          "reason": "原文直接规定过期未核销券退款前需商家确认，符合用户所问的确认主体。",
+          "supported": true
+        }
+      ],
+      "validation": {
+        "status": "complete",
+        "outputHash": "afb2f3e8f6e59e6a70f5dafca62acb9cef9143f2cd89a9f721ae8482aaa695c8",
+        "invalidDecisions": []
+      },
+      "attempts": [
+        {
+          "operation": "support",
+          "provider": "deepseek",
+          "model": "deepseek-v4-pro",
+          "attempt": 1,
+          "durationMs": 1658.2237079999977,
+          "outcome": "ok",
+          "totalTokens": 1830,
+          "inputTokens": 78,
+          "outputTokens": 88,
+          "cacheReadTokens": 1664,
+          "cacheWriteTokens": 0,
+          "costUsd": 0.000524656
+        }
+      ]
+    },
+    {
+      "id": "conditions-009",
+      "group": "regression",
+      "version": "fact-support-typed-v6",
+      "execution": "completed",
+      "passed": true,
+      "inputHash": "8fc9870e735f2384b154a08294744dac1a77f7dcb311a9da0054f9dd595edc02",
+      "verificationHash": "dd985d31d10c7d6178d483cb030629ec05fa8496919822a07c5778dc8bbbb495",
+      "requestHash": "4c352fc1bfcbb9187e07b367e88272afab5be2da5a09d26d20088bd71d6d323d",
+      "verificationInputHash": "972c5e3763429a14b95f5dcb6a1972a69cc0ceff99b752b57460ab892f99546f",
+      "candidateResults": [
+        {
+          "id": "KB-REFUND-EXPIRED",
+          "passed": true,
+          "expectedCategory": "limitation_only",
+          "expectedSupported": false,
+          "actualCategory": "limitation_only",
+          "actualSupported": false
+        }
+      ],
+      "decisions": [
+        {
+          "id": "KB-REFUND-EXPIRED",
+          "category": "limitation_only",
+          "quote": "已过期但未核销的券需要商家确认能否退款、延期以及金额。",
+          "reason": "原文仅说明过期未核销券需商家确认退款，未提供该笔券已获商家批准退款的事实，无法回答实例事实诉求。",
+          "supported": false
+        }
+      ],
+      "validation": {
+        "status": "complete",
+        "outputHash": "aecfb3d00c15811ffd6c9bafb5afbdaaa72c6c4a4cc407998dbc763cc3d396bf",
+        "invalidDecisions": []
+      },
+      "attempts": [
+        {
+          "operation": "support",
+          "provider": "deepseek",
+          "model": "deepseek-v4-pro",
+          "attempt": 1,
+          "durationMs": 1884.2326250000042,
+          "outcome": "ok",
+          "totalTokens": 1840,
+          "inputTokens": 79,
+          "outputTokens": 97,
+          "cacheReadTokens": 1664,
+          "cacheWriteTokens": 0,
+          "costUsd": 0.000561616
+        }
+      ]
+    },
+    {
+      "id": "conditions-010",
+      "group": "regression",
+      "version": "fact-support-typed-v6",
+      "execution": "completed",
+      "passed": true,
+      "inputHash": "273a5fbdb02e2fd9c9945b8de4fdfaa3b23f939458619955c53900fb9aa8e44b",
+      "verificationHash": "9fe2e6bd3c475ad1ab133a9d2b49cd51a14aca2e0f2f4e9610e76d54864a8eff",
+      "requestHash": "af49b67f9120a6f33fc0def2e7a4539cf1823cb7e6377ffa552e695ad482a95e",
+      "verificationInputHash": "c178e7b0342fc6377066472df1c2fdf9c7da5aa3a86790b4b7f38972df7afedc",
+      "candidateResults": [
+        {
+          "id": "KB-PRODUCT-LUNCH",
+          "passed": true,
+          "expectedCategory": "limitation_only",
+          "expectedSupported": false,
+          "actualCategory": "limitation_only",
+          "actualSupported": false
+        }
+      ],
+      "decisions": [
+        {
+          "id": "KB-PRODUCT-LUNCH",
+          "category": "limitation_only",
+          "quote": "菜品明细、过敏原和特殊节假日可用性未录入。",
+          "reason": "用户询问套餐具体含哪些过敏原并要求列出名称，原文仅声明过敏原未录入，未提供任何过敏原信息，无法回答该事实诉求。",
+          "supported": false
+        }
+      ],
+      "validation": {
+        "status": "complete",
+        "outputHash": "2997fc055cb799e03381191716c6b47c4286ca2df0fe756ee5b94c1976a95946",
+        "invalidDecisions": []
+      },
+      "attempts": [
+        {
+          "operation": "support",
+          "provider": "deepseek",
+          "model": "deepseek-v4-pro",
+          "attempt": 1,
+          "durationMs": 1806.4595840000038,
+          "outcome": "ok",
+          "totalTokens": 1964,
+          "inputTokens": 78,
+          "outputTokens": 94,
+          "cacheReadTokens": 1792,
+          "cacheWriteTokens": 0,
+          "costUsd": 0.000554048
+        }
+      ]
+    },
+    {
+      "id": "conditions-011",
+      "group": "regression",
+      "version": "fact-support-typed-v6",
+      "execution": "completed",
+      "passed": true,
+      "inputHash": "052d3865ecd9e75b0b92bbb2cf47c28a6a2fc0a3bf3b375ac6021935140d9c01",
+      "verificationHash": "cee89bfcc77078a233ef2b744bdf9608980814e4540ef7150f0d75f396c025d5",
+      "requestHash": "310e5ff9b5009e82f13c6c03788b28cb34e859bad237aefe148483174d2107dd",
+      "verificationInputHash": "2085d7355be59baff38bf96318dab40aaa7f5b2619465cbd5f9315b6c29da7ce",
+      "candidateResults": [
+        {
+          "id": "KB-PRODUCT-LUNCH",
+          "passed": true,
+          "expectedCategory": "boundary_answer",
+          "expectedSupported": true,
+          "actualCategory": "boundary_answer",
+          "actualSupported": true
+        }
+      ],
+      "decisions": [
+        {
+          "id": "KB-PRODUCT-LUNCH",
+          "category": "boundary_answer",
+          "quote": "菜品明细、过敏原和特殊节假日可用性未录入。",
+          "reason": "用户明确询问资料是否记录过敏原明细，原文直接声明未录入，可支持否定回答。",
+          "supported": true
+        }
+      ],
+      "validation": {
+        "status": "complete",
+        "outputHash": "23889a3bc6e41caed56b497ccf6f6e3eda1f8b17009eba9d4f7fcbcb22068143",
+        "invalidDecisions": []
+      },
+      "attempts": [
+        {
+          "operation": "support",
+          "provider": "deepseek",
+          "model": "deepseek-v4-pro",
+          "attempt": 1,
+          "durationMs": 1328.5235410000023,
+          "outcome": "ok",
+          "totalTokens": 1963,
+          "inputTokens": 89,
+          "outputTokens": 82,
+          "cacheReadTokens": 1792,
+          "cacheWriteTokens": 0,
+          "costUsd": 0.000521048
+        }
+      ]
+    },
+    {
+      "id": "conditions-012",
+      "group": "regression",
+      "version": "fact-support-typed-v6",
+      "execution": "completed",
+      "passed": false,
+      "inputHash": "b377081099b3d008a247d428f92a95a607be479e5af2ea0408f20fb87451078c",
+      "verificationHash": "b195deda1f92e24bce00c663412ba8288f4626ae77de085c8aac0c5b68aa3109",
+      "requestHash": "5396a3777abd234e12f3a2377dc3cb27b3a94ca1c81e44ce2d462696c8005421",
+      "verificationInputHash": "289805768d1cb657931839aa91cddf8f964ab289bfbd1ef60f12592af0ea0aab",
+      "candidateResults": [
+        {
+          "id": "KB-SHOP-DEMO-1",
+          "passed": false,
+          "expectedCategory": "direct_fact",
+          "expectedSupported": true,
+          "actualCategory": "limitation_only",
+          "actualSupported": false
+        }
+      ],
+      "decisions": [
+        {
+          "id": "KB-SHOP-DEMO-1",
+          "category": "limitation_only",
+          "quote": "常规午餐与晚餐套餐允许普通周末使用，到店前需用户自行与商家确认接待情况；助手目前不能预约、外呼、查询实时库存或安排接待。法定节假日、特殊活动和私享套餐使用限制没有录入，遇到这些问题应明确规则缺失并建议向商家核实。",
+          "reason": "原文仅说明普通周末可用，未明确星期天是否属于普通周末或是否适用，且要求自行确认接待情况，无法直接回答星期天是否按规则使用。",
+          "supported": false
+        }
+      ],
+      "validation": {
+        "status": "complete",
+        "outputHash": "8e230ff73abf784d4c583e27c32988b5c55ae47cebfa3c9d4548e64735f59dcd",
+        "invalidDecisions": []
+      },
+      "attempts": [
+        {
+          "operation": "support",
+          "provider": "deepseek",
+          "model": "deepseek-v4-pro",
+          "attempt": 1,
+          "durationMs": 1880.0734999999986,
+          "outcome": "ok",
+          "totalTokens": 1958,
+          "inputTokens": 18,
+          "outputTokens": 148,
+          "cacheReadTokens": 1792,
+          "cacheWriteTokens": 0,
+          "costUsd": 0.0006886879999999999
+        }
+      ]
+    },
+    {
+      "id": "conditions-001",
+      "group": "target",
+      "version": "fact-support-typed-v7",
+      "execution": "completed",
+      "passed": true,
+      "inputHash": "c50bcdb85d048e1d514d8bc1647bd35b9747619c78415594f180fa733962d2fd",
+      "verificationHash": "e26cc564a0b195c5ca3c9c2d1ca8121461973ecd267d6fa38439b0ce3f1a5351",
+      "requestHash": "df902614eb7e6c97c9178d39b523152f2ad3555d45b8cb810b2a53a36f8a03ac",
+      "verificationInputHash": "8d5c59d8e3607963190f69eafc728058dfeb9d32f1efc8ba5def4b5fdb4f6be5",
+      "candidateResults": [
+        {
+          "id": "RF005",
+          "passed": true,
+          "expectedCategory": "direct_fact",
+          "expectedSupported": true,
+          "actualCategory": "direct_fact",
+          "actualSupported": true
+        },
+        {
+          "id": "RF001",
+          "passed": true,
+          "expectedCategory": "limitation_only",
+          "expectedSupported": false,
+          "actualCategory": "limitation_only",
+          "actualSupported": false
+        }
+      ],
+      "decisions": [
+        {
+          "id": "RF005",
+          "category": "direct_fact",
+          "quote": "退款审核通过后即发起退回,资金到账时间取决于支付渠道:余额与零钱通常实时到账,银行卡1-3个工作日,信用卡3-7个工作日。",
+          "reason": "原文明确给出银行卡支付的团购券退款审核通过后通常1-3个工作日到账，直接回答所问规则条件。",
+          "supported": true
+        },
+        {
+          "id": "RF001",
+          "category": "limitation_only",
+          "quote": "退款将原路退回至原支付账户,一般1-3个工作日到账,具体到账时间以支付渠道为准。",
+          "reason": "原文给出一般退款到账时间，但未区分银行卡支付渠道，不能直接回答银行卡支付的具体到账时间。",
+          "supported": false
+        }
+      ],
+      "validation": {
+        "status": "complete",
+        "outputHash": "63647652aecb4121a70fbc60788f1ad8b224fa9f5cbcfe96ab09d1e1c56f470f",
+        "invalidDecisions": []
+      },
+      "attempts": [
+        {
+          "operation": "support",
+          "provider": "deepseek",
+          "model": "deepseek-v4-pro",
+          "attempt": 1,
+          "durationMs": 2620.8317500000003,
+          "outcome": "ok",
+          "totalTokens": 2269,
+          "inputTokens": 2073,
+          "outputTokens": 196,
+          "cacheReadTokens": 0,
+          "cacheWriteTokens": 0,
+          "costUsd": 0.0035125200000000003
+        }
+      ]
+    },
+    {
+      "id": "conditions-002",
+      "group": "target",
+      "version": "fact-support-typed-v7",
+      "execution": "completed",
+      "passed": false,
+      "inputHash": "f39ab9a1c80630753414106054f73ba023caef202542ef10de29afc2cc9d23cf",
+      "verificationHash": "bd50842830ccc77c5d301fc5006382421f96711460e4be0fd181109536534ee0",
+      "requestHash": "751428749cebade57cd2080b23eddb406e968afeb9fab8da63363195d6da684c",
+      "verificationInputHash": "cb0f81e587da854be37c5850e42989e43595d8d7a496ea975f1ea224d9cb2762",
+      "candidateResults": [
+        {
+          "id": "RF001",
+          "passed": false,
+          "expectedCategory": "limitation_only",
+          "expectedSupported": false,
+          "actualCategory": "direct_fact",
+          "actualSupported": true
+        }
+      ],
+      "decisions": [
+        {
+          "id": "RF001",
+          "category": "direct_fact",
+          "quote": "退款将原路退回至原支付账户,一般1-3个工作日到账,具体到账时间以支付渠道为准。",
+          "reason": "原文明确给出银行卡支付团购券退款审核通过后一般1-3个工作日到账，并保留以支付渠道为准的条件，直接回答所问规则。",
+          "supported": true
+        }
+      ],
+      "validation": {
+        "status": "complete",
+        "outputHash": "79b04345d5fe20307ad6381d847d1a315ea3ade46ee32e01eb3d9d658228f754",
+        "invalidDecisions": []
+      },
+      "attempts": [
+        {
+          "operation": "support",
+          "provider": "deepseek",
+          "model": "deepseek-v4-pro",
+          "attempt": 1,
+          "durationMs": 2789.947166000001,
+          "outcome": "ok",
+          "totalTokens": 2058,
+          "inputTokens": 1972,
+          "outputTokens": 86,
+          "cacheReadTokens": 0,
+          "cacheWriteTokens": 0,
+          "costUsd": 0.0029436
+        }
+      ]
+    },
+    {
+      "id": "conditions-003",
+      "group": "target",
+      "version": "fact-support-typed-v7",
+      "execution": "completed",
+      "passed": true,
+      "inputHash": "5d6a1be3d0935587ec9ded0963c63eccfdf193f6ced29f3185f0064ae97e157a",
+      "verificationHash": "d2d00295a0f3a2d75789a8fcc5c6fd85e6b1ba7e35a2196f051975c36712ab98",
+      "requestHash": "14d526012db3a3a28a2d3cc8184b29f9caaaa8d95522d80a68a0e07332861a98",
+      "verificationInputHash": "b9e26dbf146dd79479efa2dc1210748ccfd1b8b7e68dff5a19cbe9c1dbce2c6e",
+      "candidateResults": [
+        {
+          "id": "RF005",
+          "passed": true,
+          "expectedCategory": "direct_fact",
+          "expectedSupported": true,
+          "actualCategory": "direct_fact",
+          "actualSupported": true
+        }
+      ],
+      "decisions": [
+        {
+          "id": "RF005",
+          "category": "direct_fact",
+          "quote": "退款审核通过后即发起退回,资金到账时间取决于支付渠道:余额与零钱通常实时到账,银行卡1-3个工作日,信用卡3-7个工作日。",
+          "reason": "原文明确给出银行卡支付的团购券退款审核通过后通常1-3个工作日到账，直接回答所问规则条件。",
+          "supported": true
+        }
+      ],
+      "validation": {
+        "status": "complete",
+        "outputHash": "3aa791ba7d129e2d3dacf2bc7e2de215ce6d05643b8e5853338eeedfc6d59e8e",
+        "invalidDecisions": []
+      },
+      "attempts": [
+        {
+          "operation": "support",
+          "provider": "deepseek",
+          "model": "deepseek-v4-pro",
+          "attempt": 1,
+          "durationMs": 2017.125791999999,
+          "outcome": "ok",
+          "totalTokens": 2062,
+          "inputTokens": 180,
+          "outputTokens": 90,
+          "cacheReadTokens": 1792,
+          "cacheWriteTokens": 0,
+          "costUsd": 0.000672848
+        }
+      ]
+    },
+    {
+      "id": "conditions-004",
+      "group": "target",
+      "version": "fact-support-typed-v7",
+      "execution": "completed",
+      "passed": true,
+      "inputHash": "971b7e0ec6da6efcfc253b5608431a635ad4491f5fc059261815e92400731117",
+      "verificationHash": "dc9b699f0565cbf6d3d787a4646f2717cb50e89fa29ad42499abcc90137f69fb",
+      "requestHash": "0eb500041f07e0845f264770cc58c98457bec58fa2678515ae59a6b0bbca1d60",
+      "verificationInputHash": "144dfe169a817072b11a72060c78d8c6ab83e4085e59d5efe5500bc929e41ee2",
+      "candidateResults": [
+        {
+          "id": "RF005",
+          "passed": true,
+          "expectedCategory": "direct_fact",
+          "expectedSupported": true,
+          "actualCategory": "direct_fact",
+          "actualSupported": true
+        },
+        {
+          "id": "RF001",
+          "passed": true,
+          "expectedCategory": "limitation_only",
+          "expectedSupported": false,
+          "actualCategory": "limitation_only",
+          "actualSupported": false
+        }
+      ],
+      "decisions": [
+        {
+          "id": "RF005",
+          "category": "direct_fact",
+          "quote": "退款审核通过后即发起退回,资金到账时间取决于支付渠道:余额与零钱通常实时到账,银行卡1-3个工作日,信用卡3-7个工作日。",
+          "reason": "原文明确给出信用卡支付的团购券退款审核通过后通常3-7个工作日到账，直接回答所问规则条件。",
+          "supported": true
+        },
+        {
+          "id": "RF001",
+          "category": "limitation_only",
+          "quote": "退款将原路退回至原支付账户,一般1-3个工作日到账,具体到账时间以支付渠道为准。",
+          "reason": "原文给出一般1-3个工作日到账，但未区分信用卡渠道，不能直接回答信用卡支付的具体到账时间。",
+          "supported": false
+        }
+      ],
+      "validation": {
+        "status": "complete",
+        "outputHash": "75afcc51423ce6191d107484b75dfb31a78de7ff2f180eb71c2e69c3e61bf3d8",
+        "invalidDecisions": []
+      },
+      "attempts": [
+        {
+          "operation": "support",
+          "provider": "deepseek",
+          "model": "deepseek-v4-pro",
+          "attempt": 1,
+          "durationMs": 2040.5476670000007,
+          "outcome": "ok",
+          "totalTokens": 2271,
+          "inputTokens": 281,
+          "outputTokens": 198,
+          "cacheReadTokens": 1792,
+          "cacheWriteTokens": 0,
+          "costUsd": 0.001233848
+        }
+      ]
+    },
+    {
+      "id": "conditions-005",
+      "group": "target",
+      "version": "fact-support-typed-v7",
+      "execution": "completed",
+      "passed": true,
+      "inputHash": "42f8713c14a2ab85672c7a69aee3c363e361da8f70bd409d37946dcb663dc03e",
+      "verificationHash": "ae72e659f43ee916f78db36ef12c7f9d57e5e97e3866b7c9399233692d2c26de",
+      "requestHash": "cda8d88ebda64a1991b7ed4d29b37d5d65a4c76a634b7b37879e45ec647bacf1",
+      "verificationInputHash": "cf3d3236f62a2f36e1a60ab9779e09cb92e5982bafd5716e37d26e0db1b29e27",
+      "candidateResults": [
+        {
+          "id": "RF005",
+          "passed": true,
+          "expectedCategory": "direct_fact",
+          "expectedSupported": true,
+          "actualCategory": "direct_fact",
+          "actualSupported": true
+        },
+        {
+          "id": "RF001",
+          "passed": true,
+          "expectedCategory": "limitation_only",
+          "expectedSupported": false,
+          "actualCategory": "limitation_only",
+          "actualSupported": false
+        }
+      ],
+      "decisions": [
+        {
+          "id": "RF005",
+          "category": "direct_fact",
+          "quote": "退款审核通过后即发起退回,资金到账时间取决于支付渠道:余额与零钱通常实时到账,银行卡1-3个工作日,信用卡3-7个工作日。",
+          "reason": "原文明确余额支付审核通过后通常实时到账，直接回答所问规则条件。",
+          "supported": true
+        },
+        {
+          "id": "RF001",
+          "category": "limitation_only",
+          "quote": "退款将原路退回至原支付账户,一般1-3个工作日到账,具体到账时间以支付渠道为准。",
+          "reason": "原文未区分余额支付，且给出一般到账时间，不足以回答余额支付的具体时效。",
+          "supported": false
+        }
+      ],
+      "validation": {
+        "status": "complete",
+        "outputHash": "fd3f02b40581688cdf4442fecaddd8d39afb63fa61d032764f3a8297196be5e4",
+        "invalidDecisions": []
+      },
+      "attempts": [
+        {
+          "operation": "support",
+          "provider": "deepseek",
+          "model": "deepseek-v4-pro",
+          "attempt": 1,
+          "durationMs": 1865.8717499999984,
+          "outcome": "ok",
+          "totalTokens": 2219,
+          "inputTokens": 281,
+          "outputTokens": 146,
+          "cacheReadTokens": 1792,
+          "cacheWriteTokens": 0,
+          "costUsd": 0.001027928
+        }
+      ]
+    },
+    {
+      "id": "conditions-006",
+      "group": "target",
+      "version": "fact-support-typed-v7",
+      "execution": "completed",
+      "passed": true,
+      "inputHash": "9716c75c9dd4f562ca74fc5d57f81bfb5d7e779111d89da970f800d39da998f9",
+      "verificationHash": "cdc87019cabe09a4d693c735599fc474922ebf94bbf4c5ce3c1dad1f85e87afe",
+      "requestHash": "9335c3a35955c4ccb8d838fd574bdba6f73e1bb33f3cfa1b926ccc3f005a1e79",
+      "verificationInputHash": "9ac324727e0a51ea7893a0c369afc6d93b8162ffeea8ea7b11d92d7654b14281",
+      "candidateResults": [
+        {
+          "id": "RF001",
+          "passed": true,
+          "expectedCategory": "direct_fact",
+          "expectedSupported": true,
+          "actualCategory": "direct_fact",
+          "actualSupported": true
+        }
+      ],
+      "decisions": [
+        {
+          "id": "RF001",
+          "category": "direct_fact",
+          "quote": "未核销且在有效期内的团购券,支持随时申请退款,退款金额为实际支付金额,无需商家同意。退款将原路退回至原支付账户,一般1-3个工作日到账,具体到账时间以支付渠道为准。",
+          "reason": "原文直接给出未核销且在有效期内团购券退款的一般到账时限为1-3个工作日，并明确具体到账时间以支付渠道为准，完整回答所问规则。",
+          "supported": true
+        }
+      ],
+      "validation": {
+        "status": "complete",
+        "outputHash": "8fd1d41b09ff4d433a729cab940130d1ec70358789933612ac235f4296de7868",
+        "invalidDecisions": []
+      },
+      "attempts": [
+        {
+          "operation": "support",
+          "provider": "deepseek",
+          "model": "deepseek-v4-pro",
+          "attempt": 1,
+          "durationMs": 1617.6389579999995,
+          "outcome": "ok",
+          "totalTokens": 2080,
+          "inputTokens": 150,
+          "outputTokens": 138,
+          "cacheReadTokens": 1792,
+          "cacheWriteTokens": 0,
+          "costUsd": 0.000823328
+        }
+      ]
+    },
+    {
+      "id": "conditions-007",
+      "group": "regression",
+      "version": "fact-support-typed-v7",
+      "execution": "completed",
+      "passed": true,
+      "inputHash": "f1b25f2396aff2d3e62a3ef10454f432092d5da906214ccd27a27fe86ca00bc3",
+      "verificationHash": "e8dd3a6b29b0c2010b566bdfc80bde8433714d5b43a3df840b9291600656f892",
+      "requestHash": "8a60243c2ae2c79cccf028a4f6b924e87cce32e26c624faaae91e76ecb43a55b",
+      "verificationInputHash": "a2d612a62d83d23a4af4ee5aa7c619d8daa2992b996ed2674c17b3f012465020",
+      "candidateResults": [
+        {
+          "id": "RF001",
+          "passed": true,
+          "expectedCategory": "direct_fact",
+          "expectedSupported": true,
+          "actualCategory": "direct_fact",
+          "actualSupported": true
+        }
+      ],
+      "decisions": [
+        {
+          "id": "RF001",
+          "category": "direct_fact",
+          "quote": "退款将原路退回至原支付账户",
+          "reason": "原文明确未核销且在有效期内的团购券退款原路退回至原支付账户，直接回答所问账户。",
+          "supported": true
+        }
+      ],
+      "validation": {
+        "status": "complete",
+        "outputHash": "d59a773155f196dc203cd467a200d4089475738d395e184f99f17819ed8c77fd",
+        "invalidDecisions": []
+      },
+      "attempts": [
+        {
+          "operation": "support",
+          "provider": "deepseek",
+          "model": "deepseek-v4-pro",
+          "attempt": 1,
+          "durationMs": 1136.6952500000007,
+          "outcome": "ok",
+          "totalTokens": 1995,
+          "inputTokens": 145,
+          "outputTokens": 58,
+          "cacheReadTokens": 1792,
+          "cacheWriteTokens": 0,
+          "costUsd": 0.000499928
+        }
+      ]
+    },
+    {
+      "id": "conditions-008",
+      "group": "regression",
+      "version": "fact-support-typed-v7",
+      "execution": "completed",
+      "passed": true,
+      "inputHash": "3bf9f04031a2793d98bc26b61589e4e726541b1aa6eadfe3d905b270b0d3a6da",
+      "verificationHash": "d8df1fa4a653321699870f4d36c8c16f618f64f4b33304acbd0256776c5a2100",
+      "requestHash": "06e1b6d502e075c99be3c1560ce463e3db19e6ff888734f28f26012e47784a93",
+      "verificationInputHash": "62281faea1ad1a719c3434977627fb8ba6dde77691e11a5ac69459a0b207c8ae",
+      "candidateResults": [
+        {
+          "id": "KB-REFUND-EXPIRED",
+          "passed": true,
+          "expectedCategory": "direct_fact",
+          "expectedSupported": true,
+          "actualCategory": "direct_fact",
+          "actualSupported": true
+        }
+      ],
+      "decisions": [
+        {
+          "id": "KB-REFUND-EXPIRED",
+          "category": "direct_fact",
+          "quote": "已过期但未核销的券需要商家确认能否退款、延期以及金额。",
+          "reason": "原文明确回答：已过期未核销券申请退款前需要商家确认，符合所问规则诉求。",
+          "supported": true
+        }
+      ],
+      "validation": {
+        "status": "complete",
+        "outputHash": "92f95ae7249ca16de0000eff6c8becbd7d7692010b5e2af4228752b838803987",
+        "invalidDecisions": []
+      },
+      "attempts": [
+        {
+          "operation": "support",
+          "provider": "deepseek",
+          "model": "deepseek-v4-pro",
+          "attempt": 1,
+          "durationMs": 1449.2752089999994,
+          "outcome": "ok",
+          "totalTokens": 2026,
+          "inputTokens": 145,
+          "outputTokens": 89,
+          "cacheReadTokens": 1792,
+          "cacheWriteTokens": 0,
+          "costUsd": 0.000622688
+        }
+      ]
+    },
+    {
+      "id": "conditions-009",
+      "group": "regression",
+      "version": "fact-support-typed-v7",
+      "execution": "completed",
+      "passed": true,
+      "inputHash": "8fc9870e735f2384b154a08294744dac1a77f7dcb311a9da0054f9dd595edc02",
+      "verificationHash": "f4a4e7626be2ad84896eda8b307c93dc59718ab2adad65514721e4c58b826ac3",
+      "requestHash": "f0a4c41eb9ef714c647b066e14b194344d28dd3b43183fb47a68b4c890effe66",
+      "verificationInputHash": "e857ef644be79043e46f212843e93600f78e4e77368764c2a5f802213d7c4aba",
+      "candidateResults": [
+        {
+          "id": "KB-REFUND-EXPIRED",
+          "passed": true,
+          "expectedCategory": "limitation_only",
+          "expectedSupported": false,
+          "actualCategory": "limitation_only",
+          "actualSupported": false
+        }
+      ],
+      "decisions": [
+        {
+          "id": "KB-REFUND-EXPIRED",
+          "category": "limitation_only",
+          "quote": "已过期但未核销的券需要商家确认能否退款、延期以及金额。",
+          "reason": "原文仅说明需要商家确认，未提供商家已批准退款的事实，无法回答实例是否已批准。",
+          "supported": false
+        }
+      ],
+      "validation": {
+        "status": "complete",
+        "outputHash": "f8bf5988c1c140fc254f184b6265adc5dd55d23033fe08f5f37529736f17b2c6",
+        "invalidDecisions": []
+      },
+      "attempts": [
+        {
+          "operation": "support",
+          "provider": "deepseek",
+          "model": "deepseek-v4-pro",
+          "attempt": 1,
+          "durationMs": 1070.9756249999991,
+          "outcome": "ok",
+          "totalTokens": 2026,
+          "inputTokens": 146,
+          "outputTokens": 88,
+          "cacheReadTokens": 1792,
+          "cacheWriteTokens": 0,
+          "costUsd": 0.000620048
+        }
+      ]
+    },
+    {
+      "id": "conditions-010",
+      "group": "regression",
+      "version": "fact-support-typed-v7",
+      "execution": "completed",
+      "passed": true,
+      "inputHash": "273a5fbdb02e2fd9c9945b8de4fdfaa3b23f939458619955c53900fb9aa8e44b",
+      "verificationHash": "74936798ebbda3123364ef5b6fd5675403152f83662f174c633b16b8db1fdf6e",
+      "requestHash": "9711b05f261a4f572d8aa9424cf3592f2d8112cd8e31a3871321fb8a16ee2085",
+      "verificationInputHash": "46d092c36f875943029874c81a3dabbc8b0a93b8f5c9b7a4210c7db2c68b6a07",
+      "candidateResults": [
+        {
+          "id": "KB-PRODUCT-LUNCH",
+          "passed": true,
+          "expectedCategory": "limitation_only",
+          "expectedSupported": false,
+          "actualCategory": "limitation_only",
+          "actualSupported": false
+        }
+      ],
+      "decisions": [
+        {
+          "id": "KB-PRODUCT-LUNCH",
+          "category": "limitation_only",
+          "quote": "菜品明细、过敏原和特殊节假日可用性未录入。",
+          "reason": "原文明确过敏原未录入，无法列出具体过敏原名称，只能说明文档未记载，不能回答所问事实。",
+          "supported": false
+        }
+      ],
+      "validation": {
+        "status": "complete",
+        "outputHash": "f0d93771fe4df9f658f174e52654e9f0b1100b4c40e079f6da9aca0d02165cab",
+        "invalidDecisions": []
+      },
+      "attempts": [
+        {
+          "operation": "support",
+          "provider": "deepseek",
+          "model": "deepseek-v4-pro",
+          "attempt": 1,
+          "durationMs": 1443.9748749999999,
+          "outcome": "ok",
+          "totalTokens": 2132,
+          "inputTokens": 273,
+          "outputTokens": 67,
+          "cacheReadTokens": 1792,
+          "cacheWriteTokens": 0,
+          "costUsd": 0.000704528
+        }
+      ]
+    },
+    {
+      "id": "conditions-011",
+      "group": "regression",
+      "version": "fact-support-typed-v7",
+      "execution": "completed",
+      "passed": true,
+      "inputHash": "052d3865ecd9e75b0b92bbb2cf47c28a6a2fc0a3bf3b375ac6021935140d9c01",
+      "verificationHash": "8c3410cd0ac233ac08ec8acc10f61e5aa45219b842c1b397c37642392960a621",
+      "requestHash": "ef7473867d1d2be9d9c7b66ae2d7f775dd54be016dc60e9bbb79dadf7469f07b",
+      "verificationInputHash": "6782e56835b71e02e23682eccc89144bc475d49aa304eb4ec94111d67c5effc4",
+      "candidateResults": [
+        {
+          "id": "KB-PRODUCT-LUNCH",
+          "passed": true,
+          "expectedCategory": "boundary_answer",
+          "expectedSupported": true,
+          "actualCategory": "boundary_answer",
+          "actualSupported": true
+        }
+      ],
+      "decisions": [
+        {
+          "id": "KB-PRODUCT-LUNCH",
+          "category": "boundary_answer",
+          "quote": "菜品明细、过敏原和特殊节假日可用性未录入。",
+          "reason": "用户明确问资料是否记载过敏原明细，原文直接声明未录入，可支持否定回答。",
+          "supported": true
+        }
+      ],
+      "validation": {
+        "status": "complete",
+        "outputHash": "97e9c375542055a05e35177eaeead737ce3dcf35a6b16d54118ba32063025e35",
+        "invalidDecisions": []
+      },
+      "attempts": [
+        {
+          "operation": "support",
+          "provider": "deepseek",
+          "model": "deepseek-v4-pro",
+          "attempt": 1,
+          "durationMs": 1007.1056670000035,
+          "outcome": "ok",
+          "totalTokens": 2138,
+          "inputTokens": 284,
+          "outputTokens": 62,
+          "cacheReadTokens": 1792,
+          "cacheWriteTokens": 0,
+          "costUsd": 0.000699248
+        }
+      ]
+    },
+    {
+      "id": "conditions-012",
+      "group": "regression",
+      "version": "fact-support-typed-v7",
+      "execution": "completed",
+      "passed": false,
+      "inputHash": "b377081099b3d008a247d428f92a95a607be479e5af2ea0408f20fb87451078c",
+      "verificationHash": "4bbac4e7faefc789ef1a50d26b5fd4399b5789491b8e4060159c439b5ab0e958",
+      "requestHash": "4285c70df4148113c8e9c12715b8485b3af0924b38906a5d2851c73761a6a346",
+      "verificationInputHash": "14d9947019fd5479f399d49991fc7f06233929c6e3a3abfb7e1732ee98d9de1f",
+      "candidateResults": [
+        {
+          "id": "KB-SHOP-DEMO-1",
+          "passed": false,
+          "expectedCategory": "direct_fact",
+          "expectedSupported": true,
+          "actualCategory": "limitation_only",
+          "actualSupported": false
+        }
+      ],
+      "decisions": [
+        {
+          "id": "KB-SHOP-DEMO-1",
+          "category": "limitation_only",
+          "quote": "常规午餐与晚餐套餐允许普通周末使用，到店前需用户自行与商家确认接待情况；助手目前不能预约、外呼、查询实时库存或安排接待。法定节假日、特殊活动和私享套餐使用限制没有录入，遇到这些问题应明确规则缺失并建议向商家核实。",
+          "reason": "原文仅说明普通周末可用，未明确星期天是否属于普通周末，也未提供星期天使用规则，无法回答该具体问题。",
+          "supported": false
+        }
+      ],
+      "validation": {
+        "status": "complete",
+        "outputHash": "9ccf829f2559b16fbbe54dfe805f60b8899b0ebba4647bb10129b49034043746",
+        "invalidDecisions": []
+      },
+      "attempts": [
+        {
+          "operation": "support",
+          "provider": "deepseek",
+          "model": "deepseek-v4-pro",
+          "attempt": 1,
+          "durationMs": 1815.106249999997,
+          "outcome": "ok",
+          "totalTokens": 2146,
+          "inputTokens": 213,
+          "outputTokens": 141,
+          "cacheReadTokens": 1792,
+          "cacheWriteTokens": 0,
+          "costUsd": 0.000918368
+        }
+      ]
+    }
+  ]
+}
