@@ -14,7 +14,8 @@ import { readQQReplyButtons, readQQReplyFormat, sendQQReply } from "./qq-reply.t
 import { RefundStore, readRefundDatabaseConfig } from "./refunds.ts";
 import { confirmRefundReply, markRefundReplyPresented } from "./refund-entry.ts";
 import { dispatchMerchantNotifications } from "./merchant-notifications.ts";
-import { createSupportSession, readSupportArchitecture } from "./support-session.ts";
+import { createSupportSession, readSupportArchitecture, readSupportContextMode } from "./support-session.ts";
+import { ConversationStateStore } from "./conversation-state.ts";
 import { createKnowledgeService } from "./knowledge-service.ts";
 import { readKnowledgeParameters, resolveSupportRunParameters } from "./support-parameters.ts";
 
@@ -63,11 +64,13 @@ export function readQQConfig(env: NodeJS.ProcessEnv = process.env) {
 
 async function main() {
   const architecture = readSupportArchitecture();
+  const contextMode = readSupportContextMode(architecture);
   const parameters = resolveSupportRunParameters(architecture, readKnowledgeParameters());
   const { options, allowedGroups } = readQQConfig();
   const replyFormat = readQQReplyFormat();
   const replyButtons = readQQReplyButtons();
   const store = new CouponStore(createPool(readDatabaseConfig()));
+  const contexts = contextMode === "mysql" ? new ConversationStateStore(createPool(readAfterSalesDatabaseConfig())) : undefined;
   const knowledge = architecture === "controller" ? createKnowledgeService(store, { mode: parameters.knowledgeMode,
     applicability: parameters.knowledgeApplicability, queryMode: parameters.knowledgeQueryMode, supportProfile: parameters.knowledgeSupport, supportModel: parameters.knowledgeSupportModel, supportPrompt: parameters.knowledgeSupportPrompt, threshold: parameters.knowledgeThreshold, timeoutMs: parameters.knowledgeTimeoutMs }) : undefined;
   let afterSales: AfterSalesStore | undefined;
@@ -75,6 +78,7 @@ async function main() {
   let stopMerchant: (() => Promise<void>) | undefined;
   try {
     await store.ping();
+    await contexts?.ping();
     if (process.env.AFTER_SALES_DB_PASSWORD) {
       afterSales = new AfterSalesStore(createPool(readAfterSalesDatabaseConfig()));
       await afterSales.ping();
@@ -118,7 +122,9 @@ async function main() {
           store: afterSales, sourceKey: merchantSourceKey(identity, msg.groupOpenid!), refunds,
         } : undefined;
         return architecture === "controller"
-          ? createSupportSession(identity, store, modelRuntime, model, business, { groupOpenid: msg.groupOpenid!, knowledge })
+          ? createSupportSession(identity, store, modelRuntime, model, business, {
+            groupOpenid: msg.groupOpenid!, knowledge, context: contexts?.bind(identity, msg.groupOpenid!),
+          })
           : createCouponSession(identity, store, modelRuntime, model, business);
       },
       async (target, _text, reply, requesterId) => {
@@ -151,7 +157,7 @@ async function main() {
       if (afterSales && !stopMerchant) stopMerchant = startMockMerchant(afterSales, {
         afterProcess: () => dispatchMerchantNotifications(afterSales!, agent, options.appId, allowedGroups),
       });
-      console.log(`[qq] ${options.transport} 团购券客服已就绪；architecture=${architecture}；knowledge=${parameters.knowledgeMode}；模型 ${model.provider}/${model.id}；${refunds ? "模拟协商与模拟退款已启用，无真实资金操作" : afterSales ? "模拟商家协商已启用，订单/资金只读" : "只读咨询"}。`);
+      console.log(`[qq] ${options.transport} 团购券客服已就绪；architecture=${architecture}；context=${contextMode}；knowledge=${parameters.knowledgeMode}；模型 ${model.provider}/${model.id}；${refunds ? "模拟协商与模拟退款已启用，无真实资金操作" : afterSales ? "模拟商家协商已启用，订单/资金只读" : "只读咨询"}。`);
     });
     const controller = new AbortController();
     const stop = () => controller.abort();
@@ -170,9 +176,7 @@ async function main() {
     }
   } finally {
     await stopMerchant?.();
-    await refunds?.close();
-    await afterSales?.close();
-    await store.close();
+    await Promise.all([contexts?.close(), refunds?.close(), afterSales?.close(), store.close()]);
   }
 }
 

@@ -25,7 +25,7 @@ async function main() {
   }
   if (updated !== original) await writeFile(envPath, updated, { mode: 0o600 });
   await chmod(envPath, 0o600);
-  const schema = (await Promise.all(["05-merchant.sql", "06-refunds.sql", "07-merchant-notifications.sql"].map(file =>
+  const schema = (await Promise.all(["05-merchant.sql", "06-refunds.sql", "07-merchant-notifications.sql", "08-conversation-state.sql"].map(file =>
     readFile(new URL(`../db/${file}`, import.meta.url), "utf8")))).join("\n").replaceAll("USE dave_agent;", `USE \`${database}\`;`);
   const quote = (value: string) => `'${value.replaceAll("'", "''")}'`;
   const account = `${quote(user)}@'%'`;
@@ -42,7 +42,7 @@ GRANT SELECT, INSERT, UPDATE ON \`${database}\`.refund_operations TO ${refundAcc
 GRANT INSERT ON \`${database}\`.refunds TO ${refundAccount};
 GRANT UPDATE (status, refunded_cents) ON \`${database}\`.orders TO ${refundAccount};
 GRANT UPDATE (status) ON \`${database}\`.coupons TO ${refundAccount};`;
-  const sql = `${schema}\nSET SESSION sql_mode = 'NO_BACKSLASH_ESCAPES';\nCREATE USER IF NOT EXISTS ${account} IDENTIFIED BY ${quote(password)};\nALTER USER ${account} IDENTIFIED BY ${quote(password)};\nREVOKE ALL PRIVILEGES, GRANT OPTION FROM ${account};\n${reads}\nGRANT SELECT, INSERT, UPDATE ON \`${database}\`.merchant_requests TO ${account};\nGRANT SELECT, INSERT, UPDATE ON \`${database}\`.merchant_notifications TO ${account};\n${refundGrants}\n`;
+  const sql = `${schema}\nSET SESSION sql_mode = 'NO_BACKSLASH_ESCAPES';\nCREATE USER IF NOT EXISTS ${account} IDENTIFIED BY ${quote(password)};\nALTER USER ${account} IDENTIFIED BY ${quote(password)};\nREVOKE ALL PRIVILEGES, GRANT OPTION FROM ${account};\n${reads}\nGRANT SELECT, INSERT, UPDATE ON \`${database}\`.merchant_requests TO ${account};\nGRANT SELECT, INSERT, UPDATE ON \`${database}\`.merchant_notifications TO ${account};\nGRANT SELECT, INSERT, UPDATE ON \`${database}\`.conversation_state TO ${account};\n${refundGrants}\n`;
   const result = spawnSync("docker", ["compose", "exec", "-T", "mysql", "sh", "-c",
     'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql -uroot --default-character-set=utf8mb4'], {
     cwd: root, input: sql, encoding: "utf8", timeout: 20_000,

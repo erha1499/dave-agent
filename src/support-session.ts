@@ -8,6 +8,7 @@ import { merchantSourceKey, type AfterSalesStore } from "./after-sales.ts";
 import type { CouponStore, QQIdentity } from "./coupon-store.ts";
 import type { KnowledgeService } from "./knowledge-service.ts";
 import type { RefundStore } from "./refunds.ts";
+import type { SupportContextPort, SupportContextSnapshot, SupportContextValue } from "./conversation-state.ts";
 import type { Reply } from "./reply.ts";
 import { normalizeModelSupportAction, modelSupportActionParameters } from "./support-context-action.ts";
 import { SupportController, type SupportCall, type SupportResult, type TrustedPolicyTopic } from "./support-controller.ts";
@@ -53,6 +54,14 @@ export function readSupportArchitecture(env: NodeJS.ProcessEnv = process.env): "
   if (value !== "atomic" && value !== "controller") throw new Error("SUPPORT_ARCHITECTURE 仅支持 atomic 或 controller。");
   return value;
 }
+export function readSupportContextMode(architecture: "atomic" | "controller", env: NodeJS.ProcessEnv = process.env): "memory" | "mysql" {
+  const mode = env.SUPPORT_CONTEXT_MODE?.trim() || "memory";
+  if (mode !== "memory" && mode !== "mysql") throw new Error("SUPPORT_CONTEXT_MODE 仅支持 memory 或 mysql。");
+  if (mode === "mysql" && (architecture !== "controller" || !env.AFTER_SALES_DB_PASSWORD)) {
+    throw new Error("持久会话定位需要 Controller 和已初始化的售后数据库账号。");
+  }
+  return mode;
+}
 export function prepareSupportPrompt(session: AgentSession, prompt: SupportPrompt) {
   const state = sessions.get(session);
   if (!state) return;
@@ -95,8 +104,9 @@ export function supportReply(session: AgentSession, text = ""): Reply | undefine
 export async function createSupportSession(
   identity: QQIdentity, store: CouponStore, runtime: ModelRuntime, model: Model<Api>,
   afterSales?: { store: AfterSalesStore; sourceKey: string; refunds?: RefundStore },
-  options: { groupOpenid?: string; focus?: SupportFocus; onCall?: (call: SupportCall) => void; repairBudget?: number; knowledge?: KnowledgeService } = {},
+  options: { groupOpenid?: string; focus?: SupportFocus; context?: SupportContextPort; onCall?: (call: SupportCall) => void; repairBudget?: number; knowledge?: KnowledgeService } = {},
 ) {
+  if (options.focus && options.context) throw new Error("会话定位只能使用一个存储来源。");
   const { repairBudget } = resolveSupportParameters(options.repairBudget === undefined ? {} : { repairBudget: options.repairBudget });
   const groupOpenid = options.groupOpenid ?? "cli";
   const sourceKey = merchantSourceKey(identity, groupOpenid);
@@ -115,6 +125,69 @@ export async function createSupportSession(
   let turn: ReturnType<SupportController["createTurn"]> | undefined;
   let activeRun: { abort: AbortController; contextText: string; promise?: Promise<void> } | undefined;
   let pendingFocusWrite: Promise<void> | undefined;
+  let contextSnapshot: SupportContextSnapshot | undefined;
+  let contextFocus: SupportContextValue["focus"];
+  let contextOrderConfirmed = false;
+  const forgetContextFocus = () => {
+    clearReferences(state); state.focusOrderId = undefined; contextFocus = undefined; contextOrderConfirmed = false;
+  };
+  const blockedContext = (): SupportContextValue => ({ version: 1, requiresRestatement: true });
+  async function saveContext(value: SupportContextValue, abort: AbortController) {
+    if (!options.context || !contextSnapshot) return;
+    const expected = contextSnapshot;
+    const writing = (async () => {
+      contextSnapshot = await options.context!.write(expected, value);
+      // A final publication already in flight may finish after cancellation.
+      // Serialize its invalidation before a new prompt can read the record.
+      if (!value.requiresRestatement && (abort.signal.aborted || state.abort !== abort)) {
+        contextSnapshot = await options.context!.write(contextSnapshot, blockedContext());
+      }
+    })();
+    pendingFocusWrite = writing;
+    try { await writing; }
+    finally { if (pendingFocusWrite === writing) pendingFocusWrite = undefined; }
+  }
+  async function publishContext(abort: AbortController, requestId: string, selectedAt: number) {
+    if (!options.context) return;
+    if (abort.signal.aborted || state.abort !== abort) {
+      if (state.abort === abort) forgetContextFocus();
+      return;
+    }
+    const result = state.result, receipt = state.hostReceipt;
+    const selected = receipt?.version === "reference-selection-v1" && receipt.outcome === "selected" ? receipt.selectedOrderId : undefined;
+    const explicit = result?.outcome === "ready" && result.action.kind !== "clarify" && result.action.kind !== "non_business"
+      && result.action.orderRef?.kind === "explicit" ? result.verifiedOrderId : undefined;
+    if (selected || explicit) {
+      contextFocus = { orderId: (selected ?? explicit)!, requestId, source: selected ? "selection" : "explicit",
+        selectedAt, expiresAt: selectedAt + 15 * 60_000 };
+    }
+    if (selected) contextOrderConfirmed = true;
+    if (state.pendingReferenceKind === "order") contextOrderConfirmed = false;
+    // Ordinary order cards also contain an amount reference. Their presence alone
+    // must not prevent the basic order -> restart -> fresh status path.
+    const ambiguousOrders = !contextOrderConfirmed && Boolean(state.orderReferenceChoices?.overflow || state.orderReferenceChoices?.selectionRequired
+      || (state.orderReferenceChoices?.candidates.length ?? 0) > 1);
+    if (state.turnError || !result && !receipt || contextFocus && (contextFocus.expiresAt <= Date.now()
+      || result?.evidence.order && result.evidence.order.id !== contextFocus.orderId)) {
+      contextFocus = undefined; state.focusOrderId = undefined;
+    }
+    const needsRestatement = state.turnError || !result && !selected || !contextFocus || contextFocus.expiresAt <= Date.now()
+      || Boolean(state.pendingReferenceKind) || ambiguousOrders
+      || Boolean(result && (result.outcome !== "ready" || ["policy", "refund_eligibility", "paid_amount_compare"].includes(result.action.kind)))
+      || Boolean(receipt && !selected);
+    const value: SupportContextValue = { version: 1, requiresRestatement: needsRestatement,
+      ...(contextFocus && contextFocus.expiresAt > Date.now() ? { focus: contextFocus } : {}) };
+    try { await saveContext(value, abort); }
+    catch {
+      if (state.abort === abort) {
+        // A completed business action must retain its receipt and must never run
+        // again just because its optional context publication failed.
+        clearReferences(state); state.focusOrderId = undefined; state.focusUnavailable = true;
+        contextFocus = undefined;
+      }
+    }
+    finally { if (abort.signal.aborted && state.abort === abort) forgetContextFocus(); }
+  }
   const tools = [defineTool({
     name: "support_action", label: "处理客服业务动作",
     description: "每轮选择一个业务动作。宿主固定协议v2.2，protocol可省略，如提供只能为v2.2。模型判断语义，宿主验证引用和事实：当前写明订单用explicit，唯一当前订单用focus，另一笔只读订单用alternative；政策问题区分standalone/previous，previous必须带宿主话题requestId。实付比较只可用当前宿主itemPaidUnit的requestId；金额候选多义时clarify amount_basis，禁止模型代替用户选择候选。不接收身份、范围、金额或批准；缺引用或多义用clarify。",
@@ -137,9 +210,12 @@ export async function createSupportSession(
       try { result = await executingTurn.execute(validated); }
       catch (error) { if (isCurrent()) clearReferences(state); throw error; }
       assertCurrent();
+      if (options.context && state.pendingReferenceKind === "order" && result.outcome === "ready"
+        && result.action.kind !== "clarify" && result.action.kind !== "non_business"
+        && result.action.orderRef?.kind === "explicit" && result.verifiedOrderId) contextOrderConfirmed = true;
       let focusWriteFailed = false;
       const nextFocus = result.verifiedOrderId ?? (state.selectedOrderId && result.evidence.order?.id === state.selectedOrderId ? state.selectedOrderId : undefined);
-      if (nextFocus) {
+      if (nextFocus && options.focus) {
         // A write already started cannot be rolled back by cancellation. Wait
         // before publishing local state, and never let a late failure clear a new turn.
         try { await options.focus?.write(nextFocus); }
@@ -247,6 +323,7 @@ export async function createSupportSession(
   sessions.set(session, state);
   const modelPrompt = session.prompt.bind(session);
   session.prompt = async (text, promptOptions) => {
+    const selectedAt = Date.now();
     const hostSelection = /^(?:选择金额基准|选择订单|选择话题)/u.test(text.trimStart());
     const current = state.next ?? { requestId: randomUUID(), groupOpenid, messageId: randomUUID() };
     state.next = undefined;
@@ -269,15 +346,49 @@ export async function createSupportSession(
     if (previousRun) {
       await session.abort(); assertCurrent();
       await previousRun.promise?.catch(() => {}); assertCurrent();
+      if (options.context) forgetContextFocus();
     }
     // A context write already sent cannot be canceled. Let it finish before a
     // new read/write, otherwise its delayed commit could erase the newer focus.
     if (pendingFocusWrite) {
       await pendingFocusWrite.catch(() => {}); assertCurrent();
+      if (options.context) forgetContextFocus();
     }
     if (current.groupOpenid !== groupOpenid || !current.requestId || current.requestId.length > 512
       || !current.messageId || current.messageId.length > 512 || text.length > 5000) {
       clearReferences(state); state.turnError = true; throw new Error("业务请求标识或可信群路由无效。");
+    }
+    if (options.context) {
+      try {
+        const next = await options.context.read(); assertCurrent();
+        const changed = !contextSnapshot || next.revision !== contextSnapshot.revision
+          || next.customerId !== contextSnapshot.customerId || next.bindingId !== contextSnapshot.bindingId
+          || JSON.stringify(next.value) !== JSON.stringify(contextSnapshot.value);
+        if (changed) {
+          if (contextSnapshot) {
+            // Pi can rebuild finalized messages from its branch. Clear that
+            // projection too, so an old customer's messages cannot reappear.
+            session.sessionManager.resetLeaf();
+            session.agent.reset();
+          }
+          clearReferences(state);
+          contextFocus = next.value?.requiresRestatement ? undefined : next.value?.focus;
+          contextOrderConfirmed = Boolean(contextFocus);
+          state.focusOrderId = contextFocus?.orderId;
+        }
+        if (contextFocus && contextFocus.expiresAt <= Date.now()) {
+          clearReferences(state); state.focusOrderId = undefined; contextFocus = undefined;
+        }
+        contextSnapshot = next;
+        state.focusUnavailable = false;
+        // Do not let a crash, error or failed final write resurrect an older
+        // locator. The in-memory references remain usable during this turn.
+        await saveContext(blockedContext(), abort); assertCurrent();
+      } catch {
+        assertCurrent(); clearReferences(state); state.focusOrderId = undefined;
+        contextFocus = undefined; state.focusUnavailable = true; state.turnError = true;
+        throw new Error("会话定位暂时不可用，本轮尚未处理业务，请稍后重试。");
+      }
     }
     if (options.focus && !state.focusUnavailable) {
       try {
@@ -293,8 +404,12 @@ export async function createSupportSession(
     assertCurrent();
     if (!hostSelection) {
       const explicit = [...new Set(text.match(/COUPON-\d{4}(?!\d)/g) ?? [])];
+      if (options.context && explicit.length && (explicit.length !== 1 || explicit[0] !== contextFocus?.orderId)) {
+        contextFocus = undefined; contextOrderConfirmed = false;
+      }
       if (explicit.length && (explicit.length !== 1 || explicit[0] !== state.selectedOrderId)) state.selectedOrderId = undefined;
       if (explicit.length > 1 || (explicit.length === 1 && explicit[0] !== state.focusOrderId)) {
+        if (options.context) { contextFocus = undefined; contextOrderConfirmed = false; }
         state.focusOrderId = undefined;
         state.selectedOrderId = undefined;
         state.policyTopic = undefined;
@@ -347,8 +462,17 @@ export async function createSupportSession(
       run.promise = modelPrompt(text, { ...promptOptions, preflightResult: disposition => {
         assertCurrent(); promptOptions?.preflightResult?.(disposition); assertCurrent();
       } });
-      try { await run.promise; }
-      finally { if (activeRun === run) activeRun = undefined; }
+      try { await run.promise; await publishContext(abort, current.requestId, selectedAt); }
+      catch (error) {
+        if (options.context && state.abort === abort) {
+          clearReferences(state); state.focusOrderId = undefined; contextFocus = undefined;
+        }
+        throw error;
+      }
+      finally {
+        if (options.context && abort.signal.aborted && state.abort === abort) forgetContextFocus();
+        if (activeRun === run) activeRun = undefined;
+      }
       return;
     }
     if (!text.trimStart().startsWith("选择金额基准")) {
@@ -391,6 +515,7 @@ export async function createSupportSession(
           content: JSON.stringify({ kind: "host_reference_selection", requestId: current.requestId,
             outcome: receipt.outcome, selectedRequestId: selectedRequestId ?? null, text: reply.text }) }, { triggerTurn: false });
       } catch { receipt.historyFailed = true; }
+      await publishContext(abort, current.requestId, selectedAt);
       return;
     }
     const match = /^选择金额基准 ([a-f0-9-]{36})$/.exec(text.trim());
@@ -413,6 +538,7 @@ export async function createSupportSession(
         content: JSON.stringify({ kind: "host_amount_selection", requestId: current.requestId,
           outcome: receipt.outcome, selectedRequestId: reference?.requestId ?? null, text: reply.text }) }, { triggerTurn: false });
     } catch { receipt.historyFailed = true; }
+    await publishContext(abort, current.requestId, selectedAt);
   };
   return session;
 }

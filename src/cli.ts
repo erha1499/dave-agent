@@ -12,7 +12,8 @@ import { RefundStore, readRefundDatabaseConfig } from "./refunds.ts";
 import { confirmRefundReply, markRefundReplyPresented } from "./refund-entry.ts";
 import { renderReply, type Reply } from "./reply.ts";
 import { replyFromTools } from "./reply-from-tools.ts";
-import { cancelSupportTurn, createSupportSession, getSupportHostReceipt, getSupportResult, prepareSupportPrompt, readSupportArchitecture, supportReply } from "./support-session.ts";
+import { cancelSupportTurn, createSupportSession, getSupportHostReceipt, getSupportResult, prepareSupportPrompt, readSupportArchitecture, readSupportContextMode, supportReply } from "./support-session.ts";
+import { ConversationStateStore } from "./conversation-state.ts";
 import { createKnowledgeService } from "./knowledge-service.ts";
 import { readKnowledgeParameters, resolveSupportRunParameters } from "./support-parameters.ts";
 
@@ -44,10 +45,12 @@ export async function runCliPrompt(
 
 async function main() {
   const architecture = readSupportArchitecture();
+  const contextMode = readSupportContextMode(architecture);
   const parameters = resolveSupportRunParameters(architecture, readKnowledgeParameters());
   const senderId = process.env.CLI_DEMO_USER || "TEST_USER1";
   if (!["TEST_USER1", "TEST_USER2"].includes(senderId)) throw new Error("CLI_DEMO_USER 仅支持 TEST_USER1 或 TEST_USER2 合成身份。");
   const store = new CouponStore(createPool(readDatabaseConfig()));
+  const contexts = contextMode === "mysql" ? new ConversationStateStore(createPool(readAfterSalesDatabaseConfig())) : undefined;
   const knowledge = architecture === "controller" ? createKnowledgeService(store, { mode: parameters.knowledgeMode,
     applicability: parameters.knowledgeApplicability, queryMode: parameters.knowledgeQueryMode, supportProfile: parameters.knowledgeSupport, supportModel: parameters.knowledgeSupportModel, supportPrompt: parameters.knowledgeSupportPrompt, threshold: parameters.knowledgeThreshold, timeoutMs: parameters.knowledgeTimeoutMs }) : undefined;
   const afterSales = process.env.AFTER_SALES_DB_PASSWORD
@@ -56,6 +59,7 @@ async function main() {
   let stopMerchant: (() => Promise<void>) | undefined;
   try {
     await store.ping();
+    await contexts?.ping();
     if (refunds && !afterSales) throw new Error("模拟退款需要先配置商家协商数据库。");
     await refunds?.ping();
     if (afterSales) {
@@ -67,7 +71,7 @@ async function main() {
     const sourceKey = merchantSourceKey(identity, "cli");
     const business = afterSales ? { store: afterSales, sourceKey, refunds } : undefined;
     const session = architecture === "controller"
-      ? await createSupportSession(identity, store, modelRuntime, model, business, { knowledge })
+      ? await createSupportSession(identity, store, modelRuntime, model, business, { knowledge, context: contexts?.bind(identity, "cli") })
       : await createCouponSession(identity, store, modelRuntime, model, business);
     const input = createInterface({ input: stdin, output: stdout });
     console.log(`团购券客服演示（${senderId}）：券单 COUPON-1001${afterSales ? "；模拟协商 COUPON-2001 / 2002 / 2003" : "，只读咨询"}；输入 /exit 退出。全部是模拟数据。`);
@@ -98,7 +102,7 @@ async function main() {
     }
   } finally {
     try { await stopMerchant?.(); }
-    finally { await Promise.all([refunds?.close(), afterSales?.close(), store.close()]); }
+    finally { await Promise.all([contexts?.close(), refunds?.close(), afterSales?.close(), store.close()]); }
   }
 }
 

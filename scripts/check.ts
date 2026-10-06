@@ -31,6 +31,8 @@ checkSupportReferenceSelection();
 const { checkSupportReferenceSession } = await import("./support-reference-session-check.ts");
 await checkSupportReferenceSession();
 await import("./support-session-check.ts");
+const { checkSupportContext } = await import("./support-context-check.ts");
+await checkSupportContext();
 await import("./support-clarification-check.ts");
 const { checkSupportAmountContext } = await import("./support-amount-context-check.ts");
 await checkSupportAmountContext();
