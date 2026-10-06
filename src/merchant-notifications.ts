@@ -1,5 +1,5 @@
 import type { QQBotInboundMessage } from "@tencent-connect/qqbot-nodejs";
-import type { AfterSalesStore, MerchantNotification } from "./after-sales.ts";
+import { merchantSourceKey, type AfterSalesStore, type MerchantNotification } from "./after-sales.ts";
 import { QQAgent, validQQMessage } from "./qq-agent.ts";
 
 function notificationMessage(item: MerchantNotification): QQBotInboundMessage {
@@ -20,6 +20,7 @@ export async function dispatchMerchantNotifications(
   const items = await store.listNotifications(appId);
   // ponytail: a bounded batch for one test-group service; add a worker concurrency limit if traffic grows.
   const results = await Promise.allSettled(items.map(async item => {
+    if (item.appId !== appId || item.sourceKey !== merchantSourceKey({ appId, senderId: item.senderId }, item.groupOpenid)) return;
     let claimed = false;
     const msg = notificationMessage(item);
     let outcome: "busy" | "sent" | "deferred" | "unknown" = "deferred";
@@ -27,7 +28,7 @@ export async function dispatchMerchantNotifications(
       outcome = await agent.resumeMerchant(msg, async () => {
         claimed = await store.claimNotification(item.taskId, appId);
         if (!claimed) return undefined;
-        const task = await store.getTask({ appId, senderId: item.senderId }, item.sourceKey, item.orderId);
+        const task = await store.getTask({ appId, senderId: item.senderId }, item.sourceKey, item.orderId, { referenceTaskId: item.taskId });
         return task?.taskId === item.taskId && task.status !== "pending" ? task : undefined;
       });
     }

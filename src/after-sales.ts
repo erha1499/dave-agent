@@ -19,6 +19,9 @@ export type MerchantReplyRoute = { groupOpenid: string; messageId: string; times
 export type MerchantNotification = MerchantReplyRoute & {
   taskId: string; orderId: string; sourceKey: string; appId: string; senderId: string;
 };
+export type MerchantTaskReference = {
+  taskId: string; orderId: string; origin: "confirmed" | "sent"; anchorAt: number; expiresAt: number;
+};
 
 export function merchantSourceKey(identity: QQIdentity, conversationId: string): string {
   if (!/^[A-Za-z0-9_-]{1,32}$/.test(identity.appId) || !/^[A-Za-z0-9_-]{1,128}$/.test(identity.senderId)
@@ -67,12 +70,12 @@ export class AfterSalesStore {
     }
   }
 
-  async ping() { await this.controlled(async () => { await this.pool.query("SELECT 1"); }); }
+  async ping() { await this.controlled(async () => { await this.pool.query("SELECT identity_id FROM merchant_requests LIMIT 0"); }); }
   async close() { await this.controlled(() => this.pool.end()); }
 
   private async eligible(connection: PoolConnection, identity: QQIdentity, orderId: string) {
     // Lock every fact used for authorization/eligibility without granting business write privileges.
-    const [orders] = await connection.execute<RowDataPacket[]>(`SELECT o.*, s.outcome, s.delay_ms
+    const [orders] = await connection.execute<RowDataPacket[]>(`SELECT o.*, s.outcome, s.delay_ms, CAST(q.id AS CHAR) AS binding_identity_id
       FROM orders o JOIN qq_identities q ON q.customer_id = o.customer_id
       JOIN merchant_demo_scenarios s ON s.order_id = o.id
       WHERE o.id = ? AND q.app_id = ? AND q.sender_id = ? FOR SHARE`, [orderId, identity.appId, identity.senderId]);
@@ -129,10 +132,10 @@ export class AfterSalesStore {
       const taskId = randomUUID();
       // ponytail: one persistent request per demo order; add explicit attempt IDs when retries become a product requirement.
       await connection.execute(`INSERT INTO merchant_requests
-        (task_id, order_id, customer_id, source_key, reason, amount_cents, mock_outcome, due_at, deadline_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, TIMESTAMPADD(MICROSECOND, ?, UTC_TIMESTAMP(3)), UTC_TIMESTAMP(3) + INTERVAL 8 SECOND)
+        (task_id, order_id, customer_id, identity_id, source_key, reason, amount_cents, mock_outcome, due_at, deadline_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, TIMESTAMPADD(MICROSECOND, ?, UTC_TIMESTAMP(3)), UTC_TIMESTAMP(3) + INTERVAL 8 SECOND)
         ON DUPLICATE KEY UPDATE task_id = task_id`,
-      [taskId, orderId, order.customer_id, sourceKey, reason.trim(), order.paid_cents, order.outcome, Number(order.delay_ms) * 1000]);
+      [taskId, orderId, order.customer_id, order.binding_identity_id, sourceKey, reason.trim(), order.paid_cents, order.outcome, Number(order.delay_ms) * 1000]);
       const [rows] = await connection.execute<RowDataPacket[]>("SELECT * FROM merchant_requests WHERE order_id = ? FOR SHARE", [orderId]);
       const existing = rows[0]!;
       if (existing.source_key !== sourceKey || existing.customer_id !== order.customer_id) throw new BusinessError(unavailable);
@@ -144,17 +147,53 @@ export class AfterSalesStore {
     });
   }
 
+  async listTaskReferences(identity: QQIdentity, sourceKey: string, groupOpenid: string): Promise<{ candidates: MerchantTaskReference[]; overflow: boolean }> {
+    return this.controlled(async () => {
+      let boundKey: string;
+      try {
+        if (typeof groupOpenid !== "string") throw new Error();
+        boundKey = merchantSourceKey(identity, groupOpenid);
+      } catch { throw new BusinessError(unavailable); }
+      if (sourceKey !== boundKey) throw new BusinessError(unavailable);
+      // Task creation proves confirmation even after completion. Only a successful
+      // notification adds a later event anchor; queries and replay never renew either TTL.
+      const [rows] = await this.pool.execute<RowDataPacket[]>(`SELECT r.task_id, r.order_id,
+          CASE WHEN n.finished_at > UTC_TIMESTAMP(3) - INTERVAL 15 MINUTE THEN 'sent' ELSE 'confirmed' END AS origin,
+          CASE WHEN n.finished_at > UTC_TIMESTAMP(3) - INTERVAL 15 MINUTE THEN n.finished_at ELSE r.created_at END AS anchor_at
+        FROM merchant_requests r
+        JOIN qq_identities q ON q.id = r.identity_id AND q.customer_id = r.customer_id
+        JOIN orders o ON o.id = r.order_id AND o.customer_id = q.customer_id
+        LEFT JOIN merchant_notifications n ON n.task_id = r.task_id AND n.app_id = q.app_id AND n.sender_id = q.sender_id
+          AND n.group_openid = ? AND n.status = 'sent' AND r.status <> 'pending'
+          AND n.finished_at >= r.created_at AND n.finished_at <= UTC_TIMESTAMP(3)
+        WHERE q.app_id = ? AND q.sender_id = ? AND r.source_key = ? AND r.created_at <= UTC_TIMESTAMP(3)
+          AND (r.created_at > UTC_TIMESTAMP(3) - INTERVAL 15 MINUTE OR n.finished_at > UTC_TIMESTAMP(3) - INTERVAL 15 MINUTE)
+        ORDER BY anchor_at DESC, r.task_id DESC LIMIT 4`, [groupOpenid, identity.appId, identity.senderId, sourceKey]);
+      return { candidates: rows.slice(0, 3).map(row => {
+        const anchorAt = (row.anchor_at as Date).getTime();
+        if (!Number.isSafeInteger(anchorAt) || !["confirmed", "sent"].includes(row.origin)) throw new Error();
+        return { taskId: row.task_id as string, orderId: row.order_id as string,
+          origin: row.origin as MerchantTaskReference["origin"], anchorAt, expiresAt: anchorAt + 15 * 60_000 };
+      }), overflow: rows.length > 3 };
+    });
+  }
+
   async listNotifications(appId: string): Promise<MerchantNotification[]> {
     if (!/^[A-Za-z0-9_-]{1,32}$/.test(appId)) throw new BusinessError("模拟商家通知标识无效。");
     return this.controlled(async () => {
       const [rows] = await this.pool.execute<RowDataPacket[]>(`SELECT n.*, r.order_id, r.source_key
         FROM merchant_notifications n JOIN merchant_requests r ON r.task_id = n.task_id
+        JOIN qq_identities q ON q.id = r.identity_id AND q.customer_id = r.customer_id AND q.app_id = n.app_id AND q.sender_id = n.sender_id
+        JOIN orders o ON o.id = r.order_id AND o.customer_id = q.customer_id
         WHERE n.app_id = ? AND n.status = 'pending' AND r.status <> 'pending'
         ORDER BY r.completed_at, n.task_id LIMIT 20`, [appId]);
-      return rows.map(row => ({ taskId: row.task_id as string, orderId: row.order_id as string,
-        sourceKey: row.source_key as string, appId: row.app_id as string, senderId: row.sender_id as string,
-        groupOpenid: row.group_openid as string, messageId: row.message_id as string,
-        timestamp: (row.message_at as Date).toISOString() }));
+      return rows.flatMap(row => {
+        const item = { taskId: row.task_id as string, orderId: row.order_id as string,
+          sourceKey: row.source_key as string, appId: row.app_id as string, senderId: row.sender_id as string,
+          groupOpenid: row.group_openid as string, messageId: row.message_id as string,
+          timestamp: (row.message_at as Date).toISOString() };
+        return merchantSourceKey({ appId: item.appId, senderId: item.senderId }, item.groupOpenid) === item.sourceKey ? [item] : [];
+      });
     });
   }
 
@@ -164,6 +203,8 @@ export class AfterSalesStore {
       // ponytail: one attempt per notification; a crash after claim falls back to user queries rather than risking duplicate sends.
       const [changed] = await this.pool.execute<ResultSetHeader>(`UPDATE merchant_notifications n
         JOIN merchant_requests r ON r.task_id = n.task_id
+        JOIN qq_identities q ON q.id = r.identity_id AND q.customer_id = r.customer_id AND q.app_id = n.app_id AND q.sender_id = n.sender_id
+        JOIN orders o ON o.id = r.order_id AND o.customer_id = q.customer_id
         SET n.status = 'claimed', n.claimed_at = UTC_TIMESTAMP(3)
         WHERE n.task_id = ? AND n.app_id = ? AND n.status = 'pending' AND r.status <> 'pending'`, [taskId, appId]);
       return changed.affectedRows === 1;
@@ -181,13 +222,17 @@ export class AfterSalesStore {
     });
   }
 
-  async getTask(identity: QQIdentity, sourceKey: string, orderId: string): Promise<MerchantTask | undefined> {
+  async getTask(identity: QQIdentity, sourceKey: string, orderId: string,
+    options?: { referenceTaskId: string }): Promise<MerchantTask | undefined> {
     validate(identity, sourceKey, orderId);
+    if (options) notificationKey(options.referenceTaskId, identity.appId);
     return this.controlled(async () => {
       const [rows] = await this.pool.execute<RowDataPacket[]>(`SELECT r.* FROM merchant_requests r
         JOIN orders o ON o.id = r.order_id AND o.customer_id = r.customer_id
         JOIN qq_identities q ON q.customer_id = o.customer_id
-        WHERE r.order_id = ? AND r.source_key = ? AND q.app_id = ? AND q.sender_id = ?`, [orderId, sourceKey, identity.appId, identity.senderId]);
+        WHERE r.order_id = ? AND r.source_key = ? AND q.app_id = ? AND q.sender_id = ?
+          ${options ? "AND r.identity_id = q.id AND r.task_id = ?" : ""}`,
+      [orderId, sourceKey, identity.appId, identity.senderId, ...(options ? [options.referenceTaskId] : [])]);
       return rows[0] ? task(rows[0]) : undefined;
     });
   }

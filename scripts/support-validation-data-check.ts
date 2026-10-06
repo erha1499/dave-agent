@@ -186,10 +186,29 @@ export function validateSupportValidationDataset(value: unknown): SupportValidat
   return data;
 }
 
-// Preserve the frozen business contract while allowing this one additive cost-source label.
+const hash = (value: Buffer | string) => createHash("sha256").update(value).digest("hex");
+const implementationContractPath = "data/support-v2-validation-contract-v2.json";
+const implementationContractSha256 = "d6e2e9a898428979a1aa3c8f59e71199eb4389d5786119876902ec01c83a30cf";
+
+// The sidecar is an explicit implementation revision, not an equivalence claim.
+// Pin its bytes so changing source + manifest together still requires a reviewed checker update.
+function readImplementationContract(bytes: Buffer, sourceBytes: Buffer) {
+  assert.equal(hash(bytes), implementationContractSha256, "implementation revision drift");
+  const revision = JSON.parse(bytes.toString()), source = JSON.parse(sourceBytes.toString());
+  assert.equal(revision.version, 2);
+  assert.equal(revision.baselineSource.path, "data/support-v2-validation-source.json");
+  assert.equal(revision.baselineSource.sha256, hash(sourceBytes), "frozen source manifest drift");
+  assert.deepEqual(revision.dataset, source.dataset, "fixed gold must not change with implementation");
+  assert.equal(revision.change.path, "src/after-sales.ts");
+  assert.equal(revision.change.fromSha256, source.contracts[revision.change.path]);
+  assert.equal(revision.change.byteEquivalent, false);
+  assert.equal(revision.migration.path, "db/09-merchant-references.sql");
+  return revision;
+}
+
+// Preserve all unrevised business files while allowing this additive cost-source label.
 // The full normalized file must still match the original digest; business edits cannot pass.
 function assertFrozenContract(path: string, bytes: Buffer, expected: string) {
-  const hash = (value: Buffer | string) => createHash("sha256").update(value).digest("hex");
   const actual = hash(bytes);
   if (actual === expected) return null;
   const previous = '["sdk_estimate", "provider"].includes(cost.source)';
@@ -201,17 +220,27 @@ function assertFrozenContract(path: string, bytes: Buffer, expected: string) {
   return { path, frozenSha256: expected, actualSha256: actual, change: "additive price_estimate cost source; business checker byte-equivalent" };
 }
 
+function assertRevisedContract(path: string, bytes: Buffer, expected: string, revision: ReturnType<typeof readImplementationContract>) {
+  if (path !== revision.change.path) return assertFrozenContract(path, bytes, expected);
+  assert.equal(expected, revision.change.fromSha256, "revision must name the original implementation");
+  assert.equal(hash(bytes), revision.change.toSha256, `implementation v2 drift: ${path}`);
+  return { path, frozenSha256: expected, actualSha256: hash(bytes), revision: 2, byteEquivalent: false,
+    change: "task binding generation and strict automatic references/notifications; fixed gold unchanged, not executed" };
+}
+
 export async function loadSupportValidationData() {
   const bytes = await readFile(new URL("../data/support-v2-validation.json", import.meta.url));
-  const source = JSON.parse(await readFile(new URL("../data/support-v2-validation-source.json", import.meta.url), "utf8"));
-  const hash = (input: Buffer) => createHash("sha256").update(input).digest("hex");
+  const sourceBytes = await readFile(new URL("../data/support-v2-validation-source.json", import.meta.url));
+  const source = JSON.parse(sourceBytes.toString());
+  const revision = readImplementationContract(await readFile(new URL(`../${implementationContractPath}`, import.meta.url)), sourceBytes);
+  assert.equal(hash(await readFile(new URL(`../${revision.migration.path}`, import.meta.url))), revision.migration.sha256, "implementation migration drift");
   assert.equal(source.version, 1); assert.equal(source.validationPolicy, "fixed-validation-not-blind");
   assert.equal(source.dataset.path, "data/support-v2-validation.json"); assert.equal(source.dataset.sha256, hash(bytes)); assert.equal(source.dataset.bytes, bytes.length);
   const contracts = ["db/02-seed.sql", "db/05-merchant.sql", "src/support-action.ts", "src/support-evaluation.ts", "src/after-sales-entry.ts", "src/refund-entry.ts", "src/refunds.ts", "src/after-sales.ts", "scripts/merchant-test-fixture.ts"];
   assert.deepEqual(Object.keys(source.contracts), contracts);
   const compatibility = [];
   for (const path of contracts) {
-    const allowed = assertFrozenContract(path, await readFile(new URL(`../${path}`, import.meta.url)), source.contracts[path]);
+    const allowed = assertRevisedContract(path, await readFile(new URL(`../${path}`, import.meta.url)), source.contracts[path], revision);
     if (allowed) compatibility.push(allowed);
   }
   const data = validateSupportValidationDataset(JSON.parse(bytes.toString()));
@@ -220,15 +249,33 @@ export async function loadSupportValidationData() {
   for (const state of Object.values(data.orderTemplates)) assert.ok(seed.includes(`('${state.seedOrderId}'`) && seed.includes(state.items[0]!.productId));
   const knownPolicies = new Set([...seed.matchAll(/\('(KB-[A-Z0-9-]+)'/g)].map(m => m[1]));
   for (const c of data.cases) for (const t of c.turns) for (const id of [...t.expect.evidence.requiredPolicyIds, ...t.expect.evidence.forbiddenPolicyIds]) assert.ok(knownPolicies.has(id), `unknown policy ${id}`);
-  return { data, source, compatibility };
+  return { data, source, compatibility, revision };
 }
 
-const { data, source, compatibility } = await loadSupportValidationData();
+const { data, source, compatibility, revision } = await loadSupportValidationData();
 const checkerPath = "src/support-evaluation.ts";
 const checkerBytes = await readFile(new URL(`../${checkerPath}`, import.meta.url));
 assert.throws(() => assertFrozenContract(checkerPath, Buffer.concat([checkerBytes, Buffer.from("\n// unexpected drift")]), source.contracts[checkerPath]));
 assert.throws(() => assertFrozenContract("src/refunds.ts", checkerBytes, source.contracts["src/refunds.ts"]));
-if (compatibility.length) console.log("Support validation preserves frozen gold/business logic; additive price_estimate accounting label verified separately.");
+const revisedBytes = await readFile(new URL(`../${revision.change.path}`, import.meta.url));
+assert.throws(() => assertRevisedContract(revision.change.path, Buffer.concat([revisedBytes, Buffer.from("\n// unexpected drift")]), source.contracts[revision.change.path], revision));
+assert.throws(() => assertRevisedContract(revision.change.path, revisedBytes, "0".repeat(64), revision));
+const sourceBytes = await readFile(new URL("../data/support-v2-validation-source.json", import.meta.url));
+const revisionBytes = await readFile(new URL(`../${implementationContractPath}`, import.meta.url));
+assert.throws(() => readImplementationContract(revisionBytes, Buffer.concat([sourceBytes, Buffer.from("\n")])));
+for (const mutate of [
+  (copy: typeof revision) => { copy.version = 3; },
+  (copy: typeof revision) => { copy.change.path = "src/refunds.ts"; },
+  (copy: typeof revision) => { copy.change.fromSha256 = "0".repeat(64); },
+  (copy: typeof revision) => { copy.change.toSha256 = "0".repeat(64); },
+  (copy: typeof revision) => { delete copy.migration; },
+  (copy: typeof revision) => { copy.migration.extraPath = "src/refunds.ts"; },
+]) {
+  const copy = structuredClone(revision); mutate(copy);
+  assert.throws(() => readImplementationContract(Buffer.from(`${JSON.stringify(copy, null, 2)}\n`), sourceBytes));
+}
+assert.equal(compatibility.filter(item => "revision" in item).length, 1);
+console.log("Support validation keeps original gold/source hashes; implementation v2 explicitly changes task binding/notification semantics, not byte-equivalent. Cost-label compatibility remains separately checked.");
 function rejects(mutate: (copy: SupportValidationDataset) => void) {
   const copy = structuredClone(data); mutate(copy); assert.throws(() => validateSupportValidationDataset(copy));
 }
@@ -244,4 +291,4 @@ assert.throws(() => validateSupportValidationDataset({ ...data,
   fixturePolicy: { ...data.fixturePolicy, merchantTiming: { ...data.fixturePolicy.merchantTiming, holdMs: 8000 } } }));
 assert.throws(() => validateSupportValidationDataset({ ...data,
   fixturePolicy: { ...data.fixturePolicy, merchantTiming: { ...data.fixturePolicy.merchantTiming, productionDeadlineChanged: true } } }));
-console.log("Support fixed-validation data checks passed: 24 cases / 79 turns, actor/route scopes, runtime ID dependencies, confirmation-only mutations, frozen contracts; 4 O4 cases deferred, no DB/model/QQ execution.");
+console.log("Support fixed-validation data checks passed: 24 cases / 79 turns, actor/route scopes, runtime ID dependencies, confirmation-only mutations, versioned implementation contract; 4 O4 cases deferred, no DB/model/QQ execution.");

@@ -1,6 +1,6 @@
-# O4：可信订单、政策话题与历史金额引用的持久恢复
+# O4：订单、政策、历史金额与任务引用的持久恢复
 
-日期：2026-10-06。O4-1 实现 Controller 的订单定位持久化，O4-2 增加订单候选与待选恢复，O4-3 扩展政策话题和历史实付引用。均按显式开关启用；默认仍为 atomic + lexical，定位默认 memory。业务数据为合成订单与模拟协商/退款。工程检查与真实模型、QQ 验收分别记录。
+日期：2026-10-06。O4-1 实现 Controller 的订单定位持久化，O4-2 增加订单候选与待选恢复，O4-3 扩展政策话题和历史实付引用，O4-4 补齐只读任务引用及其选择恢复。持久会话恢复按显式开关启用；默认仍为 atomic + lexical，定位默认 memory。任务来源读取与自动通知的绑定代次检查也作用于 memory 模式，因此已启用售后的环境都需执行新迁移。业务数据为合成订单与模拟协商/退款。工程检查与真实模型、QQ 验收分别记录。
 
 ## 要解决的问题
 
@@ -48,6 +48,16 @@
 
 面试可从“恢复引用为什么不等于恢复授权”讲起：Pi 继续负责模型循环与生命周期；项目实现有界恢复合同、绑定代次、CAS、失效状态和重新取证。相比保存完整聊天记录，该方案便于解释每个字段的来源与失效条件；代价是恢复范围有限，业务事实需要再次读取。最坏情况下写入检查焦点 1 个、订单候选 3 个、政策订单 3 个、金额订单 2 个，共 9 个去重前的订单引用；实际去重后通常更少。快照和模型上下文都有上限，但本片尚无真实模型长会话延迟或成本收益结论。
 
+### O4-4：异步任务恢复不改变当前订单
+
+业务场景是“已确认 A 单协商，等待时查询 B 单；商家结果到达后，服务重建，用户追问那次协商”。任务与普通订单焦点分别定位：`merchant_status` 可使用宿主唯一或用户已选的 `taskRef`，然后重新核验订单归属和确切任务；查 A 任务不切换 B 焦点，也不产生新的政策或金额依据。当前消息明确写出订单号时仍用 `orderRef`；多任务或任务与订单指代不明时先澄清。`taskRef` 不用于准备协商、退款或确认执行。
+
+- **复用业务记录作为来源。** 每轮从 `merchant_requests` / `merchant_notifications` 重新读取最多三个近期候选及溢出标记。创建时间提供“用户已确认发起”的固定 15 分钟锚点，任务结束不撤销该锚点；成功通知的 `finished_at` 可提供较新的锚点。查询和重复确认不续期。`claimed/unknown/deferred` 不是发送成功，`sent` 仅表示平台接受投递，不能证明用户已读或退款完成。
+- **只保存用户选择和歧义。** 同表 JSON v4 保存任务选择的 task/order/request ID、原有效期及待选/溢出标记，兼容 v1–v3；候选、任务状态、批准、金额、令牌和展示证明不重复存入任务快照。重建后重新列出，只有仍属当前候选的真实选择可恢复。多候选先显示“选择任务 编号”，宿主只接受本 Session 实际展示过的单行指令；旧令牌拒绝后重新展示。失效、取消或选择失败不能自动改选幸存任务；选择不调用模型，不改变订单焦点。
+- **绑定代次覆盖自动路径。** 新任务从事务锁定的 QQ 绑定记录保存 `identity_id`；来源列出、通知领取及出队读取、任务选择保存均复核当前绑定和归属。同一客户解绑重绑也不能恢复旧代次。旧 NULL 记录不回填，重复确认也不补造代次；旧待发通知保留但不再自动领取。任务 worker 仍可推进到终态，用户按原订单明确查询；原审批、退款记录及确认规则保持兼容。引用过期不撤销批准或删除业务历史。
+
+个人实现是来源合同、绑定代次、有界选择恢复及只读取证边界；复用 Pi 循环、既有业务表、通知队列、固定回复和 CAS 存储。成本是每轮额外一次任务来源查询、持久选择时增加任务归属检查，且重建后未完成的选择须重新展示。本片没有模型延迟或完成率收益结论，也不承诺已读回执。管理员绕过解绑流程直接改写绑定记录仍不属于代次保证。
+
 ## 本片恢复与降级边界
 
 | 情况 | 行为 |
@@ -59,27 +69,34 @@
 | 有效历史金额比较依据 | v3 恢复历史展示值及版本，重新授权读取当前实付后比较；金额展示和选择均不授予退款权限。缺失依据时重新查询订单并由宿主展示。 |
 | 已选政策/金额失效，或发送无效选择指令 | 保留必须重新选择的状态；重建不复用旧令牌，当前指令先实际展示再选择。有效的已完成选择可按来源请求恢复。 |
 | 定位过期、坏版本、绑定变化、前序失败 | 清理可恢复定位并要求重新提供对象；未绑定或存储故障在业务执行前停止。 |
-| A单旧通知到达、当前正在查B | 通知按原任务发送，本轮B定位不变。 |
+| A单旧通知到达、当前正在查B | 通知按原任务发送，B 定位不变；重建后只读 taskRef 查询 A，普通订单追问仍查询 B。 |
+| 多任务、旧选择令牌或原已选任务失效 | v4 保留待选状态；当前候选重新展示再选择，不猜最新一项。没有有效引用时要求明确订单号。 |
 
-完整 O4 仍须补齐任务事件引用的恢复合同，以及 20/40/80 轮真实模型、常驻 QQ 服务重启和最终共同业务回归。政策恢复工程检查不代表 C1 知识判别已通过；C1 的证据误接收和未准入状态继续保留。
+完整 O4 仍须补齐 20/40/80 轮真实模型、常驻 QQ 服务重启和最终共同业务回归。政策恢复工程检查不代表 C1 知识判别已通过；C1 的证据误接收和未准入状态继续保留。
 
 ## 启用与复现
 
-已有售后账号的环境执行以下迁移；它不更改凭据、`.env` 或现有业务记录。首次完整售后初始化也已包含新表与权限。
+已有售后账号的环境先执行以下迁移，再重启 CLI/QQ；它们不更改凭据、`.env` 或已有业务状态，不回填旧任务代次。首次完整售后初始化也已包含新表、字段与权限。已有 volume 的 `db:up` 不能代替迁移；旧进程也不会自动采用新保护。新的售后启动检查读取 `identity_id` 列（零业务行），缺迁移时在启动模型、QQ 连接和 worker 前退出。
 
 ```sh
 node --env-file-if-exists=.env scripts/conversation-state-setup.ts
+node --env-file-if-exists=.env scripts/merchant-references-setup.ts
 SUPPORT_ARCHITECTURE=controller SUPPORT_CONTEXT_MODE=mysql npm start
 ```
 
-QQ使用相同两个环境变量及原有启动命令。本轮没有切换本机常驻QQ进程、发送真实QQ消息或改前端。`memory` 不启用新表；`mysql` 与atomic组合、未配置售后账号会在启动时拒绝。
+QQ使用相同两个环境变量及原有启动命令。本轮没有切换本机常驻QQ进程、发送真实QQ消息或改前端。`memory` 不启用会话状态表，但已启用售后时同样需要任务字段迁移；`mysql` 与atomic组合、未配置售后账号会在启动时拒绝。
 
 ```sh
 # 零SQL、零远程模型：真实Pi + faux / 内存CAS与可控竞态
 node scripts/support-context-check.ts
 node scripts/conversation-state-value-check.ts
+node scripts/support-task-context-check.ts
 # 真实MySQL + Pi/faux；创建独立合成fixture并清理，不发真实QQ消息
 node --env-file-if-exists=.env scripts/conversation-state-db-check.ts
+node --env-file-if-exists=.env scripts/merchant-references-db-check.ts
+node --env-file-if-exists=.env scripts/support-task-recovery-db-check.ts
+# 通知脚本单独串行运行，避免其 worker 与上述 fixture 相互影响
+node --env-file-if-exists=.env scripts/merchant-notification-db-check.ts
 npm run validate
 ```
 
@@ -95,6 +112,16 @@ O4-3 首轮工程验证（同日）：完整 `validate` 退出码 0；真实 MyS
 
 可复现的讲解路线：先运行 `support-context-check.ts` 看单话题续问、双话题选择和历史金额变化，再运行数据库脚本核对实际跨进程恢复与零退款写入。沿 [Session](../src/support-session.ts) 的 `publishContext`、恢复分支及选择处理，追到 [快照校验和事务](../src/conversation-state.ts)、[金额比较](../src/support-context.ts) 与 [话题选择](../src/support-reference-selection.ts)。无需为演示重新调用付费模型；该路线说明确定性工程行为，不作为模型理解能力的成绩。
 
-本轮零付费模型、零真实 QQ 请求。子进程检查验证真实进程边界下的 MySQL + Pi/faux 恢复，不能代替常驻 QQ 服务重启或真实模型长会话验收；它们与完整恢复仍待后续。
+### O4-4 工程验证与面试演示
+
+2026-10-06 最终完整 `npm run validate` 退出 0；任务来源真实 MySQL 六组检查、任务恢复五个独立 Pi/faux 子进程、原会话恢复 13 组（八个子进程）和原通知数据库回归均一次通过。新增就绪查询的成功/缺字段错误脱敏检查通过，售后受限账号实际执行查询通过。独立审阅覆盖 Controller、Session、存储及来源边界，未发现剩余阻断。
+
+五进程演示由 [task recovery 检查](../scripts/support-task-recovery-db-check.ts) 直接运行：`95374` 保存 B 焦点后退出 → 父进程通过真实通知调度器和本地 QQ 发送替身标记 A 通知 sent → `95382` 新进程读取 A 任务后继续读取 B → `95384` 验证双任务澄清和从实际回复选单 → `95385` 拒绝旧令牌并重新选择 → `95386` 再恢复该选择。通知前后会话快照完全相同，选择有效期未延长；只留下 fixture 有意创建的两个任务，零退款方案/退款写入，结束清理。来源检查另覆盖旧 NULL、三候选加溢出、发送状态、同客户重绑、晚通知、确切任务与归属变化。纯 Session 检查补齐无效/未展示/带图片/多行指令、取消与 CAS、来源故障及过期不能自动换对象。
+
+首次完整检查因 `src/after-sales.ts` 与旧源码冻结合同不同而失败，原日志保留；这是身份与自动通知语义的真实变化，不能按字节等价放行。新增 [v2 实现合同](../data/support-v2-validation-contract-v2.json)，固定原 source/gold 哈希、确切实现变更和迁移依赖，由[检查器](../scripts/support-validation-data-check.ts)固定其哈希并验证篡改拒绝；其余旧合同仍保留原限制。原 24 对话/79 轮未改、未执行，4 项 O4 deferred 保持不变。定向检查后第二次完整检查通过；这不计作模型效果提升。
+
+本机日志 `.runtime/o4-4-validation-attempt1.log`、`.runtime/o4-4-validation-attempt2.log`、`.runtime/o4-4-merchant-references-db.log`、`.runtime/o4-4-task-recovery-db-attempt1.log`、`.runtime/o4-4-context-db-attempt1.log` 和 `.runtime/o4-4-notification-db.log` 保留且不入库。演示可从“任务事件与订单焦点为什么分开”追到 [taskRef 只读分支](../src/support-controller.ts)、[选择失效规则](../src/support-task-context.ts)、[来源及绑定代次查询](../src/after-sales.ts) 与 [Session v4 恢复](../src/support-session.ts)。
+
+本轮零付费模型、零真实 QQ 请求。商家使用合成结果，QQ 发送由本地替身完成；真实执行的是 MySQL 事务、授权、通知调度、跨进程恢复和固定断言。真实模型长会话、任务指代理解及常驻 QQ 服务重启仍待验收；客户端已读与真实支付能力不属于当前实现和证据范围。
 
 源码入口：[持久存储](../src/conversation-state.ts)、[Session接入](../src/support-session.ts)、[表结构](../db/08-conversation-state.sql)、[CLI](../src/cli.ts)、[QQ](../src/qq.ts)。

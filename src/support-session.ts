@@ -17,6 +17,8 @@ import { amountChoiceNotice, amountChoiceTtlMs, amountChoicesVersion, currentAmo
 import { resolveSupportParameters } from "./support-parameters.ts";
 import { currentReferenceChoices, emptyReferenceChoices, referenceChoiceNotice, referenceChoiceTtlMs, rememberReferenceChoice,
   resolveReferenceChoice, selectReferenceChoice, type TrustedReferenceChoices } from "./support-reference-selection.ts";
+import { refreshTaskChoices, resolveTaskReference, selectTaskChoice, taskChoiceNotice,
+  type TrustedTaskChoices } from "./support-task-context.ts";
 
 export type SupportPrompt = {
   requestId: string; groupOpenid: string; messageId: string;
@@ -34,19 +36,22 @@ type HostReceipt = {
   reply: Extract<Reply, { kind: "notice" }>;
 };
 export type SupportHostReceipt = HostReceipt & ({ version: "amount-selection-v1"; choices: TrustedAmountChoices }
-  | { version: "reference-selection-v1"; choices: TrustedReferenceChoices; selectedOrderId?: string; presentationRequestId?: string });
+  | { version: "reference-selection-v1"; choices: TrustedReferenceChoices; selectedOrderId?: string; presentationRequestId?: string }
+  | { version: "task-selection-v1"; choices: TrustedTaskChoices; selectedTaskId?: string });
 type State = { next?: SupportPrompt; result?: SupportResult; focusOrderId?: string; policyTopic?: TrustedPolicyTopic;
   orderChoices?: TrustedOrderChoices; amountChoices?: TrustedAmountChoices; hostReceipt?: SupportHostReceipt;
   policyChoices?: TrustedReferenceChoices; orderReferenceChoices?: TrustedReferenceChoices;
   selectedOrderId?: string; pendingReferenceKind?: "order" | "policy";
   presentations?: Partial<Record<"order" | "policy", { requestId: string; choices: TrustedReferenceChoices }>>;
   amountPresentation?: TrustedAmountChoices;
+  taskChoices?: TrustedTaskChoices; taskPresentation?: TrustedTaskChoices; taskRequired?: boolean;
   abort?: AbortController; turnError?: boolean; focusUnavailable?: boolean; invalidActions: number; actionStarted: boolean };
 const sessions = new WeakMap<AgentSession, State>();
 function clearReferences(state: State) {
   state.policyTopic = undefined; state.orderChoices = undefined; state.amountChoices = undefined; state.hostReceipt = undefined;
   state.policyChoices = undefined; state.orderReferenceChoices = undefined; state.selectedOrderId = undefined;
   state.pendingReferenceKind = undefined; state.presentations = undefined; state.amountPresentation = undefined;
+  state.taskChoices = undefined; state.taskPresentation = undefined; state.taskRequired = true;
 }
 
 export function readSupportArchitecture(env: NodeJS.ProcessEnv = process.env): "atomic" | "controller" {
@@ -112,6 +117,7 @@ export async function createSupportSession(
   const groupOpenid = options.groupOpenid ?? "cli";
   const sourceKey = merchantSourceKey(identity, groupOpenid);
   const binding = { sourceKey, groupOpenid };
+  const taskReferencesEnabled = typeof afterSales?.store.listTaskReferences === "function";
   const emptyAmountChoices = (): TrustedAmountChoices => ({ ...binding, version: amountChoicesVersion,
     candidates: [], overflow: false, selectionRequired: false });
   if (afterSales && afterSales.sourceKey !== sourceKey) throw new Error("业务会话与可信路由不一致。");
@@ -141,7 +147,8 @@ export async function createSupportSession(
       // A final publication already in flight may finish after cancellation.
       // Serialize its invalidation before a new prompt can read the record.
       if ((value.focus || value.version !== 1 && value.orderChoices
-        || value.version === 3 && (value.policyChoices || value.amountChoices)) && (abort.signal.aborted || state.abort !== abort)) {
+        || (value.version === 3 || value.version === 4) && (value.policyChoices || value.amountChoices)
+        || value.version === 4 && value.taskContext) && (abort.signal.aborted || state.abort !== abort)) {
         contextSnapshot = await options.context!.write(contextSnapshot, blockedContext());
       }
     })();
@@ -156,9 +163,11 @@ export async function createSupportSession(
       return;
     }
     const result = state.result, receipt = state.hostReceipt;
+    const taskAction = result?.action.kind === "merchant_status" && "taskRef" in result.action
+      || result?.action.kind === "clarify" && result.action.field === "task";
     const selected = receipt?.version === "reference-selection-v1" && receipt.outcome === "selected" ? receipt.selectedOrderId : undefined;
     const explicit = result?.outcome === "ready" && result.action.kind !== "clarify" && result.action.kind !== "non_business"
-      && result.action.orderRef?.kind === "explicit" ? result.verifiedOrderId : undefined;
+      && "orderRef" in result.action && result.action.orderRef?.kind === "explicit" ? result.verifiedOrderId : undefined;
     if (selected || explicit) {
       contextFocus = { orderId: (selected ?? explicit)!, requestId, source: selected ? "selection" : "explicit",
         selectedAt, expiresAt: selectedAt + 15 * 60_000 };
@@ -170,12 +179,12 @@ export async function createSupportSession(
     const ambiguousOrders = !contextOrderConfirmed && Boolean(state.orderReferenceChoices?.overflow || state.orderReferenceChoices?.selectionRequired
       || (state.orderReferenceChoices?.candidates.length ?? 0) > 1);
     if (state.turnError || !result && !receipt || contextFocus && (contextFocus.expiresAt <= Date.now()
-      || result?.evidence.order && result.evidence.order.id !== contextFocus.orderId)) {
+      || !taskAction && result?.evidence.order && result.evidence.order.id !== contextFocus.orderId)) {
       contextFocus = undefined; state.focusOrderId = undefined;
     }
     const needsRestatement = state.turnError || !result && !receipt || !contextFocus || contextFocus.expiresAt <= Date.now()
       || state.pendingReferenceKind === "order" || ambiguousOrders
-      || Boolean(result && result.outcome !== "ready" && result.outcome !== "clarification");
+      || Boolean(!taskAction && result && result.outcome !== "ready" && result.outcome !== "clarification");
     const completed = !state.turnError && Boolean(result || receipt);
     const choices = completed ? currentReferenceChoices(state.orderReferenceChoices, binding) : undefined;
     const policies = completed ? currentReferenceChoices(state.policyChoices, binding) : undefined;
@@ -187,7 +196,7 @@ export async function createSupportSession(
       overflow: choices.overflow, selectionRequired: choices.selectionRequired, pending: state.pendingReferenceKind === "order" } : undefined;
     const selectedPolicy = policies?.candidates.find(row => row.token === policies.selectedToken)?.reference;
     const selectedAmount = amounts?.candidates.find(row => row.token === amounts.selectedToken)?.reference;
-    const value: SupportContextValue = policies || amounts || completed && state.pendingReferenceKind === "policy"
+    let value: SupportContextValue = policies || amounts || completed && state.pendingReferenceKind === "policy"
       ? { version: 3, ...base, ...(orderChoices ? { orderChoices } : {}),
         ...(state.pendingReferenceKind ? { pendingReferenceKind: state.pendingReferenceKind } : {}),
         ...(policies ? { policyChoices: { candidates: policies.candidates.flatMap(row => {
@@ -202,6 +211,12 @@ export async function createSupportSession(
         }), overflow: amounts.overflow, selectionRequired: amounts.selectionRequired,
         ...(selectedAmount ? { selectedRequestId: selectedAmount.requestId } : {}) } } : {}) }
       : orderChoices ? { version: 2, ...base, orderChoices } : { version: 1, ...base };
+    const tasks = completed ? state.taskChoices : undefined;
+    if (tasks && (tasks.candidates.length || tasks.selectionRequired || tasks.overflow || tasks.selected)) {
+      value = { ...value, version: 4, ...(state.pendingReferenceKind ? { pendingReferenceKind: state.pendingReferenceKind } : {}),
+        taskContext: { selectionRequired: tasks.selectionRequired, overflow: tasks.overflow,
+        ...(tasks.selected ? { selected: structuredClone(tasks.selected) } : {}) } };
+    }
     try { await saveContext(value, abort); }
     catch {
       if (state.abort === abort) {
@@ -215,7 +230,7 @@ export async function createSupportSession(
   }
   const tools = [defineTool({
     name: "support_action", label: "处理客服业务动作",
-    description: "每轮选择一个业务动作。宿主固定协议v2.2，protocol可省略，如提供只能为v2.2。模型判断语义，宿主验证引用和事实：当前写明订单用explicit，唯一当前订单用focus，另一笔只读订单用alternative；政策问题区分standalone/previous，previous必须带宿主话题requestId。实付比较只可用当前宿主itemPaidUnit的requestId；金额候选多义时clarify amount_basis，禁止模型代替用户选择候选。不接收身份、范围、金额或批准；缺引用或多义用clarify。",
+    description: "每轮选择一个业务动作。宿主固定协议v2.2，protocol可省略，如提供只能为v2.2。模型判断语义，宿主验证引用和事实：当前写明订单用explicit，唯一当前订单用focus，另一笔只读订单用alternative；政策问题区分standalone/previous，previous必须带宿主话题requestId。实付比较只可用当前宿主itemPaidUnit的requestId；金额候选多义时clarify amount_basis。协商任务用merchant_status与非空宿主taskReference的taskId，不得同时给orderRef；taskReference为空或多义用clarify task，禁止模型代替用户选择候选。不接收身份、范围、金额或批准；缺引用或多义用clarify。",
     parameters: modelSupportActionParameters,
     execute: async (_id, { action }) => {
       if (!turn) throw new Error("业务轮次尚未初始化。");
@@ -237,9 +252,12 @@ export async function createSupportSession(
       assertCurrent();
       if (options.context && state.pendingReferenceKind === "order" && result.outcome === "ready"
         && result.action.kind !== "clarify" && result.action.kind !== "non_business"
-        && result.action.orderRef?.kind === "explicit" && result.verifiedOrderId) contextOrderConfirmed = true;
+        && "orderRef" in result.action && result.action.orderRef?.kind === "explicit" && result.verifiedOrderId) contextOrderConfirmed = true;
       let focusWriteFailed = false;
-      const nextFocus = result.verifiedOrderId ?? (state.selectedOrderId && result.evidence.order?.id === state.selectedOrderId ? state.selectedOrderId : undefined);
+      const taskAction = result.action.kind === "merchant_status" && "taskRef" in result.action
+        || result.action.kind === "clarify" && result.action.field === "task";
+      const nextFocus = taskAction ? undefined : result.verifiedOrderId
+        ?? (state.selectedOrderId && result.evidence.order?.id === state.selectedOrderId ? state.selectedOrderId : undefined);
       if (nextFocus && options.focus) {
         // A write already started cannot be rolled back by cancellation. Wait
         // before publishing local state, and never let a late failure clear a new turn.
@@ -248,55 +266,62 @@ export async function createSupportSession(
         assertCurrent();
       }
       state.result = result;
-      state.policyTopic = result.verifiedPolicyTopic;
-      if (result.verifiedPolicyTopic) {
-        const action = result.action;
-        const continueRequestId = "questionContext" in action && action.questionContext.kind === "previous"
-          && action.orderRef?.kind !== "alternative" ? action.questionContext.requestId : undefined;
-        state.policyChoices = rememberReferenceChoice(state.policyChoices, binding,
-          { kind: "policy", topic: result.verifiedPolicyTopic }, { continueRequestId });
-      } else if (result.outcome === "blocked" || result.outcome === "non_business"
-        || result.outcome === "ready" && (result.action.kind === "policy" || result.action.kind === "refund_eligibility")) {
-        // A failed or unsupported follow-up cannot silently fall back to an older success.
-        state.policyChoices = emptyReferenceChoices("policy", binding);
-        state.policyTopic = undefined;
+      if (taskAction && state.taskChoices && (result.referencePresentation === "task" || result.outcome !== "ready")) {
+        state.taskChoices = { ...state.taskChoices, selected: undefined, selectionRequired: true };
+        result.evidence.taskChoices = structuredClone(state.taskChoices);
+        if (result.referencePresentation === "task") state.taskPresentation = structuredClone(state.taskChoices);
       }
-      if (result.verifiedAmountReference && !result.needsAnswer && result.reply.kind === "order") {
-        state.amountChoices = rememberAmountChoice(state.amountChoices, binding, result.verifiedAmountReference);
-      } else if (result.outcome === "blocked" || result.outcome === "non_business") state.amountChoices = undefined;
-      const replyText = "text" in result.reply ? result.reply.text : "";
-      if (state.amountChoices && state.amountChoices.candidates.some(row =>
-        replyText.includes(`选择金额基准 ${row.token}`))) state.amountPresentation = structuredClone(state.amountChoices);
-      if (result.outcome === "ready" && result.reply.kind === "order" && result.evidence.order) {
-        state.orderChoices = rememberOrderChoice(state.orderChoices, { sourceKey, groupOpenid }, result.evidence.order.id, result.evidence.requestId);
-        state.orderReferenceChoices = rememberReferenceChoice(state.orderReferenceChoices, binding,
-          { kind: "order", orderId: result.evidence.order.id, requestId: result.evidence.requestId });
-      } else if (result.outcome === "blocked" || result.outcome === "non_business") {
-        state.orderChoices = undefined; state.orderReferenceChoices = undefined;
-      }
-      if (result.pendingReferenceKind) {
-        state.pendingReferenceKind = result.pendingReferenceKind;
-      }
-      if (result.referencePresentation) {
-        const choices = result.referencePresentation === "order" ? state.orderReferenceChoices : state.policyChoices;
-        if (choices) {
-          choices.selectedToken = undefined; choices.selectionRequired = true;
-          if (result.referencePresentation === "order") result.evidence.orderReferenceChoices = structuredClone(choices);
-          else result.evidence.policyChoices = structuredClone(choices);
-          state.presentations ??= {};
-          state.presentations[result.referencePresentation] = { requestId: result.evidence.requestId, choices: structuredClone(choices) };
+      if (!taskAction) {
+        state.policyTopic = result.verifiedPolicyTopic;
+        if (result.verifiedPolicyTopic) {
+          const action = result.action;
+          const continueRequestId = "questionContext" in action && action.questionContext.kind === "previous"
+            && action.orderRef?.kind !== "alternative" ? action.questionContext.requestId : undefined;
+          state.policyChoices = rememberReferenceChoice(state.policyChoices, binding,
+            { kind: "policy", topic: result.verifiedPolicyTopic }, { continueRequestId });
+        } else if (result.outcome === "blocked" || result.outcome === "non_business"
+          || result.outcome === "ready" && (result.action.kind === "policy" || result.action.kind === "refund_eligibility")) {
+          // A failed or unsupported follow-up cannot silently fall back to an older success.
+          state.policyChoices = emptyReferenceChoices("policy", binding);
+          state.policyTopic = undefined;
         }
-      }
-      if (result.evidence.order && result.outcome === "ready"
-        && (result.action.kind !== "clarify" && result.action.kind !== "non_business")
-        && result.action.orderRef?.kind === "explicit" && state.pendingReferenceKind === "order") state.pendingReferenceKind = undefined;
-      if (nextFocus) {
-        // A selected order is only a locator until this turn's fresh authorized read.
-        state.selectedOrderId = undefined;
-        state.focusOrderId = focusWriteFailed ? undefined : nextFocus;
-        state.focusUnavailable = focusWriteFailed;
-        // A failed context write must not turn a prepared operation into a retry.
-        if (focusWriteFailed) clearReferences(state);
+        if (result.verifiedAmountReference && !result.needsAnswer && result.reply.kind === "order") {
+          state.amountChoices = rememberAmountChoice(state.amountChoices, binding, result.verifiedAmountReference);
+        } else if (result.outcome === "blocked" || result.outcome === "non_business") state.amountChoices = undefined;
+        const replyText = "text" in result.reply ? result.reply.text : "";
+        if (state.amountChoices && state.amountChoices.candidates.some(row =>
+          replyText.includes(`选择金额基准 ${row.token}`))) state.amountPresentation = structuredClone(state.amountChoices);
+        if (result.outcome === "ready" && result.reply.kind === "order" && result.evidence.order) {
+          state.orderChoices = rememberOrderChoice(state.orderChoices, { sourceKey, groupOpenid }, result.evidence.order.id, result.evidence.requestId);
+          state.orderReferenceChoices = rememberReferenceChoice(state.orderReferenceChoices, binding,
+            { kind: "order", orderId: result.evidence.order.id, requestId: result.evidence.requestId });
+        } else if (result.outcome === "blocked" || result.outcome === "non_business") {
+          state.orderChoices = undefined; state.orderReferenceChoices = undefined;
+        }
+        if (result.pendingReferenceKind) {
+          state.pendingReferenceKind = result.pendingReferenceKind;
+        }
+        if (result.referencePresentation && result.referencePresentation !== "task") {
+          const choices = result.referencePresentation === "order" ? state.orderReferenceChoices : state.policyChoices;
+          if (choices) {
+            choices.selectedToken = undefined; choices.selectionRequired = true;
+            if (result.referencePresentation === "order") result.evidence.orderReferenceChoices = structuredClone(choices);
+            else result.evidence.policyChoices = structuredClone(choices);
+            state.presentations ??= {};
+            state.presentations[result.referencePresentation] = { requestId: result.evidence.requestId, choices: structuredClone(choices) };
+          }
+        }
+        if (result.evidence.order && result.outcome === "ready"
+          && (result.action.kind !== "clarify" && result.action.kind !== "non_business")
+          && "orderRef" in result.action && result.action.orderRef?.kind === "explicit" && state.pendingReferenceKind === "order") state.pendingReferenceKind = undefined;
+        if (nextFocus) {
+          // A selected order is only a locator until this turn's fresh authorized read.
+          state.selectedOrderId = undefined;
+          state.focusOrderId = focusWriteFailed ? undefined : nextFocus;
+          state.focusUnavailable = focusWriteFailed;
+          // A failed context write must not turn a prepared operation into a retry.
+          if (focusWriteFailed) clearReferences(state);
+        }
       }
       const { order, rules, task, operation, amountComparison, displayedPaidUnit, knowledge } = result.evidence;
       return { content: [{ type: "text", text: JSON.stringify({
@@ -352,7 +377,7 @@ export async function createSupportSession(
   const modelPrompt = session.prompt.bind(session);
   session.prompt = async (text, promptOptions) => {
     const selectedAt = Date.now();
-    const hostSelection = /^(?:选择金额基准|选择订单|选择话题)/u.test(text.trimStart());
+    const hostSelection = /^(?:选择金额基准|选择订单|选择话题|选择任务)/u.test(text.trimStart());
     const current = state.next ?? { requestId: randomUUID(), groupOpenid, messageId: randomUUID() };
     state.next = undefined;
     turn = undefined;
@@ -400,6 +425,9 @@ export async function createSupportSession(
             session.agent.reset();
           }
           clearReferences(state);
+          const savedTasks = next.value?.version === 4 ? next.value.taskContext : undefined;
+          state.taskRequired = savedTasks?.selectionRequired ?? Boolean(next.value?.requiresRestatement);
+          if (savedTasks) state.taskChoices = { ...binding, ...structuredClone(savedTasks), candidates: [] };
           contextFocus = next.value?.requiresRestatement ? undefined : next.value?.focus;
           contextOrderConfirmed = Boolean(contextFocus);
           state.focusOrderId = contextFocus?.orderId;
@@ -417,7 +445,7 @@ export async function createSupportSession(
               selectionRequired: saved.selectionRequired || saved.overflow || saved.candidates.length > 1 };
             if (saved.pending || !contextFocus && (saved.selectionRequired || saved.overflow)) state.pendingReferenceKind = "order";
           }
-          if (next.value?.version === 3) {
+          if (next.value?.version === 3 || next.value?.version === 4) {
             const savedPolicies = next.value.policyChoices, savedAmounts = next.value.amountChoices;
             if (savedPolicies) {
               let choices = emptyReferenceChoices("policy", binding);
@@ -449,8 +477,10 @@ export async function createSupportSession(
         if (contextFocus && contextFocus.expiresAt <= Date.now()) {
           const choices = currentReferenceChoices(state.orderReferenceChoices, binding);
           const policies = currentReferenceChoices(state.policyChoices, binding), amounts = currentAmountChoices(state.amountChoices, binding);
+          const tasks = state.taskChoices, taskPresentation = state.taskPresentation, taskRequired = state.taskRequired;
           clearReferences(state); state.focusOrderId = undefined; contextFocus = undefined; contextOrderConfirmed = false;
           state.policyChoices = policies; state.amountChoices = amounts;
+          state.taskChoices = tasks; state.taskPresentation = taskPresentation; state.taskRequired = taskRequired;
           // A recent authorized query may have produced candidates newer than
           // the original focus. Keep their deadlines, but require a new choice.
           if (choices) {
@@ -481,6 +511,18 @@ export async function createSupportSession(
       }
     }
     assertCurrent();
+    if (taskReferencesEnabled) {
+      try {
+        const listing = await afterSales!.store.listTaskReferences(identity, sourceKey, groupOpenid); assertCurrent();
+        const previous = state.taskChoices ?? { ...binding, candidates: [], overflow: false, selectionRequired: Boolean(state.taskRequired) };
+        const choices = refreshTaskChoices(previous, listing, binding);
+        if (!choices) throw new Error("任务引用无效");
+        state.taskChoices = choices;
+      } catch {
+        assertCurrent(); clearReferences(state); state.turnError = true;
+        throw new Error("协商任务引用暂时不可用，本轮尚未处理业务，请稍后重试。");
+      }
+    }
     if (!hostSelection) {
       const explicit = [...new Set(text.match(/COUPON-\d{4}(?!\d)/g) ?? [])];
       if (options.context && explicit.length && (explicit.length !== 1 || explicit[0] !== contextFocus?.orderId)) {
@@ -514,6 +556,7 @@ export async function createSupportSession(
         turn = controller.createTurn({ requestId: current.requestId, identity, sourceKey, userText: text,
           trustedRoute: { groupOpenid, messageId: current.messageId }, focusOrderId,
           policyTopic, orderChoices: state.orderChoices, amountChoices: state.amountChoices,
+          taskChoices: state.taskChoices,
           policyChoices: state.policyChoices, orderReferenceChoices: state.orderReferenceChoices, pendingReferenceKind: state.pendingReferenceKind,
           signal: abort.signal, onCall: current.onCall ?? options.onCall });
       } catch (error) {
@@ -523,6 +566,7 @@ export async function createSupportSession(
           policyTopic: policyTopic ? { requestId: policyTopic.requestId, originalQuery: policyTopic.originalQuery,
             priorQueries: policyTopic.priorQueries, intent: policyTopic.intent, orderId: policyTopic.orderId } : null,
           policyChoices: state.policyChoices, orderChoices: state.orderReferenceChoices,
+          taskChoices: state.taskChoices, taskReference: resolveTaskReference(state.taskChoices, binding) ?? null,
           pendingReferenceKind: state.pendingReferenceKind ?? null,
           itemPaidUnit: amountReference ? { requestId: amountReference.requestId, orderId: amountReference.orderId,
             field: amountReference.field, paidCents: amountReference.paidCents } : null,
@@ -531,7 +575,7 @@ export async function createSupportSession(
             candidates: state.amountChoices.candidates.map(row => ({ token: row.token, version: row.version,
               requestId: row.reference.requestId, orderId: row.reference.orderId, field: row.reference.field, paidCents: row.reference.paidCents })) },
           alternativeOrderId: state.pendingReferenceKind === "order" ? null : selectAlternativeOrder(state.orderChoices, binding, focusOrderId) ?? null,
-          instruction: "宿主固定协议v2.2，protocol可省略，如提供只能为v2.2。这些是有界定位引用，不代表批准或确认。当前有订单号用explicit；当前单用focus；唯一另一单用alternative且仅只读。依赖前文的话题用previous与policyTopic.requestId；独立完整问题用standalone。只读实付比较仅可用paid_amount_compare与当前非空itemPaidUnit.requestId；amountChoices只是曾展示候选，模型不得自行挑选其中requestId。金额基准为空或多义用clarify amount_basis，宿主会列出单行选择指令，由用户下一轮选择。引用不匹配先clarify，禁止从历史聊天自造引用或把旧状态带到新单；宿主每轮重新授权取证。" });
+          instruction: "宿主固定协议v2.2，protocol可省略，如提供只能为v2.2。这些是有界定位引用，不代表批准或确认。当前有订单号用explicit；当前单用focus；唯一另一单用alternative且仅只读。依赖前文的话题用previous与policyTopic.requestId；独立完整问题用standalone。只读实付比较仅可用paid_amount_compare与当前非空itemPaidUnit.requestId；amountChoices只是曾展示候选，模型不得自行挑选其中requestId。金额基准为空或多义用clarify amount_basis。协商任务独立于当前订单：只有非空taskReference可供merchant_status的taskRef使用；taskChoices不得由模型代选，缺少引用用clarify task。任务查询不能切换当前订单或产生退款权限。宿主会列出单行选择指令，由用户下一轮选择。引用不匹配先clarify，禁止从历史聊天自造引用或把旧状态带到新单；宿主每轮重新授权取证。" });
       assertCurrent();
       const run: NonNullable<typeof activeRun> = { abort, contextText };
       activeRun = run;
@@ -552,6 +596,32 @@ export async function createSupportSession(
         if (options.context && abort.signal.aborted && state.abort === abort) forgetContextFocus();
         if (activeRun === run) activeRun = undefined;
       }
+      return;
+    }
+    if (text.trimStart().startsWith("选择任务")) {
+      const match = /^选择任务 ([a-f0-9-]{36})$/.exec(text.trim());
+      const choices = state.taskChoices ?? { ...binding, candidates: [], overflow: false, selectionRequired: true };
+      const offered = match && state.taskPresentation?.candidates.find(row => row.token === match[1]);
+      const candidate = match && choices.candidates.find(row => row.token === match[1]);
+      const selected = offered && candidate && JSON.stringify(offered.reference) === JSON.stringify(candidate.reference)
+        && !promptOptions?.images?.length ? selectTaskChoice(choices, binding, match![1]!, current.requestId) : undefined;
+      state.taskChoices = selected ?? { ...choices, selected: undefined, selectionRequired: true };
+      const reference = selected ? resolveTaskReference(selected, binding) : undefined;
+      const reply: HostReceipt["reply"] = { kind: "notice", text: reference
+        ? `已选择订单 ${reference.orderId} 的协商任务 ${reference.taskId}。请在下一条消息查询任务，届时重新核验归属和最新状态。本次选择未改变当前订单，也不代表退款批准或确认。`
+        : "选择未生效：请使用本会话仍有效且已经展示的单行指令。\n" + taskChoiceNotice(state.taskChoices, binding) };
+      const receipt: SupportHostReceipt = { version: "task-selection-v1", requestId: current.requestId, sourceKey,
+        trustedRoute: { groupOpenid, messageId: current.messageId }, outcome: reference ? "selected" : "rejected",
+        ...(reference ? { selectedTaskId: reference.taskId, selectedRequestId: current.requestId } : {}),
+        choices: structuredClone(state.taskChoices), reply };
+      state.hostReceipt = receipt;
+      if (!reference) state.taskPresentation = structuredClone(state.taskChoices);
+      try {
+        await session.sendCustomMessage({ customType: "host_task_selection", display: false,
+          content: JSON.stringify({ kind: "host_task_selection", requestId: current.requestId,
+            outcome: receipt.outcome, selectedTaskId: reference?.taskId ?? null, text: reply.text }) }, { triggerTurn: false });
+      } catch { receipt.historyFailed = true; }
+      await publishContext(abort, current.requestId, selectedAt);
       return;
     }
     if (!text.trimStart().startsWith("选择金额基准")) {

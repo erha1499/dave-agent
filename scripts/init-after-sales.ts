@@ -25,7 +25,7 @@ async function main() {
   }
   if (updated !== original) await writeFile(envPath, updated, { mode: 0o600 });
   await chmod(envPath, 0o600);
-  const schema = (await Promise.all(["05-merchant.sql", "06-refunds.sql", "07-merchant-notifications.sql", "08-conversation-state.sql"].map(file =>
+  const schema = (await Promise.all(["05-merchant.sql", "06-refunds.sql", "07-merchant-notifications.sql", "08-conversation-state.sql", "09-merchant-references.sql"].map(file =>
     readFile(new URL(`../db/${file}`, import.meta.url), "utf8")))).join("\n").replaceAll("USE dave_agent;", `USE \`${database}\`;`);
   const quote = (value: string) => `'${value.replaceAll("'", "''")}'`;
   const account = `${quote(user)}@'%'`;

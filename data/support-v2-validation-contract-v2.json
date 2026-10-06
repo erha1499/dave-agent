@@ -1,0 +1,44 @@
+{
+  "version": 2,
+  "createdDate": "2026-10-06",
+  "purpose": "Original fixed gold on an explicitly revised implementation; not business byte equivalence or a completed evaluation run.",
+  "baselineSource": {
+    "path": "data/support-v2-validation-source.json",
+    "sha256": "e20e0e62da4067eb9df58370134132d8f57f8f12dbe48899c8483542c5c61565"
+  },
+  "dataset": {
+    "path": "data/support-v2-validation.json",
+    "sha256": "7860c21fb98efd4fcbb8158e9dcc9629aad113dc688d280027c14790e6b84969",
+    "bytes": 129822,
+    "cases": 24,
+    "turns": 79
+  },
+  "change": {
+    "path": "src/after-sales.ts",
+    "fromSha256": "16f063484cfb9fb381f70b3adc03425ca9e418897787673f0fefbe25a2d26b14",
+    "toSha256": "1100a2158af2e368e4e13706fc850c901bda647e3b874850f1c4d593c3a3a5d1",
+    "byteEquivalent": false,
+    "reason": "O4-4 task provenance and automatic delivery must respect the current QQ binding generation.",
+    "behaviorImpacts": [
+      "New tasks record the locked creator identity_id; idempotent replay cannot renew or backfill it.",
+      "Task references are bounded, scoped, fresh read-only locators from confirmed creation or platform-accepted notification anchors.",
+      "Notification listing, claim and dequeued reads require current binding generation, customer/order ownership and the original route.",
+      "Strict task reference reads match exact task ID and binding; legacy NULL identity rows cannot become automatic references or notifications.",
+      "Explicit order queries retain prior access rules; old approvals/refund state are not revoked by reference expiry.",
+      "Startup readiness checks the required identity_id column before starting CLI/QQ processing."
+    ],
+    "checks": [
+      "scripts/support-task-context-check.ts",
+      "scripts/support-context-check.ts",
+      "scripts/merchant-references-db-check.ts",
+      "scripts/support-task-recovery-db-check.ts",
+      "scripts/conversation-state-db-check.ts",
+      "scripts/merchant-notification-db-check.ts"
+    ]
+  },
+  "migration": {
+    "path": "db/09-merchant-references.sql",
+    "sha256": "de33d672035b1feaebc72eb52d4299671e0698635deda7b635b96f32f0817b6f"
+  },
+  "status": "Data/implementation contract checks only. Original 24 cases / 79 turns remain unchanged and unexecuted; 4 recovery cases remain deferred. No model-quality or real QQ claim."
+}

@@ -6,6 +6,8 @@
 
 当前消息明确给出的订单用 explicit；省略订单且宿主提供唯一有效焦点时用 focus，不能将历史订单冒充当前显式订单。多单、无有效焦点或请求不明确，用 clarify，不猜单。merchant_prepare 的 reason 只摘取用户当前提供的原文，不编造。refund_prepare 只有 orderRef，不接受 reason，也不要求用户重复协商原因；已登记原因和批准由宿主重读真实任务。
 
+查询此前确认的协商任务或商家结果通知时，只有宿主 taskReference 非空且与当前所指任务相符，才用 merchant_status 携带 taskRef={"taskId":"宿主taskReference.taskId"}，此时不传 orderRef。taskChoices 中的候选不是用户选择，不得从多候选中抄 taskId 或默认选最新一项；用 clarify(field="task",reason="missing"或"ambiguous")，宿主展示“选择任务”指令，用户选择后再续问。当前订单与另一单任务同时存在、用户仅说“刚才那个”等含糊指代时先澄清。明确询问当前订单仍用 orderRef；当前消息写出单号时用 explicit，不用 taskRef。任务选择/查询不切换当前订单，也不授权创建任务或退款。confirmed 仅表示已确认创建任务，sent 仅表示发送接口成功，均不代表用户已读、商家批准或退款完成。任务当前状态由宿主重新查询；退款状态和办理继续使用原订单动作。
+
 policy/refund_eligibility 的 question 保留用户本轮原问题，并必填 questionContext。独立完整问题用 {"kind":"standalone"}；只有宿主 policyTopic 确实对应所指话题时，才用 {"kind":"previous","requestId":"宿主policyTopic.requestId"} 续问。不要把未知日期、使用资格或费用改写成更容易回答的问题。
 
 宿主 orderChoices / policyChoices 只列实际成功查询过的候选。多个候选竞争时，不因最近一个看起来相关就替用户选择；policyTopic 为空时不能从候选、旧聊天或选项文字抄 requestId 绕过选择。按缺项调用 clarify，宿主展示“选择订单／选择话题”单行指令，由用户发送后再续问。选择只确定引用，后续仍重新取证；不要把选择指令当作退款确认。pendingReferenceKind 标记尚未解决的歧义：用户完整重述的新问题可用 standalone 独立处理，省略问题不能借 standalone 绕过缺失指代。已选话题的连续续问使用更新后的 policyTopic；priorQueries 是真实原问链，只供理解问题，不是已核实业务事实。

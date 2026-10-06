@@ -15,6 +15,7 @@ import { amountChoiceNotice, compareRemainingAmount, createAmountReference, reso
   type RemainingAmountComparison, type TrustedAmountReference, type TrustedAmountChoices, type TrustedOrderChoices } from "./support-context.ts";
 export type { RemainingAmountComparison, TrustedAmountReference, TrustedAmountChoices, TrustedOrderChoices } from "./support-context.ts";
 import { currentReferenceChoices, referenceChoiceNotice, resolveReferenceChoice, type TrustedReferenceChoices } from "./support-reference-selection.ts";
+import { currentTaskChoices, resolveTaskReference, taskChoiceNotice, type TrustedTaskChoices } from "./support-task-context.ts";
 
 type Order = Awaited<ReturnType<CouponStore["getOrder"]>>;
 type Knowledge = Awaited<ReturnType<CouponStore["searchKnowledge"]>>;
@@ -99,6 +100,7 @@ export type SupportTurnContext = {
   userText: string; focusOrderId?: string; policyTopic?: TrustedPolicyTopic; signal?: AbortSignal;
   orderChoices?: TrustedOrderChoices; amountReference?: TrustedAmountReference; amountChoices?: TrustedAmountChoices;
   policyChoices?: TrustedReferenceChoices; orderReferenceChoices?: TrustedReferenceChoices;
+  taskChoices?: TrustedTaskChoices;
   pendingReferenceKind?: "order" | "policy";
   onCall?: (call: SupportCall) => void;
 };
@@ -112,6 +114,7 @@ export type EvidenceBundle = {
   displayedPaidUnit?: TrustedAmountReference;
   amountChoices?: TrustedAmountChoices;
   policyChoices?: TrustedReferenceChoices; orderReferenceChoices?: TrustedReferenceChoices;
+  taskChoices?: TrustedTaskChoices;
   task?: MerchantTask | null;
   operation?: Awaited<ReturnType<RefundStore["get"]>> | null;
 };
@@ -123,7 +126,7 @@ export type SupportResult = {
   verifiedPolicyTopic?: TrustedPolicyTopic;
   verifiedAmountReference?: TrustedAmountReference;
   pendingReferenceKind?: "order" | "policy";
-  referencePresentation?: "order" | "policy";
+  referencePresentation?: "order" | "policy" | "task";
 };
 export type SupportServices = {
   store: Pick<CouponStore, "getOrder" | "searchKnowledge">;
@@ -159,6 +162,7 @@ export class SupportController {
       ...(context.orderChoices ? { orderChoices: structuredClone(context.orderChoices) } : {}),
       ...(context.policyChoices ? { policyChoices: structuredClone(context.policyChoices) } : {}),
       ...(context.orderReferenceChoices ? { orderReferenceChoices: structuredClone(context.orderReferenceChoices) } : {}),
+      ...(context.taskChoices ? { taskChoices: structuredClone(context.taskChoices) } : {}),
       ...(context.amountChoices ? { amountChoices: structuredClone(context.amountChoices) } : {}),
       ...(context.amountReference ? { amountReference: structuredClone(context.amountReference) } : {}) };
     let accepted: AnySupportAction | undefined;
@@ -169,6 +173,10 @@ export class SupportController {
       if (action.kind === "clarify" || action.kind === "non_business"
         || !isContextSupportAction(action) && hasAmbiguousOrderReference(trusted.userText)) return action;
       const ids = [...new Set(trusted.userText.match(/COUPON-\d{4}(?!\d)/g) ?? [])];
+      if (action.kind === "merchant_status" && "taskRef" in action && action.taskRef && ids.length) {
+        throw new SupportProtocolError("当前消息已写明订单，请使用该显式订单查询协商状态，不能忽略当前对象沿用历史任务。");
+      }
+      if (action.kind === "merchant_status" && "taskRef" in action) return action;
       if (action.orderRef?.kind === "explicit" && !ids.includes(action.orderRef.orderId)) {
         throw new SupportProtocolError("订单引用不在当前用户消息中；历史唯一订单应使用 focus，不能编造显式选单。");
       }
@@ -221,6 +229,7 @@ export class SupportController {
     if (context.amountChoices) evidence.amountChoices = structuredClone(context.amountChoices);
     if (context.policyChoices) evidence.policyChoices = structuredClone(context.policyChoices);
     if (context.orderReferenceChoices) evidence.orderReferenceChoices = structuredClone(context.orderReferenceChoices);
+    if (context.taskChoices) evidence.taskChoices = structuredClone(context.taskChoices);
     const binding = { sourceKey: context.sourceKey, groupOpenid: context.trustedRoute.groupOpenid };
     // A supplied candidate list is authoritative: the model cannot bypass its
     // ambiguity by naming any otherwise valid historical requestId.
@@ -268,6 +277,12 @@ export class SupportController {
       return value;
     };
     const clarify = (field: ContextClarificationField) => {
+      if (field === "task") {
+        const current = currentTaskChoices(context.taskChoices, binding);
+        if (current) evidence.taskChoices = { ...current, selected: undefined, selectionRequired: true };
+        if (current?.candidates.length) referencePresentation = "task";
+        return result(notice(taskChoiceNotice(evidence.taskChoices, binding)), "clarification");
+      }
       const referenceKind = field === "order" ? "order" : ["policy_topic", "time_channel", "actor"].includes(field) ? "policy" : undefined;
       if (referenceKind && (pendingReferenceKind !== "order" || referenceKind === "order")) pendingReferenceKind = referenceKind;
       const choices = referenceKind === "order" ? context.orderReferenceChoices : context.policyChoices;
@@ -293,6 +308,40 @@ export class SupportController {
     if (action.kind === "non_business") return result(notice(action.reason === "greeting"
       ? "你好，我可以查询模拟团购券订单、说明套餐规则，以及办理模拟协商和退款。请告诉我你的问题。"
       : "当前仅支持模拟团购券咨询、订单查询、协商和退款，不支持这项请求。"), "non_business");
+
+    // Task references are a separate read-only locator. They never select an
+    // order focus, create policy/amount references, or authorize a write.
+    if (action.kind === "merchant_status" && "taskRef" in action) {
+      const reference = resolveTaskReference(context.taskChoices, binding);
+      if (!reference || reference.taskId !== action.taskRef.taskId) return clarify("task");
+      if (!this.services.merchant) return result(notice("当前未启用模拟协商，暂时无法核实任务状态。"), "blocked");
+      const stillCurrent = () => {
+        const current = resolveTaskReference(context.taskChoices, binding);
+        return current?.taskId === reference.taskId && current.orderId === reference.orderId;
+      };
+      try {
+        evidence.order = await call("get_order", { orderId: reference.orderId }, async () => {
+          const value = await this.services.store.getOrder(context.identity, reference.orderId);
+          if (value.id !== reference.orderId || value.source !== "demo-database" || !value.shop.id || !value.items.length) throw new Error();
+          return value;
+        });
+        if (!stillCurrent()) return clarify("task");
+        const task = await call("get_merchant_request", { orderId: reference.orderId, taskId: reference.taskId }, async () => {
+          const value = await this.services.merchant!.getTask(context.identity, context.sourceKey, reference.orderId, { referenceTaskId: reference.taskId });
+          if (value && (value.taskId !== reference.taskId || value.orderId !== reference.orderId
+            || !["pending", "approved", "rejected", "timed_out"].includes(value.status))) throw new Error();
+          return value;
+        });
+        if (!stillCurrent()) return clarify("task");
+        evidence.task = task ?? null;
+        return task ? result({ kind: "merchant_status", task })
+          : result(notice("该历史协商任务当前不可查询，请提供本人订单号重新核实；不会沿用旧任务结果。"), "blocked");
+      } catch (error) {
+        context.signal?.throwIfAborted();
+        if (!(error instanceof SupportServiceError)) throw error;
+        return result(notice(error.message), "blocked");
+      }
+    }
 
     const semantic = isContextSupportAction(action);
     if (context.pendingReferenceKind === "order" && (action.orderRef?.kind === "focus" || action.orderRef?.kind === "alternative"

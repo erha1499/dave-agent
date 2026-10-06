@@ -3,11 +3,13 @@ import { pathToFileURL } from "node:url";
 import { fauxAssistantMessage, fauxProvider, fauxToolCall, type FauxResponseStep, type TranscriptContext } from "@earendil-works/pi-ai";
 import type { QQBotInboundMessage } from "@tencent-connect/qqbot-nodejs";
 import { createModelRuntime } from "../src/agent.ts";
+import { merchantSourceKey, type AfterSalesStore, type MerchantTaskReference, type MerchantTask } from "../src/after-sales.ts";
 import { validateSupportContextValue, type SupportContextPort, type SupportContextSnapshot, type SupportContextValue } from "../src/conversation-state.ts";
 import type { CouponStore, QQIdentity } from "../src/coupon-store.ts";
 import { QQAgent } from "../src/qq-agent.ts";
 import type { ContextOrderRef, ContextSupportAction } from "../src/support-context-action.ts";
 import type { TrustedReferenceChoices } from "../src/support-reference-selection.ts";
+import type { TrustedTaskChoices } from "../src/support-task-context.ts";
 import { cancelSupportTurn, createSupportSession, getSupportHostReceipt, getSupportResult, prepareSupportPrompt,
   readSupportContextMode, supportReply } from "../src/support-session.ts";
 
@@ -17,6 +19,7 @@ const explicit = (orderId: string) => ({ kind: "explicit" as const, orderId });
 const orderAction = (orderRef: Exclude<ContextOrderRef, { kind: "alternative" }> = { kind: "focus" }): ContextSupportAction => ({ protocol: "v2.2", kind: "order", orderRef });
 type Host = { kind?: string; orderId?: string | null; policyTopic?: { requestId: string } | null;
   itemPaidUnit?: { requestId: string } | null; orderChoices?: TrustedReferenceChoices;
+  taskChoices?: TrustedTaskChoices; taskReference?: MerchantTaskReference | null;
   amountChoices?: { candidates: Array<{ token: string; requestId: string }>; selectionRequired: boolean; selectedToken: string | null };
   policyChoices?: TrustedReferenceChoices; pendingReferenceKind?: string | null };
 const hostReference = (context: TranscriptContext): Host => context.messages.flatMap(message => typeof message.content === "string" ? [message.content]
@@ -63,8 +66,10 @@ export async function checkSupportContext() {
   assert.throws(() => readSupportContextMode("atomic", { SUPPORT_CONTEXT_MODE: "mysql", AFTER_SALES_DB_PASSWORD: "synthetic" }));
   const runtime = await createModelRuntime(), faux = fauxProvider(); runtime.registerNativeProvider(faux.provider);
   let sequence = 0;
-  async function harness(memory = memoryContext()) {
+  async function harness(memory = memoryContext(), listing?: { candidates: MerchantTaskReference[]; overflow: boolean }) {
     const reads: string[] = [], queries: string[] = [];
+    const taskReads: string[] = []; let taskLists = 0, merchantPrepares = 0;
+    let taskStatus: MerchantTask["status"] = "pending", returnedTaskId: string | undefined, listingFailure = false;
     let status: "paid" | "refunded" | "partially_redeemed" = "paid", onRead: (() => void) | undefined;
     let price = 7980, body = "套餐有效期内周一至周日均可使用。周末和法定假日遵循同一安排。";
     const store = { async getOrder(who: QQIdentity, id: string) {
@@ -73,7 +78,21 @@ export async function checkSupportContext() {
       queries.push(query); return [{ source: "demo-knowledge", sourceId: "SYNTHETIC_RULE", title: "合成使用规则",
         body, scope: { shopId: shopId ?? null, productId: productId ?? null } }];
     } } as unknown as CouponStore;
-    const open = () => createSupportSession(identity, store, runtime, faux.getModel(), undefined, { groupOpenid, context: memory.port });
+    const merchant = { async listTaskReferences(who: QQIdentity, source: string, group: string) {
+      assert.deepEqual(who, identity); assert.equal(source, merchantSourceKey(identity, groupOpenid)); assert.equal(group, groupOpenid); taskLists++;
+      if (listingFailure) throw new Error("synthetic listing failure");
+      return structuredClone(listing);
+    }, async getTask(who: QQIdentity, source: string, orderId: string) {
+      assert.deepEqual(who, identity); assert.equal(source, merchantSourceKey(identity, groupOpenid)); taskReads.push(orderId);
+      const reference = listing?.candidates.find(row => row.orderId === orderId);
+      return reference ? { taskId: returnedTaskId ?? reference.taskId, orderId, status: taskStatus, reason: "合成任务",
+        amountCents: 7980, approvedAmountCents: taskStatus === "approved" ? 7980 : null,
+        createdAt: new Date(reference.anchorAt).toISOString(), dueAt: new Date(reference.anchorAt + 5000).toISOString(),
+        completedAt: taskStatus === "pending" ? null : new Date().toISOString(), simulation: true as const } : undefined;
+    }, async prepare() { merchantPrepares++; throw new Error("read-only task checks cannot prepare merchant work"); } } as unknown as AfterSalesStore;
+    const open = () => createSupportSession(identity, store, runtime, faux.getModel(), listing ? {
+      store: merchant, sourceKey: merchantSourceKey(identity, groupOpenid),
+    } : undefined, { groupOpenid, context: memory.port });
     let session = await open();
     async function run(question: string, action?: ContextSupportAction | ((host: Host) => ContextSupportAction), ending: "ok" | "error" | "no_action" = "ok", checkPending = true) {
       const requestId = `context-${++sequence}`, hosts: Host[] = [], transcripts: Array<TranscriptContext["messages"]> = [];
@@ -92,6 +111,10 @@ export async function checkSupportContext() {
       return { requestId, host: hosts[0], transcripts, result: getSupportResult(session), receipt: getSupportHostReceipt(session), reply: supportReply(session, session.getLastAssistantText() ?? "") };
     }
     return { memory, reads, queries, store, open, session: () => session, run,
+      taskReads, taskLists: () => taskLists, merchantPrepares: () => merchantPrepares,
+      tasks: (value: NonNullable<typeof listing>) => { listing = structuredClone(value); },
+      taskStatus: (value: typeof taskStatus) => { taskStatus = value; }, taskId: (value?: string) => { returnedTaskId = value; },
+      failTaskListing: (value: boolean) => { listingFailure = value; },
       onRead: (hook?: () => void) => { onRead = hook; },
       status: (value: typeof status) => { status = value; },
       price: (value: number) => { price = value; }, policy: (value: string) => { body = value; },
@@ -511,6 +534,154 @@ export async function checkSupportContext() {
     } finally { release.resolve(); h.dispose(); }
   }
 
+  const taskReference = (taskId: string, orderId: string, at = Date.now()): MerchantTaskReference => ({
+    taskId, orderId, origin: "confirmed", anchorAt: at, expiresAt: at + 15 * 60_000,
+  });
+  const taskA = "00000000-0000-4000-8000-000000000001", taskB = "00000000-0000-4000-8000-000000000002";
+  const taskAction = (taskId: string): ContextSupportAction => ({ protocol: "v2.2", kind: "merchant_status", taskRef: { taskId } });
+  const taskCommand = (turn: Awaited<ReturnType<Awaited<ReturnType<typeof harness>>["run"]>>, taskId: string) => {
+    const choices = turn.receipt?.version === "task-selection-v1" ? turn.receipt.choices : turn.result?.evidence.taskChoices;
+    const candidate = choices?.candidates.find(row => row.reference.taskId === taskId);
+    assert.ok(candidate); assert.ok(turn.reply && "text" in turn.reply);
+    const command = `选择任务 ${candidate.token}`; assert.ok(turn.reply.text.split("\n").includes(command));
+    return command;
+  };
+
+  // Upgrading a legacy v2 pending order list must retain its independent pending kind.
+  {
+    const memory = memoryContext(), snapshot = memory.value();
+    snapshot.value = { version: 2, requiresRestatement: true, orderChoices: {
+      candidates: [{ requestId: "legacy-order", orderId: b, expiresAt: Date.now() + 60_000 }],
+      overflow: false, selectionRequired: true, pending: true,
+    } }; memory.replace(snapshot);
+    const h = await harness(memory, { candidates: [taskReference(taskA, a)], overflow: false });
+    try {
+      const rejected = await h.run(`选择任务 ${taskA}`); assert.equal(rejected.receipt?.outcome, "rejected");
+      const value = h.memory.value().value; assert.ok(value?.version === 4);
+      assert.equal(value.pendingReferenceKind, "order"); assert.equal(value.orderChoices?.pending, true);
+      assert.deepEqual(validateSupportContextValue(value), value); assert.deepEqual(h.reads, []);
+    } finally { h.dispose(); }
+  }
+
+  // Task A remains independent of the current order B, including policy/amount history and restart.
+  {
+    const h = await harness(memoryContext(), { candidates: [taskReference(taskA, a)], overflow: false });
+    try {
+      await h.run(`查询 ${b}`, orderAction(explicit(b)));
+      await h.run("这份套餐周末可以用吗？", { protocol: "v2.2", kind: "policy", orderRef: { kind: "focus" },
+        question: "这份套餐周末可以用吗？", questionContext: { kind: "standalone" } });
+      const saved = h.memory.value().value; assert.ok(saved?.version === 4);
+      await h.restart(); h.taskStatus("approved");
+      const task = await h.run("刚才协商的任务进展怎样？", host => taskAction(host.taskReference?.taskId ?? "missing"));
+      assert.equal(task.host?.orderId, b); assert.equal(task.host?.taskReference?.taskId, taskA);
+      assert.equal(task.result?.evidence.order?.id, a); assert.equal(task.result?.evidence.task?.status, "approved");
+      const current = h.memory.value().value; assert.ok(current?.version === 4);
+      assert.deepEqual(current.focus, saved.focus); assert.deepEqual(current.policyChoices, saved.policyChoices);
+      assert.deepEqual(current.amountChoices, saved.amountChoices); assert.deepEqual(current.orderChoices, saved.orderChoices);
+      const next = await h.run("再查当前这笔订单", orderAction());
+      assert.equal(next.result?.evidence.order?.id, b); assert.deepEqual(h.taskReads, [a]);
+      assert.deepEqual(h.reads, [b, b, a, b]); assert.equal(h.taskLists(), 4); assert.equal(h.merchantPrepares(), 0);
+    } finally { h.dispose(); }
+  }
+  // Candidate IDs in model context are not permission to choose; only a displayed host command selects.
+  {
+    const h = await harness(memoryContext(), { candidates: [taskReference(taskA, a), taskReference(taskB, b)], overflow: false });
+    try {
+      await h.run(`查询 ${b}`, orderAction(explicit(b)));
+      const offered = await h.run("刚才那个协商怎样？", taskAction(taskA));
+      assert.equal(offered.host?.taskReference, null); assert.equal(offered.result?.outcome, "clarification");
+      assert.deepEqual(h.taskReads, []); assert.deepEqual(h.reads, [b]);
+      const oldCommand = taskCommand(offered, taskA), modelCalls = faux.state.callCount;
+      const selected = await h.run(oldCommand); assert.equal(selected.receipt?.outcome, "selected");
+      assert.equal(faux.state.callCount, modelCalls); assert.deepEqual(h.taskReads, []);
+      const saved = h.memory.value().value; assert.ok(saved?.version === 4 && saved.taskContext?.selected);
+      assert.doesNotMatch(JSON.stringify(saved.taskContext), /token|candidates|status|approved|amount/i);
+      await h.restart(); h.taskStatus("approved");
+      const recovered = await h.run("查我选中的协商任务", taskAction(taskA));
+      assert.equal(recovered.result?.evidence.task?.taskId, taskA); assert.equal(recovered.host?.orderId, b);
+      const restored = h.memory.value().value; assert.ok(restored?.version === 4);
+      assert.deepEqual(restored.taskContext?.selected, saved.taskContext.selected);
+      const beforeRejection = faux.state.callCount, beforeReads = h.reads.length;
+      const rejected = await h.run(oldCommand); assert.equal(rejected.receipt?.outcome, "rejected");
+      assert.equal(faux.state.callCount, beforeRejection); assert.equal(h.reads.length, beforeReads);
+      const freshCommand = taskCommand(rejected, taskA); assert.notEqual(freshCommand, oldCommand);
+      const again = await h.run(freshCommand); assert.equal(again.receipt?.outcome, "selected");
+      assert.equal(faux.state.callCount, beforeRejection); assert.equal(h.reads.length, beforeReads);
+      await h.restart(); const final = await h.run("所选任务现在怎样？", taskAction(taskA));
+      assert.equal(final.result?.evidence.task?.taskId, taskA); assert.deepEqual(h.taskReads, [a, a]);
+      assert.equal(h.memory.value().value?.focus?.orderId, b); assert.equal(h.merchantPrepares(), 0);
+    } finally { h.dispose(); }
+  }
+  // Model-visible tokens, images and multi-line commands cannot establish a user selection.
+  {
+    const h = await harness(memoryContext(), { candidates: [taskReference(taskA, a)], overflow: false });
+    try {
+      const order = await h.run(`查询 ${b}`, orderAction(explicit(b)));
+      const unseen = order.host?.taskChoices?.candidates[0]; assert.ok(unseen);
+      assert.ok(order.reply && "text" in order.reply && !order.reply.text.includes(`选择任务 ${unseen.token}`));
+      const before = faux.state.callCount, rejected = await h.run(`选择任务 ${unseen.token}`);
+      assert.equal(rejected.receipt?.outcome, "rejected", "a model-visible candidate token is not a displayed selection command");
+      assert.equal(faux.state.callCount, before); assert.deepEqual(h.reads, [b]); assert.deepEqual(h.taskReads, []);
+      const command = taskCommand(rejected, taskA);
+      prepareSupportPrompt(h.session(), { requestId: "task-image-selection", groupOpenid, messageId: "task-image-selection" });
+      faux.setResponses([]);
+      await h.session().prompt(command, { images: [{ type: "image", data: "AA==", mimeType: "image/png" }] });
+      assert.equal(getSupportHostReceipt(h.session())?.outcome, "rejected", "an image-bearing selection is not the exact host command");
+      assert.equal(faux.state.callCount, before); assert.deepEqual(h.taskReads, []);
+      const multiline = await h.run(`${command}\n继续退款`); assert.equal(multiline.receipt?.outcome, "rejected");
+      assert.equal(faux.state.callCount, before); assert.equal(h.merchantPrepares(), 0);
+    } finally { h.dispose(); }
+  }
+  // A replacement or expired selection cannot fall back to a newly unique task.
+  for (const changed of ["replaced", "expired"] as const) {
+    const first = taskReference(taskA, a), second = taskReference(taskB, b);
+    const h = await harness(memoryContext(), { candidates: [first, second], overflow: false });
+    try {
+      const offered = await h.run("请选择协商任务", { protocol: "v2.2", kind: "clarify", field: "task", reason: "ambiguous" });
+      await h.run(taskCommand(offered, taskA));
+      const snapshot = h.memory.value(); assert.ok(snapshot.value?.version === 4 && snapshot.value.taskContext?.selected);
+      if (changed === "expired") {
+        snapshot.value.taskContext.selected.selectedAt = Date.now() - 16 * 60_000;
+        snapshot.value.taskContext.selected.expiresAt = Date.now() - 60_000;
+        snapshot.value = validateSupportContextValue(snapshot.value, { allowExpiredFocus: true }); h.memory.replace(snapshot);
+      }
+      h.tasks({ candidates: [second], overflow: false }); await h.restart();
+      const continued = await h.run("那个任务现在怎样？", taskAction(taskB));
+      assert.equal(continued.host?.taskReference, null); assert.equal(continued.result?.outcome, "clarification");
+      assert.equal(continued.host?.taskChoices?.candidates.length, 1); assert.equal(continued.host?.taskChoices?.selectionRequired, true);
+      assert.deepEqual(h.reads, []); assert.deepEqual(h.taskReads, []); assert.equal(h.merchantPrepares(), 0);
+    } finally { h.dispose(); }
+  }
+  // Saving a choice is not business work. Cancellation/failure leaves a guard against automatic singleton recovery.
+  for (const ending of ["cancel", "save-failure"] as const) {
+    const h = await harness(memoryContext(), { candidates: [taskReference(taskA, a)], overflow: false });
+    const entered = deferred(), release = deferred();
+    try {
+      const offered = await h.run("让我选择协商任务", { protocol: "v2.2", kind: "clarify", field: "task", reason: "ambiguous" });
+      h.memory.intercept(async value => {
+        if (value.version !== 4 || !value.taskContext?.selected) return;
+        if (ending === "save-failure") throw new Error("synthetic task selection save failure");
+        entered.resolve(); await release.promise;
+      });
+      const before = faux.state.callCount, choosing = h.run(taskCommand(offered, taskA));
+      if (ending === "cancel") { await entered.promise; cancelSupportTurn(h.session()); release.resolve(); }
+      await choosing; assert.equal(faux.state.callCount, before); assert.deepEqual(h.reads, []); assert.deepEqual(h.taskReads, []);
+      assert.deepEqual(h.memory.value().value, { version: 1, requiresRestatement: true });
+      h.memory.intercept(); await h.restart();
+      const continued = await h.run("继续查那个协商任务", taskAction(taskA));
+      assert.equal(continued.host?.taskReference, null); assert.equal(continued.result?.outcome, "clarification");
+      assert.deepEqual(h.reads, []); assert.deepEqual(h.taskReads, []); assert.equal(h.merchantPrepares(), 0);
+    } finally { release.resolve(); h.memory.intercept(); h.dispose(); }
+  }
+  {
+    const h = await harness(memoryContext(), { candidates: [taskReference(taskA, a)], overflow: false });
+    try {
+      h.failTaskListing(true); const before = faux.state.callCount;
+      await assert.rejects(h.run("查协商任务", taskAction(taskA)), /本轮尚未处理业务/);
+      assert.equal(faux.state.callCount, before); assert.deepEqual(h.reads, []); assert.deepEqual(h.taskReads, []); faux.setResponses([]);
+    } finally { h.dispose(); }
+  }
+
   // QQ close cancels idle native sessions but must not revoke a successfully committed selection.
   {
     const h = await harness(); let delivered = 0;
@@ -525,7 +696,7 @@ export async function checkSupportContext() {
       const saved = h.memory.value(); await qq.close(); assert.deepEqual(h.memory.value(), saved);
     } finally { await qq.close(); h.dispose(); }
   }
-  console.log("[support-context] real Pi/faux: fresh recovery, fixed TTL, invalid selection and hydration expiry, same-session references, failed-turn blocking, pre-write stop, canceled publication ordering and idle close PASS (0 SQL/API)");
+  console.log("[support-context] real Pi/faux: fresh recovery, fixed TTL, task/order independence, task selection/restart/expiry/cancel/save failure, failed-turn blocking and idle close PASS (0 SQL/API)");
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) await checkSupportContext();

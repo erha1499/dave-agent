@@ -41,7 +41,7 @@ export async function checkConversationStateValue() {
   assert.deepEqual(validate({ ...v2, orderChoices: { ...choices, candidates: [boundary] } }),
     { ...v2, orderChoices: { ...choices, candidates: [boundary] } }, "normalization must not renew expiry");
 
-  for (const bad of [null, [], {}, { ...v2, version: 4 }, { ...v2, requiresRestatement: 1 }, { ...v2, token: "old-token" },
+  for (const bad of [null, [], {}, { ...v2, version: 5 }, { ...v2, requiresRestatement: 1 }, { ...v2, token: "old-token" },
     { ...v2, presentation: {} }, { ...v2, amount: 7980 }, { ...v2, identity: "forged" }, { ...v2, history: [] },
     { ...v2, orderChoices: { ...choices, token: "old-token" } }, { ...v2, orderChoices: { ...choices, pending: "true" } },
     { ...v2, orderChoices: { ...choices, overflow: 1 } }, { ...v2, orderChoices: { ...choices, selectionRequired: null } },
@@ -143,6 +143,28 @@ export async function checkConversationStateValue() {
     invalid({ ...v3, amountChoices: { ...amountChoices, candidates: [{ reference: { ...amount, ...patch }, expiresAt: a.expiresAt }] } });
   }
 
+  const selectedTask = { taskId: "00000000-0000-4000-8000-000000000001", orderId: a.orderId,
+    requestId: "task-selection", selectedAt: now - 1000, expiresAt: a.expiresAt };
+  const taskContext = { selectionRequired: true, overflow: false, selected: selectedTask };
+  const v4 = { ...v3, version: 4 as const, taskContext };
+  assert.deepEqual(validate(v4), { ...normalized3, version: 4, taskContext });
+  assert.deepEqual(validate({ version: 4, requiresRestatement: false, taskContext }, selectedTask.expiresAt),
+    { version: 4, requiresRestatement: false, taskContext: { selectionRequired: true, overflow: false } },
+    "expired task selection keeps the task choice requirement without erasing an independent order focus");
+  assert.deepEqual(validate({ version: 4, requiresRestatement: true, taskContext: { selectionRequired: false, overflow: true } }),
+    { version: 4, requiresRestatement: true, taskContext: { selectionRequired: true, overflow: true } });
+  for (const version of [1, 2, 3]) invalid({ version, requiresRestatement: false, taskContext });
+  for (const patch of [{ candidates: [] }, { token: "old" }, { status: "approved" }, { approvedAmountCents: 7980 },
+    { overflow: 1 }, { selectionRequired: "true" }, { selected: null }]) invalid({ ...v4, taskContext: { ...taskContext, ...patch } });
+  for (const patch of [{ taskId: "forged" }, { orderId: "COUPON-12" }, { requestId: "bad\nrequest" }, { token: "old" },
+    { status: "approved" }, { selectedAt: now + 1 }, { expiresAt: selectedTask.selectedAt },
+    { expiresAt: selectedTask.selectedAt + ttl + 1 }, { expiresAt: NaN }, { expiresAt: now + 0.5 }]) {
+    invalid({ ...v4, taskContext: { ...taskContext, selected: { ...selectedTask, ...patch } } });
+  }
+  invalid({ ...v4, taskContext: { ...taskContext, [Symbol("hidden")]: true } });
+  invalid({ ...v4, taskContext: { ...taskContext, selected: { ...selectedTask, [Symbol("hidden")]: true } } });
+  invalid({ ...v4, taskContext: Object.assign(Object.create({ inherited: true }), taskContext) });
+
   // Exercise the store read boundary without a database: malformed stored JSON fails closed.
   const row = { bound_customer_id: "synthetic", bound_identity_id: "41", recorded_customer_id: "synthetic",
     recorded_identity_id: "41", revision: 7, context_json: "" };
@@ -167,11 +189,13 @@ export async function checkConversationStateValue() {
   assert.deepEqual(await port.read(), { revision: 7, customerId: "synthetic", bindingId: "41" }, "same-customer rebinding cannot recover the old value");
 
   // The transaction must authorize every distinct live order, including candidates not in focus.
-  const authorized: string[] = []; let written: SupportContextValue | undefined, denied: string | undefined, rolledBack = 0;
+  const authorized: string[] = [], taskAuthorizations: unknown[][] = [];
+  let written: SupportContextValue | undefined, denied: string | undefined, deniedTask = false, rolledBack = 0;
   const connection = { beginTransaction: async () => {}, commit: async () => {}, rollback: async () => { rolledBack++; }, release: () => {},
     execute: async (sql: string, params: unknown[]) => {
       if (sql.includes("FROM qq_identities")) return [[{ customer_id: "synthetic", binding_id: "41" }]];
       if (sql.includes("SELECT revision")) return [[{ revision: 7 }]];
+      if (sql.includes("FROM merchant_requests")) { taskAuthorizations.push(params); return [deniedTask ? [] : [{ task_id: params[0] }]]; }
       if (sql.includes("FROM orders")) { const id = String(params[0]); authorized.push(id); assert.equal(params[1], "synthetic"); return [id === denied ? [] : [{ id }]]; }
       assert.ok(sql.includes("UPDATE conversation_state")); written = JSON.parse(String(params[3])) as SupportContextValue; return [{ affectedRows: 1 }];
     } };
@@ -200,6 +224,17 @@ export async function checkConversationStateValue() {
     assert.ok(authorized.includes(unauthorized)); assert.equal(written, undefined);
   }
   assert.equal(rolledBack, 3);
+  denied = undefined;
+  const input4: SupportContextValue = { ...input3, version: 4,
+    taskContext: { ...taskContext, selected: { ...selectedTask, selectedAt: at, expiresAt: at + 60_000 } } };
+  const saved4 = await writePort.write(expected, input4);
+  assert.deepEqual(saved4.value, written); assert.equal(taskAuthorizations.length, 1);
+  const [taskId, orderId, sourceKey, customerId, identityId] = taskAuthorizations[0]!;
+  assert.equal(taskId, selectedTask.taskId); assert.equal(orderId, selectedTask.orderId);
+  assert.match(String(sourceKey), /^[a-f0-9]{64}$/); assert.equal(customerId, "synthetic"); assert.equal(identityId, "41");
+  deniedTask = true; written = undefined;
+  await assert.rejects(writePort.write(expected, input4), ConversationStateError);
+  assert.equal(written, undefined); assert.equal(rolledBack, 4, "foreign, old-generation or changed task cannot publish selection");
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

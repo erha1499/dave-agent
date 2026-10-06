@@ -14,13 +14,15 @@ description: 根据请求选择结构化团购券业务动作，由宿主完成�
 | 能否退款、可申请多少、部分核销/过期等资格 | refund_eligibility | orderRef、当前question、questionContext |
 | 唯一剩余未消费券实付与上次展示值比较 | paid_amount_compare | explicit/focus orderRef、amountRef.requestId；不传金额或批准，无需政策检索 |
 | 请联系商家协商 | merchant_prepare | orderRef、用户当前提供的单行原因reason；缺原因先clarify |
-| 只问协商进度 | merchant_status | orderRef |
+| 只问协商进度 | merchant_status | orderRef；此前任务也可用宿主唯一/已选 taskRef.taskId，二者互斥 |
 | 明确申请退款、准备或再次生成方案 | refund_prepare | 仅orderRef，不传reason；无需重复已登记协商原因 |
 | 钱退了吗、原退款方案/操作是否有效、过期、等待确认或已执行 | refund_status | orderRef；仅查询，不重建；普通同意不等于执行退款 |
-| 需要澄清 | clarify | field为order/reason/intent/amount_basis/policy_topic/time_channel/actor；reason为missing/ambiguous/multiple_intents |
+| 需要澄清 | clarify | field为order/reason/intent/amount_basis/policy_topic/time_channel/actor/task；reason为missing/ambiguous/multiple_intents |
 | 问候或不支持请求 | non_business | reason为greeting/unsupported |
 
 orderRef 是 {"kind":"explicit","orderId":"COUPON-2001"} 或 {"kind":"focus"}。explicit 仅表示当前消息写明的订单；focus 仅使用宿主提供的有效、唯一定位引用。多单指代不清时先问订单，不并行查询各单资格。用户转而询问FAQ时照常选择 policy，不能因某单仍在等待协商而用进度替代当前咨询。
+
+taskRef={"taskId":"宿主taskReference.taskId"} 仅用于 merchant_status，只读续问此前协商/通知。taskReference 为空或任务有竞争时先 clarify(field="task")；taskChoices 只是候选，不允许模型替用户挑一个。宿主展示的“选择任务”单行指令由用户发送后生效，选择任务不切换当前订单。任务与当前订单指向不同对象而用户表达含糊时先澄清；当前明确单号仍走 orderRef explicit。confirmed 是任务创建来源，sent 是平台发送成功来源，均不证明用户已读或退款批准。当前状态重新取证，不从通知旧文字继承状态、金额、确认或写入权限。
 
 先辨认状态的对象：“订单/券过期了吗”查询订单事实；“过期券能否退款”查询退款资格；“原退款方案过期了吗、查已过期方案，不要重建”查询 refund_status。当前有明确申请、准备或再次生成的办理意图就选择 refund_prepare，即使已有待确认方案；历史状态不能覆盖当前意图。“先查再准备”是该动作的宿主依赖链，不降级为只读查询。重复准备的重新校验、方案复用与编号轮换由宿主幂等处理，不代表必须新建，也不执行退款。只有纯状态查询或明确不准备时使用 refund_status；不能因为看到“过期”就新建操作。
 

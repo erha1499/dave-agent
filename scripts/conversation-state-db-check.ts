@@ -313,7 +313,8 @@ export async function checkConversationStateDatabase() {
     return { result: getSupportResult(session), reply: supportReply(session), reads: reads.slice(before), requestId: id };
   }
   const action = (kind: "order" | "merchant_status" | "refund_status" | "refund_prepare",
-    orderRef: typeof focus | ReturnType<typeof explicit> = focus): ContextSupportAction => ({ protocol: "v2.2", kind, orderRef });
+    orderRef: typeof focus | ReturnType<typeof explicit> = focus): ContextSupportAction => kind === "merchant_status"
+      ? { protocol: "v2.2", kind: "merchant_status", orderRef } : { protocol: "v2.2", kind, orderRef };
   async function expectBlocked(channel: string, context = bind(channel), who = identity, storageFailure = false) {
     const session = await create(channel, context, who), before = reads.length;
     if (storageFailure) {

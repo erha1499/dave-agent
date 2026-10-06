@@ -20,12 +20,15 @@ const evidenceTarget = Type.Optional(Type.Union([
   Type.Object({ kind: Type.Literal("current_order") }, { additionalProperties: false }),
   Type.Object({ kind: Type.Literal("rule_only"), basis: question }, { additionalProperties: false }),
 ]));
-const clarificationFields = ["order", "reason", "intent", "amount_basis", "policy_topic", "time_channel", "actor"] as const;
+const clarificationFields = ["order", "reason", "intent", "amount_basis", "policy_topic", "time_channel", "actor", "task"] as const;
 const common = supportActionSchema.anyOf.filter(schema => !["policy", "refund_eligibility", "clarify"].includes(schema.properties.kind.const))
   .map(schema => Type.Object({ ...schema.properties, protocol }, { additionalProperties: false }));
 
 // The historical v2.1 schema is immutable: current sessions expose only this version.
 export const contextSupportActionSchema = Type.Union([...common,
+  Type.Object({ protocol, kind: Type.Literal("merchant_status"),
+    taskRef: Type.Object({ taskId: Type.String({ pattern: "^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$" }) }, { additionalProperties: false }),
+  }, { additionalProperties: false }),
   Type.Object({ protocol, kind: Type.Literal("policy"), question, questionContext,
     orderRef: Type.Optional(readOrderRef), productMention, evidenceTarget }, { additionalProperties: false }),
   Type.Object({ protocol, kind: Type.Literal("refund_eligibility"), question, questionContext,
@@ -47,7 +50,9 @@ export type ContextOrderRef = SupportOrderRef | { kind: "alternative" };
 export type ContextEvidenceTarget = { kind: "current_order" } | { kind: "rule_only"; basis: string };
 export type ContextClarificationField = typeof clarificationFields[number];
 export type ContextSupportAction = { protocol: "v2.2" } & (
-  Exclude<SupportAction, { kind: "policy" | "refund_eligibility" | "clarify" }>
+  Exclude<SupportAction, { kind: "policy" | "refund_eligibility" | "clarify" | "merchant_status" }>
+  | { kind: "merchant_status"; orderRef: SupportOrderRef }
+  | { kind: "merchant_status"; taskRef: { taskId: string } }
   | { kind: "policy"; question: string; questionContext: ContextQuestionRef; orderRef?: ContextOrderRef; productMention?: string; evidenceTarget?: ContextEvidenceTarget }
   | { kind: "refund_eligibility"; question: string; questionContext: ContextQuestionRef; orderRef: ContextOrderRef; productMention?: string; evidenceTarget?: ContextEvidenceTarget }
   | { kind: "paid_amount_compare"; orderRef: SupportOrderRef; amountRef: { requestId: string }; productMention?: string }

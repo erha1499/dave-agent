@@ -4,6 +4,7 @@ import type { QQIdentity } from "./coupon-store.ts";
 import type { TrustedAmountReference } from "./support-context.ts";
 import type { TrustedPolicyTopic } from "./support-controller.ts";
 import { validPolicyTopicFields } from "./support-reference-selection.ts";
+import { validateTaskContext, type TaskContext } from "./support-task-context.ts";
 
 export type SupportContextOrderChoices = {
   candidates: Array<{ requestId: string; orderId: string; expiresAt: number }>;
@@ -21,7 +22,9 @@ export type SupportContextValue = {
   requiresRestatement: boolean;
 } & ({ version: 1 } | { version: 2; orderChoices?: SupportContextOrderChoices }
   | { version: 3; orderChoices?: SupportContextOrderChoices; policyChoices?: SupportContextPolicyChoices;
-      amountChoices?: SupportContextAmountChoices; pendingReferenceKind?: "order" | "policy" });
+      amountChoices?: SupportContextAmountChoices; pendingReferenceKind?: "order" | "policy" }
+  | { version: 4; orderChoices?: SupportContextOrderChoices; policyChoices?: SupportContextPolicyChoices;
+      amountChoices?: SupportContextAmountChoices; pendingReferenceKind?: "order" | "policy"; taskContext?: TaskContext });
 export type SupportContextSnapshot = { revision: number; customerId?: string; bindingId?: string; value?: SupportContextValue };
 export type SupportContextPort = {
   read(): Promise<SupportContextSnapshot>;
@@ -86,9 +89,9 @@ function selectedChoices<T extends { expiresAt: number }>(input: unknown, now: n
 export function validateSupportContextValue(input: unknown, options: { now?: number; allowExpiredFocus?: boolean } = {}): SupportContextValue {
   const now = options.now ?? Date.now();
   rejectUnless(Number.isSafeInteger(now) && now > 0 && now <= 8.64e15);
-  rejectUnless(plain(input) && (input.version === 1 || input.version === 2 || input.version === 3)
+  rejectUnless(plain(input) && (input.version === 1 || input.version === 2 || input.version === 3 || input.version === 4)
     && keys(input, ["version", "requiresRestatement"], input.version === 1 ? ["focus"] : input.version === 2 ? ["focus", "orderChoices"]
-      : ["focus", "orderChoices", "policyChoices", "amountChoices", "pendingReferenceKind"])
+      : ["focus", "orderChoices", "policyChoices", "amountChoices", "pendingReferenceKind", ...(input.version === 4 ? ["taskContext"] : [])])
     && typeof input.requiresRestatement === "boolean");
   const value: SupportContextValue = { version: input.version, requiresRestatement: input.requiresRestatement };
   if (input.focus !== undefined) {
@@ -124,7 +127,7 @@ export function validateSupportContextValue(input: unknown, options: { now?: num
       selectionRequired: choices.selectionRequired || choices.overflow || candidates.length > 1 };
     if (remaining.length !== candidates.length && !value.focus) value.requiresRestatement = true;
   }
-  if (value.version === 3) {
+  if (value.version === 3 || value.version === 4) {
     rejectUnless(input.pendingReferenceKind === undefined || input.pendingReferenceKind === "order" || input.pendingReferenceKind === "policy");
     if (input.pendingReferenceKind !== undefined) value.pendingReferenceKind = input.pendingReferenceKind;
     rejectUnless(!value.orderChoices || value.orderChoices.pending === (value.pendingReferenceKind === "order"));
@@ -141,6 +144,14 @@ export function validateSupportContextValue(input: unknown, options: { now?: num
       }, candidate => candidate.reference.requestId);
       if (value.amountChoices.candidates.length !== (input.amountChoices as { candidates: unknown[] }).candidates.length && !value.focus) value.requiresRestatement = true;
     }
+  }
+  if (value.version === 4 && input.taskContext !== undefined) {
+    rejectUnless(plain(input.taskContext) && keys(input.taskContext, ["selectionRequired", "overflow"], ["selected"])
+      && (input.taskContext.selected === undefined || plain(input.taskContext.selected)
+        && keys(input.taskContext.selected, ["taskId", "orderId", "requestId", "selectedAt", "expiresAt"])));
+    const context = validateTaskContext(input.taskContext, now);
+    rejectUnless(context);
+    value.taskContext = context;
   }
   return value;
 }
@@ -209,12 +220,20 @@ export class ConversationStateStore {
           rejectUnless(currentRevision === expectedRevision, conflict);
           const orderIds = new Set([...(value.focus ? [value.focus.orderId] : []),
             ...(value.version !== 1 ? value.orderChoices?.candidates.map(candidate => candidate.orderId) ?? [] : []),
-            ...(value.version === 3 ? value.policyChoices?.candidates.flatMap(candidate => candidate.topic.orderId ? [candidate.topic.orderId] : []) ?? [] : []),
-            ...(value.version === 3 ? value.amountChoices?.candidates.map(candidate => candidate.reference.orderId) ?? [] : [])]);
+            ...(value.version === 3 || value.version === 4 ? value.policyChoices?.candidates.flatMap(candidate => candidate.topic.orderId ? [candidate.topic.orderId] : []) ?? [] : []),
+            ...(value.version === 3 || value.version === 4 ? value.amountChoices?.candidates.map(candidate => candidate.reference.orderId) ?? [] : [])]);
           for (const orderId of orderIds) {
             const [orders] = await connection.execute<RowDataPacket[]>(
               "SELECT id FROM orders WHERE id = ? AND customer_id = ? FOR SHARE", [orderId, expectedCustomer]);
             rejectUnless(orders.length === 1, "未找到当前客户可恢复的订单，请重新明确订单号。");
+          }
+          if (value.version === 4 && value.taskContext?.selected) {
+            const selected = value.taskContext.selected;
+            const [tasks] = await connection.execute<RowDataPacket[]>(`SELECT r.task_id FROM merchant_requests r
+              JOIN orders o ON o.id = r.order_id AND o.customer_id = r.customer_id
+              WHERE r.task_id = ? AND r.order_id = ? AND r.source_key = ? AND r.customer_id = ? AND r.identity_id = ? FOR SHARE`,
+            [selected.taskId, selected.orderId, sourceKey, expectedCustomer, expectedBinding]);
+            rejectUnless(tasks.length === 1, "未找到当前绑定可恢复的协商任务，请重新选择任务。");
           }
           value = validateSupportContextValue(value); // A delayed lock cannot renew a locator or retain expired candidates.
           const nextRevision = expectedRevision + 1, encoded = JSON.stringify(value);

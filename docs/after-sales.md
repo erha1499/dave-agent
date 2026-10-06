@@ -2,7 +2,7 @@
 
 已实现“准备协商 → 用户精确确认 → 持久任务 → 模拟结果 → 原 QQ 会话通知或查询 → 用户请求退款 → 固定退款方案 → 用户精确确认 → 幂等模拟退款 → 重启查询”。复用 QQ/CLI、Pi SDK 和同一 MySQL，不改 Pi 核心；商家与退款均为演示，不连接真实商家或支付渠道。D2/D3 已完成联合真实模型与真实 QQ 同意退款链路验收；三终态通知另有历史验收。
 
-本页平台验收来自 **2026-10-02 至 10-03**，后续真实模型核心回归来自 **2026-10-05**。2026-10-06 只为下面的面试路线核对现有源码、命令与记录，未重跑 MySQL、真实模型或 QQ；历史通过不等于当前环境已重验。默认 `atomic + lexical` 的售后材料与 [C1 Controller 候选](./c1-implementation-results.md) 分开，C1 尚未准入。
+本页平台验收来自 **2026-10-02 至 10-03**，后续真实模型核心回归来自 **2026-10-05**。2026-10-06 前次面试路线整理仅核对源码、命令与记录；本轮 O4-4 已重跑任务来源、恢复和通知 MySQL 工程回归，详见[恢复证据](./conversation-recovery.md#o4-4-工程验证与面试演示)，未重跑真实模型或 QQ。历史平台通过不等于当前环境已重验。默认 `atomic + lexical` 的售后材料与 [C1 Controller 候选](./c1-implementation-results.md) 分开，C1 尚未准入。
 
 ## 启动
 
@@ -17,6 +17,8 @@ npm start
 ```
 
 `after-sales:init` 保留已有数据、任务和 QQ 绑定，补充协商表、退款操作表、通知表与三张演示订单，并建立两个独立受限账户。`AFTER_SALES_DB_USER` 默认 `dave_agent_after_sales`，`REFUND_DB_USER` 默认 `dave_agent_refund`；密码只保存于忽略的 `.env`。D3 复用协商账户，不增加数据库或账户。重启 QQ/CLI 后启用相应能力；未配置时不注册相应工具，已配置但连接失败时报错退出。
+
+已有售后账号升级 O4-4 时可单独运行 `node --env-file-if-exists=.env scripts/merchant-references-setup.ts`，再重启 CLI/QQ；已有 volume 的 `db:up` 不执行该迁移。新字段 `merchant_requests.identity_id` 记录创建时绑定代次，memory/atomic 下的自动通知也会核验；启动检查会拒绝缺字段的环境。旧 NULL 任务不回填，其待发通知不再自动领取，仍可按原订单查询；任务 worker、既有审批及退款规则继续生效。引用的 15 分钟有效期不撤销批准，也不代表用户已读，细节见[任务恢复边界](./conversation-recovery.md#o4-4异步任务恢复不改变当前订单)。
 
 | 演示订单 | 客户 / 金额 | 模拟结果 |
 | --- | --- | --- |
