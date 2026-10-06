@@ -1,5 +1,5 @@
 import { isDeepStrictEqual } from "node:util";
-import { Type, validateToolArguments, type ToolCall } from "@earendil-works/pi-ai";
+import { Type, validateToolArguments, type JsonObject, type ToolCall } from "@earendil-works/pi-ai";
 import { parseSupportAction, supportActionSchema, SupportProtocolError, type SupportAction, type SupportOrderRef } from "./support-action.ts";
 
 const protocol = Type.Literal("v2.2");
@@ -23,11 +23,15 @@ const evidenceTarget = Type.Optional(Type.Union([
 const clarificationFields = ["order", "reason", "intent", "amount_basis", "policy_topic", "time_channel", "actor", "task"] as const;
 const common = supportActionSchema.anyOf.filter(schema => !["policy", "refund_eligibility", "clarify"].includes(schema.properties.kind.const))
   .map(schema => Type.Object({ ...schema.properties, protocol }, { additionalProperties: false }));
+export type TaskReferenceMode = "id" | "current";
+export const taskReferenceContractVersion = "task-reference-mode-v1";
+const taskIdRef = Type.Object({ taskId: Type.String({ pattern: "^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$" }) }, { additionalProperties: false });
+const currentTaskRef = Type.Object({ kind: Type.Literal("current") }, { additionalProperties: false });
 
 // The historical v2.1 schema is immutable: current sessions expose only this version.
 export const contextSupportActionSchema = Type.Union([...common,
   Type.Object({ protocol, kind: Type.Literal("merchant_status"),
-    taskRef: Type.Object({ taskId: Type.String({ pattern: "^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$" }) }, { additionalProperties: false }),
+    taskRef: Type.Union([taskIdRef, currentTaskRef]),
   }, { additionalProperties: false }),
   Type.Object({ protocol, kind: Type.Literal("policy"), question, questionContext,
     orderRef: Type.Optional(readOrderRef), productMention, evidenceTarget }, { additionalProperties: false }),
@@ -43,8 +47,18 @@ export const contextSupportActionSchema = Type.Union([...common,
 export const contextSupportActionParameters = Type.Object({ action: contextSupportActionSchema }, { additionalProperties: false });
 // Protocol is a host constant, not a semantic decision for the model. All
 // business fields retain the strict current schema, including extra-key rejection.
-export const modelSupportActionParameters = Type.Object({ action: Type.Union(contextSupportActionSchema.anyOf.map(schema =>
-  Type.Object({ ...schema.properties, protocol: Type.Optional(protocol) }, { additionalProperties: false }))) }, { additionalProperties: false });
+function modelParameters(taskRef: typeof taskIdRef | typeof currentTaskRef) {
+  return Type.Object({ action: Type.Union(contextSupportActionSchema.anyOf.map(schema =>
+    Type.Object({ ...schema.properties, ...("taskRef" in schema.properties ? { taskRef } : {}),
+      protocol: Type.Optional(protocol) }, { additionalProperties: false }))) }, { additionalProperties: false });
+}
+export const modelSupportActionParameters = modelParameters(taskIdRef);
+const currentModelSupportActionParameters = modelParameters(currentTaskRef);
+export function getModelSupportActionParameters(mode: TaskReferenceMode) {
+  if (mode === "id") return modelSupportActionParameters;
+  if (mode === "current") return currentModelSupportActionParameters;
+  throw new Error("任务引用模式仅支持 id 或 current。");
+}
 export type ContextQuestionRef = { kind: "standalone" } | { kind: "previous"; requestId: string };
 export type ContextOrderRef = SupportOrderRef | { kind: "alternative" };
 export type ContextEvidenceTarget = { kind: "current_order" } | { kind: "rule_only"; basis: string };
@@ -52,7 +66,7 @@ export type ContextClarificationField = typeof clarificationFields[number];
 export type ContextSupportAction = { protocol: "v2.2" } & (
   Exclude<SupportAction, { kind: "policy" | "refund_eligibility" | "clarify" | "merchant_status" }>
   | { kind: "merchant_status"; orderRef: SupportOrderRef }
-  | { kind: "merchant_status"; taskRef: { taskId: string } }
+  | { kind: "merchant_status"; taskRef: ({ taskId: string; kind?: never } | { kind: "current"; taskId?: never }) & JsonObject }
   | { kind: "policy"; question: string; questionContext: ContextQuestionRef; orderRef?: ContextOrderRef; productMention?: string; evidenceTarget?: ContextEvidenceTarget }
   | { kind: "refund_eligibility"; question: string; questionContext: ContextQuestionRef; orderRef: ContextOrderRef; productMention?: string; evidenceTarget?: ContextEvidenceTarget }
   | { kind: "paid_amount_compare"; orderRef: SupportOrderRef; amountRef: { requestId: string }; productMention?: string }
@@ -62,9 +76,12 @@ export type AnySupportAction = SupportAction | ContextSupportAction;
 export const isContextSupportAction = (action: AnySupportAction): action is ContextSupportAction => "protocol" in action;
 
 export function parseContextSupportAction(value: unknown): ContextSupportAction {
+  return parseContextAction(value, contextSupportActionParameters);
+}
+function parseContextAction(value: unknown, parameters: typeof contextSupportActionParameters | ReturnType<typeof modelParameters>): ContextSupportAction {
   try {
     const args = { action: value };
-    const parsed = validateToolArguments({ name: "support_action", description: "有界客服动作", parameters: contextSupportActionParameters },
+    const parsed = validateToolArguments({ name: "support_action", description: "有界客服动作", parameters },
       { type: "toolCall", id: "validate-context-action", name: "support_action", arguments: args as ToolCall["arguments"] });
     if (!isDeepStrictEqual(parsed, args)) throw new Error();
     return parsed.action as ContextSupportAction;
@@ -72,9 +89,13 @@ export function parseContextSupportAction(value: unknown): ContextSupportAction 
     throw new SupportProtocolError("业务动作格式无效：请使用 v2.2 动作及宿主给出的引用，不得传身份、范围、金额或批准状态。");
   }
 }
-export function normalizeModelSupportAction(value: unknown): ContextSupportAction {
-  return parseContextSupportAction(value && typeof value === "object" && !Array.isArray(value) && !Object.hasOwn(value, "protocol")
+export function normalizeModelSupportAction(value: unknown, mode: TaskReferenceMode = "id"): ContextSupportAction {
+  const parameters = getModelSupportActionParameters(mode);
+  // The wire schema permits omission only. A supplied undefined/null/invalid
+  // protocol must still fail the required canonical contract before mode checks.
+  const action = parseContextSupportAction(value && typeof value === "object" && !Array.isArray(value) && !Object.hasOwn(value, "protocol")
     ? { ...value, protocol: "v2.2" } : value);
+  return parseContextAction(action, parameters);
 }
 export function parseAnySupportAction(value: unknown): AnySupportAction {
   return value && typeof value === "object" && "protocol" in value ? parseContextSupportAction(value) : parseSupportAction(value);

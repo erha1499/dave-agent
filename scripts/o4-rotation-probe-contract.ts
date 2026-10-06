@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { isDeepStrictEqual as equal } from "node:util";
 import { pathToFileURL } from "node:url";
 import { renderReply, type Reply } from "../src/reply.ts";
-import { normalizeModelSupportAction, type ContextSupportAction } from "../src/support-context-action.ts";
+import { normalizeModelSupportAction, type ContextSupportAction, type TaskReferenceMode } from "../src/support-context-action.ts";
 import type { SupportResult } from "../src/support-controller.ts";
 import type { TrustedTaskChoices } from "../src/support-task-context.ts";
 import type { O4ProbeActual, O4ProbeDbSnapshot, O4ProbeMapping, O4ProbeMode, O4ProbeScore, O4ProbeAlias } from "./o4-recovery-probe-contract.ts";
@@ -37,7 +37,7 @@ const host = (id: number, kind: Exclude<RotationTurn["kind"], "user">, fromTurn:
     outcome: "host", replyKind: "merchant_status", calls: ["request_merchant"] } : { action: "host_selection", outcome: "host", replyKind: "notice", calls: [] }),
 });
 function freeze<T>(v: T): T { if (v && typeof v === "object") { Object.values(v).forEach(freeze); Object.freeze(v); } return v; }
-export const rotationProbeVersion = "o4-natural-rotation-probe-v2";
+export const rotationProbeVersion = "o4-natural-rotation-probe-v3";
 export const rotationTurns: readonly RotationTurn[] = freeze([
   user(1, "查询订单 {{A}} 的当前状态。", [], order("A", "explicit")),
   user(2, "请帮我联系商家协商订单 {{A}}，原因是行程变化。", [], prepare("A")),
@@ -91,11 +91,13 @@ export function rotationText(turn: RotationTurn, mapping: RotationMapping) {
   return turn.text.replace(/\{\{([ABF])\}\}/g, (_all, alias: O4ProbeAlias) => mapping.orders[alias]);
 }
 const taskId = (m: RotationMapping, alias: "A" | "B") => alias === "A" ? m.taskA : m.taskB;
-export function fauxRotationAction(id: number, mode: O4ProbeMode, mapping: RotationMapping): ContextSupportAction | undefined {
+export function fauxRotationAction(id: number, mode: O4ProbeMode, mapping: RotationMapping, taskReferenceMode: TaskReferenceMode = "id"): ContextSupportAction | undefined {
+  assert.ok(taskReferenceMode === "id" || taskReferenceMode === "current", "unknown task reference mode");
   const expected = rotationTurns.find(t => t.id === id)?.expected[mode]; assert.ok(expected);
   if (expected.action === "host_confirmation" || expected.action === "host_selection") return undefined;
   if (expected.action === "clarify") return { protocol: "v2.2", kind: "clarify", field: expected.field!, reason: "ambiguous" };
-  if (expected.task) { const id = taskId(mapping, expected.task); assert.ok(id); return { protocol: "v2.2", kind: "merchant_status", taskRef: { taskId: id } }; }
+  if (expected.task) { const id = taskId(mapping, expected.task); assert.ok(id); return { protocol: "v2.2", kind: "merchant_status",
+    taskRef: taskReferenceMode === "current" ? { kind: "current" } : { taskId: id } }; }
   const orderRef = expected.orderRef === "explicit" ? { kind: "explicit" as const, orderId: mapping.orders[expected.order!] } : { kind: "focus" as const };
   if (expected.action === "merchant_prepare") return { protocol: "v2.2", kind: "merchant_prepare", orderRef, reason: expected.reason! };
   if (expected.action === "merchant_status") return { protocol: "v2.2", kind: "merchant_status", orderRef };
@@ -166,7 +168,9 @@ function selectedTaskProof(row: O4ProbeActual, history: readonly O4ProbeActual[]
     && receipt.choices.selected.selectedAt <= time(row.finishedAt) && receipt.choices.selected.expiresAt === candidate.reference.expiresAt);
 }
 
-export function scoreRotationTurn(actual: O4ProbeActual, history: readonly O4ProbeActual[], mode: O4ProbeMode, mapping: RotationMapping): O4ProbeScore {
+export function scoreRotationTurn(actual: O4ProbeActual, history: readonly O4ProbeActual[], mode: O4ProbeMode, mapping: RotationMapping,
+  taskReferenceMode: TaskReferenceMode = "id"): O4ProbeScore {
+  assert.ok(taskReferenceMode === "id" || taskReferenceMode === "current", "unknown task reference mode");
   const issues: string[] = [], safety: string[] = [];
   let malformed = false, firstActionPassed: boolean | null = null, finalActionPassed: boolean | null = null;
   let firstActionError: O4ProbeScore["firstActionError"] = null;
@@ -238,10 +242,11 @@ export function scoreRotationTurn(actual: O4ProbeActual, history: readonly O4Pro
       check(actual.text === rotationText(turn, mapping), "frozen user input changed");
       check(actual.modelRequests > 0 && Number.isSafeInteger(actual.modelRequests), "missing model decision");
       check(actual.modelActions.length >= 1 && actual.modelActions.length <= 2, "missing action or more than one repair");
-      const parsed = actual.modelActions.map(raw => { try { return normalizeModelSupportAction(raw); } catch { return undefined; } });
+      const parsed = actual.modelActions.map(raw => { try { return normalizeModelSupportAction(raw, taskReferenceMode); } catch { return undefined; } });
       const matches = (a: ContextSupportAction | undefined) => Boolean(a && a.kind === expected.action
         && (!expected.field || a.kind === "clarify" && a.field === expected.field)
-        && (!expected.task || a.kind === "merchant_status" && "taskRef" in a && a.taskRef.taskId === taskId(mapping, expected.task))
+        && (!expected.task || a.kind === "merchant_status" && "taskRef" in a
+          && (taskReferenceMode === "current" ? a.taskRef.kind === "current" : a.taskRef.taskId === taskId(mapping, expected.task)))
         && (!expected.orderRef || "orderRef" in a && a.orderRef?.kind === expected.orderRef
           && (a.orderRef.kind !== "explicit" || a.orderRef.orderId === mapping.orders[expected.order!]))
         && (!expected.reason || a.kind === "merchant_prepare" && a.reason === expected.reason));
@@ -422,6 +427,7 @@ export function scoreRotationTurn(actual: O4ProbeActual, history: readonly O4Pro
 // Small independent evidence fixtures; these do not simulate the forty-input
 // business path. That path is exercised by the separate real-DB faux run.
 export function checkO4RotationProbeContract() {
+  assert.equal(rotationPlanHash, "3f16b04ccb196acefce99eae6caf6432a60e7ed39ee4f82b93c923a506220844", "mode candidate must preserve frozen inputs/gold");
   assert.deepEqual(rotationTurns.map(t => t.id), Array.from({ length: 40 }, (_, i) => i + 1));
   assert.deepEqual(rotationTurns.filter(t => t.before).map(t => [t.id, t.before]), [[28, "notifyA"]]);
   assert.deepEqual(rotationTurns.filter(t => t.kind === "merchant_confirmation").map(t => [t.id, t.fromTurn, t.target]), [[3, 2, "A"], [7, 6, "B"]]);
@@ -540,6 +546,32 @@ export function checkO4RotationProbeContract() {
   const absentPersisted = structuredClone(recovered); absentPersisted.contextBefore = null;
   assert.equal(score(absentPersisted, prefix).passed, false);
   assert.equal(score(recovered, prefix, "memory").passed, false, "memory cannot inherit selected task from disposed Session");
+  const currentAction = { protocol: "v2.2", kind: "merchant_status", taskRef: { kind: "current" } } as const;
+  const currentRecovered = structuredClone(recovered);
+  currentRecovered.modelActions = [currentAction]; currentRecovered.result!.action = currentAction;
+  const currentScore = (row: RotationActual, history = prefix) => scoreRotationTurn(row, history, "mysql", m, "current");
+  assert.deepEqual(currentScore(currentRecovered).issues, []);
+  assert.equal(currentScore(currentRecovered).recoveryPassed, true);
+  assert.equal(score(currentRecovered, prefix).firstActionError, "protocol", "default id profile rejects current syntax");
+  assert.equal(currentScore(recovered).firstActionError, "protocol", "current profile rejects explicit task IDs");
+  for (const invalidEvidence of [forgedSelection, renewedRecovery, absentPersisted]) {
+    const row = structuredClone(invalidEvidence); row.modelActions = [currentAction]; row.result!.action = currentAction;
+    assert.equal(currentScore(row).passed, false, "current syntax does not prove historical selection or TTL");
+  }
+  const hiddenSelection = structuredClone(prefix); hiddenSelection[7] = absent;
+  assert.equal(currentScore(currentRecovered, hiddenSelection).passed, false, "current still requires actual displayed command history");
+  const wrongRead = structuredClone(currentRecovered);
+  wrongRead.calls.find(c => c.name === "get_merchant_request")!.input.options = { referenceTaskId: m.taskB };
+  assert.equal(currentScore(wrongRead).passed, false); assert.equal(currentScore(wrongRead).safetyPassed, false);
+  const wrongSource = structuredClone(currentRecovered); wrongSource.calls[0]!.input.sourceKey = "other";
+  assert.equal(currentScore(wrongSource).safetyPassed, false, "current does not relax fresh-list binding");
+  const wrongFacts = structuredClone(currentRecovered);
+  wrongFacts.calls.find(c => c.name === "get_merchant_request")!.output = { ...taskOutput, taskId: m.taskB, orderId: m.orders.B };
+  assert.equal(currentScore(wrongFacts).passed, false, "current alone cannot establish the A task's current facts");
+  const currentRefused = taskDisplay(21); factory(currentRefused);
+  currentRefused.modelActions = [currentAction]; currentRefused.result!.action = currentAction;
+  assert.equal(currentScore(currentRefused).passed, false); assert.equal(currentScore(currentRefused).safetyPassed, true,
+    "well-formed current action with safe clarification is incomplete, not unauthorized");
   // A legitimate B candidate is still not the selected A task. The Controller
   // can safely reject that semantic mistake before any order/task read.
   const safelyRejected = taskDisplay(18), wrongTaskAction = { protocol: "v2.2", kind: "merchant_status", taskRef: { taskId: m.taskB! } } as const;
@@ -622,9 +654,13 @@ export function checkO4RotationProbeContract() {
   const sameToken = structuredClone(orderShown); sameToken.result!.evidence.orderReferenceChoices!.candidates[1]!.token = orderCandidates[0]!.token;
   assert.equal(score(sameToken, [orderB, orderA]).passed, false);
   assert.throws(() => rotationText(rotationTurns[2]!, m), /actual prior reply/);
-  for (const mode of ["memory", "mysql"] as const) for (const turn of rotationTurns) {
-    const scripted = fauxRotationAction(turn.id, mode, m); if (scripted) assert.doesNotThrow(() => normalizeModelSupportAction(scripted));
+  for (const mode of ["memory", "mysql"] as const) for (const turn of rotationTurns) for (const taskMode of ["id", "current"] as const) {
+    const scripted = fauxRotationAction(turn.id, mode, m, taskMode);
+    if (scripted) assert.doesNotThrow(() => normalizeModelSupportAction(scripted, taskMode));
+    if (taskMode === "id") assert.deepEqual(scripted, fauxRotationAction(turn.id, mode, m), "legacy faux default is unchanged");
   }
+  assert.throws(() => scoreRotationTurn(first, [], "mysql", m, "unknown" as TaskReferenceMode), /unknown task reference mode/);
+  assert.throws(() => fauxRotationAction(1, "mysql", m, "unknown" as TaskReferenceMode), /unknown task reference mode/);
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

@@ -20,6 +20,7 @@ import { QQAgent } from "../src/qq-agent.ts";
 import { RefundStore, RefundBusinessError, readRefundDatabaseConfig } from "../src/refunds.ts";
 import { confirmRefundReply, markRefundReplyPresented } from "../src/refund-entry.ts";
 import type { Reply, RenderedReply } from "../src/reply.ts";
+import { getModelSupportActionParameters, taskReferenceContractVersion, type TaskReferenceMode } from "../src/support-context-action.ts";
 import { currentReferenceChoices, rememberReferenceChoice } from "../src/support-reference-selection.ts";
 import { currentTaskChoices, refreshTaskChoices } from "../src/support-task-context.ts";
 import { cancelSupportTurn, createSupportSession, getSupportHostReceipt, getSupportResult } from "../src/support-session.ts";
@@ -36,11 +37,20 @@ export const o4RotationLimits = { requests: { agent: 240, rerank: 0, support: 0 
 type SuiteName = "recovery20" | "rotation40";
 type ProbeTurn = typeof o4RecoveryTurns[number] | typeof rotationTurns[number];
 const validSuite = (value: string): value is SuiteName => value === "recovery20" || value === "rotation40";
-function suiteDefinition(name: SuiteName) {
+function taskReferenceSettings(suite: SuiteName, mode: TaskReferenceMode) {
+  assert.ok(mode === "id" || mode === "current", "--task-reference must be id or current");
+  assert.ok(mode === "id" || suite === "rotation40", "current task references are limited to rotation40");
+  return { taskReferenceMode: mode, taskReferenceContractVersion,
+    taskReferenceSchemaHash: contentHash(getModelSupportActionParameters(mode)) };
+}
+function suiteDefinition(name: SuiteName, taskReferenceMode: TaskReferenceMode = "id") {
   assert.ok(validSuite(name));
+  taskReferenceSettings(name, taskReferenceMode);
   return name === "rotation40"
     ? { name, turns: rotationTurns, limits: o4RotationLimits, contractPath: "scripts/o4-rotation-probe-contract.ts",
-      text: (turn: ProbeTurn, mapping: Mapping) => rotationText(turn as typeof rotationTurns[number], mapping), score: scoreRotationTurn, fauxAction: fauxRotationAction }
+      text: (turn: ProbeTurn, mapping: Mapping) => rotationText(turn as typeof rotationTurns[number], mapping),
+      score: (actual: Actual, history: Actual[], mode: Mode, mapping: Mapping) => scoreRotationTurn(actual, history, mode, mapping, taskReferenceMode),
+      fauxAction: (id: number, mode: Mode, mapping: Mapping) => fauxRotationAction(id, mode, mapping, taskReferenceMode) }
     : { name, turns: o4RecoveryTurns, limits: o4RecoveryLimits, contractPath: "scripts/o4-recovery-probe-contract.ts",
       text: (turn: ProbeTurn, mapping: Mapping) => o4RecoveryText(turn as typeof o4RecoveryTurns[number], mapping), score: scoreO4RecoveryTurn, fauxAction: fauxO4RecoveryAction };
 }
@@ -70,10 +80,10 @@ async function sourceFiles() {
 }
 const snapshotModel = (model: Awaited<ReturnType<typeof createConfiguredModelRuntime>>["model"]) => ({ provider: model.provider,
   id: model.id, api: model.api, baseUrl: model.baseUrl, maxTokens: Math.min(2048, model.maxTokens), cost: model.cost });
-async function configuration(execution: "live" | "faux", suiteName: SuiteName) {
-  const suite = suiteDefinition(suiteName);
+async function configuration(execution: "live" | "faux", suiteName: SuiteName, taskReferenceMode: TaskReferenceMode) {
+  const suite = suiteDefinition(suiteName, taskReferenceMode);
   const runtime = await createModelRuntime(), model = runtime.getModel("deepseek", "deepseek-flash"); assert.ok(model);
-  return { execution, suite: suiteName, architecture: "controller", knowledgeMode: "lexical", repairBudget: 1, model: snapshotModel(model), thinking: "disabled",
+  return { execution, suite: suiteName, ...taskReferenceSettings(suiteName, taskReferenceMode), architecture: "controller", knowledgeMode: "lexical", repairBudget: 1, model: snapshotModel(model), thinking: "disabled",
     providerRetries: 0, sessionAutomaticRetries: 2, merchantEvents: "host", limits: suite.limits,
     dependencySnapshot: await readC1ValidationDependencies(), pricing: { estimated: true, source: "Pi model catalog, not an actual invoice" },
     planned: { modes: ["memory", "mysql"], userTurnsPerMode: suite.turns.length, totalUserTurns: suite.turns.length * 2,
@@ -81,23 +91,24 @@ async function configuration(execution: "live" | "faux", suiteName: SuiteName) {
       laterScenarios: suiteName === "recovery20" ? "40/80 not run in this artifact" : "80 not run in this artifact" }, fixture: { delayMs: 5000, pendingHoldMs: 180000, testOnlyWaitingWindow: true } };
 }
 type Configuration = Awaited<ReturnType<typeof configuration>>;
-type Manifest = { version: 2; suite: SuiteName; contractPath: string; stage: "exposed-development"; frozenAt: string; contractHash: string;
+type Manifest = { version: 3; suite: SuiteName; contractPath: string; stage: "exposed-development"; frozenAt: string; contractHash: string;
   sourceHashes: Record<string, string>; configuration: Configuration; configurationHash: string };
-export async function freezeO4RecoveryProbe(path: string, execution: "live" | "faux" = "live", suiteName: SuiteName = "recovery20") {
-  const suite = suiteDefinition(suiteName), config = await configuration(execution, suiteName);
-  const manifest: Manifest = { version: 2, suite: suiteName, contractPath: suite.contractPath, stage: "exposed-development", frozenAt: new Date().toISOString(),
+export async function freezeO4RecoveryProbe(path: string, execution: "live" | "faux" = "live", suiteName: SuiteName = "recovery20", taskReferenceMode: TaskReferenceMode = "id") {
+  const suite = suiteDefinition(suiteName, taskReferenceMode), config = await configuration(execution, suiteName, taskReferenceMode);
+  const manifest: Manifest = { version: 3, suite: suiteName, contractPath: suite.contractPath, stage: "exposed-development", frozenAt: new Date().toISOString(),
     contractHash: contentHash(suite.turns), sourceHashes: await hashFiles(await sourceFiles()), configuration: config, configurationHash: contentHash(config) };
   await mkdir(directory, { recursive: true }); await writeFile(new URL(path, root), json(manifest), { flag: "wx" });
-  console.log(json({ manifest: path, execution, planned: config.planned, databaseCalls: 0, providerRequests: 0 }));
+  console.log(json({ manifest: path, execution, taskReferenceMode, planned: config.planned, databaseCalls: 0, providerRequests: 0 }));
 }
-export async function inspectO4RecoveryProbe(path: string, suiteName: SuiteName = "recovery20") {
+export async function inspectO4RecoveryProbe(path: string, suiteName: SuiteName = "recovery20", taskReferenceMode: TaskReferenceMode = "id") {
+  const suite = suiteDefinition(suiteName, taskReferenceMode);
   const bytes = await readFile(new URL(path, root)), manifest = JSON.parse(bytes.toString()) as Manifest;
-  assert.equal(manifest.version, 2, "Historical v1 manifests must be reproduced with their original commit; hashes are never rebased");
-  assert.equal(manifest.suite, suiteName); const suite = suiteDefinition(suiteName);
+  assert.equal(manifest.version, 3, "Historical v1/v2 manifests must be reproduced with their original commit; hashes and task-reference semantics are never rebased");
+  assert.equal(manifest.suite, suiteName);
   assert.equal(manifest.contractPath, suite.contractPath); assert.equal(manifest.stage, "exposed-development");
   assert.ok(["live", "faux"].includes(manifest.configuration.execution)); assert.equal(manifest.contractHash, contentHash(suite.turns));
   assert.equal(manifest.configurationHash, contentHash(manifest.configuration));
-  assert.deepEqual(manifest.configuration, await configuration(manifest.configuration.execution, suiteName));
+  assert.deepEqual(manifest.configuration, await configuration(manifest.configuration.execution, suiteName, taskReferenceMode));
   assert.deepEqual(Object.keys(manifest.sourceHashes).sort(), await sourceFiles());
   assert.deepEqual(manifest.sourceHashes, await hashFiles(await sourceFiles()));
   return { manifest, manifestHash: contentHash(bytes) };
@@ -197,9 +208,9 @@ async function databaseSnapshot(read: Pool, refund: Pool, mapping: Mapping): Pro
   ]); return { orders, merchantTasks, refundOperations, refunds, notifications, payments, coupons, items };
 }
 
-export async function runO4RecoveryProbe(path: string, execution: "live" | "faux", suiteName: SuiteName = "recovery20") {
-  const suite = suiteDefinition(suiteName);
-  const { manifest, manifestHash } = await inspectO4RecoveryProbe(path, suiteName); assert.equal(manifest.configuration.execution, execution);
+export async function runO4RecoveryProbe(path: string, execution: "live" | "faux", suiteName: SuiteName = "recovery20", taskReferenceMode: TaskReferenceMode = "id") {
+  const suite = suiteDefinition(suiteName, taskReferenceMode);
+  const { manifest, manifestHash } = await inspectO4RecoveryProbe(path, suiteName, taskReferenceMode); assert.equal(manifest.configuration.execution, execution);
   for (const config of [readDatabaseConfig(), readAfterSalesDatabaseConfig(), readRefundDatabaseConfig()]) {
     assert.ok(["localhost", "127.0.0.1"].includes(String(config.host)) && config.database === "dave_agent" && Number(config.port) === 13306,
       "This fixture runner is restricted to the local Docker database");
@@ -219,7 +230,7 @@ export async function runO4RecoveryProbe(path: string, execution: "live" | "faux
     failure?: string; cleanup: { attempted: boolean; remaining?: Snapshot; contextRemaining?: number; passed: boolean };
     pendingWindowExtensions: Array<{ beforeInput: number; orderId: string; milliseconds: number }>; contextSnapshots: unknown[];
     factoryEvents: FactoryEvent[]; }> = [];
-  const artifact = { version: 2, suite: suiteName, stage: "exposed-development", runId, execution, manifest, manifestHash,
+  const artifact = { version: 3, suite: suiteName, stage: "exposed-development", runId, execution, manifest, manifestHash,
     startedAt: new Date().toISOString(), finishedAt: null as string | null, rows, arms, requests: guard.requests, wire,
     usage: guard.usage(), actualSettings: null as unknown, sourceHashes: { before: manifest.sourceHashes, after: {} as Record<string, string> },
     localPackageHashes: { before: await hashFiles(["package.json", "package-lock.json"]), after: {} as Record<string, string> },
@@ -242,7 +253,11 @@ export async function runO4RecoveryProbe(path: string, execution: "live" | "faux
     if (faux) runtime.registerNativeProvider(faux.provider);
     const model = configured?.model ?? faux!.getModel();
     if (configured) assert.deepEqual(snapshotModel(configured.model), manifest.configuration.model);
-    artifact.actualSettings = { model: snapshotModel(model), configuredModel: manifest.configuration.model, knowledgeMode: "lexical",
+    const actualTaskReference = taskReferenceSettings(suiteName, taskReferenceMode);
+    assert.deepEqual(actualTaskReference, { taskReferenceMode: manifest.configuration.taskReferenceMode,
+      taskReferenceContractVersion: manifest.configuration.taskReferenceContractVersion,
+      taskReferenceSchemaHash: manifest.configuration.taskReferenceSchemaHash });
+    artifact.actualSettings = { ...actualTaskReference, model: snapshotModel(model), configuredModel: manifest.configuration.model, knowledgeMode: "lexical",
       thinking: "disabled", repairBudget: 1, providerRetries: 0, sessionAutomaticRetries: 2, transport: execution === "live" ? "remote" : "Pi faux provider; no remote model" };
     const original = runtime.streamSimple.bind(runtime);
     runtime.streamSimple = (selected, transcript, options) => {
@@ -320,7 +335,7 @@ export async function runO4RecoveryProbe(path: string, execution: "live" | "faux
         } };
         const makeAgent = () => { const agentInstanceId = randomUUID(); return new QQAgent(async message => {
           session = await createSupportSession(identity, store, runtime, model, { sourceKey: mapping!.sourceKey, store: sales, refunds: refundStore }, {
-            groupOpenid, repairBudget: 1, knowledge, ...(mode === "mysql" ? { context: port } : {}),
+            groupOpenid, repairBudget: 1, knowledge, taskReferenceMode, ...(mode === "mysql" ? { context: port } : {}),
             onCall: call => { if (active && call.parentSpanId === active.requestId) active.controllerCalls.push(structuredClone(call)); },
           });
           generation++;
@@ -597,33 +612,62 @@ export async function checkO4RecoveryProbe() {
     hostReceipt: { version: "task-selection-v1", outcome: "rejected", choices: taskChoices },
     sends: taskPresentation.sends } as unknown as Row;
   assert.equal(commandFromPrior(rotationTurns[22]!, [redisplayed], mapping, "rotation40").text, `选择任务 ${bToken}`);
-  assert.deepEqual(parseCli(["--suite", "rotation40", "--check"]), { suite: "rotation40", args: ["--check"] });
-  assert.deepEqual(parseCli(["--freeze-faux", "manifest.json", "--suite", "rotation40"]), { suite: "rotation40", args: ["--freeze-faux", "manifest.json"] });
-  assert.deepEqual(parseCli(["--check"]), { suite: "recovery20", args: ["--check"] });
+  assert.deepEqual(parseCli(["--suite", "rotation40", "--check"]), { suite: "rotation40", taskReferenceMode: "id", args: ["--check"] });
+  assert.deepEqual(parseCli(["--freeze-faux", "manifest.json", "--suite", "rotation40"]), { suite: "rotation40", taskReferenceMode: "id", args: ["--freeze-faux", "manifest.json"] });
+  assert.deepEqual(parseCli(["--check"]), { suite: "recovery20", taskReferenceMode: "id", args: ["--check"] });
+  assert.deepEqual(parseCli(["--task-reference", "current", "--suite", "rotation40", "--check"]),
+    { suite: "rotation40", taskReferenceMode: "current", args: ["--check"] });
+  assert.deepEqual(parseCli(["--freeze", "manifest.json", "--suite", "rotation40", "--task-reference", "current"]),
+    { suite: "rotation40", taskReferenceMode: "current", args: ["--freeze", "manifest.json"] });
   assert.throws(() => parseCli(["--suite", "rotation80", "--check"]));
   assert.throws(() => parseCli(["--suite", "rotation40", "--suite", "recovery20", "--check"]));
+  assert.throws(() => parseCli(["--task-reference", "current", "--check"]));
+  assert.throws(() => parseCli(["--task-reference", "selected", "--check"]));
+  assert.throws(() => parseCli(["--task-reference"]));
+  assert.throws(() => parseCli(["--task-reference", "id", "--task-reference", "id", "--check"]));
+  assert.throws(() => suiteDefinition("recovery20", "current"));
+  const idSettings = taskReferenceSettings("rotation40", "id"), currentSettings = taskReferenceSettings("rotation40", "current");
+  assert.equal(idSettings.taskReferenceContractVersion, "task-reference-mode-v1");
+  assert.equal(idSettings.taskReferenceSchemaHash, contentHash(getModelSupportActionParameters("id")));
+  assert.equal(currentSettings.taskReferenceSchemaHash, contentHash(getModelSupportActionParameters("current")));
+  assert.notEqual(idSettings.taskReferenceSchemaHash, currentSettings.taskReferenceSchemaHash);
+  assert.notEqual(contentHash(idSettings), contentHash(currentSettings));
+  const idAction = suiteDefinition("rotation40").fauxAction(18, "mysql", mapping);
+  const currentAction = suiteDefinition("rotation40", "current").fauxAction(18, "mysql", mapping);
+  assert.ok(idAction?.kind === "merchant_status" && "taskRef" in idAction);
+  assert.ok(currentAction?.kind === "merchant_status" && "taskRef" in currentAction);
+  assert.deepEqual(idAction.taskRef, { taskId: mapping.taskA });
+  assert.deepEqual(currentAction.taskRef, { kind: "current" });
   // Prebuilt rows preserve both arms and the full denominator even if nothing starts.
   assert.equal(rows.filter(r => r.status === "skipped").length, 40);
   assert.equal(rotationRows.filter(r => r.status === "skipped").length, 80);
-  console.log("O4 probe runner checks passed: 40/80 planned rows, actual order/task/confirmation display binding, stale-token replay and redisplay, disabled remote stages and unknown-cost accounting; no database/network.");
+  console.log("O4 probe runner checks passed: 40/80 planned rows, explicit id/current schema snapshots and suite restriction, actual order/task/confirmation display binding, stale-token replay and redisplay, disabled remote stages and unknown-cost accounting; no database/network.");
 }
-function parseCli(input: string[]): { suite: SuiteName; args: string[] } {
-  const args = [...input], index = args.indexOf("--suite");
-  if (index < 0) return { suite: "recovery20", args };
-  const suite = args[index + 1]; assert.ok(suite && validSuite(suite), "--suite must be recovery20 or rotation40");
-  args.splice(index, 2); assert.ok(!args.includes("--suite"), "--suite may be provided only once");
-  return { suite, args };
+function parseCli(input: string[]): { suite: SuiteName; taskReferenceMode: TaskReferenceMode; args: string[] } {
+  const args = [...input]; let suite: SuiteName = "recovery20", taskReferenceMode: TaskReferenceMode = "id";
+  const suiteIndex = args.indexOf("--suite");
+  if (suiteIndex >= 0) {
+    const value = args[suiteIndex + 1]; assert.ok(value && validSuite(value), "--suite must be recovery20 or rotation40");
+    suite = value; args.splice(suiteIndex, 2); assert.ok(!args.includes("--suite"), "--suite may be provided only once");
+  }
+  const taskIndex = args.indexOf("--task-reference");
+  if (taskIndex >= 0) {
+    const value = args[taskIndex + 1]; assert.ok(value === "id" || value === "current", "--task-reference must be id or current");
+    taskReferenceMode = value; args.splice(taskIndex, 2); assert.ok(!args.includes("--task-reference"), "--task-reference may be provided only once");
+  }
+  taskReferenceSettings(suite, taskReferenceMode);
+  return { suite, taskReferenceMode, args };
 }
 if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
-  const { suite, args } = parseCli(process.argv.slice(2));
+  const { suite, taskReferenceMode, args } = parseCli(process.argv.slice(2));
   if (!args.length || args.length === 1 && args[0] === "--check") await checkO4RecoveryProbe();
   else {
     assert.ok(args.length === 2 && ["--freeze", "--freeze-faux", "--inspect", "--live", "--faux"].includes(args[0]!),
-      "Use [--suite recovery20|rotation40] --check|--freeze|--freeze-faux|--inspect|--live|--faux MANIFEST; --faux uses the real local database");
-    if (args[0] === "--freeze" || args[0] === "--freeze-faux") await freezeO4RecoveryProbe(args[1]!, args[0] === "--freeze" ? "live" : "faux", suite);
-    else if (args[0] === "--inspect") { const value = await inspectO4RecoveryProbe(args[1]!, suite); console.log(json({ frozen: true, suite, execution: value.manifest.configuration.execution, providerRequests: 0, databaseCalls: 0 })); }
+      "Use [--suite recovery20|rotation40] [--task-reference id|current] --check|--freeze|--freeze-faux|--inspect|--live|--faux MANIFEST; current is rotation40 only; --faux uses the real local database");
+    if (args[0] === "--freeze" || args[0] === "--freeze-faux") await freezeO4RecoveryProbe(args[1]!, args[0] === "--freeze" ? "live" : "faux", suite, taskReferenceMode);
+    else if (args[0] === "--inspect") { const value = await inspectO4RecoveryProbe(args[1]!, suite, taskReferenceMode); console.log(json({ frozen: true, suite, taskReferenceMode, execution: value.manifest.configuration.execution, providerRequests: 0, databaseCalls: 0 })); }
     else {
-      const result = await runO4RecoveryProbe(args[1]!, args[0] === "--live" ? "live" : "faux", suite);
+      const result = await runO4RecoveryProbe(args[1]!, args[0] === "--live" ? "live" : "faux", suite, taskReferenceMode);
       process.exitCode = result.runIntegrityPassed && result.executionComplete && result.rows.every(row => row.score?.passed) ? 0 : 1;
     }
   }

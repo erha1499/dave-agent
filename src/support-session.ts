@@ -11,7 +11,7 @@ import type { KnowledgeService } from "./knowledge-service.ts";
 import type { RefundStore } from "./refunds.ts";
 import type { SupportContextPort, SupportContextSnapshot, SupportContextValue } from "./conversation-state.ts";
 import type { Reply } from "./reply.ts";
-import { normalizeModelSupportAction, modelSupportActionParameters } from "./support-context-action.ts";
+import { normalizeModelSupportAction, getModelSupportActionParameters, type TaskReferenceMode } from "./support-context-action.ts";
 import { SupportController, type SupportCall, type SupportResult, type TrustedPolicyTopic } from "./support-controller.ts";
 import { amountChoiceNotice, amountChoiceTtlMs, amountChoicesVersion, currentAmountChoices, rememberAmountChoice, rememberOrderChoice,
   resolveAmountReference, selectAmountChoice, selectAlternativeOrder, type TrustedAmountChoices, type TrustedOrderChoices } from "./support-context.ts";
@@ -111,9 +111,16 @@ export function supportReply(session: AgentSession, text = ""): Reply | undefine
 export async function createSupportSession(
   identity: QQIdentity, store: CouponStore, runtime: ModelRuntime, model: Model<Api>,
   afterSales?: { store: AfterSalesStore; sourceKey: string; refunds?: RefundStore },
-  options: { groupOpenid?: string; focus?: SupportFocus; context?: SupportContextPort; onCall?: (call: SupportCall) => void; repairBudget?: number; knowledge?: KnowledgeService } = {},
+  options: { groupOpenid?: string; focus?: SupportFocus; context?: SupportContextPort; onCall?: (call: SupportCall) => void; repairBudget?: number; knowledge?: KnowledgeService; taskReferenceMode?: TaskReferenceMode } = {},
 ) {
   if (options.focus && options.context) throw new Error("会话定位只能使用一个存储来源。");
+  const taskReferenceMode = options.taskReferenceMode === undefined ? "id" : options.taskReferenceMode;
+  const modelActionParameters = getModelSupportActionParameters(taskReferenceMode);
+  const taskReferenceText = (text: string) => taskReferenceMode === "id" ? text : text
+    .replaceAll('taskRef={"taskId":"宿主taskReference.taskId"}', 'taskRef={"kind":"current"}（由宿主解析当前任务，不传taskId）')
+    .replaceAll("taskRef.taskId", 'taskRef={"kind":"current"}')
+    .replace("与非空宿主taskReference的taskId", '与taskRef={"kind":"current"}（仅当宿主taskReference非空，由宿主解析）')
+    .replace("只有非空taskReference可供merchant_status的taskRef使用", '只有非空taskReference时可用merchant_status与taskRef={"kind":"current"}，由宿主解析，不传taskId');
   const { repairBudget } = resolveSupportParameters(options.repairBudget === undefined ? {} : { repairBudget: options.repairBudget });
   const groupOpenid = options.groupOpenid ?? "cli";
   const sourceKey = merchantSourceKey(identity, groupOpenid);
@@ -231,8 +238,8 @@ export async function createSupportSession(
   }
   const tools = [defineTool({
     name: "support_action", label: "处理客服业务动作",
-    description: "每轮选择一个业务动作。宿主固定协议v2.2，protocol可省略，如提供只能为v2.2。模型判断语义，宿主验证引用和事实：当前写明订单用explicit，唯一当前订单用focus，另一笔只读订单用alternative；政策问题区分standalone/previous，previous必须带宿主话题requestId。实付比较只可用当前宿主itemPaidUnit的requestId；金额候选多义时clarify amount_basis。协商任务用merchant_status与非空宿主taskReference的taskId，不得同时给orderRef；taskReference为空或多义用clarify task，禁止模型代替用户选择候选。不接收身份、范围、金额或批准；缺引用或多义用clarify。",
-    parameters: modelSupportActionParameters,
+    description: taskReferenceText("每轮选择一个业务动作。宿主固定协议v2.2，protocol可省略，如提供只能为v2.2。模型判断语义，宿主验证引用和事实：当前写明订单用explicit，唯一当前订单用focus，另一笔只读订单用alternative；政策问题区分standalone/previous，previous必须带宿主话题requestId。实付比较只可用当前宿主itemPaidUnit的requestId；金额候选多义时clarify amount_basis。协商任务用merchant_status与非空宿主taskReference的taskId，不得同时给orderRef；taskReference为空或多义用clarify task，禁止模型代替用户选择候选。不接收身份、范围、金额或批准；缺引用或多义用clarify。"),
+    parameters: modelActionParameters,
     execute: async (_id, { action }) => {
       if (!turn) throw new Error("业务轮次尚未初始化。");
       const executingTurn = turn, executingAbort = state.abort;
@@ -245,7 +252,7 @@ export async function createSupportSession(
       // Schema/current-message errors may be repaired before any business action
       // starts. A started action (including a refusal or exception) is terminal
       // for request forcing; the Controller still caches its result or failure.
-      const validated = executingTurn.validate(normalizeModelSupportAction(action));
+      const validated = executingTurn.validate(normalizeModelSupportAction(action, taskReferenceMode));
       state.actionStarted = true;
       let result: SupportResult;
       try { result = await executingTurn.execute(validated); }
@@ -337,7 +344,7 @@ export async function createSupportSession(
     },
   })];
   const session = await createSession(runtime, { ...model, maxTokens: Math.min(model.maxTokens, 2048) },
-    `${prompt.trim()}\n\n${skill.trim()}`, tools, skills, async () =>
+    taskReferenceText(`${prompt.trim()}\n\n${skill.trim()}`), tools, skills, async () =>
       activeRun && activeRun.abort === state.abort && !activeRun.abort.signal.aborted ? activeRun.contextText : undefined,
     (payload, api) => {
       // Pi's native payload hook is per Session and per request. The current
@@ -362,7 +369,7 @@ export async function createSupportSession(
       try {
         if (part.name !== "support_action" || Object.keys(part.arguments).length !== 1 || !("action" in part.arguments)) throw new Error();
         // Count pure reference/protocol failures in the same bounded repair budget as schema errors.
-        const action = normalizeModelSupportAction(part.arguments.action);
+        const action = normalizeModelSupportAction(part.arguments.action, taskReferenceMode);
         if (turn) turn.validate(action);
       } catch { state.invalidActions++; }
     }
@@ -577,7 +584,7 @@ export async function createSupportSession(
             candidates: state.amountChoices.candidates.map(row => ({ token: row.token, version: row.version,
               requestId: row.reference.requestId, orderId: row.reference.orderId, field: row.reference.field, paidCents: row.reference.paidCents })) },
           alternativeOrderId: state.pendingReferenceKind === "order" ? null : selectAlternativeOrder(state.orderChoices, binding, focusOrderId) ?? null,
-          instruction: "宿主固定协议v2.2，protocol可省略，如提供只能为v2.2。这些是有界定位引用，不代表批准或确认。当前有订单号用explicit；当前单用focus；唯一另一单用alternative且仅只读。依赖前文的话题用previous与policyTopic.requestId；独立完整问题用standalone。只读实付比较仅可用paid_amount_compare与当前非空itemPaidUnit.requestId；amountChoices只是曾展示候选，模型不得自行挑选其中requestId。金额基准为空或多义用clarify amount_basis。协商任务独立于当前订单：只有非空taskReference可供merchant_status的taskRef使用；taskChoices不得由模型代选，缺少引用用clarify task。任务查询不能切换当前订单或产生退款权限。宿主会列出单行选择指令，由用户下一轮选择。引用不匹配先clarify，禁止从历史聊天自造引用或把旧状态带到新单；宿主每轮重新授权取证。" });
+          instruction: taskReferenceText("宿主固定协议v2.2，protocol可省略，如提供只能为v2.2。这些是有界定位引用，不代表批准或确认。当前有订单号用explicit；当前单用focus；唯一另一单用alternative且仅只读。依赖前文的话题用previous与policyTopic.requestId；独立完整问题用standalone。只读实付比较仅可用paid_amount_compare与当前非空itemPaidUnit.requestId；amountChoices只是曾展示候选，模型不得自行挑选其中requestId。金额基准为空或多义用clarify amount_basis。协商任务独立于当前订单：只有非空taskReference可供merchant_status的taskRef使用；taskChoices不得由模型代选，缺少引用用clarify task。任务查询不能切换当前订单或产生退款权限。宿主会列出单行选择指令，由用户下一轮选择。引用不匹配先clarify，禁止从历史聊天自造引用或把旧状态带到新单；宿主每轮重新授权取证。") });
       assertCurrent();
       const run: NonNullable<typeof activeRun> = { abort, contextText };
       activeRun = run;

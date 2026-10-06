@@ -214,6 +214,38 @@ node --env-file-if-exists=.env scripts/o4-recovery-probe-live.ts --suite rotatio
 
 本机独立重评记录：`.runtime/o4-recovery-probe/rotation40-v2-offline-review.json`；v2 scorer SHA-256 `cb6427559095a287f64faf8a99f4a8e8a649e34f24e1c9204ac2476faea36ce3`。原 faux manifest SHA-256 `08afb213b9828a77a63a15c6ce6831d7a7459e540c4d51df90872ce0b30ce702`，原 live manifest SHA-256 `6b355b71ff3c6987ce9e3f2aa9f6aa31bb4648261c77ae855b6547742309091a`。v2 不能直接重放旧 manifest，须用原提交复现或另冻新的实验，不能替换其源码哈希。
 
-**下一轮候选，尚未实施：** 模型表达“查询当前已选任务”，宿主用既有 `resolveTaskReference` 解析唯一或经用户选择的任务，再执行原身份、群、具体 taskId 与最新状态校验。订单查询继续独立使用订单引用。这样可去掉模型复制不透明 UUID 的负担，而不用更强模型、新模型阶段或更长提示词；代价是需要版本化动作合同并验证兼容性。旧式显式错误 taskId 仍须拒绝，不能静默替换成宿主所选任务。
+**任务引用候选：** 模型表达“查询当前已选任务”，宿主用既有 `resolveTaskReference` 解析唯一或经用户选择的任务，再执行原身份、群、具体 taskId 与最新状态校验。订单查询继续独立使用订单引用。这样可去掉模型复制不透明 UUID 的负担，而不用更强模型、新模型阶段或更长提示词；代价是需要版本化动作合同并验证兼容性。旧式显式错误 taskId 仍须拒绝，不能静默替换成宿主所选任务。
 
-先以零 API 工程对照覆盖：A 任务/B 焦点、双任务未选先澄清、旧指令/过期/重绑失效、明确单号仍查指定订单、不创建业务写入。验收要求原安全边界和固定行为不退步，且模型无需自行选择或复制 taskId；不能满足则保留原方案。通过后另冻一次有限模型对照与新问法，分别报告意图准确率、业务完成、首次动作、修复调用和成本。此处设计不计作已实现，也不补足本次未执行的输入。
+先以零 API 工程对照覆盖：A 任务/B 焦点、双任务未选先澄清、旧指令/过期/重绑失效、明确单号仍查指定订单、不创建业务写入。验收要求原安全边界和固定行为不退步，且模型无需自行选择或复制 taskId；不能满足则保留原方案。工程通过后，真实模型效果须另列收益、预算与验收口径；工程结果不补足此前未执行的输入。
+
+### 当前任务引用工程合同（2026-10-06，工程通过，模型效果待验收）
+
+- **业务问题与面试追问：** 用户已选 A 协商任务、普通订单焦点为 B 时，模型仍需复制 A 的不透明 UUID。前轮实际输出了 B 的合法 UUID，宿主安全拒绝。此候选回答“哪些语义由模型判断，哪些定位由宿主确定，以及确定性定位是否会掩盖模型错误”。
+- **假设与取舍：** 模型只表达 `merchant_status + taskRef={"kind":"current"}`，宿主解析已有有效选择；未选、多义、过期、失效仍澄清。减少复制 UUID 的协议负担，代价是模型只能表达当前有效任务；用户当前写明订单号仍必须走 `orderRef.explicit`。本轮不能证明真实模型意图准确率提高。
+- **个人实现与复用：** 复用 Pi、`resolveTaskReference`、任务选择及两次 TTL 校验、订单授权与精确任务读取；增加 Session 的 `taskReferenceMode: id | current`、严格模型 schema、执行与修复计数的同模式校验。默认 `id`；CLI/QQ 常驻配置及评测前端不切换。Prompt、Skill、工具说明与宿主指令按 Session 模式一致渲染，原 ID 模式文本和工具 schema 保留。
+- **证据合同：** 动作协议继续 `v2.2`，独立候选版本 `task-reference-mode-v1`。原始模型动作保留 current 形状，不补造 taskId；评分以实际展示、用户选择、原有效期、新鲜授权读取、exact-task 查询与 DB 状态证明 A/B 目标。固定 40 轮题序/gold 不改，20 轮合同保留；manifest v3 显式冻结 mode、候选版本、schema hash、实际参数及源码。旧 manifest 按原提交复现。
+- **预算与停止条件：** 零远程模型、rerank、support 和 QQ 请求。先完成纯边界及原生 Session 检查、全量 `validate` 和独立审阅；工程阶段最多各一批同源码 id/current 真实 MySQL＋Pi/faux 80 行配对。发生边界错误先定位，不扩大题量或改 gold；有修复时只补受影响验证。两模式结果、失败与清理均归档后收尾。真实模型与新问法验收另行冻结，当前合同不授权自动付费重跑。
+
+**实现与回归结果：** 两种模式的 schema、Controller、原生 Pi Session 和评分反例检查通过。独立审阅发现无 mode 的模型 normalizer 不应接受 canonical 双格式，已保持默认严格 id；双格式只由 canonical parser 接受。首次完整 `validate` 又捕获显式 `protocol: undefined` 被可省略的模型 schema 接受，已修正为“只补完全缺省字段 → canonical 必填协议校验 → mode 校验”，原断言不改；定向 Session 与第二次完整 `validate` 均退出 0。两模式执行及修复计数入口都实际受此约束。默认 id 模型 schema 的 JSON 字节与 `d3ea503` 一致，Prompt/Skill 文件未修改，默认 Session 的实际系统文本回归通过。
+
+| 同源码工程批次 | runId | memory | mysql | 远程请求 | CLI |
+| --- | --- | --- | --- | --- | --- |
+| id | `e8030598-c215-4682-b971-83ce6a0b6066` | 40/40 | 40/40 | 0 | 0 |
+| current | `a9d9a3c2-c389-4792-937e-f1a8e43e948b` | 40/40 | 40/40 | 0 | 0 |
+
+两批总计 160 条输入全执行、全通过，零跳过；固定题序/gold 与 planHash 不变。四个 arm 均在实际第 1/21/40 条由同一 QQAgent 创建 Session；mysql 恢复原选择并重新取证，memory 在丢失定位时安全请求重述，后者不计成功恢复。A 通知均由实际 dispatcher 沿第 3 条原路由发送一次；第 28 条仍查选中的 B pending，第 29 条订单焦点仍为 B，重新选 A 后读取 approved。旧令牌均拒绝并重新展示；各 arm 最终只有两项约定协商任务、零退款和退款方案，fixture 与 conversation_state 均清理完整。源码、依赖、运行记录及完整性核对通过；独立审阅还从每批 124 份实际 transcript 核对唯一 schema 与配置一致。
+
+current 批次的 20 个任务引用动作均保留 `{"kind":"current"}` 原形，无复制或补造 taskId；真实任务目标仍由选择来源、TTL、fresh authorization、exact-task 读取及独立 DB 状态共同证明。离线重评原 faux80＋live80（含未执行项）共 160 行，默认 id 评分逐字段与 v2 相同，原始文件不改。原 20 轮合同 SHA-256 仍为 `47d319da706557cda3534f2219440743556451fe26a4b018845f571ea1f9b3ad`。
+
+本机记录：`.runtime/o4-recovery-probe/taskref-v1-engineering-review.json`、两份 `taskref-v1-{id,current}-faux-manifest.json` 和上述 runId 的 raw 文件。id/current manifest SHA-256 分别为 `b80be49a5a036d0f13428cb26b5aa294489520dc5a1bb0f3d6447836ba3bc79d` / `9d2cfca39e22c9004d2746b8781eaf8563968b7f6780c238888d91352b204ef1`；raw SHA-256 分别为 `886fda415db4918c8335009654ba50c53863d016b0aa6adb759e563a9a921823` / `d8413af26d0a5d534f2d65814218cee60834926aa028a11df8d47695b257e421`。两份 manifest 源码哈希相同，mode 与 schema hash 显式不同；raw 不入库。faux 的 `usageComplete=false` 沿用既有定义，不表述为真实模型用量验收。
+
+复现使用全新 manifest 文件名，避免覆盖已有尝试；id 工程对照将下列 `current` 替换为 `id`，并使用另一个文件名：
+
+```bash
+node scripts/o4-recovery-probe-live.ts --suite rotation40 --task-reference current --check
+node --env-file-if-exists=.env scripts/o4-recovery-probe-live.ts --suite rotation40 --task-reference current --freeze-faux .runtime/o4-recovery-probe/current-replay-new-manifest.json
+node --env-file-if-exists=.env scripts/o4-recovery-probe-live.ts --suite rotation40 --task-reference current --inspect .runtime/o4-recovery-probe/current-replay-new-manifest.json
+node --env-file-if-exists=.env scripts/o4-recovery-probe-live.ts --suite rotation40 --task-reference current --faux .runtime/o4-recovery-probe/current-replay-new-manifest.json
+```
+
+**保留与停止决定：** 保留 current 为可控工程候选，默认 id、atomic＋lexical、memory 及常驻 QQ/前端配置不切换。本轮按零 API 预算收尾。它证明“模型可只表达业务意图，宿主依据真实选择定位”的兼容和边界，尚不能证明意图准确率、修复率、延迟或单位正确完成成本改善。此前真实模型的 17 通过、1 失败、62 未执行原样保留，不能与本轮脚本动作比较模型收益。下一轮应另冻有限真实模型和新问法的验收目标、预算与对照口径；完整 O4、80 轮混合上下文、共同业务合同、C1/O5 和常驻 QQ 重启仍待完成。

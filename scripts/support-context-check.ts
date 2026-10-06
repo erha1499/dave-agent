@@ -1,13 +1,13 @@
 import assert from "node:assert/strict";
 import { pathToFileURL } from "node:url";
-import { fauxAssistantMessage, fauxProvider, fauxToolCall, type FauxResponseStep, type TranscriptContext } from "@earendil-works/pi-ai";
+import { fauxAssistantMessage, fauxProvider, fauxToolCall, getCurrentSystemPrompt, getCurrentTools, type FauxResponseStep, type TranscriptContext } from "@earendil-works/pi-ai";
 import type { QQBotInboundMessage } from "@tencent-connect/qqbot-nodejs";
 import { createModelRuntime } from "../src/agent.ts";
 import { merchantSourceKey, type AfterSalesStore, type MerchantTaskReference, type MerchantTask } from "../src/after-sales.ts";
 import { validateSupportContextValue, type SupportContextPort, type SupportContextSnapshot, type SupportContextValue } from "../src/conversation-state.ts";
 import type { CouponStore, QQIdentity } from "../src/coupon-store.ts";
 import { QQAgent } from "../src/qq-agent.ts";
-import type { ContextOrderRef, ContextSupportAction } from "../src/support-context-action.ts";
+import { getModelSupportActionParameters, type ContextOrderRef, type ContextSupportAction, type TaskReferenceMode } from "../src/support-context-action.ts";
 import type { TrustedReferenceChoices } from "../src/support-reference-selection.ts";
 import type { TrustedTaskChoices } from "../src/support-task-context.ts";
 import { cancelSupportTurn, createSupportSession, getSupportHostReceipt, getSupportResult, prepareSupportPrompt,
@@ -66,7 +66,7 @@ export async function checkSupportContext() {
   assert.throws(() => readSupportContextMode("atomic", { SUPPORT_CONTEXT_MODE: "mysql", AFTER_SALES_DB_PASSWORD: "synthetic" }));
   const runtime = await createModelRuntime(), faux = fauxProvider(); runtime.registerNativeProvider(faux.provider);
   let sequence = 0;
-  async function harness(memory = memoryContext(), listing?: { candidates: MerchantTaskReference[]; overflow: boolean }) {
+  async function harness(memory = memoryContext(), listing?: { candidates: MerchantTaskReference[]; overflow: boolean }, taskReferenceMode: TaskReferenceMode = "id") {
     const reads: string[] = [], queries: string[] = [];
     const taskReads: string[] = []; let taskLists = 0, merchantPrepares = 0;
     let taskStatus: MerchantTask["status"] = "pending", returnedTaskId: string | undefined, listingFailure = false;
@@ -92,7 +92,7 @@ export async function checkSupportContext() {
     }, async prepare() { merchantPrepares++; throw new Error("read-only task checks cannot prepare merchant work"); } } as unknown as AfterSalesStore;
     const open = () => createSupportSession(identity, store, runtime, faux.getModel(), listing ? {
       store: merchant, sourceKey: merchantSourceKey(identity, groupOpenid),
-    } : undefined, { groupOpenid, context: memory.port });
+    } : undefined, { groupOpenid, context: memory.port, taskReferenceMode });
     let session = await open();
     async function run(question: string, action?: ContextSupportAction | ((host: Host) => ContextSupportAction), ending: "ok" | "error" | "no_action" = "ok", checkPending = true) {
       const requestId = `context-${++sequence}`, hosts: Host[] = [], transcripts: Array<TranscriptContext["messages"]> = [];
@@ -575,6 +575,66 @@ export async function checkSupportContext() {
     const command = `选择任务 ${candidate.token}`; assert.ok(turn.reply.text.split("\n").includes(command));
     return command;
   };
+
+  // The real native Session exposes one task syntax, while the host retains full audit references.
+  {
+    const currentAction: ContextSupportAction = { protocol: "v2.2", kind: "merchant_status", taskRef: { kind: "current" } };
+    const h = await harness(memoryContext(), { candidates: [taskReference(taskA, a), taskReference(taskB, b)], overflow: false }, "current");
+    try {
+      await h.run(`查询 ${b}`, orderAction(explicit(b)));
+      const offered = await h.run("查之前的协商任务", currentAction);
+      assert.equal(offered.host?.taskReference, null); assert.equal(offered.result?.outcome, "clarification");
+      assert.deepEqual(h.reads, [b]); assert.deepEqual(h.taskReads, []);
+      const command = taskCommand(offered, taskA); await h.run(command);
+      const saved = h.memory.value().value; assert.ok(saved?.version === 4 && saved.taskContext?.selected);
+      await h.restart(); h.taskStatus("approved");
+      let instructionError: unknown;
+      const checked = await h.run("我选中的协商现在怎样？", host => {
+        try {
+          assert.equal(host.orderId, b); assert.equal(host.taskReference?.taskId, taskA);
+        } catch (error) { instructionError = error; }
+        return currentAction;
+      });
+      assert.equal(instructionError, undefined);
+      assert.deepEqual(checked.result?.action, currentAction, "raw current action remains current, never a fabricated model UUID");
+      assert.equal(checked.result?.evidence.task?.taskId, taskA); assert.equal(checked.result?.evidence.order?.id, a);
+      assert.equal(h.memory.value().value?.focus?.orderId, b);
+      const value = h.memory.value().value; assert.ok(value?.version === 4);
+      assert.deepEqual(value.taskContext?.selected, saved.taskContext.selected, "current lookup cannot renew the selection TTL");
+      const transcript = checked.transcripts[0]!;
+      const prompt = getCurrentSystemPrompt(transcript), tool = getCurrentTools(transcript)[0]!;
+      assert.ok(prompt.includes('taskRef={"kind":"current"}')); assert.ok(!prompt.includes('taskRef={"taskId":'));
+      assert.ok(!prompt.includes("taskRef.taskId")); assert.ok(tool.description.includes('taskRef={"kind":"current"}'));
+      assert.deepEqual(JSON.parse(JSON.stringify(tool.parameters)), JSON.parse(JSON.stringify(getModelSupportActionParameters("current"))));
+      assert.ok(JSON.stringify(transcript).includes("由宿主解析，不传taskId"), "actual host instruction uses the current syntax");
+      const rejected = await h.run(command); assert.equal(rejected.receipt?.outcome, "rejected");
+      const unknown = await h.run("继续查当前协商", currentAction);
+      assert.equal(unknown.host?.taskReference, null); assert.equal(unknown.result?.outcome, "clarification");
+      assert.deepEqual(h.reads, [b, a]); assert.deepEqual(h.taskReads, [a]); assert.equal(h.merchantPrepares(), 0);
+    } finally { h.dispose(); }
+  }
+
+  // Both Session validation paths count cross-profile formats against the repair budget.
+  for (const mode of ["id", "current"] as const) {
+    const valid: ContextSupportAction = mode === "id" ? taskAction(taskA)
+      : { protocol: "v2.2", kind: "merchant_status", taskRef: { kind: "current" } };
+    const invalid: ContextSupportAction = mode === "id"
+      ? { protocol: "v2.2", kind: "merchant_status", taskRef: { kind: "current" } } : taskAction(taskA);
+    const h = await harness(memoryContext(), { candidates: [taskReference(taskA, a)], overflow: false }, mode);
+    try {
+      prepareSupportPrompt(h.session(), { requestId: `cross-mode-${mode}`, groupOpenid, messageId: "cross-mode" });
+      const choose = (action: ContextSupportAction) => fauxAssistantMessage(fauxToolCall("support_action", { action }), { stopReason: "toolUse" });
+      faux.setResponses([choose(invalid), choose(valid), fauxAssistantMessage("完成")]);
+      await h.session().prompt("查询协商任务", { expandPromptTemplates: false });
+      assert.equal(faux.getPendingResponseCount(), 0); assert.deepEqual(getSupportResult(h.session())?.action, valid);
+      assert.deepEqual(h.reads, [a]); assert.deepEqual(h.taskReads, [a]);
+      prepareSupportPrompt(h.session(), { requestId: `cross-mode-over-budget-${mode}`, groupOpenid, messageId: "cross-mode" });
+      faux.setResponses([choose(invalid), choose(invalid), choose(valid)]);
+      await h.session().prompt("再查询协商任务", { expandPromptTemplates: false });
+      assert.equal(getSupportResult(h.session()), undefined); assert.equal(faux.getPendingResponseCount(), 1);
+      assert.deepEqual(h.reads, [a]); assert.deepEqual(h.taskReads, [a]);
+    } finally { faux.setResponses([]); h.dispose(); }
+  }
 
   // Upgrading a legacy v2 pending order list must retain its independent pending kind.
   {

@@ -313,7 +313,7 @@ export class SupportController {
     // order focus, create policy/amount references, or authorize a write.
     if (action.kind === "merchant_status" && "taskRef" in action) {
       const reference = resolveTaskReference(context.taskChoices, binding);
-      if (!reference || reference.taskId !== action.taskRef.taskId) return clarify("task");
+      if (!reference || action.taskRef.kind !== "current" && reference.taskId !== action.taskRef.taskId) return clarify("task");
       if (!this.services.merchant) return result(notice("当前未启用模拟协商，暂时无法核实任务状态。"), "blocked");
       const stillCurrent = () => {
         const current = resolveTaskReference(context.taskChoices, binding);

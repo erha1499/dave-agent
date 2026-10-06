@@ -5,7 +5,8 @@ import type { Pool } from "mysql2/promise";
 import { AfterSalesStore, merchantSourceKey, type MerchantTask, type MerchantTaskReference } from "../src/after-sales.ts";
 import { OrderAccessError } from "../src/coupon-store.ts";
 import { SupportProtocolError } from "../src/support-action.ts";
-import { normalizeModelSupportAction, parseContextSupportAction } from "../src/support-context-action.ts";
+import { getModelSupportActionParameters, modelSupportActionParameters, normalizeModelSupportAction, parseContextSupportAction,
+  type TaskReferenceMode } from "../src/support-context-action.ts";
 import { SupportController, type SupportServices, type SupportTurnContext } from "../src/support-controller.ts";
 import { currentTaskChoices, refreshTaskChoices, resolveTaskReference, selectTaskChoice, taskChoiceNotice,
   taskReferenceTtlMs, validateTaskContext, type TrustedTaskChoices } from "../src/support-task-context.ts";
@@ -60,14 +61,39 @@ export async function checkSupportTaskContext() {
   assert.match(taskChoiceNotice(multi, binding, now), /选择任务 [a-f0-9-]+/);
 
   const taskAction = { protocol: "v2.2" as const, kind: "merchant_status" as const, taskRef: { taskId: a.taskId } };
+  const currentTaskAction = { protocol: "v2.2" as const, kind: "merchant_status" as const, taskRef: { kind: "current" as const } };
   assert.deepEqual(parseContextSupportAction(taskAction), taskAction);
   assert.deepEqual(normalizeModelSupportAction({ kind: "merchant_status", taskRef: { taskId: a.taskId } }), taskAction);
+  assert.deepEqual(parseContextSupportAction(currentTaskAction), currentTaskAction);
+  assert.throws(() => normalizeModelSupportAction({ kind: "merchant_status", taskRef: { kind: "current" } }), SupportProtocolError,
+    "omitted model mode stays id; only canonical parsing accepts both variants");
+  assert.equal(getModelSupportActionParameters("id"), modelSupportActionParameters, "default schema stays explicit id");
+  const nonTaskBranches = (mode: TaskReferenceMode) => getModelSupportActionParameters(mode).properties.action.anyOf.filter(s => !("taskRef" in s.properties));
+  assert.deepEqual(nonTaskBranches("id"), nonTaskBranches("current"), "candidate mode changes no knowledge/order/write schema");
+  for (const [mode, allowed, rejected] of [["id", taskAction, currentTaskAction], ["current", currentTaskAction, taskAction]] as const) {
+    assert.deepEqual(normalizeModelSupportAction(allowed, mode), allowed);
+    const { protocol: _protocol, ...withoutProtocol } = allowed;
+    assert.deepEqual(normalizeModelSupportAction(withoutProtocol, mode), allowed);
+    assert.throws(() => normalizeModelSupportAction(rejected, mode), SupportProtocolError);
+    const { protocol: _rejectedProtocol, ...rejectedWithoutProtocol } = rejected;
+    assert.throws(() => normalizeModelSupportAction(rejectedWithoutProtocol, mode), SupportProtocolError);
+  }
+  assert.throws(() => getModelSupportActionParameters("unknown" as TaskReferenceMode));
+  assert.throws(() => normalizeModelSupportAction(taskAction, "unknown" as TaskReferenceMode));
   for (const invalid of [
     { ...taskAction, orderRef: { kind: "focus" } }, { ...taskAction, taskRef: { taskId: a.taskId, orderId: a.orderId } },
     { ...taskAction, taskRef: { taskId: "bad" } }, { ...taskAction, protocol: "v3" },
     { ...taskAction, kind: "refund_prepare" }, { ...taskAction, kind: "merchant_prepare", reason: "测试" },
     { ...taskAction, approved: true }, { ...taskAction, amountCents: 100 }, { ...taskAction, senderId: "other" },
-  ]) assert.throws(() => parseContextSupportAction(invalid), SupportProtocolError);
+    { ...currentTaskAction, taskRef: { kind: "current", taskId: a.taskId } },
+    { ...currentTaskAction, taskRef: { kind: "current", orderId: a.orderId } },
+    { ...currentTaskAction, taskRef: { kind: "selected" } }, { ...currentTaskAction, orderRef: { kind: "focus" } },
+    { ...currentTaskAction, kind: "refund_prepare" }, { ...currentTaskAction, kind: "merchant_prepare", reason: "测试" },
+    { ...currentTaskAction, approved: true }, { ...currentTaskAction, sourceKey: binding.sourceKey },
+  ]) {
+    assert.throws(() => parseContextSupportAction(invalid), SupportProtocolError);
+    for (const mode of ["id", "current"] as const) assert.throws(() => normalizeModelSupportAction(invalid, mode), SupportProtocolError);
+  }
 
   const order: Awaited<ReturnType<SupportServices["store"]["getOrder"]>> = {
     source: "demo-database", id: a.orderId, status: "paid", asOf: new Date(now).toISOString(),
@@ -109,41 +135,65 @@ export async function checkSupportTaskContext() {
   assert.throws(() => firstTurn.execute({ protocol: "v2.2", kind: "refund_prepare", orderRef: { kind: "focus" } }), SupportProtocolError);
   task = { ...task!, status: "approved", approvedAmountCents: 6000 };
   assert.equal((await controller.createTurn(context(selected)).execute(taskAction)).evidence.task!.status, "approved", "read fresh task status rather than historic notification");
+  for (const choices of [single, selected]) {
+    calls.length = 0; taskOptions.length = 0;
+    const original = structuredClone(choices), currentTurn = controller.createTurn(context(choices));
+    const response = await currentTurn.execute(currentTaskAction);
+    assert.equal(response.outcome, "ready"); assert.equal(response.evidence.task!.taskId, a.taskId);
+    assert.equal(response.evidence.task!.status, "approved"); assert.deepEqual(calls, ["order", "task"]);
+    assert.deepEqual(taskOptions, [{ referenceTaskId: a.taskId }]);
+    assert.equal(response.verifiedOrderId, undefined); assert.equal(response.verifiedPolicyTopic, undefined); assert.equal(response.verifiedAmountReference, undefined);
+    assert.deepEqual(choices, original, "current lookup cannot alter selection/focus or extend original TTL");
+    assert.equal(await currentTurn.execute(currentTaskAction), response); assert.deepEqual(calls, ["order", "task"]);
+  }
+  calls.length = 0;
+  const wrongId = await controller.createTurn(context(selected)).execute({ ...taskAction, taskRef: { taskId: b.taskId } });
+  assert.equal(wrongId.outcome, "clarification"); assert.deepEqual(calls, [], "legacy wrong id must not silently substitute selected A");
 
   for (const choices of [multi, { ...single, selectionRequired: true }, { ...single, groupOpenid: "other" },
-    { ...single, candidates: [] }]) {
+    { ...single, sourceKey: "other" }, { ...single, overflow: true }, { ...single, candidates: [] }]) for (const action of [taskAction, currentTaskAction]) {
     calls.length = 0;
-    const response = await controller.createTurn(context(choices)).execute(taskAction);
+    const response = await controller.createTurn(context(choices)).execute(action);
     assert.equal(response.outcome, "clarification"); assert.deepEqual(calls, []);
     if (choices === multi) { assert.equal(response.referencePresentation, "task"); assert.ok("text" in response.reply); assert.match(response.reply.text, /选择任务/); }
   }
-  calls.length = 0;
-  const explicit = controller.createTurn(context(single, `查询 ${a.orderId} 的协商状态`));
-  await assert.rejects(explicit.execute(taskAction), SupportProtocolError); assert.deepEqual(calls, []);
-  assert.equal((await explicit.execute({ protocol: "v2.2", kind: "merchant_status", orderRef: { kind: "explicit", orderId: a.orderId } })).verifiedOrderId, a.orderId,
-    "pure task preflight rejection allows repair to the current explicit order");
+  for (const action of [taskAction, currentTaskAction]) {
+    calls.length = 0;
+    const explicit = controller.createTurn(context(single, `查询 ${a.orderId} 的协商状态`));
+    await assert.rejects(explicit.execute(action), SupportProtocolError); assert.deepEqual(calls, []);
+    assert.equal((await explicit.execute({ protocol: "v2.2", kind: "merchant_status", orderRef: { kind: "explicit", orderId: a.orderId } })).verifiedOrderId, a.orderId,
+      "pure task preflight rejection allows repair to the current explicit order");
+    calls.length = 0;
+    assert.equal((await controller.createTurn({ ...context(), taskChoices: undefined }).execute(action)).outcome, "clarification");
+    assert.deepEqual(calls, [], "neither task syntax may fall back to ordinary order focus");
+  }
   const pending = await controller.createTurn({ ...context(multi), pendingReferenceKind: "order" }).execute({ protocol: "v2.2", kind: "clarify", field: "task", reason: "ambiguous" });
   assert.equal(pending.pendingReferenceKind, "order"); assert.equal(pending.referencePresentation, "task");
-  for (const failure of ["denial", "outage", "replacement", "missing"] as const) {
+  for (const failure of ["denial", "outage", "replacement", "missing"] as const) for (const action of [taskAction, currentTaskAction]) {
     denial = failure === "denial"; outage = failure === "outage";
     task = failure === "missing" ? undefined : { ...first.evidence.task!, taskId: failure === "replacement" ? b.taskId : a.taskId };
     calls.length = 0;
-    const response = await controller.createTurn(context()).execute(taskAction);
+    const response = await controller.createTurn(context()).execute(action);
     assert.equal(response.outcome, "blocked"); assert.equal(response.reply.kind, "notice"); assert.equal(response.evidence.task ?? null, null);
     assert.ok(!JSON.stringify(response.reply).includes("SQL"));
     assert.deepEqual(calls, failure === "denial" ? ["order"] : ["order", "task"]);
   }
   denial = false; outage = false;
   const realNow = Date.now;
-  try {
-    afterOrder = () => { Date.now = () => a.expiresAt; }; calls.length = 0;
-    const expiredDuringRead = await controller.createTurn(context()).execute(taskAction);
-    assert.equal(expiredDuringRead.outcome, "clarification"); assert.equal(expiredDuringRead.evidence.task, undefined);
-    assert.deepEqual(calls, ["order"], "a locator expiring during authorization cannot start the task read");
-  } finally { Date.now = realNow; afterOrder = undefined; }
-  const abort = new AbortController(); afterOrder = () => abort.abort(); calls.length = 0;
-  await assert.rejects(controller.createTurn({ ...context(), signal: abort.signal }).execute(taskAction));
-  assert.deepEqual(calls, ["order"], "cancelled task read cannot continue to the next service"); afterOrder = undefined;
-  console.log("support-task-context-check: helper selection/expiry + strict read-only Controller checks passed (0 API/DB)");
+  for (const action of [taskAction, currentTaskAction]) {
+    try {
+      afterOrder = () => { Date.now = () => a.expiresAt; }; calls.length = 0;
+      const expiredDuringRead = await controller.createTurn(context()).execute(action);
+      assert.equal(expiredDuringRead.outcome, "clarification"); assert.equal(expiredDuringRead.evidence.task, undefined);
+      assert.deepEqual(calls, ["order"], "a locator expiring during authorization cannot start the task read");
+      calls.length = 0;
+      assert.equal((await controller.createTurn(context()).execute(action)).outcome, "clarification");
+      assert.deepEqual(calls, [], "expired locator cannot start authorization");
+    } finally { Date.now = realNow; afterOrder = undefined; }
+    const abort = new AbortController(); afterOrder = () => abort.abort(); calls.length = 0;
+    await assert.rejects(controller.createTurn({ ...context(), signal: abort.signal }).execute(action));
+    assert.deepEqual(calls, ["order"], "cancelled task read cannot continue to the next service"); afterOrder = undefined;
+  }
+  console.log("support-task-context-check: id/current schema, selection/expiry + strict read-only Controller checks passed (0 API/DB)");
 }
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) await checkSupportTaskContext();
