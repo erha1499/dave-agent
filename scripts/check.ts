@@ -26,6 +26,10 @@ await import("./retrieval-context-check.ts");
 // Deterministic v2 checks only: faux Pi, in-memory services and mocked provider fetch.
 await import("./support-controller-check.ts");
 await import("./support-reference-controller-check.ts");
+const { checkSupportPolicyScopeController } = await import("./support-policy-scope-controller-check.ts");
+await checkSupportPolicyScopeController();
+const { checkC1PolicyScopeEvidence } = await import("./c1-policy-scope-evidence-check.ts");
+await checkC1PolicyScopeEvidence();
 const { checkSupportTaskContext } = await import("./support-task-context-check.ts");
 await checkSupportTaskContext();
 const { checkSupportReferenceSelection } = await import("./support-reference-selection-check.ts");

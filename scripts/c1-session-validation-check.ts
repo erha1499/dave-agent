@@ -10,10 +10,11 @@ import { applyEvidenceSupport, validateEvidenceSupportVerification, evidenceSupp
   evidenceSupportValidationVersion, evidenceSupportTypedPromptVersion, evidenceSupportTypedV6PromptVersion,
   type EvidenceSupportDecision, type EvidenceSupportSettings, type EvidenceSupportVerification } from "../src/evidence-support.ts";
 import type { CouponStore, QQIdentity } from "../src/coupon-store.ts";
-import type { ContextSupportAction } from "../src/support-context-action.ts";
+import { normalizeModelSupportAction, type ContextSupportAction } from "../src/support-context-action.ts";
 import { amountChoiceTtlMs, compareRemainingAmount, createAmountReference, rememberAmountChoice, resolveAmountReference, type RemainingAmountComparison } from "../src/support-context.ts";
 import type { SupportHostReceipt } from "../src/support-session.ts";
-import type { SupportCall, SupportKnowledgeContext, SupportResult, TrustedPolicyTopic } from "../src/support-controller.ts";
+import { SupportController, type SupportCall, type SupportKnowledgeContext, type SupportPolicyScopeRepair, type SupportResult, type TrustedPolicyTopic } from "../src/support-controller.ts";
+import { resolveReferenceChoice, type TrustedReferenceChoices } from "../src/support-reference-selection.ts";
 import { applyKnowledgeApplicabilityGate, finishKnowledgeApplicabilityAcceptance, knowledgeApplicabilitySettings, type KnowledgeTrace } from "../src/knowledge-service.ts";
 import { buildKnowledgeApplicabilityContext, gateKnowledgeApplicability, knowledgeApplicabilitySourceHash, revalidateKnowledgeApplicabilitySnapshot, validateKnowledgeApplicabilitySnapshot,
   type KnowledgeApplicabilityMode, type KnowledgeApplicabilitySnapshot } from "../src/knowledge-applicability.ts";
@@ -22,7 +23,7 @@ import type { SessionTurnActual } from "./c1-session-live.ts";
 import { scoreC1ReferenceEvidence } from "./c1-reference-evidence.ts";
 
 // Pure contracts/scoring only. No executor, generated validation questions, I/O or model judge.
-export const c1ValidationScoringVersion = "c1-session-validation-v8";
+export const c1ValidationScoringVersion = "c1-session-validation-v9";
 export const c1Families = ["order_state", "paid_amount", "alternative_order", "policy_followup", "refund_time", "appointment_actor"] as const;
 export const c1Strata = ["known", "missing", "competing", "direct_missing_fact", "boundary"] as const;
 type Family = typeof c1Families[number];
@@ -65,7 +66,8 @@ export type C1ValidationKnowledgeConfiguration = { applicability?: KnowledgeAppl
   supportPrompt?: "v5" | "v6";
   supportSettings?: EvidenceSupportSettings;
   // Frozen candidate requirement, independent of a trace's own version label.
-  evidenceBindingVersion?: "order-evidence-binding-v2" };
+  evidenceBindingVersion?: "order-evidence-binding-v2";
+  policyScopeRepair?: { version: "policy-scope-repair-v1"; maxRepairs: 1; repairBudget: 1 | 2 } };
 const nonempty = (value: unknown): value is string => typeof value === "string" && Boolean(value.trim());
 const digest = (value: unknown) => typeof value === "string" && /^[a-f0-9]{64}$/.test(value);
 const equal = isDeepStrictEqual;
@@ -142,6 +144,187 @@ function reviewPassed(turn: C1ValidationTurn, actual: C1ValidationActual | undef
     && turn.expected.answerCriteria.every(criterion => review.checks.some(row => row.criterionId === criterion.id && row.passed === true && nonempty(row.reasoning)));
 }
 
+const recordedObject = (value: unknown): Record<string, unknown> => {
+  assert.ok(value && typeof value === "object" && !Array.isArray(value), "Expected actual recorded object");
+  return value as Record<string, unknown>;
+};
+
+// An opt-in exception is reconstructed from SDK actions and authorized calls.
+// The first successful read explains a refusal; only the second read can supply
+// current facts for knowledge. No retry label or self-reported hash is authority.
+export function assertC1PolicyScopeRepairEvidence(actual: C1ValidationActual, originalQuery: string, history: C1ValidationHistory,
+  corpus: readonly RetrievalDocument[], configuration: C1ValidationKnowledgeConfiguration) {
+  const frozen = configuration.policyScopeRepair, result = actual.result, ingress = actual.ingress;
+  assert.ok(frozen && equal(Object.keys(frozen).sort(), ["maxRepairs", "repairBudget", "version"])
+    && frozen.version === "policy-scope-repair-v1" && frozen.maxRepairs === 1 && [1, 2].includes(frozen.repairBudget),
+  "Repair requires its independently frozen version and bounded budget");
+  assert.ok(result && ingress && actual.requestId && actual.execution === "completed");
+  const repair: SupportPolicyScopeRepair | undefined = result.evidence.policyScopeRepair;
+  assert.ok(repair && repair.version === frozen.version && repair.reason === "scope_changed" && repair.budget);
+  assert.ok(Object.keys(repair).every(key => ["version", "reason", "action", "topic", "call", "budget"].includes(key)));
+  const budget = repair.budget;
+  assert.ok(equal(Object.keys(budget).sort(), ["limit", "toolCallId", "usedAfter", "usedBefore"]));
+  assert.equal(budget.limit, frozen.repairBudget); assert.ok(nonempty(budget.toolCallId));
+  assert.equal(ingress.requestId, actual.requestId); assert.equal(result.evidence.requestId, actual.requestId);
+  assert.deepEqual(result.evidence.trustedRoute, { groupOpenid: ingress.groupOpenid, messageId: ingress.messageId });
+  assert.deepEqual(result.evidence.action, result.action); assert.deepEqual(actual.calls, result.evidence.actualCalls);
+  assert.equal(actual.hostReceipt, undefined, "A host selection receipt cannot masquerade as model repair");
+  const start = Date.parse(ingress.observedAt ?? "");
+  assert.ok(Number.isFinite(start) && actual.durationMs !== null && Number.isFinite(actual.durationMs) && actual.durationMs >= 0);
+  const end = start + actual.durationMs;
+  const initial = normalizeModelSupportAction(repair.action);
+  assert.deepEqual(initial, repair.action);
+  assert.ok(initial.kind === "policy" && initial.questionContext.kind === "previous" && initial.orderRef?.kind === "explicit"
+    && (!initial.evidenceTarget || initial.evidenceTarget.kind === "current_order"));
+  const initialOrderId = initial.orderRef.orderId;
+  const explicitIds = [...new Set(originalQuery.match(/COUPON-\d{4}(?!\d)/g) ?? [])];
+  assert.deepEqual(explicitIds, [initial.orderRef.orderId], "Repair cannot change or invent the current explicit object");
+  const finalAction = normalizeModelSupportAction(result.action);
+  assert.deepEqual(finalAction, result.action);
+  const finalPolicy = finalAction.kind === "policy";
+  if (finalPolicy) assert.ok(finalAction.questionContext.kind === "standalone" && finalAction.orderRef?.kind === "explicit"
+    && finalAction.orderRef.orderId === initial.orderRef.orderId && (!finalAction.evidenceTarget || finalAction.evidenceTarget.kind === "current_order"));
+  else assert.ok(finalAction.kind === "clarify" && finalAction.field === "policy_topic", "No other action is unlocked");
+
+  const tools: Array<{ id: string; name: string; arguments: unknown; step: SessionTurnActual["steps"][number] }> = [];
+  let pending: { id: string; name: string; arguments: unknown } | undefined;
+  const sdkIds = new Set<string>();
+  for (const [index, step] of actual.steps.entries()) {
+    assert.equal(step.index, index + 1); assert.ok(step.durationMs !== null && Number.isFinite(step.durationMs) && step.durationMs >= 0);
+    if (step.type === "model") {
+      assert.equal(step.isError, false); assert.equal(pending, undefined, "A tool execution cannot disappear between model responses");
+      const output = recordedObject(step.output); assert.ok(Array.isArray(output.content));
+      const emitted = output.content.filter(part => recordedObject(part).type === "toolCall");
+      assert.ok(emitted.length <= 1, "Multiple simultaneous model actions do not open this exception");
+      if (emitted.length) {
+        assert.equal(output.stopReason, "toolUse"); const call = recordedObject(emitted[0]);
+        assert.ok(nonempty(call.id) && nonempty(call.name) && !sdkIds.has(call.id)); sdkIds.add(call.id);
+        pending = { id: call.id, name: call.name, arguments: call.arguments };
+      }
+    } else {
+      assert.ok(pending && step.name === pending.name, "SDK execution must match the actual preceding model tool call");
+      assert.deepEqual(step.input, pending.arguments); tools.push({ ...pending, step }); pending = undefined;
+    }
+  }
+  assert.equal(pending, undefined); assert.ok(tools.length >= 2 && tools.length <= frozen.repairBudget + 1);
+  const firstIndex = tools.findIndex(tool => tool.id === budget.toolCallId), failed = tools[firstIndex], final = tools.at(-1)!;
+  assert.ok(failed && firstIndex < tools.length - 1 && failed.name === "support_action" && failed.step.isError);
+  const modelAction = (value: unknown) => {
+    const args = recordedObject(value); assert.deepEqual(Object.keys(args), ["action"]);
+    return normalizeModelSupportAction(args.action);
+  };
+  assert.deepEqual(modelAction(failed.arguments), initial); assert.deepEqual(modelAction(final.arguments), finalAction);
+  assert.equal(final.name, "support_action"); assert.equal(final.step.isError, false);
+  assert.ok(tools.slice(0, -1).every(tool => tool.step.isError), "A completed earlier action remains terminal");
+  const sourceKey = merchantSourceKey(ingress.identity, ingress.groupOpenid);
+  const unexpectedRead = async (): Promise<never> => { throw new Error("Pure protocol replay cannot execute business reads"); };
+  // Only validate: the topic is already reconstructed below at its recorded
+  // time. A bare snapshot here avoids consulting today's TTL during replay.
+  const preflight = new SupportController({ store: { getOrder: unexpectedRead, searchKnowledge: unexpectedRead } }).createTurn({
+    requestId: ingress.requestId, identity: ingress.identity, sourceKey, userText: originalQuery,
+    trustedRoute: { groupOpenid: ingress.groupOpenid, messageId: ingress.messageId }, policyTopic: repair.topic,
+    ...(actual.hostReference?.orderId ? { focusOrderId: actual.hostReference.orderId } : {}) });
+  for (const [index, tool] of tools.slice(0, -1).entries()) {
+    if (index === firstIndex) continue;
+    assert.throws(() => {
+      assert.equal(tool.name, "support_action"); const action = modelAction(tool.arguments);
+      if (index > firstIndex) assert.ok(action.kind === "clarify" && action.field === "policy_topic"
+        || action.kind === "policy" && action.questionContext.kind === "standalone" && action.orderRef?.kind === "explicit"
+        && action.orderRef.orderId === initialOrderId && (!action.evidenceTarget || action.evidenceTarget.kind === "current_order"));
+      preflight.validate(action);
+    }, "Only a reproducible pure protocol rejection can consume the shared repair budget");
+  }
+  assert.equal(budget.usedBefore, tools.slice(0, firstIndex).filter(tool => tool.step.isError).length);
+  assert.equal(budget.usedAfter, budget.usedBefore + 1); assert.ok(budget.usedAfter <= frozen.repairBudget);
+  assert.ok(tools.filter(tool => tool.step.isError).length <= frozen.repairBudget, "Protocol failures and scope repair share one budget");
+  const typed = tools.flatMap(tool => {
+    const output = recordedObject(tool.step.output); assert.ok(Array.isArray(output.content));
+    return output.content.flatMap(part => {
+      const entry = recordedObject(part); if (entry.type !== "text" || typeof entry.text !== "string") return [];
+      let parsed: unknown; try { parsed = JSON.parse(entry.text); } catch { return []; }
+      return parsed && typeof parsed === "object" && !Array.isArray(parsed) && "code" in parsed && parsed.code === "POLICY_SCOPE_CHANGED"
+        ? [{ id: tool.id, value: recordedObject(parsed) }] : [];
+    });
+  });
+  assert.equal(typed.length, 1); assert.equal(typed[0]!.id, failed.id); assert.deepEqual(typed[0]!.value.repair, repair,
+    "The actual SDK typed error and final audit must be the same host evidence");
+  const details = recordedObject(recordedObject(final.step.output).details);
+  assert.deepEqual(details.action, finalAction); assert.equal(details.outcome, result.outcome);
+
+  const calls = actual.calls, firstRead = calls[0];
+  assert.equal(new Set(calls.map(call => call.id)).size, calls.length);
+  for (const [index, call] of calls.entries()) {
+    assert.equal(call.id, `${actual.requestId}:${index + 1}`); assert.equal(call.parentSpanId, actual.requestId);
+    assert.equal(call.actor, "host"); assert.equal(call.trigger, "user"); assert.equal(call.component, "support-controller");
+    assert.equal(call.isError, false); assert.equal(call.errorKind, undefined);
+    const observedAt = Date.parse(call.observedAt);
+    assert.ok(Number.isFinite(observedAt) && observedAt >= start && observedAt <= end
+      && Number.isFinite(call.durationMs) && call.durationMs >= 0);
+    if (index) assert.ok(observedAt >= Date.parse(calls[index - 1]!.observedAt), "Calls must remain in actual execution order");
+  }
+  assert.ok(firstRead && firstRead.name === "get_order" && !firstRead.knowledge); assert.deepEqual(firstRead, repair.call);
+  assert.deepEqual(firstRead.input, { orderId: initial.orderRef.orderId });
+  const firstOrder = firstRead.output as Order;
+  assert.ok(firstOrder?.source === "demo-database" && firstOrder.id === initial.orderRef.orderId && nonempty(firstOrder.shop?.id)
+    && Array.isArray(firstOrder.items) && firstOrder.items.length > 0 && firstOrder.items.every(item => nonempty(item.productId))
+    && new Set(firstOrder.items.map(item => item.productId)).size === 1);
+  const firstScope = { shopId: firstOrder.shop.id, productId: firstOrder.items[0]!.productId };
+  assert.notDeepEqual(repair.topic.scope, firstScope, "A label without actual scope mismatch cannot unlock the action");
+  const binding = { sourceKey: merchantSourceKey(ingress.identity, ingress.groupOpenid), groupOpenid: ingress.groupOpenid };
+  assert.equal(repair.topic.sourceKey, binding.sourceKey); assert.equal(repair.topic.groupOpenid, binding.groupOpenid);
+  assert.equal(repair.topic.orderId, initial.orderRef.orderId); assert.equal(repair.topic.requestId, initial.questionContext.requestId);
+  const inputChoices = recordedObject(actual.hostReference).policyChoices as TrustedReferenceChoices | undefined;
+  assert.ok(inputChoices && result.evidence.policyChoices, "The actual host candidate list, not a bare historical topic, is required");
+  const resolved = resolveReferenceChoice(inputChoices, binding, Date.parse(firstRead.observedAt) + Math.floor(firstRead.durationMs));
+  assert.ok(resolved?.kind === "policy"); assert.deepEqual(resolved.topic, repair.topic, "TTL and actual user selection still apply after the first read");
+  const donors = history.filter(row => row.actual.caseId === actual.caseId && row.actual.turn < actual.turn && row.actual.requestId === repair.topic.requestId);
+  assert.equal(donors.length, 1); const donor = donors[0]!, before = history.filter(row => row.actual.turn < donor.actual.turn);
+  assert.ok(donor.actual.execution === "completed" && donor.actual.result?.outcome === "ready" && donor.actual.ingress
+    && donor.actual.result.evidence.rules.length > 0 && donor.actual.result.evidence.knowledge.length > 0);
+  assert.deepEqual(donor.actual.ingress.identity, ingress.identity); assert.equal(donor.actual.ingress.groupOpenid, ingress.groupOpenid);
+  assert.deepEqual(donor.actual.result.verifiedPolicyTopic, repair.topic);
+  assert.ok(knowledgeProofPassed(donor.actual, corpus, configuration, donor.question, before), "Prior rules must have their own real source proof");
+  const references = scoreC1ReferenceEvidence(actual, originalQuery, history, { required: true,
+    // The caller separately verifies final knowledge. Recursing into this same
+    // current turn would create a proof cycle; every historical donor is checked.
+    verifyPolicyTopic: (value, question, previous) => value === actual || knowledgeProofPassed(value, corpus, configuration, question, previous) });
+  assert.ok(references.passed, references.issues.join("; "));
+
+  const finalCalls = calls.slice(1);
+  if (finalPolicy) {
+    assert.deepEqual(finalCalls.map(call => call.name), ["get_order", "search_faq"]);
+    const fresh = finalCalls[0]!, search = finalCalls[1]!, order = result.evidence.order;
+    assert.ok(order && result.outcome === "ready"); assert.deepEqual(fresh.input, { orderId: initial.orderRef.orderId });
+    assert.deepEqual(fresh.output, order); assert.equal(fresh.knowledge, undefined);
+    assert.ok(search.knowledge); assert.deepEqual(result.evidence.knowledge, [{ callId: search.id, ...search.knowledge }]);
+    const rebuilt = buildSupportEvidenceBinding({ action: finalAction, originalQuery, order, requestId: ingress.requestId,
+      verifiedTopic: null, binding: { ...binding, orderId: order.id } });
+    for (const key of ["evidenceBindingVersion", "evidenceTarget", "evidenceUse", "purpose", "facts", "effectiveQuery"] as const)
+      assert.deepEqual(search.knowledge.context[key], rebuilt[key], `Final repair ${key} must use the second authorized read`);
+    assert.deepEqual(search.knowledge.context.applicability, rebuilt.applicability); assert.equal(search.knowledge.context.policyTopic, null);
+    assert.equal(search.knowledge.context.originalQuery, originalQuery); assert.equal(search.knowledge.context.modelQuestion, finalAction.question);
+    assert.deepEqual(search.knowledge.trace.scope, { shopId: order.shop.id, productId: order.items[0]!.productId });
+    if (result.verifiedPolicyTopic) assert.deepEqual(result.verifiedPolicyTopic.priorQueries, [], "Standalone repair cannot transplant the old question chain");
+  } else {
+    assert.deepEqual(finalCalls, []); assert.equal(result.outcome, "clarification"); assert.equal(result.needsAnswer, false);
+    assert.equal(result.evidence.order, undefined); assert.equal(result.verifiedOrderId, undefined); assert.equal(result.verifiedPolicyTopic, undefined);
+    assert.deepEqual(result.evidence.rules, []); assert.deepEqual(result.evidence.knowledge, []);
+    assert.equal(result.referencePresentation, undefined); assert.equal(result.pendingReferenceKind, "policy");
+    assert.deepEqual(result.reply, { kind: "notice",
+      text: "本订单的商品或门店范围已变化。请完整重述当前对象、条件和要确认的问题；旧话题不能直接沿用。" },
+    "Scope repair clarification must request a new question instead of displaying the stale topic selector");
+    assert.deepEqual(actual.reply, result.reply, "The notice must be the actual delivered host reply");
+    const output = recordedObject(final.step.output); assert.ok(Array.isArray(output.content));
+    const payloads = output.content.flatMap(part => {
+      const entry = recordedObject(part); if (entry.type !== "text" || typeof entry.text !== "string") return [];
+      try { return [recordedObject(JSON.parse(entry.text))]; } catch { return []; }
+    });
+    assert.equal(payloads.length, 1); assert.equal(payloads[0]!.outcome, "clarification");
+    assert.deepEqual(payloads[0]!.reply, result.reply, "The SDK success result must carry the same real host notice");
+  }
+  return { repair, attempts: [{ action: initial, calls: [firstRead] }, { action: finalAction, calls: finalCalls }] };
+}
+
 // Rebuild the host binding from actual ingress and completed prior results. The
 // recorded context is only compared with this reconstruction, never used as input.
 function reconstructKnowledgeBinding(actual: C1ValidationActual, call: SupportCall, corpus: readonly RetrievalDocument[],
@@ -163,7 +346,10 @@ function reconstructKnowledgeBinding(actual: C1ValidationActual, call: SupportCa
   assert.equal(context.originalQuery, originalQuery); assert.equal(trace.originalQuery, originalQuery);
   assert.equal(context.modelQuestion, "question" in action ? action.question : null);
   const order = result.evidence.order;
-  const priorReads = actual.calls.slice(0, actual.calls.indexOf(call)).filter(item => item.name === "get_order" && !item.isError);
+  const attemptCalls = result.evidence.policyScopeRepair
+    ? assertC1PolicyScopeRepairEvidence(actual, originalQuery, history, corpus, configuration).attempts[1]!.calls : actual.calls;
+  assert.ok(attemptCalls.includes(call), "Knowledge must belong to the final attempt");
+  const priorReads = attemptCalls.slice(0, attemptCalls.indexOf(call)).filter(item => item.name === "get_order" && !item.isError);
   if (order) {
     assert.equal(priorReads.length, 1); const read = priorReads[0]!;
     assert.equal(read.parentSpanId, actual.requestId); assert.equal(read.input.orderId, order.id); assert.deepEqual(read.output, order);
@@ -302,6 +488,10 @@ export function knowledgeProofPassed(actual: C1ValidationActual | undefined, cor
     const result = actual.result, calls = actual.calls, knowledgeCalls = calls.filter(call => call.knowledge);
     if (new Set(calls.map(call => call.id)).size !== calls.length || calls.some(call => call.name === "search_faq" && !call.knowledge)) return false;
     if (!result) return knowledgeCalls.length === 0;
+    if (result.evidence.policyScopeRepair) {
+      assert.ok(originalQuery !== undefined);
+      assertC1PolicyScopeRepairEvidence(actual, originalQuery, history, corpus, configuration);
+    }
     if (!equal(calls, result.evidence.actualCalls) || !equal(knowledgeCalls.map(call => ({ callId: call.id, ...call.knowledge! })), result.evidence.knowledge)) return false;
     const rules: SupportResult["evidence"]["rules"] = [];
     for (const call of knowledgeCalls) {
@@ -454,7 +644,16 @@ export function scoreC1ValidationTurn(turn: C1ValidationTurn, actual: C1Validati
   const scoped = traces.every(trace => equal({ shopId: trace.scope.shopId ?? null, productId: trace.scope.productId ?? null },
     { shopId: e.scope.shopId ?? null, productId: e.scope.productId ?? null }) && trace.originalQuery === turn.question);
   const freshCalls = calls.filter(call => call.name === "get_order" && !call.isError);
+  let repairedClarificationFresh = false;
+  if (e.outcome === "clarification" && e.freshOrder && actual && result?.evidence.policyScopeRepair && evidenceProofPassed) {
+    try {
+      const proof = assertC1PolicyScopeRepairEvidence(actual, turn.question, history, corpus, configuration);
+      repairedClarificationFresh = proof.attempts[1]!.action.kind === "clarify" && proof.attempts[1]!.calls.length === 0
+        && equal(proof.attempts[0]!.calls[0]!.output, e.freshOrder) && result.evidence.order === undefined;
+    } catch { /* An unproven retry cannot relax the old fresh-read contract. */ }
+  }
   const fresh = e.freshOrder ? Boolean(e.outcome === "clarification" && !calls.some(call => call.name === "get_order") && !result?.evidence.order
+    || repairedClarificationFresh
     || result && equal(result.evidence.order, e.freshOrder) && freshCalls.some(call => call.parentSpanId === actual?.requestId
     && call.input.orderId === e.freshOrder!.id && equal(call.output, result.evidence.order)))
     : e.deniedOrderId ? freshCalls.length === 0 && calls.some(call => call.name === "get_order" && call.input.orderId === e.deniedOrderId && call.isError && call.errorKind === "business_denial")

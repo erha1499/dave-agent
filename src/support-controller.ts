@@ -52,6 +52,28 @@ export type TrustedPolicyTopic = {
   intent?: "policy" | "refund_eligibility";
   priorQueries?: Array<{ requestId: string; originalQuery: string }>;
 };
+export type SupportPolicyScopeRepair = {
+  version: "policy-scope-repair-v1"; reason: "scope_changed";
+  action: AnySupportAction; topic: TrustedPolicyTopic; call: SupportCall;
+  budget?: { limit: number; usedBefore: number; usedAfter: number; toolCallId: string };
+};
+function freezePolicyScopeRepair(value: unknown, seen = new WeakSet<object>()): void {
+  if (!value || typeof value !== "object" || seen.has(value)) return;
+  seen.add(value);
+  for (const member of Object.values(value)) freezePolicyScopeRepair(member, seen);
+  Object.freeze(value);
+}
+export class SupportPolicyScopeRepairError extends SupportProtocolError {
+  readonly repair: SupportPolicyScopeRepair;
+  constructor(repair: SupportPolicyScopeRepair) {
+    const audit = structuredClone(repair);
+    freezePolicyScopeRepair(audit);
+    super(JSON.stringify({ code: "POLICY_SCOPE_CHANGED", repair: audit,
+      instruction: "前序话题的商品范围与本轮订单不同；本轮尚未检索规则或办理业务。若当前原问完整，请重新选择同订单的 policy、standalone 和 current_order；否则明确 clarify policy_topic。不能沿用 previous、旧商品事实或假设。" }));
+    this.name = "SupportPolicyScopeRepairError";
+    this.repair = audit;
+  }
+}
 
 // Legacy v2.1 replay only. Current v2.2 sessions select bounded references in the
 // action; these language heuristics must not route a current action.
@@ -102,11 +124,13 @@ export type SupportTurnContext = {
   policyChoices?: TrustedReferenceChoices; orderReferenceChoices?: TrustedReferenceChoices;
   taskChoices?: TrustedTaskChoices;
   pendingReferenceKind?: "order" | "policy";
+  allowPolicyScopeRepair?: boolean;
   onCall?: (call: SupportCall) => void;
 };
 export type EvidenceBundle = {
   version: 1; requestId: string; trustedRoute: SupportTurnContext["trustedRoute"];
   action: AnySupportAction; actualCalls: SupportCall[];
+  policyScopeRepair?: SupportPolicyScopeRepair;
   traceDeliveryFailed?: boolean;
   order?: Order; rules: Array<Knowledge[number] & { version: string }>;
   knowledge: Array<{ callId: string; context: SupportKnowledgeContext; trace: KnowledgeTrace }>;
@@ -154,6 +178,7 @@ export class SupportController {
     if (!context.requestId || context.requestId.length > 512 || !context.userText.trim() || context.userText.length > 5000
       || !context.trustedRoute.messageId || context.trustedRoute.messageId.length > 512
       || context.sourceKey !== merchantSourceKey(context.identity, context.trustedRoute.groupOpenid)
+      || context.allowPolicyScopeRepair !== undefined && typeof context.allowPolicyScopeRepair !== "boolean"
       || (context.focusOrderId !== undefined && !/^COUPON-\d{4}$/.test(context.focusOrderId))) {
       throw new SupportProtocolError("宿主业务上下文无效。");
     }
@@ -167,8 +192,21 @@ export class SupportController {
       ...(context.amountReference ? { amountReference: structuredClone(context.amountReference) } : {}) };
     let accepted: AnySupportAction | undefined;
     let pending: Promise<SupportResult> | undefined;
+    let sequence = 0;
+    let policyScopeRepair: SupportPolicyScopeRepair | undefined;
     const validate = (input: unknown): AnySupportAction => {
       const action = parseAnySupportAction(input);
+      if (policyScopeRepair) {
+        trusted.signal?.throwIfAborted();
+        const original = policyScopeRepair.action;
+        const standalone = isContextSupportAction(action) && action.kind === "policy"
+          && action.questionContext.kind === "standalone" && action.orderRef?.kind === "explicit"
+          && "orderRef" in original && original.orderRef?.kind === "explicit" && action.orderRef.orderId === original.orderRef.orderId
+          && (!action.evidenceTarget || action.evidenceTarget.kind === "current_order");
+        if (!standalone && !(isContextSupportAction(action) && action.kind === "clarify" && action.field === "policy_topic")) {
+          throw new SupportProtocolError("范围修复只能重新查询同订单的完整当前问题（policy/standalone/current_order），或 clarify policy_topic；不能重复 previous、换单、改用途或办理业务。");
+        }
+      }
       // Pure preflight: invalid current-message references can be repaired before locking any action.
       if (action.kind === "clarify" || action.kind === "non_business"
         || !isContextSupportAction(action) && hasAmbiguousOrderReference(trusted.userText)) return action;
@@ -217,15 +255,27 @@ export class SupportController {
         try { validate(action); } catch (error) { return Promise.reject(error); }
         accepted = structuredClone(action);
         // Cache the promise, including rejection: a model retry cannot re-run an uncertain mutation.
-        pending = this.execute(trusted, accepted);
+        pending = this.execute(trusted, accepted, { nextCallId: () => `${trusted.requestId}:${++sequence}`, policyScopeRepair }).catch(error => {
+          // Only this completed, side-effect-free scope rejection can release
+          // the lock. Service failures and cancellation remain terminal.
+          if (error instanceof SupportPolicyScopeRepairError && !policyScopeRepair) {
+            trusted.signal?.throwIfAborted();
+            policyScopeRepair = structuredClone(error.repair);
+            accepted = undefined;
+            pending = undefined;
+          }
+          throw error;
+        });
         return pending;
       },
     };
   }
 
-  private async execute(context: SupportTurnContext, action: AnySupportAction): Promise<SupportResult> {
+  private async execute(context: SupportTurnContext, action: AnySupportAction,
+    attempt: { nextCallId: () => string; policyScopeRepair?: SupportPolicyScopeRepair }): Promise<SupportResult> {
     const evidence: EvidenceBundle = { version: 1, requestId: context.requestId, trustedRoute: { ...context.trustedRoute }, action,
-      actualCalls: [], rules: [], knowledge: [] };
+      actualCalls: attempt.policyScopeRepair ? [structuredClone(attempt.policyScopeRepair.call)] : [], rules: [], knowledge: [],
+      ...(attempt.policyScopeRepair ? { policyScopeRepair: structuredClone(attempt.policyScopeRepair) } : {}) };
     if (context.amountChoices) evidence.amountChoices = structuredClone(context.amountChoices);
     if (context.policyChoices) evidence.policyChoices = structuredClone(context.policyChoices);
     if (context.orderReferenceChoices) evidence.orderReferenceChoices = structuredClone(context.orderReferenceChoices);
@@ -240,7 +290,6 @@ export class SupportController {
     let verifiedOrderId: string | undefined;
     let verifiedPolicyTopic: TrustedPolicyTopic | undefined;
     let verifiedAmountReference: TrustedAmountReference | undefined;
-    let sequence = 0;
     const result = (reply: Reply, outcome: SupportResult["outcome"] = "ready", needsAnswer = false): SupportResult =>
       ({ action, outcome, reply, evidence, needsAnswer, ...(verifiedOrderId ? { verifiedOrderId } : {}),
         ...(verifiedPolicyTopic ? { verifiedPolicyTopic } : {}), ...(verifiedAmountReference ? { verifiedAmountReference } : {}),
@@ -252,7 +301,7 @@ export class SupportController {
     };
     const call = async <T>(name: CallName, input: Record<string, unknown>, operation: (step: SupportCall) => Promise<T>): Promise<T> => {
       context.signal?.throwIfAborted();
-      const step: SupportCall = { id: `${context.requestId}:${++sequence}`, parentSpanId: context.requestId,
+      const step: SupportCall = { id: attempt.nextCallId(), parentSpanId: context.requestId,
         actor: "host", trigger: "user", component: "support-controller", name, input: structuredClone(input),
         observedAt: new Date().toISOString(), durationMs: 0, isError: false };
       const started = performance.now();
@@ -304,7 +353,13 @@ export class SupportController {
       pendingReferenceKind = "policy";
       return result(notice("前文问题链已超过本轮可可靠恢复的范围。请完整重述当前问题，写明具体对象、条件和要确认的内容；不能省略或截断旧条件后继续判断。"), "clarification");
     };
-    if (action.kind === "clarify") return clarify(action.field);
+    if (action.kind === "clarify") {
+      if (attempt.policyScopeRepair && action.field === "policy_topic") {
+        pendingReferenceKind = "policy";
+        return result(notice("本订单的商品或门店范围已变化。请完整重述当前对象、条件和要确认的问题；旧话题不能直接沿用。"), "clarification");
+      }
+      return clarify(action.field);
+    }
     if (action.kind === "non_business") return result(notice(action.reason === "greeting"
       ? "你好，我可以查询模拟团购券订单、说明套餐规则，以及办理模拟协商和退款。请告诉我你的问题。"
       : "当前仅支持模拟团购券咨询、订单查询、协商和退款，不支持这项请求。"), "non_business");
@@ -513,7 +568,20 @@ export class SupportController {
     // The model may classify the request, but cannot replace an unknown fact with an easier policy question.
     const currentScope = { shopId: order?.shop.id ?? null, productId: order?.items[0]?.productId ?? null };
     if (question.topic && context.policyChoices && !isDeepStrictEqual(selectedPolicyTopic(context), question.topic)) return clarify("policy_topic");
-    if (question.topic && !alternativeOrderId && !isDeepStrictEqual(question.topic.scope, currentScope)) return clarify("policy_topic");
+    if (question.topic && !alternativeOrderId && !isDeepStrictEqual(question.topic.scope, currentScope)) {
+      const read = evidence.actualCalls[0];
+      if (context.allowPolicyScopeRepair && !attempt.policyScopeRepair && context.policyChoices && semantic && action.kind === "policy"
+        && action.questionContext.kind === "previous" && action.orderRef?.kind === "explicit"
+        && (!action.evidenceTarget || action.evidenceTarget.kind === "current_order")
+        && order?.id === action.orderRef.orderId && question.topic.orderId === order.id
+        && evidence.actualCalls.length === 1 && read?.name === "get_order" && !read.isError
+        && read.input.orderId === order.id && isDeepStrictEqual(read.output, order) && !evidence.traceDeliveryFailed) {
+        context.signal?.throwIfAborted();
+        throw new SupportPolicyScopeRepairError({ version: "policy-scope-repair-v1", reason: "scope_changed",
+          action, topic: question.topic, call: read });
+      }
+      return clarify("policy_topic");
+    }
     let evidenceBinding: ReturnType<typeof buildSupportEvidenceBinding> | undefined;
     try {
       if (semantic) evidenceBinding = buildSupportEvidenceBinding({ action, originalQuery: context.userText,

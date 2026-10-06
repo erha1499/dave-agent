@@ -12,7 +12,8 @@ import type { RefundStore } from "./refunds.ts";
 import type { SupportContextPort, SupportContextSnapshot, SupportContextValue } from "./conversation-state.ts";
 import type { Reply } from "./reply.ts";
 import { normalizeModelSupportAction, getModelSupportActionParameters, type TaskReferenceMode } from "./support-context-action.ts";
-import { SupportController, type SupportCall, type SupportResult, type TrustedPolicyTopic } from "./support-controller.ts";
+import { SupportController, SupportPolicyScopeRepairError, type SupportCall, type SupportResult, type TrustedPolicyTopic,
+  type SupportPolicyScopeRepair } from "./support-controller.ts";
 import { amountChoiceNotice, amountChoiceTtlMs, amountChoicesVersion, currentAmountChoices, rememberAmountChoice, rememberOrderChoice,
   resolveAmountReference, selectAmountChoice, selectAlternativeOrder, type TrustedAmountChoices, type TrustedOrderChoices } from "./support-context.ts";
 import { resolveSupportParameters } from "./support-parameters.ts";
@@ -46,6 +47,7 @@ type State = { next?: SupportPrompt; result?: SupportResult; focusOrderId?: stri
   presentations?: Partial<Record<"order" | "policy", { requestId: string; choices: TrustedReferenceChoices }>>;
   amountPresentation?: TrustedAmountChoices;
   taskChoices?: TrustedTaskChoices; taskPresentation?: TrustedTaskChoices; taskRequired?: boolean;
+  policyScopeRepair?: SupportPolicyScopeRepair; scopeRepairDisallowedToolCalls?: Set<string>;
   abort?: AbortController; turnError?: boolean; focusUnavailable?: boolean; invalidActions: number; actionStarted: boolean };
 const sessions = new WeakMap<AgentSession, State>();
 function clearReferences(state: State) {
@@ -79,9 +81,17 @@ export function prepareSupportPrompt(session: AgentSession, prompt: SupportPromp
   state.turnError = false;
   state.invalidActions = 0;
   state.actionStarted = false;
+  state.policyScopeRepair = undefined;
+  state.scopeRepairDisallowedToolCalls = undefined;
   state.next = prompt;
 }
 export const getSupportResult = (session: AgentSession) => sessions.get(session)?.result;
+// Current-turn diagnostics survive a failed repair, but are never a reusable
+// conversation reference or authorization for the next request.
+export const getSupportPolicyScopeRepair = (session: AgentSession) => {
+  const repair = sessions.get(session)?.policyScopeRepair;
+  return repair ? structuredClone(repair) : undefined;
+};
 export const getSupportHostReceipt = (session: AgentSession) => {
   const receipt = sessions.get(session)?.hostReceipt;
   return receipt ? structuredClone(receipt) : undefined;
@@ -240,7 +250,7 @@ export async function createSupportSession(
     name: "support_action", label: "处理客服业务动作",
     description: taskReferenceText("每轮选择一个业务动作。宿主固定协议v2.2，protocol可省略，如提供只能为v2.2。模型判断语义，宿主验证引用和事实：当前写明订单用explicit，唯一当前订单用focus，另一笔只读订单用alternative；政策问题区分standalone/previous，previous必须带宿主话题requestId。实付比较只可用当前宿主itemPaidUnit的requestId；金额候选多义时clarify amount_basis。协商任务用merchant_status与非空宿主taskReference的taskId，不得同时给orderRef；taskReference为空或多义用clarify task，禁止模型代替用户选择候选。不接收身份、范围、金额或批准；缺引用或多义用clarify。"),
     parameters: modelActionParameters,
-    execute: async (_id, { action }) => {
+    execute: async (toolCallId, { action }) => {
       if (!turn) throw new Error("业务轮次尚未初始化。");
       const executingTurn = turn, executingAbort = state.abort;
       const isCurrent = () => turn === executingTurn && state.abort === executingAbort && !executingAbort?.signal.aborted;
@@ -249,15 +259,56 @@ export async function createSupportSession(
         if (!isCurrent()) throw new Error("业务轮次已切换，不能发布旧轮次结果。");
       };
       assertCurrent();
-      // Schema/current-message errors may be repaired before any business action
-      // starts. A started action (including a refusal or exception) is terminal
-      // for request forcing; the Controller still caches its result or failure.
+      if (state.policyScopeRepair && state.scopeRepairDisallowedToolCalls?.has(toolCallId)) {
+        state.turnError = true;
+        clearReferences(state);
+        executingAbort?.abort();
+        void session.abort().catch(() => {});
+        throw new Error("范围修复须看到失败结果后只选择一个动作，不能批量猜测或重复执行。");
+      }
+      // Schema/current-message errors are repairable before an action starts.
+      // The only later exception is a host-signed, read-only scope failure;
+      // ordinary refusals and uncertain service/mutation results stay terminal.
       const validated = executingTurn.validate(normalizeModelSupportAction(action, taskReferenceMode));
       state.actionStarted = true;
       let result: SupportResult;
       try { result = await executingTurn.execute(validated); }
-      catch (error) { if (isCurrent()) clearReferences(state); throw error; }
+      catch (error) {
+        if (error instanceof SupportPolicyScopeRepairError) {
+          assertCurrent();
+          const repair = structuredClone(error.repair);
+          state.policyScopeRepair = repair;
+          // The provider must see this failure before choosing a repair. A batch
+          // of guessed tool calls cannot consume the special continuation.
+          if (state.invalidActions >= repairBudget || state.scopeRepairDisallowedToolCalls?.has(toolCallId)) {
+            state.turnError = true;
+            clearReferences(state);
+            executingAbort?.abort();
+            // The host signal does not stop Pi's native loop on its own. Do
+            // not await settlement from inside the tool that must settle first.
+            void session.abort().catch(() => {});
+            throw error;
+          }
+          repair.budget = { limit: repairBudget, usedBefore: state.invalidActions,
+            usedAfter: ++state.invalidActions, toolCallId };
+          state.policyScopeRepair = repair;
+          state.actionStarted = false;
+          // Pi receives the same audit (including the budget) that is later
+          // attached to the final result; no second loop or automatic rewrite.
+          throw new SupportPolicyScopeRepairError(repair);
+        }
+        if (isCurrent()) clearReferences(state);
+        throw error;
+      }
       assertCurrent();
+      if (state.policyScopeRepair?.budget) {
+        const { budget: _budget, ...signedRepair } = state.policyScopeRepair;
+        if (!isDeepStrictEqual(result.evidence.policyScopeRepair, signedRepair)) {
+          clearReferences(state);
+          throw new Error("只读范围修复证据不匹配，不能发布本轮结果。");
+        }
+        result.evidence.policyScopeRepair = structuredClone(state.policyScopeRepair);
+      }
       if (options.context && state.pendingReferenceKind === "order" && result.outcome === "ready"
         && result.action.kind !== "clarify" && result.action.kind !== "non_business"
         && "orderRef" in result.action && result.action.orderRef?.kind === "explicit" && result.verifiedOrderId) contextOrderConfirmed = true;
@@ -364,6 +415,11 @@ export async function createSupportSession(
       || !activeRun || activeRun.abort !== state.abort || activeRun.abort.signal.aborted) return;
     if (event.message.stopReason === "error" || event.message.stopReason === "aborted") { state.turnError = true; clearReferences(state); }
     if (event.message.stopReason !== "toolUse" && !state.result) clearReferences(state);
+    const toolCalls = event.message.content.filter(part => part.type === "toolCall");
+    if (toolCalls.length > 1) {
+      state.scopeRepairDisallowedToolCalls ??= new Set();
+      for (const part of toolCalls) state.scopeRepairDisallowedToolCalls.add(part.id);
+    }
     for (const part of event.message.content) {
       if (part.type !== "toolCall") continue;
       try {
@@ -397,6 +453,8 @@ export async function createSupportSession(
     state.turnError = false;
     state.invalidActions = 0;
     state.actionStarted = false;
+    state.policyScopeRepair = undefined;
+    state.scopeRepairDisallowedToolCalls = undefined;
     const assertCurrent = () => {
       abort.signal.throwIfAborted();
       if (state.abort !== abort) throw new Error("业务轮次已切换。");
@@ -570,6 +628,7 @@ export async function createSupportSession(
           policyTopic, orderChoices: state.orderChoices, amountChoices: state.amountChoices,
           taskChoices: state.taskChoices,
           policyChoices: state.policyChoices, orderReferenceChoices: state.orderReferenceChoices, pendingReferenceKind: state.pendingReferenceKind,
+          allowPolicyScopeRepair: repairBudget > 0,
           signal: abort.signal, onCall: current.onCall ?? options.onCall });
       } catch (error) {
         assertCurrent(); turn = undefined; state.turnError = true; clearReferences(state); throw error;

@@ -63,7 +63,7 @@ type Field = { key: string; label: string; type: "number" | "select"; min?: numb
 export const experimentFields: Record<"support" | "retrieval", Field[]> = {
   support: [
     { key: "timeoutMs", label: "每轮超时（ms）", type: "number", min: 10000, max: 120000, step: 1000 },
-    { key: "repairBudget", label: "格式修复次数", type: "number", min: 0, max: 2, step: 1, note: "仅 Controller 生效" },
+    { key: "repairBudget", label: "动作修复次数", type: "number", min: 0, max: 2, step: 1, note: "仅 Controller；格式与只读范围修复共用，范围修复最多一次" },
     { key: "merchantEvents", label: "商家通知处理", type: "select", options: [
       { value: "architecture", label: "跟随架构" }, { value: "host", label: "宿主直接处理" }, { value: "model", label: "经过模型" }], note: "最终状态卡始终由宿主生成" },
     { key: "knowledgeMode", label: "知识检索", type: "select", options: [

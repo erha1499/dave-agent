@@ -22,6 +22,8 @@
 
 每个实验含 1–2 个方案，每个方案重复 1–3 次，按 repetition → A/B 顺序串行执行。不同方案各有独立 batch。业务参数为 `timeoutMs`（10000–120000）、`repairBudget`（0–2，仅 Controller）、`merchantEvents`（architecture/host/model）。Controller 不支持 model 通知分支，配置时拒绝；atomic 可切 host 作通知消融。实际 QQ 配置不受实验影响。
 
+`repairBudget`是同一轮共用的动作修复预算：格式/当前引用错误，以及[范围变化后的有限只读修复](./c1-policy-scope-repair.md)共享计数。设为0关闭修复；设为1或2也只允许一次范围修复，下一动作只能重新查询同订单的独立当前问题或澄清，不能转为写入。普通业务拒绝、服务失败及不确定的副作用继续锁定，不使用此预算重试。真实模型收益尚未验收，工程替代结果须单列。
+
 检索方案改为 `kind: "retrieval"`，每个 variant 使用 `modes: ["M0", "M4"]` 替代 architecture。参数含 candidateTopK、bm25K1/bm25B、rrfK/rrfWindow、cache、timeoutMs、retries、maxRequests、consecutiveFailureLimit。默认及边界由共享校验器提供。M4 始终使用可见范围内全部候选；Recall@5 / MRR@5 固定。cache=refresh 不读取或写入持久结果缓存，复用缓存的运行不能声称为独立模型重复或生产延迟。
 
 模型固定为现有业务模型配置及百炼 text-embedding-v4 1024 维、qwen3-rerank。没有任意模型、API URL、系统提示词、命令、文件路径或环境变量表单。长期记忆和模型改写暂未实现。
