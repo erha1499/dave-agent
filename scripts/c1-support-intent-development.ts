@@ -15,12 +15,15 @@ const suites = {
     limits: { requests: 40, estimatedUsd: .15, deadlineMs: 8 * 60_000, timeoutMs: 60_000 } },
   conditions: { versions: ["fact-support-typed-v6", "fact-support-typed-v7"], inputs: 12,
     limits: { requests: 24, estimatedUsd: .06, deadlineMs: 5 * 60_000, timeoutMs: 60_000 } },
+  environment: { versions: ["fact-support-typed-v7"], inputs: 12,
+    limits: { requests: 12, estimatedUsd: .03, deadlineMs: 3 * 60_000, timeoutMs: 60_000 } },
 } as const;
 type Suite = keyof typeof suites;
 type Version = typeof suites[Suite]["versions"][number];
 type Expected = { category: EvidenceSupportCategory; acceptableCategories?: EvidenceSupportCategory[]; supported: boolean; evidenceQuote: string };
 type Case = { id: string; group: string; query: string; scope: RetrievalScope; candidates: EvidenceSupportCandidate[]; inputHash: string;
-  expected?: Expected; expectedByCandidate?: Array<Expected & { id: string }> };
+  expected?: Expected; expectedByCandidate?: Array<Expected & { id: string }>;
+  environment?: "single" | "with_specific" | "with_unrelated" | "positive_control"; targetCandidateId?: string };
 type Dataset = { version: number; cases: Case[]; sources?: Array<{ path: string; sha256: string; bytes?: number }> };
 type Row = { id: string; group: string; version: Version; execution: "not_run" | "completed" | "error";
   passed: boolean; verification?: EvidenceSupportVerification; attempts?: EvidenceSupportAttempt[]; error?: string; notRunReason?: string };
@@ -39,9 +42,34 @@ function checkInputs(data: Dataset, suite: Suite) {
   if (suite === "intent") {
     assert.deepEqual(["expanded", "language", "contextual"].map(group => data.cases.filter(row => row.group === group).length), [10, 8, 2]);
     assert.equal(data.cases.filter(row => row.expected?.supported).length, 10);
-  } else {
+  } else if (suite === "conditions") {
     assert.deepEqual(["target", "regression"].map(group => data.cases.filter(row => row.group === group).length), [6, 6]);
     assert.deepEqual([true, false].map(supported => data.cases.flatMap(expectedFor).filter(item => item.supported === supported).length), [9, 6]);
+  } else {
+    assert.deepEqual(["channel", "actor", "condition", "regression"].map(group => data.cases.filter(row => row.group === group).length), [3, 3, 3, 3]);
+    assert.deepEqual([true, false].map(supported => data.cases.flatMap(expectedFor).filter(item => item.supported === supported).length), [6, 12]);
+    for (const group of ["channel", "actor", "condition"]) {
+      const rows = data.cases.filter(row => row.group === group);
+      assert.deepEqual(rows.map(row => row.environment), ["single", "with_specific", "with_unrelated"]);
+      const base = rows[0]!;
+      assert.equal(base.candidates.length, 1); assert.equal(base.targetCandidateId, base.candidates[0]!.id);
+      for (const row of rows) {
+        assert.equal(row.query, base.query, "Candidate environment must not change the question");
+        assert.deepEqual(row.scope, base.scope, "Candidate environment must not change scope");
+        assert.equal(row.targetCandidateId, base.targetCandidateId);
+        assert.deepEqual(row.candidates[0], base.candidates[0], "The target candidate, rank and score must stay fixed");
+        assert.deepEqual(expectedFor(row).find(expected => expected.id === row.targetCandidateId), expectedFor(base)[0], "The target gold must stay fixed across environments");
+        assert.equal(expectedFor(row).find(expected => expected.id === row.targetCandidateId)?.supported, false);
+      }
+      assert.deepEqual(rows.map(row => row.candidates.length), [1, 2, 2]);
+      assert.notEqual(rows[1]!.candidates[1]!.id, rows[2]!.candidates[1]!.id);
+      assert.equal(expectedFor(rows[1]!).find(expected => expected.id === rows[1]!.candidates[1]!.id)?.supported, true);
+      assert.equal(expectedFor(rows[2]!).find(expected => expected.id === rows[2]!.candidates[1]!.id)?.supported, false);
+    }
+    for (const row of data.cases.filter(row => row.group === "regression")) {
+      assert.equal(row.environment, "positive_control"); assert.equal(row.candidates.length, 1);
+      assert.equal(row.targetCandidateId, row.candidates[0]!.id); assert.equal(expectedFor(row)[0]!.supported, true);
+    }
   }
   for (const row of data.cases) {
     assert.equal(row.inputHash, contentHash({ query: row.query, scope: row.scope, candidates: row.candidates }));
@@ -70,7 +98,7 @@ async function loadInputs(suite: Suite) {
 }
 function guardLimits(suite: Suite) {
   const { limits } = suites[suite];
-  return { requests: { agent: 1, rerank: 1, support: limits.requests }, estimatedUsd: limits.estimatedUsd,
+  return { requests: { agent: suite === "environment" ? 0 : 1, rerank: suite === "environment" ? 0 : 1, support: limits.requests }, estimatedUsd: limits.estimatedUsd,
     estimatedCny: .1, deadlineMs: limits.deadlineMs, turnTimeoutMs: limits.timeoutMs };
 }
 async function clients(suite: Suite, guard?: ReturnType<typeof createC1ValidationGuard>) {
@@ -92,9 +120,11 @@ async function snapshot(suite: Suite) {
     ...(data.sources ?? []).map(source => source.path)])].sort();
   const settings = Object.fromEntries(versions.map(version => [version, variants[version].settings]));
   const stripPrompt = (version: Version) => { const { promptVersion: _version, promptHash: _hash, ...other } = variants[version].settings; return other; };
-  assert.deepEqual(stripPrompt(versions[0]), stripPrompt(versions[1]), "Prompt content/version are the only settings variable");
+  for (const version of versions.slice(1)) assert.deepEqual(stripPrompt(versions[0]), stripPrompt(version), "Prompt content/version are the only settings variable");
   for (const version of versions) assert.equal(variants[version].settings.maxRetries, 0);
-  return { version: 1, stage: "exposed-development-fixed-input-support-prompt-ablation", suite, limits, versions, settings,
+  return { version: 1, stage: suite === "environment" ? "exposed-development-fixed-input-candidate-environment-diagnostic"
+    : "exposed-development-fixed-input-support-prompt-ablation", suite, limits, versions, settings,
+    ...(suite === "environment" ? { requestLimits: guardLimits(suite).requests } : {}),
     sourceHashes: await hashes(files), dependencies: await readC1ValidationDependencies() };
 }
 
@@ -115,8 +145,8 @@ export function summarizeIntentComparison(data: Dataset, rows: Row[]) {
 
 function candidateResults(item: Case, row: Row) {
   return expectedFor(item).map(expected => {
-    const invalid = row.verification?.validation?.invalidDecisions.some(decision => decision.id === expected.id) ?? false;
-    const actual = invalid ? undefined : row.verification?.value.find(decision => decision.id === expected.id);
+    const invalid = row.execution === "completed" && (row.verification?.validation?.invalidDecisions.some(decision => decision.id === expected.id) ?? false);
+    const actual = row.execution !== "completed" || invalid ? undefined : row.verification?.value.find(decision => decision.id === expected.id);
     return { id: expected.id, expectedPositive: expected.supported, state: invalid ? "invalid" : actual ? "valid" : "missing",
       passed: Boolean(actual && (expected.acceptableCategories ?? [expected.category]).includes(actual.category!) && actual.supported === expected.supported),
       falseAccepted: Boolean(actual && !expected.supported && actual.supported), falseRejected: Boolean(actual && expected.supported && !actual.supported) };
@@ -126,8 +156,8 @@ function casePassed(item: Case, row: Row) {
   return row.verification?.validation?.status === "complete" && row.verification.value.length === item.candidates.length
     && candidateResults(item, row).every(candidate => candidate.passed);
 }
-export function summarizeConditionsComparison(data: Dataset, rows: Row[], requests: Request[] = []) {
-  return Object.fromEntries(suites.conditions.versions.map(version => {
+export function summarizeConditionsComparison(data: Dataset, rows: Row[], requests: Request[] = [], suite: "conditions" | "environment" = "conditions") {
+  return Object.fromEntries(suites[suite].versions.map(version => {
     const group = rows.filter(row => row.version === version), complete = group.filter(row => row.execution === "completed");
     const candidates = group.flatMap(row => candidateResults(data.cases.find(item => item.id === row.id)!, row));
     const sent = requests.filter(request => request.caseId.endsWith(`:${version}`));
@@ -146,7 +176,17 @@ export function summarizeConditionsComparison(data: Dataset, rows: Row[], reques
       http: { requests: sent.length, unknownCosts: sent.length - known.length, knownEstimatedUsd: known.reduce((sum, request) => sum + request.estimatedCost!, 0),
         estimatedUsd: sent.length === known.length ? known.reduce((sum, request) => sum + request.estimatedCost!, 0) : null,
         totalTokens: sent.every(request => request.totalTokens !== null) ? sent.reduce((sum, request) => sum + request.totalTokens!, 0) : null },
-      latency: { observed: times.length, p50Ms: times[Math.ceil(times.length * .5) - 1] ?? null, p95Ms: times[Math.ceil(times.length * .95) - 1] ?? null } }];
+      latency: { observed: times.length, p50Ms: times[Math.ceil(times.length * .5) - 1] ?? null, p95Ms: times[Math.ceil(times.length * .95) - 1] ?? null },
+      ...(suite === "environment" ? { targetDecisions: data.cases.filter(item => item.group !== "regression").map(item => {
+        const row = group.find(row => row.id === item.id);
+        const decision = row?.verification?.value.find(decision => decision.id === item.targetCandidateId);
+        const candidate = candidateResults(item, row ?? { id: item.id, group: item.group, version, execution: "not_run", passed: false })
+          .find(candidate => candidate.id === item.targetCandidateId)!;
+        return { id: item.id, group: item.group, environment: item.environment, targetCandidateId: item.targetCandidateId,
+          execution: row?.execution ?? "not_run", state: candidate.state, passed: candidate.passed,
+          category: candidate.state === "valid" ? decision!.category : null,
+          supported: candidate.state === "valid" ? decision!.supported : null };
+      }) } : {}) }];
   }));
 }
 function recordingComplete(data: Dataset, suite: Suite, rows: Row[], requests: Request[], runId: string) {
@@ -171,7 +211,7 @@ async function run(suite: Suite) {
   await writeFile(new URL(`attempt-${contentHash(frozen)}.json`, dir), JSON.stringify({ runId, manifestHash: contentHash(frozen), output: output.pathname }) + "\n", { flag: "wx" });
   const guard = createC1ValidationGuard(fetch, Date.now, guardLimits(suite));
   const deadline = AbortSignal.timeout(limits.deadlineMs), rows = plannedRows(data, suite);
-  const summary = () => suite === "intent" ? summarizeIntentComparison(data, rows) : summarizeConditionsComparison(data, rows, guard.requests);
+  const summary = () => suite === "intent" ? summarizeIntentComparison(data, rows) : summarizeConditionsComparison(data, rows, guard.requests, suite);
   const artifact = { version: 1, runId, suite, stage: before.stage, scope: "Real fixed-input support classification; no retrieval, Agent, SQL, QQ, business actions or final reply evaluation.",
     manifest: frozen, actualSettings: null as typeof before.settings | null,
     startedAt: new Date().toISOString(), finishedAt: null as string | null, rows, requests: guard.requests,
@@ -194,10 +234,10 @@ async function run(suite: Suite) {
         assert.ok(validateEvidenceSupportVerification(row.verification, { query: item.query, scope: item.scope, candidates: item.candidates, settings: client.settings }));
         assert.equal(attempts.length, 1);
         if (suite === "intent") assert.equal(row.verification.validation!.status, "complete");
-        row.passed = casePassed(item, row); row.execution = "completed";
+        row.execution = "completed"; row.passed = casePassed(item, row);
       } catch (error) {
         if (error instanceof EvidenceSupportError) attempts = error.attempts;
-        row.execution = "error"; row.error = error instanceof EvidenceSupportError ? error.code : "verification_incomplete";
+        row.execution = "error"; row.passed = false; row.error = error instanceof EvidenceSupportError ? error.code : "verification_incomplete";
       }
       row.attempts = attempts;
       const sent = guard.requests.map((request, i) => ({ request, i })).filter(value => value.i >= start && value.request.operation === "support");
@@ -212,8 +252,8 @@ async function run(suite: Suite) {
     artifact.recordingComplete = recordingComplete(data, suite, rows, guard.requests, runId);
     artifact.executionComplete = rows.every(row => row.execution !== "not_run");
     artifact.usageComplete = guard.requests.every(request => request.usageRecorded && request.estimatedCost !== null && request.totalTokens !== null);
-    // Retain legacy integrity semantics; conditions separates faithful recording from execution and known usage.
-    artifact.integrityPassed = artifact.codeStable && artifact.recordingComplete && contentHash(artifact.actualSettings) === contentHash(frozen.settings) && (suite === "conditions" ||
+    // Candidate suites separate faithful recording from execution and known usage; failures remain in the denominator.
+    artifact.integrityPassed = artifact.codeStable && artifact.recordingComplete && contentHash(artifact.actualSettings) === contentHash(frozen.settings) && (suite !== "intent" ||
       (rows.every(row => row.execution === "completed") && guard.requests.length === limits.requests && artifact.usageComplete));
     await save(); console.log(JSON.stringify({ runId, integrityPassed: artifact.integrityPassed, executionComplete: artifact.executionComplete,
       usageComplete: artifact.usageComplete, summary: artifact.summary, usage: artifact.usage }));
@@ -229,13 +269,13 @@ export async function checkSupportIntentDevelopment(suite: Suite = "intent") {
     assert.equal(summary.planned, 1); assert.equal(summary.completed, 0); assert.equal(summary.passed, 0); assert.equal(summary.errorsOrNotRun, 1);
     assert.equal(summary.p50Ms, null);
   } else {
-    const version = suites.conditions.versions[0], summary = summarizeConditionsComparison(data, rows)[version]!;
+    const version = suites[suite].versions[0], summary = summarizeConditionsComparison(data, rows, [], suite)[version]!;
     assert.equal(summary.exactInputs.planned, 12); assert.equal(summary.exactInputs.notRun, 12);
     assert.equal(summary.candidates.falseAccepted, 0); assert.equal(summary.candidates.falseRejected, 0);
     assert.equal(summary.candidates.positiveEvaluated + summary.candidates.negativeEvaluated, 0);
     assert.equal(summary.candidates.missing, data.cases.reduce((sum, row) => sum + row.candidates.length, 0));
     assert.equal(summary.latency.p50Ms, null);
-    const multi = data.cases.find(row => row.candidates.length > 1)!; assert.ok(multi, "The conditions suite must exercise independent multi-candidate decisions");
+    const multi = data.cases.find(row => row.candidates.length > 1)!; assert.ok(multi, "Candidate suites must exercise independent multi-candidate decisions");
     const verification = { value: expectedFor(multi).map(expected => ({ id: expected.id, category: expected.category, supported: expected.supported,
       quote: expected.supported ? expected.evidenceQuote : null, reason: "测试原文依据" })).reverse(), attempts: [], requestHash: "synthetic", inputHash: "synthetic",
       validation: { status: "complete" as const, outputHash: null, invalidDecisions: [] } };
@@ -246,24 +286,49 @@ export async function checkSupportIntentDevelopment(suite: Suite = "intent") {
       decision.supported = !decision.supported; decision.category = decision.supported ? "direct_fact" : "limitation_only";
     }
     swapped.passed = casePassed(multi, swapped); assert.equal(swapped.passed, false);
-    const wrong = summarizeConditionsComparison(data, [swapped])[version]!.candidates;
+    const wrong = summarizeConditionsComparison(data, [swapped], [], suite)[version]!.candidates;
     assert.equal(wrong.falseAccepted, expectedFor(multi).filter(expected => !expected.supported).length);
     assert.equal(wrong.falseRejected, expectedFor(multi).filter(expected => expected.supported).length);
     assert.equal(wrong.positiveEvaluated + wrong.negativeEvaluated, multi.candidates.length);
+    const errored = structuredClone(swapped); errored.execution = "error"; errored.error = "verification_incomplete";
+    errored.passed = casePassed(multi, errored); assert.equal(errored.passed, false);
+    const unvalidated = summarizeConditionsComparison(data, [errored], [], suite)[version]!.candidates;
+    assert.equal(unvalidated.positiveEvaluated + unvalidated.negativeEvaluated, 0);
+    assert.equal(unvalidated.passed + unvalidated.falseAccepted + unvalidated.falseRejected, 0);
+    assert.equal(unvalidated.missing, multi.candidates.length, "An error with raw verification is unvalidated, not a valid decision");
     const invalidId = row.verification!.value.pop()!.id;
     row.verification!.validation = { status: "partial", outputHash: null, invalidDecisions: [{ id: invalidId, code: "invalid_quote" }] };
     row.passed = casePassed(multi, row); assert.equal(row.passed, false);
-    const partial = summarizeConditionsComparison(data, [row])[version]!.candidates;
+    const partial = summarizeConditionsComparison(data, [row], [], suite)[version]!.candidates;
     assert.equal(partial.invalid, 1); assert.equal(partial.falseAccepted, 0); assert.equal(partial.falseRejected, 0);
     assert.equal(partial.positiveEvaluated + partial.negativeEvaluated, multi.candidates.length - 1);
     const malformed = structuredClone(data); malformed.cases[0]!.expectedByCandidate = [];
     assert.throws(() => checkInputs(malformed, suite));
+    if (suite === "environment") {
+      assert.equal(rows.length, 12); assert.equal(summary.candidates.planned, 18);
+      assert.equal(summary.targetDecisions!.length, 9);
+      assert.equal(summary.candidates.positivePlanned, 6); assert.equal(summary.candidates.negativePlanned, 12);
+      for (const mutation of ["query", "rank"] as const) {
+        const changed = structuredClone(data), target = changed.cases[1]!;
+        if (mutation === "query") target.query += "改变问题"; else target.candidates[0]!.rank++;
+        target.inputHash = contentHash({ query: target.query, scope: target.scope, candidates: target.candidates });
+        assert.throws(() => checkInputs(changed, suite), mutation === "query" ? /must not change the question/ : /target candidate/);
+      }
+      const invalid = structuredClone(swapped), targetId = multi.targetCandidateId!;
+      invalid.verification!.validation = { status: "partial", outputHash: null, invalidDecisions: [{ id: targetId, code: "invalid_quote" }] };
+      invalid.passed = casePassed(multi, invalid); assert.equal(invalid.passed, false);
+      const invalidResult = summarizeConditionsComparison(data, [invalid], [], suite)[version]!;
+      assert.equal(invalidResult.candidates.falseAccepted, 0, "An invalid negative must not become a valid false acceptance or a correct rejection");
+      assert.equal(invalidResult.candidates.invalid, 1); assert.equal(invalidResult.candidates.passed, 0);
+      const target = invalidResult.targetDecisions!.find(row => row.id === multi.id)!;
+      assert.equal(target.state, "invalid"); assert.equal(target.supported, null); assert.equal(target.category, null); assert.equal(target.passed, false);
+    }
   }
   const runId = "synthetic", guard = createC1ValidationGuard(async () => new Response("{}", { status: 200 }), Date.now, guardLimits(suite));
   const row = rows[0]!; guard.setActive({ caseId: `${row.id}:${row.version}`, turn: 1, requestId: `${runId}:${row.id}:${row.version}`, signal: new AbortController().signal });
   await guard.fetchFor("support")("https://synthetic.invalid/support");
   assert.equal(guard.usage().support.estimatedCost, null); assert.equal(guard.usage().support.unknownCosts, 1);
-  if (suite === "conditions") assert.equal(summarizeConditionsComparison(data, rows, guard.requests)[row.version]!.http.estimatedUsd, null);
+  if (suite !== "intent") assert.equal(summarizeConditionsComparison(data, rows, guard.requests, suite)[row.version]!.http.estimatedUsd, null);
   guard.record(0, null, null); guard.seal();
   row.execution = "error"; row.error = "provider_error";
   for (const skipped of rows.filter(row => row.execution === "not_run")) skipped.notRunReason = "run_deadline";
@@ -273,6 +338,11 @@ export async function checkSupportIntentDevelopment(suite: Suite = "intent") {
   let sent = 0;
   const budget = createC1ValidationGuard(async () => { sent++; return new Response("{}"); }, Date.now, guardLimits(suite));
   budget.setActive({ caseId: "budget", turn: 1, requestId: "budget", signal: new AbortController().signal });
+  if (suite === "environment") {
+    await assert.rejects(budget.fetchFor("agent")("https://synthetic.invalid/agent"), /operation_disabled:agent/);
+    await assert.rejects(budget.fetchFor("rerank")("https://synthetic.invalid/rerank"), /operation_disabled:rerank/);
+    assert.equal(sent, 0); assert.equal(budget.requests.length, 0);
+  }
   for (let i = 0; i < suites[suite].limits.requests; i++) await budget.fetchFor("support")("https://synthetic.invalid/support");
   await assert.rejects(budget.fetchFor("support")("https://synthetic.invalid/support"), /operation_request_limit/);
   assert.equal(sent, suites[suite].limits.requests);
@@ -283,8 +353,8 @@ export async function checkSupportIntentDevelopment(suite: Suite = "intent") {
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const args = process.argv.slice(2), suiteIndex = args.indexOf("--suite"), suite = suiteIndex < 0 ? "intent" : args[suiteIndex + 1];
   if (suiteIndex >= 0) args.splice(suiteIndex, 2);
-  assert.ok(suite === "intent" || suite === "conditions", "--suite must be intent or conditions");
-  assert.equal(args.length, 1, "Use [--suite intent|conditions] --check|--freeze|--inspect|--live");
+  assert.ok(suite === "intent" || suite === "conditions" || suite === "environment", "--suite must be intent, conditions or environment");
+  assert.equal(args.length, 1, "Use [--suite intent|conditions|environment] --check|--freeze|--inspect|--live");
   const mode = args[0];
   if (mode === "--freeze") { await writeFile(new URL(manifestPath(suite), root), JSON.stringify(await snapshot(suite), null, 2) + "\n", { flag: "wx" }); console.log("Frozen without HTTP"); }
   else if (mode === "--inspect") { assert.deepEqual(await snapshot(suite), await json(manifestPath(suite))); console.log("Frozen inputs/settings/code/dependencies match; HTTP=0"); }

@@ -1,0 +1,155 @@
+{
+  "version": 1,
+  "stage": "exposed-development-fixed-input-candidate-environment-diagnostic",
+  "suite": "environment",
+  "limits": {
+    "requests": 12,
+    "estimatedUsd": 0.03,
+    "deadlineMs": 180000,
+    "timeoutMs": 60000
+  },
+  "versions": [
+    "fact-support-typed-v7"
+  ],
+  "settings": {
+    "fact-support-typed-v7": {
+      "provider": "deepseek",
+      "model": "deepseek-v4-pro",
+      "api": "openai-completions",
+      "endpoint": "https://api.deepseek.com",
+      "timeoutMs": 60000,
+      "temperature": 0,
+      "maxTokens": 2048,
+      "maxRetries": 0,
+      "promptVersion": "fact-support-typed-v7",
+      "promptHash": "c2d8e1f3de93d86ef658a0d691fe753138efcab7240c9a13f20f499d41937a9c",
+      "serialization": "json-query-id-title-tags-body-v1",
+      "serializationHash": "1d16c5e3ef4647c120fe6ddce72417c9ec618ee41dc77faa447ec214e5749c4a",
+      "pricing": {
+        "currency": "USD",
+        "estimated": true,
+        "source": "Pi model catalog",
+        "rates": {
+          "input": 1.32,
+          "output": 3.96,
+          "cacheRead": 0.044,
+          "cacheWrite": 0
+        }
+      },
+      "profile": "typed",
+      "validationVersion": "typed-candidate-isolation-v1"
+    }
+  },
+  "requestLimits": {
+    "agent": 0,
+    "rerank": 0,
+    "support": 12
+  },
+  "sourceHashes": {
+    "data/c1-support-conditions-development.json": "779073de82045e7c9643012c689d62a4f8b92ab5ce76035423375f46e476c7da",
+    "data/c1-support-environment-development.json": "e9840fdb76647ad91d5c21db53fe2a27550f8444e9926c31eec92a9a6a727113",
+    "prompts/customer-service-v2.md": "0ce7234817f7cfd9925c32c4e0230253c3c73c06723c270e477c4cf4f3527a85",
+    "scripts/c1-reference-evidence.ts": "de290d8865be3dac6f515eb9a43e54f229cc8ccc385f3b30604e4a3ea61755d7",
+    "scripts/c1-session-validation-check.ts": "4f3c99665de52f83aff24ce18b11fd43946709d155cd349c9d3d0006935248c2",
+    "scripts/c1-session-validation-live.ts": "20c61114dbab7addffc2d1b904847d25dd1254d148d2d6f50af42bab1cdb2b5f",
+    "scripts/c1-support-intent-development.ts": "4a5694a23e66f14dbe1805867f15edddb8f9e26563b1c7e24f79082f6d6397a0",
+    "skills/shop-support-v2/SKILL.md": "c59ac5eaea1771605e8c46df7c731ee518e8bdb30525b3ee510a470584921a04",
+    "src/after-sales-entry.ts": "bb2ec9d9a7585efefc4af7fcd87c0e9a4d978315d4fd576d4a1ad76a17ea1162",
+    "src/after-sales.ts": "1100a2158af2e368e4e13706fc850c901bda647e3b874850f1c4d593c3a3a5d1",
+    "src/agent.ts": "90f63b64503acde752a7cd74a85c97d9b4613df42afe5eb4c7cabf82e9e47de3",
+    "src/bailian.ts": "ed7fc42f703bd3e49ee38581c4bfa5d35f886872f5039c2b467e74682c1d95b1",
+    "src/cli.ts": "5731d83c2bc3c98bb2c2e7e6837f8107ad3145033a6079b86e94729522aff290",
+    "src/conversation-state.ts": "5dc215be064b59657a53cdf66e2ccf67ccf39d2f9f0a0a8affb5353d4ea9ea79",
+    "src/coupon-store.ts": "9886c9f3bd7e364850d49bff9aa94a5fddc41c7f2e88240a8a32fb459a376f8f",
+    "src/eval-analysis.ts": "8e7f23098e84eb841a445c90e91c84f1d12647aa3d453c7041c1dd4f533281b9",
+    "src/eval-capture.ts": "e485728471d3d9f97cab666a832157b2ae802fb189c704f1f4b54d7c5b03d324",
+    "src/eval-server.ts": "50601e5b1f0ea16a9c3d2b0c414ae6e7d81307a230c71209e538886afa3ed591",
+    "src/eval-store.ts": "c215fb7fa5446a3b775ab2f524a7a49f7e7348ee1708b3c73e6aca2f652e9680",
+    "src/evaluation.ts": "a36a158cd4632ca31c613848c3ed48d3443967b2b8763494043652557fcf8106",
+    "src/evidence-acceptance.ts": "6e8040cf1ea30135dd7c18a44ed72d255ce94131226223325df3ab209b61d368",
+    "src/evidence-support.ts": "3be39594a13526492a36cc92677aef86a4c926ba1b8fd89f39430f9ca06453a2",
+    "src/experiment-config.ts": "5c58037e9835339ae1bf4fadbc0219686bb337a5b43cfb6d2d06e4ef5957fa00",
+    "src/experiment-jobs.ts": "b1432a8373e5384603bd0a21a0679b91e03c9c785615a9d6e3618932bde203c7",
+    "src/knowledge-applicability.ts": "8d7a6d338cc30b00a26b60e201b5bcb21c14b0000d5cac03bdfbc3ffa7895b3f",
+    "src/knowledge-evaluation.ts": "27088e91b6a312be662f94aad7d78a6fbcb21f362284d3fa9b9864158bcd1df9",
+    "src/knowledge-retrieval.ts": "89a9c606cabc1579b2cbe45ec25675260731e0a0fbe2fe99133515d7df8ebf00",
+    "src/knowledge-service.ts": "b011f73e166230e6d1fb654e501978f52532319143c5d3d72e5e9c4e2260c126",
+    "src/merchant-notifications.ts": "aada6867e0ea8c13628c14a25d7122560438b6f0f9a80c8b9eebd29160881d85",
+    "src/qq-agent.ts": "38c318cb579a83b1abb95f96c6eac745f433d4becb02263fb397b4b84e4724ea",
+    "src/qq-http.ts": "a6e380771e1ce25be1693263d36c7f18ed4a14aa69855d2e4dcaad151ced9d75",
+    "src/qq-identity.ts": "b081c6faae50708875cf9142b7fd238b448404de99828ee2813981b301ab0f9e",
+    "src/qq-reply.ts": "e7ca9ad9ce1363b58913da659f6394ef1572ad52077c4d0b287d5c23291f464c",
+    "src/qq.ts": "e8067e31d5051549d231d8d0cdce01ec7c712a3f7f18b5bf8693a9fedef36f03",
+    "src/refund-entry.ts": "ee0047a29cb45b13325ef98b886b6d5aa704b61369a97aa19128940f8d133e7f",
+    "src/refunds.ts": "a00872bf5e20114752fd2fe001b3f9ab3bc3b94895b95fa22b44c64bb047df3d",
+    "src/reply-from-tools.ts": "d208059bbe689dc9c9a7dea5841e835219c6238307ed800ecfa10b777db23643",
+    "src/reply.ts": "c6b8a78856042294ffde60577052c7ff74b0c852f5321f3264aa3b5415478540",
+    "src/retrieval-ranking.ts": "6391fcf74f4bfb79f01c018d8c3cc0fb3f969a2256f9269e3127b5f907f6dc89",
+    "src/support-action.ts": "4d8449d054b730a6d2e0ea32f752ff5f227166b689a7e6e96d955c8d9caec291",
+    "src/support-context-action.ts": "8fbf6e09b699e5542f11c0cc0ffb7b59c900c69dd7fe121180fbc6725b0194c6",
+    "src/support-context.ts": "6d7e251dab36f6d12bf0365d0ab90f6cc41f5318f36f84b4b1777fd97c2d7bfb",
+    "src/support-controller.ts": "9c5c0ea938af6bb8a3a3caabf90eac32f32a1e718bcd21ae9c06b606060bdbf9",
+    "src/support-evaluation.ts": "1d5669d1ca812deebd03bf38022cd61d62c7fd4655dae04d5b989c74ee54bf8a",
+    "src/support-evidence-context.ts": "cd68e46389194df14f375e6cec271b39e5616e8c76cba43d28fd7c74b2742bf3",
+    "src/support-parameters.ts": "fc830130eaedc8f8cdb923791c9daff9c88aeff249f0030b44bf4969ebd9244c",
+    "src/support-reference-selection.ts": "ca311ef20479e30c9418c1c8a06d607774d0a18ffa4dec0de8a3b920ea3b83aa",
+    "src/support-session.ts": "6b9a8f846def7d5763eabbba1c7bbfe97c2c0eb601bc86ac9bebf9d964de65c9",
+    "src/support-task-context.ts": "1243f7907e17683d6feaa6d0f91d022712158f561e672615d7a2869d8e792b70"
+  },
+  "dependencies": {
+    "version": 1,
+    "rootDeclarations": {
+      "@earendil-works/pi-ai": "1.0.0",
+      "@earendil-works/pi-agent-core": null,
+      "@earendil-works/pi-coding-agent": "1.0.0",
+      "mysql2": "3.24.5"
+    },
+    "packages": [
+      {
+        "path": "node_modules/@earendil-works/pi-ai",
+        "name": "@earendil-works/pi-ai",
+        "installedVersion": "1.0.0",
+        "lockedVersion": "1.0.0",
+        "lockIntegrity": "sha512-3/W1vdDaVtpeMd23ElvJC12HLA5yS/BGqqcXF+0SK082dN7cbgNcCwguTBRBC258Ke8SzSvUW1B75iAf8w8IxA==",
+        "dependencyDeclarations": {}
+      },
+      {
+        "path": "node_modules/@earendil-works/pi-coding-agent",
+        "name": "@earendil-works/pi-coding-agent",
+        "installedVersion": "1.0.0",
+        "lockedVersion": "1.0.0",
+        "lockIntegrity": "sha512-/FtbxoSQU/mEv1QnichJjRjqteqaIaMWxmhB4G367+MwZfX7/DI5B9YAg5lqbN7nztFskBEtUSZ+FlmMBECtMw==",
+        "dependencyDeclarations": {
+          "@earendil-works/pi-ai": "^1.0.0",
+          "@earendil-works/pi-agent-core": "^1.0.0"
+        }
+      },
+      {
+        "path": "node_modules/@earendil-works/pi-coding-agent/node_modules/@earendil-works/pi-agent-core",
+        "name": "@earendil-works/pi-agent-core",
+        "installedVersion": "1.0.0",
+        "lockedVersion": "1.0.0",
+        "lockIntegrity": null,
+        "dependencyDeclarations": {
+          "@earendil-works/pi-ai": "^1.0.0"
+        }
+      },
+      {
+        "path": "node_modules/@earendil-works/pi-coding-agent/node_modules/@earendil-works/pi-ai",
+        "name": "@earendil-works/pi-ai",
+        "installedVersion": "1.0.0",
+        "lockedVersion": "1.0.0",
+        "lockIntegrity": null,
+        "dependencyDeclarations": {}
+      },
+      {
+        "path": "node_modules/mysql2",
+        "name": "mysql2",
+        "installedVersion": "3.24.5",
+        "lockedVersion": "3.24.5",
+        "lockIntegrity": "sha512-X6Ujsr2QSkkLpkQGjxzpKRAPn9nu4axpR63ntBzquFVEvPOArgbUQ1sJjFKI7hnaYtiVZxa17Z7q18KSubW0IQ==",
+        "dependencyDeclarations": {}
+      }
+    ]
+  }
+}

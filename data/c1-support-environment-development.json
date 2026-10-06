@@ -1,0 +1,686 @@
+{
+  "version": 1,
+  "suiteId": "c1-support-environment-development-v1",
+  "stage": "exposed-development-fixed-input-candidate-environment-diagnostic",
+  "sources": [
+    {
+      "path": "data/c1-support-conditions-development.json",
+      "sha256": "779073de82045e7c9643012c689d62a4f8b92ab5ce76035423375f46e476c7da",
+      "bytes": 30628
+    }
+  ],
+  "syntheticBoundary": "All payment channels, shops, products, policies and approvals here are original synthetic diagnostic data. They are not live/demo business policies, do not authorize actions, and are not quotations from any external platform. Failure-type-derived development cases are not independent admission evidence.",
+  "measurement": {
+    "plannedInputs": 12,
+    "plannedVersions": 1,
+    "plannedHttp": 12,
+    "candidateDecisionsPerVersion": 18,
+    "positiveCandidateDecisionsPerVersion": 6,
+    "negativeCandidateDecisionsPerVersion": 12,
+    "targetCandidateDecisionsPerVersion": 9,
+    "scope": "Support classification only under unchanged typed v7. No Agent, rerank, QQ, SQL, business writes or final reply evaluation.",
+    "decision": "Describe whether each target classification changes across its three candidate environments and preserve all false acceptance/rejection, invalid/missing responses and cost. Do not edit old gold, promote a candidate, introduce a new prompt, or rerun this manifest to chase a passing score."
+  },
+  "cases": [
+    {
+      "id": "environment-001",
+      "group": "channel",
+      "environment": "single",
+      "targetCandidateId": "ENV-CHANNEL-GENERAL",
+      "query": "用杉木钱包支付的团购券，退款审核通过并发起后通常几个工作日到账？",
+      "scope": {
+        "shopId": null,
+        "productId": null
+      },
+      "candidates": [
+        {
+          "id": "ENV-CHANNEL-GENERAL",
+          "title": "合成团购退款的一般到账说明",
+          "body": "【原创合成诊断规则，非线上演示政策】团购券退款审核通过后，退款会退回原支付账户。一般预计2至5个工作日到账；各支付渠道采用自己的清算安排，具体时限以该渠道的退款规则为准。用户可在订单退款进度中查看已发起时间。",
+          "tags": [
+            "退款",
+            "到账",
+            "一般时限"
+          ],
+          "shopId": null,
+          "productId": null,
+          "status": "active",
+          "rank": 1,
+          "score": 0.83
+        }
+      ],
+      "expectedByCandidate": [
+        {
+          "id": "ENV-CHANNEL-GENERAL",
+          "category": "limitation_only",
+          "supported": false,
+          "evidenceQuote": "一般预计2至5个工作日到账；各支付渠道采用自己的清算安排，具体时限以该渠道的退款规则为准。",
+          "reason": "文档把具体时限留给各渠道，没有独立提供杉木钱包时限；不能借另一篇或泛化数字补足。"
+        }
+      ],
+      "source": {
+        "path": "data/c1-support-conditions-development.json",
+        "caseId": "conditions-002",
+        "originalInputHash": "f39ab9a1c80630753414106054f73ba023caef202542ef10de29afc2cc9d23cf",
+        "derivation": "Original synthetic channel example derived from the exposed failure type only. No historical query, document wording, observed rank/score or model output is replayed. Within this group, only the candidate set changes; target query, scope and full candidate shape stay fixed."
+      },
+      "inputHash": "f318c3e0af126281e37add52c9757d7a87f6ce16dbde6c564fac3dbadeadcb8a"
+    },
+    {
+      "id": "environment-002",
+      "group": "channel",
+      "environment": "with_specific",
+      "targetCandidateId": "ENV-CHANNEL-GENERAL",
+      "query": "用杉木钱包支付的团购券，退款审核通过并发起后通常几个工作日到账？",
+      "scope": {
+        "shopId": null,
+        "productId": null
+      },
+      "candidates": [
+        {
+          "id": "ENV-CHANNEL-GENERAL",
+          "title": "合成团购退款的一般到账说明",
+          "body": "【原创合成诊断规则，非线上演示政策】团购券退款审核通过后，退款会退回原支付账户。一般预计2至5个工作日到账；各支付渠道采用自己的清算安排，具体时限以该渠道的退款规则为准。用户可在订单退款进度中查看已发起时间。",
+          "tags": [
+            "退款",
+            "到账",
+            "一般时限"
+          ],
+          "shopId": null,
+          "productId": null,
+          "status": "active",
+          "rank": 1,
+          "score": 0.83
+        },
+        {
+          "id": "ENV-CHANNEL-CEDAR",
+          "title": "杉木钱包退款渠道规则",
+          "body": "【原创合成诊断规则，非线上演示政策】杉木钱包是本诊断数据虚构的支付渠道。使用杉木钱包支付的团购券，退款审核通过并发起后，通常3至6个工作日到账。超过6个工作日仍未到账时，需核对钱包交易记录，再由平台协助查询。",
+          "tags": [
+            "杉木钱包",
+            "退款",
+            "到账"
+          ],
+          "shopId": null,
+          "productId": null,
+          "status": "active",
+          "rank": 2,
+          "score": 0.79
+        }
+      ],
+      "expectedByCandidate": [
+        {
+          "id": "ENV-CHANNEL-GENERAL",
+          "category": "limitation_only",
+          "supported": false,
+          "evidenceQuote": "一般预计2至5个工作日到账；各支付渠道采用自己的清算安排，具体时限以该渠道的退款规则为准。",
+          "reason": "文档把具体时限留给各渠道，没有独立提供杉木钱包时限；不能借另一篇或泛化数字补足。"
+        },
+        {
+          "id": "ENV-CHANNEL-CEDAR",
+          "category": "direct_fact",
+          "supported": true,
+          "evidenceQuote": "使用杉木钱包支付的团购券，退款审核通过并发起后，通常3至6个工作日到账。",
+          "reason": "原文独立覆盖虚构渠道、审核并发起后的通常时限。"
+        }
+      ],
+      "source": {
+        "path": "data/c1-support-conditions-development.json",
+        "caseId": "conditions-002",
+        "originalInputHash": "f39ab9a1c80630753414106054f73ba023caef202542ef10de29afc2cc9d23cf",
+        "derivation": "Original synthetic channel example derived from the exposed failure type only. No historical query, document wording, observed rank/score or model output is replayed. Within this group, only the candidate set changes; target query, scope and full candidate shape stay fixed."
+      },
+      "inputHash": "9008a0cb0ff955c08828faa6a8cc09029eff404f6a8a548b326ec229502c540b"
+    },
+    {
+      "id": "environment-003",
+      "group": "channel",
+      "environment": "with_unrelated",
+      "targetCandidateId": "ENV-CHANNEL-GENERAL",
+      "query": "用杉木钱包支付的团购券，退款审核通过并发起后通常几个工作日到账？",
+      "scope": {
+        "shopId": null,
+        "productId": null
+      },
+      "candidates": [
+        {
+          "id": "ENV-CHANNEL-GENERAL",
+          "title": "合成团购退款的一般到账说明",
+          "body": "【原创合成诊断规则，非线上演示政策】团购券退款审核通过后，退款会退回原支付账户。一般预计2至5个工作日到账；各支付渠道采用自己的清算安排，具体时限以该渠道的退款规则为准。用户可在订单退款进度中查看已发起时间。",
+          "tags": [
+            "退款",
+            "到账",
+            "一般时限"
+          ],
+          "shopId": null,
+          "productId": null,
+          "status": "active",
+          "rank": 1,
+          "score": 0.83
+        },
+        {
+          "id": "ENV-CHANNEL-INVOICE",
+          "title": "合成电子发票获取说明",
+          "body": "【原创合成诊断规则，非线上演示政策】已支付团购券可在订单页面申请电子发票，商家完成开票后可下载。发票抬头修改应由开票主体核实，不以退款进度为依据。",
+          "tags": [
+            "发票",
+            "开票",
+            "下载"
+          ],
+          "shopId": null,
+          "productId": null,
+          "status": "active",
+          "rank": 2,
+          "score": 0.79
+        }
+      ],
+      "expectedByCandidate": [
+        {
+          "id": "ENV-CHANNEL-GENERAL",
+          "category": "limitation_only",
+          "supported": false,
+          "evidenceQuote": "一般预计2至5个工作日到账；各支付渠道采用自己的清算安排，具体时限以该渠道的退款规则为准。",
+          "reason": "文档把具体时限留给各渠道，没有独立提供杉木钱包时限；不能借另一篇或泛化数字补足。"
+        },
+        {
+          "id": "ENV-CHANNEL-INVOICE",
+          "category": "unrelated",
+          "supported": false,
+          "evidenceQuote": "商家完成开票后可下载。",
+          "reason": "开票下载规则不回答支付渠道的退款到账时限。"
+        }
+      ],
+      "source": {
+        "path": "data/c1-support-conditions-development.json",
+        "caseId": "conditions-002",
+        "originalInputHash": "f39ab9a1c80630753414106054f73ba023caef202542ef10de29afc2cc9d23cf",
+        "derivation": "Original synthetic channel example derived from the exposed failure type only. No historical query, document wording, observed rank/score or model output is replayed. Within this group, only the candidate set changes; target query, scope and full candidate shape stay fixed."
+      },
+      "inputHash": "38f85760031df86738c4ac179f890697b7840d3b5c21a802af51bb3445f3a3a6"
+    },
+    {
+      "id": "environment-004",
+      "group": "actor",
+      "environment": "single",
+      "targetCandidateId": "ENV-ACTOR-MERCHANT",
+      "query": "已核销券有消费记录争议时，如果门店已经同意提交纠错材料，平台是否就可以免于审核，直接把券恢复为未核销？只咨询处理权限规则，不询问本券是否已审批。",
+      "scope": {
+        "shopId": null,
+        "productId": null
+      },
+      "candidates": [
+        {
+          "id": "ENV-ACTOR-MERCHANT",
+          "title": "核销异常的商家意见收集",
+          "body": "【原创合成诊断规则，非线上演示政策】顾客对已核销记录提出异议时，可请求门店核对现场消费记录。店长同意协商后，由门店填写意见并提交核销异常处理材料。客服可以展示门店提交的意见和材料提交进度。",
+          "tags": [
+            "核销异常",
+            "商家意见",
+            "材料提交"
+          ],
+          "shopId": null,
+          "productId": null,
+          "status": "active",
+          "rank": 1,
+          "score": 0.83
+        }
+      ],
+      "expectedByCandidate": [
+        {
+          "id": "ENV-ACTOR-MERCHANT",
+          "category": "limitation_only",
+          "supported": false,
+          "evidenceQuote": "店长同意协商后，由门店填写意见并提交核销异常处理材料。",
+          "reason": "仅提供商家同意和材料提交流程，没有独立回答平台能否免审及谁可变更核销状态。"
+        }
+      ],
+      "source": {
+        "path": "data/c1-support-conditions-development.json",
+        "caseId": "conditions-009",
+        "originalInputHash": "8fc9870e735f2384b154a08294744dac1a77f7dcb311a9da0054f9dd595edc02",
+        "derivation": "Original synthetic actor example derived from the exposed failure type only. No historical query, document wording, observed rank/score or model output is replayed. Within this group, only the candidate set changes; target query, scope and full candidate shape stay fixed."
+      },
+      "inputHash": "d75e9d3b8ec275c20731d2ce2f0a67f7334b3a6a7b08f7cca145cfe6bc32fb36"
+    },
+    {
+      "id": "environment-005",
+      "group": "actor",
+      "environment": "with_specific",
+      "targetCandidateId": "ENV-ACTOR-MERCHANT",
+      "query": "已核销券有消费记录争议时，如果门店已经同意提交纠错材料，平台是否就可以免于审核，直接把券恢复为未核销？只咨询处理权限规则，不询问本券是否已审批。",
+      "scope": {
+        "shopId": null,
+        "productId": null
+      },
+      "candidates": [
+        {
+          "id": "ENV-ACTOR-MERCHANT",
+          "title": "核销异常的商家意见收集",
+          "body": "【原创合成诊断规则，非线上演示政策】顾客对已核销记录提出异议时，可请求门店核对现场消费记录。店长同意协商后，由门店填写意见并提交核销异常处理材料。客服可以展示门店提交的意见和材料提交进度。",
+          "tags": [
+            "核销异常",
+            "商家意见",
+            "材料提交"
+          ],
+          "shopId": null,
+          "productId": null,
+          "status": "active",
+          "rank": 1,
+          "score": 0.83
+        },
+        {
+          "id": "ENV-ACTOR-PLATFORM",
+          "title": "核销异常纠错的审批主体",
+          "body": "【原创合成诊断规则，非线上演示政策】对已核销团购券进行状态纠错，须由平台核验核销记录及门店证明，并作出纠错审批。门店同意仅用于提交协商材料，不能替代平台审核。平台审批通过后，由核销服务执行状态变更；本政策不证明某张券已获批准。",
+          "tags": [
+            "核销异常",
+            "平台审核",
+            "状态纠错"
+          ],
+          "shopId": null,
+          "productId": null,
+          "status": "active",
+          "rank": 2,
+          "score": 0.79
+        }
+      ],
+      "expectedByCandidate": [
+        {
+          "id": "ENV-ACTOR-MERCHANT",
+          "category": "limitation_only",
+          "supported": false,
+          "evidenceQuote": "店长同意协商后，由门店填写意见并提交核销异常处理材料。",
+          "reason": "仅提供商家同意和材料提交流程，没有独立回答平台能否免审及谁可变更核销状态。"
+        },
+        {
+          "id": "ENV-ACTOR-PLATFORM",
+          "category": "direct_fact",
+          "supported": true,
+          "evidenceQuote": "门店同意仅用于提交协商材料，不能替代平台审核。",
+          "reason": "明确区分商家意见、平台审批与核销服务执行，能否免审有否定依据；不声称当前券已经获批。"
+        }
+      ],
+      "source": {
+        "path": "data/c1-support-conditions-development.json",
+        "caseId": "conditions-009",
+        "originalInputHash": "8fc9870e735f2384b154a08294744dac1a77f7dcb311a9da0054f9dd595edc02",
+        "derivation": "Original synthetic actor example derived from the exposed failure type only. No historical query, document wording, observed rank/score or model output is replayed. Within this group, only the candidate set changes; target query, scope and full candidate shape stay fixed."
+      },
+      "inputHash": "b848727ffaac645f3fa8ae932255c82a69f42abbaec4fdfd0bce1b4cc79a0011"
+    },
+    {
+      "id": "environment-006",
+      "group": "actor",
+      "environment": "with_unrelated",
+      "targetCandidateId": "ENV-ACTOR-MERCHANT",
+      "query": "已核销券有消费记录争议时，如果门店已经同意提交纠错材料，平台是否就可以免于审核，直接把券恢复为未核销？只咨询处理权限规则，不询问本券是否已审批。",
+      "scope": {
+        "shopId": null,
+        "productId": null
+      },
+      "candidates": [
+        {
+          "id": "ENV-ACTOR-MERCHANT",
+          "title": "核销异常的商家意见收集",
+          "body": "【原创合成诊断规则，非线上演示政策】顾客对已核销记录提出异议时，可请求门店核对现场消费记录。店长同意协商后，由门店填写意见并提交核销异常处理材料。客服可以展示门店提交的意见和材料提交进度。",
+          "tags": [
+            "核销异常",
+            "商家意见",
+            "材料提交"
+          ],
+          "shopId": null,
+          "productId": null,
+          "status": "active",
+          "rank": 1,
+          "score": 0.83
+        },
+        {
+          "id": "ENV-ACTOR-INVOICE",
+          "title": "开票主体变更核验",
+          "body": "【原创合成诊断规则，非线上演示政策】用户申请修改电子发票抬头时，须由实际开票商家核实抬头信息。平台可转交申请，不能代替开票主体直接变更税务记录。",
+          "tags": [
+            "发票",
+            "抬头",
+            "税务"
+          ],
+          "shopId": null,
+          "productId": null,
+          "status": "active",
+          "rank": 2,
+          "score": 0.79
+        }
+      ],
+      "expectedByCandidate": [
+        {
+          "id": "ENV-ACTOR-MERCHANT",
+          "category": "limitation_only",
+          "supported": false,
+          "evidenceQuote": "店长同意协商后，由门店填写意见并提交核销异常处理材料。",
+          "reason": "仅提供商家同意和材料提交流程，没有独立回答平台能否免审及谁可变更核销状态。"
+        },
+        {
+          "id": "ENV-ACTOR-INVOICE",
+          "category": "unrelated",
+          "supported": false,
+          "evidenceQuote": "须由实际开票商家核实抬头信息。",
+          "reason": "发票抬头审批主体与核销记录纠错权限不是同一业务事项。"
+        }
+      ],
+      "source": {
+        "path": "data/c1-support-conditions-development.json",
+        "caseId": "conditions-009",
+        "originalInputHash": "8fc9870e735f2384b154a08294744dac1a77f7dcb311a9da0054f9dd595edc02",
+        "derivation": "Original synthetic actor example derived from the exposed failure type only. No historical query, document wording, observed rank/score or model output is replayed. Within this group, only the candidate set changes; target query, scope and full candidate shape stay fixed."
+      },
+      "inputHash": "88a1666203bd6c3f5513c5910144ab549ef41b78ea71a3fab59877d7fdae86aa"
+    },
+    {
+      "id": "environment-007",
+      "group": "condition",
+      "environment": "single",
+      "targetCandidateId": "ENV-CONDITION-CATEGORY",
+      "query": "已核实当前券的商品名为海棠晚场双人观影券，状态未核销；暂未核实它属于哪种套餐类别。该商品是不是自由场次观影套餐，并可按其普通周六预约规则使用？不问某个具体日期是否为节假日，也不声称已预约。",
+      "scope": {
+        "shopId": "shop-env-cinema",
+        "productId": "product-env-haitang"
+      },
+      "candidates": [
+        {
+          "id": "ENV-CONDITION-CATEGORY",
+          "title": "自由场次观影套餐使用规则",
+          "body": "【原创合成诊断规则，非线上演示政策】自由场次观影套餐允许在普通周六、周日预约使用；法定节假日和特别影展场次除外，例外场次须另行确认。预约成功后按对应场次核销，未预约不保证有座位。",
+          "tags": [
+            "观影",
+            "自由场次套餐",
+            "周末"
+          ],
+          "shopId": null,
+          "productId": null,
+          "status": "active",
+          "rank": 1,
+          "score": 0.83
+        }
+      ],
+      "expectedByCandidate": [
+        {
+          "id": "ENV-CONDITION-CATEGORY",
+          "category": "limitation_only",
+          "supported": false,
+          "evidenceQuote": "自由场次观影套餐允许在普通周六、周日预约使用；法定节假日和特别影展场次除外",
+          "reason": "虽然有类别的普通周末规则，但没有当前商品属于该类别的事实；不能凭名称或另一篇补足商品归属。"
+        }
+      ],
+      "source": {
+        "path": "data/c1-support-conditions-development.json",
+        "caseId": "conditions-012",
+        "originalInputHash": "b377081099b3d008a247d428f92a95a607be479e5af2ea0408f20fb87451078c",
+        "derivation": "Original synthetic condition example derived from the exposed failure type only. No historical query, document wording, observed rank/score or model output is replayed. Within this group, only the candidate set changes; target query, scope and full candidate shape stay fixed."
+      },
+      "inputHash": "472fbd82ff9a588d223f7da49da52a1287eabd8ad31326bae764f9d5ef7fcebe"
+    },
+    {
+      "id": "environment-008",
+      "group": "condition",
+      "environment": "with_specific",
+      "targetCandidateId": "ENV-CONDITION-CATEGORY",
+      "query": "已核实当前券的商品名为海棠晚场双人观影券，状态未核销；暂未核实它属于哪种套餐类别。该商品是不是自由场次观影套餐，并可按其普通周六预约规则使用？不问某个具体日期是否为节假日，也不声称已预约。",
+      "scope": {
+        "shopId": "shop-env-cinema",
+        "productId": "product-env-haitang"
+      },
+      "candidates": [
+        {
+          "id": "ENV-CONDITION-CATEGORY",
+          "title": "自由场次观影套餐使用规则",
+          "body": "【原创合成诊断规则，非线上演示政策】自由场次观影套餐允许在普通周六、周日预约使用；法定节假日和特别影展场次除外，例外场次须另行确认。预约成功后按对应场次核销，未预约不保证有座位。",
+          "tags": [
+            "观影",
+            "自由场次套餐",
+            "周末"
+          ],
+          "shopId": null,
+          "productId": null,
+          "status": "active",
+          "rank": 1,
+          "score": 0.83
+        },
+        {
+          "id": "ENV-CONDITION-PRODUCT",
+          "title": "海棠晚场双人观影券类别与时段",
+          "body": "【原创合成诊断规则，非线上演示政策】海棠晚场双人观影券属于自由场次观影套餐，可在普通周六、周日预约使用。法定节假日和特别影展场次不适用普通周末规则，须另行确认；完成预约才保留座位。",
+          "tags": [
+            "海棠晚场双人观影券",
+            "商品类别",
+            "周末"
+          ],
+          "shopId": null,
+          "productId": null,
+          "status": "active",
+          "rank": 2,
+          "score": 0.79
+        }
+      ],
+      "expectedByCandidate": [
+        {
+          "id": "ENV-CONDITION-CATEGORY",
+          "category": "limitation_only",
+          "supported": false,
+          "evidenceQuote": "自由场次观影套餐允许在普通周六、周日预约使用；法定节假日和特别影展场次除外",
+          "reason": "虽然有类别的普通周末规则，但没有当前商品属于该类别的事实；不能凭名称或另一篇补足商品归属。"
+        },
+        {
+          "id": "ENV-CONDITION-PRODUCT",
+          "category": "direct_fact",
+          "supported": true,
+          "evidenceQuote": "海棠晚场双人观影券属于自由场次观影套餐，可在普通周六、周日预约使用。",
+          "reason": "原文独立给出当前商品的类别映射和普通周末规则，同时保留节假日、特别场次和预约条件。"
+        }
+      ],
+      "source": {
+        "path": "data/c1-support-conditions-development.json",
+        "caseId": "conditions-012",
+        "originalInputHash": "b377081099b3d008a247d428f92a95a607be479e5af2ea0408f20fb87451078c",
+        "derivation": "Original synthetic condition example derived from the exposed failure type only. No historical query, document wording, observed rank/score or model output is replayed. Within this group, only the candidate set changes; target query, scope and full candidate shape stay fixed."
+      },
+      "inputHash": "5439680c5212ed161eec4db5ce2801b0f51ca7751ddce58eb0dca89ff133d6ac"
+    },
+    {
+      "id": "environment-009",
+      "group": "condition",
+      "environment": "with_unrelated",
+      "targetCandidateId": "ENV-CONDITION-CATEGORY",
+      "query": "已核实当前券的商品名为海棠晚场双人观影券，状态未核销；暂未核实它属于哪种套餐类别。该商品是不是自由场次观影套餐，并可按其普通周六预约规则使用？不问某个具体日期是否为节假日，也不声称已预约。",
+      "scope": {
+        "shopId": "shop-env-cinema",
+        "productId": "product-env-haitang"
+      },
+      "candidates": [
+        {
+          "id": "ENV-CONDITION-CATEGORY",
+          "title": "自由场次观影套餐使用规则",
+          "body": "【原创合成诊断规则，非线上演示政策】自由场次观影套餐允许在普通周六、周日预约使用；法定节假日和特别影展场次除外，例外场次须另行确认。预约成功后按对应场次核销，未预约不保证有座位。",
+          "tags": [
+            "观影",
+            "自由场次套餐",
+            "周末"
+          ],
+          "shopId": null,
+          "productId": null,
+          "status": "active",
+          "rank": 1,
+          "score": 0.83
+        },
+        {
+          "id": "ENV-CONDITION-PARKING",
+          "title": "影城停车优惠券说明",
+          "body": "【原创合成诊断规则，非线上演示政策】影城停车优惠券只能抵扣当次停车费用，一张券可抵扣2小时。停车券不能用于购买电影票或保留观影座位。",
+          "tags": [
+            "停车",
+            "抵扣",
+            "优惠券"
+          ],
+          "shopId": null,
+          "productId": null,
+          "status": "active",
+          "rank": 2,
+          "score": 0.79
+        }
+      ],
+      "expectedByCandidate": [
+        {
+          "id": "ENV-CONDITION-CATEGORY",
+          "category": "limitation_only",
+          "supported": false,
+          "evidenceQuote": "自由场次观影套餐允许在普通周六、周日预约使用；法定节假日和特别影展场次除外",
+          "reason": "虽然有类别的普通周末规则，但没有当前商品属于该类别的事实；不能凭名称或另一篇补足商品归属。"
+        },
+        {
+          "id": "ENV-CONDITION-PARKING",
+          "category": "unrelated",
+          "supported": false,
+          "evidenceQuote": "影城停车优惠券只能抵扣当次停车费用",
+          "reason": "停车券抵扣规则不回答观影商品类别和观影预约使用资格。"
+        }
+      ],
+      "source": {
+        "path": "data/c1-support-conditions-development.json",
+        "caseId": "conditions-012",
+        "originalInputHash": "b377081099b3d008a247d428f92a95a607be479e5af2ea0408f20fb87451078c",
+        "derivation": "Original synthetic condition example derived from the exposed failure type only. No historical query, document wording, observed rank/score or model output is replayed. Within this group, only the candidate set changes; target query, scope and full candidate shape stay fixed."
+      },
+      "inputHash": "f4516d3a99a996ec2efb7249e8294b02abf8bc41ec9892776955ec4d86668824"
+    },
+    {
+      "id": "environment-010",
+      "group": "regression",
+      "environment": "positive_control",
+      "targetCandidateId": "ENV-POSITIVE-WEEKDAY",
+      "query": "假设是常规日场体验券，使用日期为普通周三且不遇法定节假日或封场活动，这类券能否预约使用？请保留预约和例外条件，不判断某个具体日期或我是否已预约。",
+      "scope": {
+        "shopId": null,
+        "productId": null
+      },
+      "candidates": [
+        {
+          "id": "ENV-POSITIVE-WEEKDAY",
+          "title": "常规日场体验券工作日政策",
+          "body": "【原创合成诊断规则，非线上演示政策】常规日场体验券在普通工作日周一至周五均可预约使用。法定节假日或场馆公布的封场活动除外，须另行核实对应日期；完成预约才保证席位。",
+          "tags": [
+            "日场",
+            "普通工作日",
+            "预约"
+          ],
+          "shopId": null,
+          "productId": null,
+          "status": "active",
+          "rank": 1,
+          "score": 0.83
+        }
+      ],
+      "expectedByCandidate": [
+        {
+          "id": "ENV-POSITIVE-WEEKDAY",
+          "category": "direct_fact",
+          "supported": true,
+          "evidenceQuote": "常规日场体验券在普通工作日周一至周五均可预约使用。",
+          "reason": "周三属于明确规定的工作日范围，用户已给定一般条件；回答须保留例外和预约，不要求虚构实例事实。"
+        }
+      ],
+      "source": {
+        "path": "data/c1-support-conditions-development.json",
+        "caseId": "conditions-006",
+        "originalInputHash": "9716c75c9dd4f562ca74fc5d57f81bfb5d7e779111d89da970f800d39da998f9",
+        "derivation": "Original synthetic positive control. Reuses the accepted distinction only, with new query and full original synthetic text; no prior fixed input or model response is replayed."
+      },
+      "inputHash": "94b02890722e906e06c352e863b782d2280d08145495fd520d9d17d2da195779"
+    },
+    {
+      "id": "environment-011",
+      "group": "regression",
+      "environment": "positive_control",
+      "targetCandidateId": "ENV-POSITIVE-APPROVAL",
+      "query": "预约时间已经过去但券还没使用，申请改期要先经过哪些审批步骤，分别由谁处理？只问流程，不问我的申请已经通过没有。",
+      "scope": {
+        "shopId": null,
+        "productId": null
+      },
+      "candidates": [
+        {
+          "id": "ENV-POSITIVE-APPROVAL",
+          "title": "预约超期申请的审批步骤",
+          "body": "【原创合成诊断规则，非线上演示政策】对预约时间已过但未使用的体验券，顾客可提交超期处理申请。门店先核对未使用记录并确认是否接受改期以及新的预约时间，平台随后审核材料并记录结果。经批准后才可重新预约，政策本身不证明某次申请已批准。",
+          "tags": [
+            "超期",
+            "审批步骤",
+            "改期"
+          ],
+          "shopId": null,
+          "productId": null,
+          "status": "active",
+          "rank": 1,
+          "score": 0.83
+        }
+      ],
+      "expectedByCandidate": [
+        {
+          "id": "ENV-POSITIVE-APPROVAL",
+          "category": "direct_fact",
+          "supported": true,
+          "evidenceQuote": "门店先核对未使用记录并确认是否接受改期以及新的预约时间，平台随后审核材料并记录结果。",
+          "reason": "用户明确询问审批流程，原文提供所需主体、步骤和批准前提；无需把它误判为询问已批准状态。"
+        }
+      ],
+      "source": {
+        "path": "data/c1-support-conditions-development.json",
+        "caseId": "conditions-008",
+        "originalInputHash": "3bf9f04031a2793d98bc26b61589e4e726541b1aa6eadfe3d905b270b0d3a6da",
+        "derivation": "Original synthetic positive control. Reuses the accepted distinction only, with new query and full original synthetic text; no prior fixed input or model response is replayed."
+      },
+      "inputHash": "2834944b8fc6bc8f51add689ff9a3b7334c88ff8c028b33a7683545e90d8b9c7"
+    },
+    {
+      "id": "environment-012",
+      "group": "regression",
+      "environment": "positive_control",
+      "targetCandidateId": "ENV-POSITIVE-METADATA",
+      "query": "已核实当前商品为海棠晚场双人观影券。现有商品资料有没有登记字幕语言？只核对资料覆盖范围，不要求你说出具体语言，也不推断某场电影实际采用什么字幕。",
+      "scope": {
+        "shopId": "shop-env-cinema",
+        "productId": "product-env-haitang"
+      },
+      "candidates": [
+        {
+          "id": "ENV-POSITIVE-METADATA",
+          "title": "海棠晚场双人观影券资料覆盖",
+          "body": "【原创合成诊断规则，非线上演示政策】商品资料记录海棠晚场双人观影券可供两人观影，一张券核销一次。当前资料未登记影片的字幕语言和无障碍服务项目；如需确认实际场次信息，应向影城核实。",
+          "tags": [
+            "观影",
+            "商品资料",
+            "字幕"
+          ],
+          "shopId": null,
+          "productId": null,
+          "status": "active",
+          "rank": 1,
+          "score": 0.83
+        }
+      ],
+      "expectedByCandidate": [
+        {
+          "id": "ENV-POSITIVE-METADATA",
+          "category": "boundary_answer",
+          "supported": true,
+          "evidenceQuote": "当前资料未登记影片的字幕语言和无障碍服务项目",
+          "reason": "原问明确是元资料覆盖问题，原文直接说明未登记；不能据此推断实际语言或没有字幕。"
+        }
+      ],
+      "source": {
+        "path": "data/c1-support-conditions-development.json",
+        "caseId": "conditions-011",
+        "originalInputHash": "052d3865ecd9e75b0b92bbb2cf47c28a6a2fc0a3bf3b375ac6021935140d9c01",
+        "derivation": "Original synthetic positive control. Reuses the accepted distinction only, with new query and full original synthetic text; no prior fixed input or model response is replayed."
+      },
+      "inputHash": "433709f7e302e5f7ca60e7311fba53c103cfc395519658dc283b8fff44e45fac"
+    }
+  ]
+}

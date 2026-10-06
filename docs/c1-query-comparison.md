@@ -52,6 +52,6 @@ node --env-file-if-exists=.env scripts/c1-query-development.ts --live
 
 019/1 两组仍把索取具体过敏原名称误判为 `boundary_answer`，用“未录入”作为正向支持；023/1 真正询问资料覆盖范围的正例则两组通过。引用存在、格式有效和宿主前提检查通过，均不能证明模型理解了用户所求事实。
 
-**决定：保留分离开关，作为后续 Session 验证候选；当前默认继续 combined，QQ/atomic + lexical 不变。** 本次达到预声明的组件推进条件，但未解决缺事实误收和竞争引用，C1 仍未准入。下一步单独修正“具体事实缺失 vs 资料覆盖边界”的支持判别，并保留两类正负对照，再做完整 Session 开发回归；不重跑本轮以挑选更好分数。
+**决定：保留分离开关，作为后续 Session 验证候选；当前默认继续 combined，QQ/atomic + lexical 不变。** 本次达到预声明的组件推进条件，但未解决缺事实误收和竞争引用，C1 仍未准入。随后“具体事实缺失 vs 资料覆盖边界”已有[v6组件对照](./c1-support-intent-comparison.md)，竞争引用交互及恢复也已实现；当前进入[新来源适用性诊断](./c1-support-environment-diagnostic.md)。完整Session仍须单独验证，不重跑本轮以挑选更好分数。
 
 原始报告保存在本机 `.runtime/c1-query-development/7740f402-e083-4193-a684-9411f2817ac5.json`，SHA-256 `32edf46fb1f55c65a312508735a9b93a5a9d579df4b2929c9e192ec21fa6d392`。完整 `npm run validate`、查询服务工程检查、两个评分器变造检查、旧 Flash/Pro 回放一致性及执行器 `--check` / `--inspect` 均通过；真实 API 只执行本次固定输入对照，不计为 QQ/业务端到端验收。
