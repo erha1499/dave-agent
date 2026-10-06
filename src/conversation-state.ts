@@ -1,15 +1,27 @@
 import type { Pool, PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { merchantSourceKey } from "./after-sales.ts";
 import type { QQIdentity } from "./coupon-store.ts";
+import type { TrustedAmountReference } from "./support-context.ts";
+import type { TrustedPolicyTopic } from "./support-controller.ts";
+import { validPolicyTopicFields } from "./support-reference-selection.ts";
 
 export type SupportContextOrderChoices = {
   candidates: Array<{ requestId: string; orderId: string; expiresAt: number }>;
   overflow: boolean; selectionRequired: boolean; pending: boolean;
 };
+type SelectedChoices<T> = { candidates: T[]; overflow: boolean; selectionRequired: boolean; selectedRequestId?: string };
+export type SupportContextPolicyChoices = SelectedChoices<{
+  topic: Omit<TrustedPolicyTopic, "sourceKey" | "groupOpenid">; expiresAt: number;
+}>;
+export type SupportContextAmountChoices = SelectedChoices<{
+  reference: Omit<TrustedAmountReference, "sourceKey" | "groupOpenid">; expiresAt: number;
+}>;
 export type SupportContextValue = {
   focus?: { orderId: string; requestId: string; source: "explicit" | "selection"; selectedAt: number; expiresAt: number };
   requiresRestatement: boolean;
-} & ({ version: 1 } | { version: 2; orderChoices?: SupportContextOrderChoices });
+} & ({ version: 1 } | { version: 2; orderChoices?: SupportContextOrderChoices }
+  | { version: 3; orderChoices?: SupportContextOrderChoices; policyChoices?: SupportContextPolicyChoices;
+      amountChoices?: SupportContextAmountChoices; pendingReferenceKind?: "order" | "policy" });
 export type SupportContextSnapshot = { revision: number; customerId?: string; bindingId?: string; value?: SupportContextValue };
 export type SupportContextPort = {
   read(): Promise<SupportContextSnapshot>;
@@ -31,13 +43,52 @@ function rejectUnless(condition: unknown, message = invalid): asserts condition 
 const validOrderId = (value: unknown): value is string => typeof value === "string" && /^COUPON-\d{4}$/.test(value);
 const validRequestId = (value: unknown): value is string => typeof value === "string" && value.length > 0 && value.length <= 512
   && value === value.trim() && !/[\u0000-\u001f\u007f]/u.test(value);
+const validExpiry = (value: unknown, now: number): value is number => typeof value === "number" && Number.isSafeInteger(value)
+  && value > 0 && value <= 8.64e15 && value <= now + ttlMs;
 
-// These are locators, never cached authorization, approval, choice tokens or monetary facts.
+function policyCandidate(input: unknown): SupportContextPolicyChoices["candidates"][number] {
+  rejectUnless(plain(input) && keys(input, ["topic", "expiresAt"]));
+  const topic = input.topic;
+  rejectUnless(plain(topic) && keys(topic, ["requestId", "originalQuery", "orderId", "scope", "sources"], ["intent", "priorQueries"])
+    && validRequestId(topic.requestId) && plain(topic.scope) && keys(topic.scope, ["shopId", "productId"])
+    && Array.isArray(topic.sources) && Array.from(topic.sources).every(source => plain(source) && keys(source, ["sourceId", "version"]))
+    && (topic.priorQueries === undefined || Array.isArray(topic.priorQueries) && Array.from(topic.priorQueries).every(prior =>
+      plain(prior) && keys(prior, ["requestId", "originalQuery"]) && validRequestId(prior.requestId)))
+    && validPolicyTopicFields(topic));
+  return { topic: structuredClone(topic), expiresAt: input.expiresAt as number }; // Expiry checked with the shared choice clock below.
+}
+function amountCandidate(input: unknown): SupportContextAmountChoices["candidates"][number] {
+  rejectUnless(plain(input) && keys(input, ["reference", "expiresAt"]));
+  const reference = input.reference;
+  rejectUnless(plain(reference) && keys(reference, ["requestId", "orderId", "itemId", "productId", "field", "paidCents", "orderVersion"])
+    && validRequestId(reference.requestId) && validOrderId(reference.orderId) && validRequestId(reference.itemId) && validRequestId(reference.productId)
+    && reference.field === "item_paid_unit" && typeof reference.paidCents === "number" && Number.isSafeInteger(reference.paidCents) && reference.paidCents > 0
+    && typeof reference.orderVersion === "string" && /^[a-f0-9]{64}$/.test(reference.orderVersion));
+  return { reference: { requestId: reference.requestId, orderId: reference.orderId, itemId: reference.itemId, productId: reference.productId,
+    field: reference.field, paidCents: reference.paidCents, orderVersion: reference.orderVersion }, expiresAt: input.expiresAt as number };
+}
+function selectedChoices<T extends { expiresAt: number }>(input: unknown, now: number, limit: number,
+  parse: (value: unknown) => T, requestId: (value: T) => string): SelectedChoices<T> {
+  rejectUnless(plain(input) && keys(input, ["candidates", "overflow", "selectionRequired"], ["selectedRequestId"])
+    && Array.isArray(input.candidates) && input.candidates.length <= limit
+    && typeof input.overflow === "boolean" && typeof input.selectionRequired === "boolean");
+  const candidates = Array.from(input.candidates, parse), requests = candidates.map(requestId);
+  rejectUnless(candidates.every(candidate => validExpiry(candidate.expiresAt, now)) && new Set(requests).size === candidates.length
+    && (input.selectedRequestId === undefined || validRequestId(input.selectedRequestId) && requests.includes(input.selectedRequestId)));
+  const remaining = candidates.filter(candidate => candidate.expiresAt > now);
+  const selectedRequestId = remaining.some(candidate => requestId(candidate) === input.selectedRequestId) ? input.selectedRequestId as string : undefined;
+  return { candidates: remaining, overflow: input.overflow,
+    selectionRequired: input.selectionRequired || input.overflow || candidates.length > 1 || Boolean(input.selectedRequestId && !selectedRequestId),
+    ...(selectedRequestId ? { selectedRequestId } : {}) };
+}
+
+// Historical references are not current facts, authorization, approval or reusable presentation tokens.
 export function validateSupportContextValue(input: unknown, options: { now?: number; allowExpiredFocus?: boolean } = {}): SupportContextValue {
   const now = options.now ?? Date.now();
   rejectUnless(Number.isSafeInteger(now) && now > 0 && now <= 8.64e15);
-  rejectUnless(plain(input) && (input.version === 1 || input.version === 2)
-    && keys(input, ["version", "requiresRestatement"], input.version === 1 ? ["focus"] : ["focus", "orderChoices"])
+  rejectUnless(plain(input) && (input.version === 1 || input.version === 2 || input.version === 3)
+    && keys(input, ["version", "requiresRestatement"], input.version === 1 ? ["focus"] : input.version === 2 ? ["focus", "orderChoices"]
+      : ["focus", "orderChoices", "policyChoices", "amountChoices", "pendingReferenceKind"])
     && typeof input.requiresRestatement === "boolean");
   const value: SupportContextValue = { version: input.version, requiresRestatement: input.requiresRestatement };
   if (input.focus !== undefined) {
@@ -53,7 +104,7 @@ export function validateSupportContextValue(input: unknown, options: { now?: num
     else value.focus = { orderId: focus.orderId, requestId: focus.requestId, source: focus.source,
       selectedAt: focus.selectedAt, expiresAt: focus.expiresAt };
   }
-  if (value.version === 2 && input.orderChoices !== undefined) {
+  if (value.version !== 1 && input.orderChoices !== undefined) {
     const choices = input.orderChoices;
     rejectUnless(plain(choices) && keys(choices, ["candidates", "overflow", "selectionRequired", "pending"])
       && Array.isArray(choices.candidates) && choices.candidates.length <= 3
@@ -62,8 +113,7 @@ export function validateSupportContextValue(input: unknown, options: { now?: num
     const candidates = Array.from(choices.candidates, candidate => {
       rejectUnless(plain(candidate) && keys(candidate, ["requestId", "orderId", "expiresAt"])
         && validRequestId(candidate.requestId) && validOrderId(candidate.orderId)
-        && typeof candidate.expiresAt === "number" && Number.isSafeInteger(candidate.expiresAt)
-        && candidate.expiresAt > 0 && candidate.expiresAt <= 8.64e15 && candidate.expiresAt <= now + ttlMs);
+        && validExpiry(candidate.expiresAt, now));
       rejectUnless(!orders.has(candidate.orderId) && !requests.has(candidate.requestId));
       orders.add(candidate.orderId); requests.add(candidate.requestId);
       return { requestId: candidate.requestId, orderId: candidate.orderId, expiresAt: candidate.expiresAt };
@@ -73,6 +123,24 @@ export function validateSupportContextValue(input: unknown, options: { now?: num
     value.orderChoices = { candidates: remaining, overflow: choices.overflow, pending: choices.pending,
       selectionRequired: choices.selectionRequired || choices.overflow || candidates.length > 1 };
     if (remaining.length !== candidates.length && !value.focus) value.requiresRestatement = true;
+  }
+  if (value.version === 3) {
+    rejectUnless(input.pendingReferenceKind === undefined || input.pendingReferenceKind === "order" || input.pendingReferenceKind === "policy");
+    if (input.pendingReferenceKind !== undefined) value.pendingReferenceKind = input.pendingReferenceKind;
+    rejectUnless(!value.orderChoices || value.orderChoices.pending === (value.pendingReferenceKind === "order"));
+    if (input.policyChoices !== undefined) {
+      value.policyChoices = selectedChoices(input.policyChoices, now, 3, policyCandidate, candidate => candidate.topic.requestId);
+      if (value.policyChoices.candidates.length !== (input.policyChoices as { candidates: unknown[] }).candidates.length && !value.focus) value.requiresRestatement = true;
+    }
+    if (input.amountChoices !== undefined) {
+      const sources = new Set<string>();
+      value.amountChoices = selectedChoices(input.amountChoices, now, 2, candidate => {
+        const parsed = amountCandidate(candidate), reference = parsed.reference;
+        const source = JSON.stringify([reference.orderId, reference.itemId, reference.productId]);
+        rejectUnless(!sources.has(source)); sources.add(source); return parsed;
+      }, candidate => candidate.reference.requestId);
+      if (value.amountChoices.candidates.length !== (input.amountChoices as { candidates: unknown[] }).candidates.length && !value.focus) value.requiresRestatement = true;
+    }
   }
   return value;
 }
@@ -140,7 +208,9 @@ export class ConversationStateStore {
           const currentRevision = rows[0] ? revision(rows[0].revision) : 0;
           rejectUnless(currentRevision === expectedRevision, conflict);
           const orderIds = new Set([...(value.focus ? [value.focus.orderId] : []),
-            ...(value.version === 2 ? value.orderChoices?.candidates.map(candidate => candidate.orderId) ?? [] : [])]);
+            ...(value.version !== 1 ? value.orderChoices?.candidates.map(candidate => candidate.orderId) ?? [] : []),
+            ...(value.version === 3 ? value.policyChoices?.candidates.flatMap(candidate => candidate.topic.orderId ? [candidate.topic.orderId] : []) ?? [] : []),
+            ...(value.version === 3 ? value.amountChoices?.candidates.map(candidate => candidate.reference.orderId) ?? [] : [])]);
           for (const orderId of orderIds) {
             const [orders] = await connection.execute<RowDataPacket[]>(
               "SELECT id FROM orders WHERE id = ? AND customer_id = ? FOR SHARE", [orderId, expectedCustomer]);

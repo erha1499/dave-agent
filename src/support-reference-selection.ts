@@ -27,7 +27,13 @@ function validReference(value: unknown, binding: ReferenceBinding): value is Tru
   if (!record(value)) return false;
   if (value.kind === "order") return keys(value, ["kind", "requestId", "orderId"]) && text(value.requestId) && orderId(value.orderId);
   if (value.kind !== "policy" || !keys(value, ["kind", "topic"]) || !record(value.topic)) return false;
-  const topic = value.topic;
+  const { sourceKey, groupOpenid, ...topic } = value.topic;
+  return sourceKey === binding.sourceKey && groupOpenid === binding.groupOpenid && validPolicyTopicFields(topic);
+}
+
+// Storage carries no routing claims; the Session supplies its trusted binding again on recovery.
+export function validPolicyTopicFields(topic: unknown): topic is Omit<TrustedPolicyTopic, "sourceKey" | "groupOpenid"> {
+  if (!record(topic)) return false;
   const prior = topic.priorQueries;
   if (prior !== undefined && (!Array.isArray(prior) || prior.length > 4
     || prior.some(query => !record(query) || !keys(query, ["requestId", "originalQuery"])
@@ -35,8 +41,8 @@ function validReference(value: unknown, binding: ReferenceBinding): value is Tru
     || new Set([...prior.map(query => query.requestId), topic.requestId]).size !== prior.length + 1)) return false;
   if (!text(topic.originalQuery, 500) || topic.originalQuery.length
     + (Array.isArray(prior) ? prior.reduce((sum, query) => sum + query.originalQuery.length, 0) : 0) > 500) return false;
-  return keys(topic, ["requestId", "sourceKey", "groupOpenid", "originalQuery", "orderId", "scope", "sources", "intent", "priorQueries"])
-    && topic.sourceKey === binding.sourceKey && topic.groupOpenid === binding.groupOpenid && text(topic.requestId)
+  return keys(topic, ["requestId", "originalQuery", "orderId", "scope", "sources", "intent", "priorQueries"])
+    && text(topic.requestId)
     && text(topic.originalQuery, 500) && (topic.orderId === null || orderId(topic.orderId))
     && record(topic.scope) && keys(topic.scope, ["shopId", "productId"])
     && (topic.scope.shopId === null || text(topic.scope.shopId)) && (topic.scope.productId === null || text(topic.scope.productId))
@@ -62,11 +68,12 @@ export function currentReferenceChoices(choices: TrustedReferenceChoices | undef
     || choices.kind === "order" && new Set(choices.candidates.map(row => row.reference.kind === "order" ? row.reference.orderId : undefined)).size !== choices.candidates.length
     || choices.selectedToken !== undefined && (!uuid(choices.selectedToken) || !choices.candidates.some(row => row.token === choices.selectedToken))) return undefined;
   const candidates = choices.candidates.filter(row => row.expiresAt > now);
+  const selectedToken = candidates.some(row => row.token === choices.selectedToken) ? choices.selectedToken : undefined;
   // An empty expired list retains the earlier ambiguity; remembering one fresh
   // candidate must not silently resolve a choice the user never made.
   return { ...structuredClone(choices), candidates: structuredClone(candidates),
-    selectionRequired: choices.selectionRequired || choices.overflow || choices.candidates.length > 1,
-    selectedToken: candidates.some(row => row.token === choices.selectedToken) ? choices.selectedToken : undefined };
+    selectionRequired: choices.selectionRequired || choices.overflow || choices.candidates.length > 1
+      || Boolean(choices.selectedToken && !selectedToken), selectedToken };
 }
 
 export function resolveReferenceChoice(choices: TrustedReferenceChoices | undefined, binding: ReferenceBinding,

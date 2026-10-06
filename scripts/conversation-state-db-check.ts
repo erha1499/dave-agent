@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { createPool, type Pool, type RowDataPacket } from "mysql2/promise";
-import { fauxAssistantMessage, fauxProvider, fauxToolCall, type FauxResponseStep } from "@earendil-works/pi-ai";
+import { fauxAssistantMessage, fauxProvider, fauxToolCall, type FauxResponseStep, type TranscriptContext } from "@earendil-works/pi-ai";
 import type { QQBotInboundMessage } from "@tencent-connect/qqbot-nodejs";
 import { createModelRuntime } from "../src/agent.ts";
 import { AfterSalesStore, merchantSourceKey, readAfterSalesDatabaseConfig } from "../src/after-sales.ts";
@@ -20,59 +20,191 @@ type Port = ReturnType<ConversationStateStore["bind"]>;
 type Value = NonNullable<Awaited<ReturnType<Port["read"]>>["value"]>;
 type Session = Awaited<ReturnType<typeof createSupportSession>>;
 type Candidate = { requestId: string; orderId: string; expiresAt: number };
-type ChildInput = { identity: QQIdentity; channel: string; orders: [string, string]; oldCommand?: string; expectedPaidCents?: number };
+type ChildMode = "write" | "recover" | "policy-write" | "policy-continue" | "policy-select" | "policy-restore" | "amount-write" | "amount-compare";
+type ChildInput = { identity: QQIdentity; channel: string; orders: [string, string]; oldCommand?: string; expectedPaidCents?: number;
+  referenceRequestId?: string; referenceOrderVersion?: string };
+type ChildOutput = { pid: number; command?: string; candidates?: Candidate[]; selectedOrderId?: string; paidCents?: number;
+  referenceRequestId?: string; referenceOrderVersion?: string; sourceIds?: string[] };
+type ChildHost = { kind?: string; orderId?: string | null; policyTopic?: { requestId: string; originalQuery: string } | null;
+  itemPaidUnit?: { requestId: string; paidCents: number } | null };
+const policyQuestion = "这份午餐套餐普通周末可以使用吗？", policyFollowup = "周日也能使用吗？";
+const policyOther = "这份午餐套餐一张券对应几人用餐？";
+const hostReference = (context: TranscriptContext): ChildHost => context.messages.flatMap(message => typeof message.content === "string" ? [message.content]
+  : message.content.filter(part => part.type === "text").map(part => part.text))
+  .map(text => { try { return JSON.parse(text) as ChildHost; } catch { return {}; } }).filter(value => value.kind === "host_order_reference").at(-1) ?? {};
 
-function displayedCommand(reply: ReturnType<typeof supportReply>, orderId: string) {
+function displayedCommand(reply: ReturnType<typeof supportReply>, label: string, kind = "订单") {
   assert.equal(reply?.kind, "notice");
-  const lines = (reply as { text: string }).text.split("\n"), index = lines.indexOf(orderId);
-  assert.ok(index >= 0, "The order must actually be displayed before extracting its selection command");
+  const lines = (reply as { text: string }).text.split("\n"), index = lines.indexOf(label);
+  assert.ok(index >= 0, "The reference must actually be displayed before extracting its selection command");
   const command = lines[index + 1];
-  assert.match(command ?? "", /^选择订单 [0-9a-f-]{36}$/);
+  assert.match(command ?? "", new RegExp(`^选择${kind} [0-9a-f-]{36}$`));
   return command!;
 }
 
 // Each mode owns its pools and Pi session; the parent waits for process exit before starting the next one.
 async function contextChild(mode: string, input: ChildInput) {
-  assert.ok(mode === "write" || mode === "recover");
+  assert.ok(["write", "recover", "policy-write", "policy-continue", "policy-select", "policy-restore", "amount-write", "amount-compare"].includes(mode));
   assert.match(input.identity.appId, /^CS_DB_[a-f0-9]{16}$/);
   const nonce = input.identity.appId.slice(6);
-  assert.equal(input.identity.senderId, `owner_${nonce}`); assert.equal(input.channel, `cs-${nonce}-process`);
+  assert.equal(input.identity.senderId, `owner_${nonce}`);
+  assert.equal(input.channel, `cs-${nonce}-${mode.startsWith("policy-") ? "policy" : mode.startsWith("amount-") ? "amount" : "process"}`);
   assert.equal(input.orders.length, 2); for (const id of input.orders) assert.match(id, /^COUPON-2\d{3}$/);
   const contextPool = createPool(readAfterSalesDatabaseConfig()), businessPool = createPool(readDatabaseConfig());
   const contexts = new ConversationStateStore(contextPool), business = new CouponStore(businessPool);
   const port = contexts.bind(input.identity, input.channel), reads: string[] = [];
+  const queries: Array<{ query: string; shopId?: string; productId?: string; documents: Awaited<ReturnType<CouponStore["searchKnowledge"]>> }> = [];
   const observed = { async getOrder(who: QQIdentity, orderId: string) { reads.push(orderId); return business.getOrder(who, orderId); },
-    searchKnowledge: (...args: Parameters<CouponStore["searchKnowledge"]>) => business.searchKnowledge(...args) } as unknown as CouponStore;
+    async searchKnowledge(query: string, shopId?: string, productId?: string) {
+      const documents = await business.searchKnowledge(query, shopId, productId);
+      queries.push({ query, shopId, productId, documents }); return documents;
+    } } as unknown as CouponStore;
   let session: Session | undefined;
   try {
     const runtime = await createModelRuntime(), faux = fauxProvider(); runtime.registerNativeProvider(faux.provider);
     session = await createSupportSession(input.identity, observed, runtime, faux.getModel(), undefined, { groupOpenid: input.channel, context: port });
     let request = 0;
-    async function turn(text: string, action?: ContextSupportAction) {
+    async function turn(text: string, action?: ContextSupportAction | ((host: ChildHost) => ContextSupportAction)) {
       const requestId = `cs-child-${process.pid}-${++request}`;
       prepareSupportPrompt(session!, { requestId, groupOpenid: input.channel, messageId: requestId });
-      faux.setResponses(action ? [() => fauxAssistantMessage(fauxToolCall("support_action", { action }), { stopReason: "toolUse" }),
+      let host: ChildHost | undefined;
+      faux.setResponses(action ? [context => {
+        host = hostReference(context);
+        return fauxAssistantMessage(fauxToolCall("support_action", { action: typeof action === "function" ? action(host) : action }), { stopReason: "toolUse" });
+      },
         () => fauxAssistantMessage("仅按本轮模拟业务结果回复。")] : []);
-      const calls = faux.state.callCount, before = reads.length;
+      const calls = faux.state.callCount, before = reads.length, beforeQueries = queries.length;
       await session!.prompt(text, { expandPromptTemplates: false });
       assert.equal(session!.agent.state.errorMessage, undefined); assert.equal(faux.getPendingResponseCount(), 0);
-      if (!action) { assert.equal(faux.state.callCount, calls, "Host selection cannot invoke a model"); assert.equal(reads.length, before); }
-      return { requestId, reply: supportReply(session!), result: getSupportResult(session!), receipt: getSupportHostReceipt(session!) };
+      if (!action) { assert.equal(faux.state.callCount, calls, "Host selection cannot invoke a model"); assert.equal(reads.length, before); assert.equal(queries.length, beforeQueries); }
+      return { requestId, host, reply: supportReply(session!), result: getSupportResult(session!), receipt: getSupportHostReceipt(session!) };
     }
     const [orderA, orderB] = input.orders;
+    function checkPolicy(checked: Awaited<ReturnType<typeof turn>>, question: string, previous?: string) {
+      assert.equal(checked.result?.outcome, "ready");
+      const topic = checked.result?.verifiedPolicyTopic, query = queries.at(-1);
+      assert.ok(topic && query); assert.equal(topic.requestId, checked.requestId); assert.equal(topic.originalQuery, question);
+      assert.equal(query.shopId, "shop-demo-1"); assert.equal(query.productId, "product-demo-1");
+      assert.equal(checked.result?.evidence.knowledge.length, 1);
+      assert.equal(checked.result.evidence.knowledge[0]?.trace.mode, "lexical");
+      assert.equal(checked.result.evidence.knowledge[0]?.context.originalQuery, question);
+      assert.ok(query.query.includes(question.replaceAll(orderA, "该订单")), "Retrieval may normalize only the authorized order locator");
+      assert.ok(query.documents.length > 0);
+      assert.deepEqual(topic.sources, query.documents.map(document => ({ sourceId: document.sourceId,
+        version: createHash("sha256").update(JSON.stringify(document)).digest("hex") })));
+      if (previous) {
+        assert.equal(checked.host?.policyTopic?.requestId, previous);
+        assert.equal(checked.result.evidence.knowledge[0]?.context.policyTopic?.requestId, previous);
+        assert.ok(query.query.includes(policyQuestion), "The actual fresh retrieval retains the original policy question");
+        assert.ok(topic.priorQueries?.some(row => row.requestId === previous));
+      }
+      return topic;
+    }
+    const previousPolicy = (question: string) => (host: ChildHost): ContextSupportAction => ({ protocol: "v2.2", kind: "policy",
+      orderRef: { kind: "focus" }, question, questionContext: { kind: "previous", requestId: host.policyTopic?.requestId ?? "missing-host-topic" },
+      evidenceTarget: { kind: "rule_only", basis: question } });
+    if (mode === "policy-write") {
+      const first = await turn(`${orderA} ${policyQuestion}`, { protocol: "v2.2", kind: "policy", orderRef: { kind: "explicit", orderId: orderA },
+        question: policyQuestion, questionContext: { kind: "standalone" }, evidenceTarget: { kind: "rule_only", basis: policyQuestion } });
+      const topic = checkPolicy(first, `${orderA} ${policyQuestion}`), saved = (await port.read()).value;
+      assert.ok(topic.sources.some(source => source.sourceId === "KB-SHOP-DEMO-1"));
+      assert.ok(saved?.version === 3 && saved.policyChoices?.candidates.length === 1);
+      assert.equal(saved.policyChoices.selectedRequestId, undefined, "A unique topic is not an explicit user selection");
+      assert.doesNotMatch(JSON.stringify(saved.policyChoices), /token|presentation|sourceKey|groupOpenid|reply/);
+      assert.deepEqual(reads, [orderA]); assert.equal(queries.length, 1);
+      return { pid: process.pid, referenceRequestId: first.requestId, sourceIds: topic.sources.map(source => source.sourceId) };
+    }
+    if (mode === "policy-continue") {
+      assert.ok(input.referenceRequestId);
+      const continued = await turn(policyFollowup, previousPolicy(policyFollowup));
+      checkPolicy(continued, policyFollowup, input.referenceRequestId);
+      const other = await turn(policyOther, { protocol: "v2.2", kind: "policy", orderRef: { kind: "focus" },
+        question: policyOther, questionContext: { kind: "standalone" }, evidenceTarget: { kind: "rule_only", basis: policyOther } });
+      const topic = checkPolicy(other, policyOther); assert.ok(topic.sources.some(source => source.sourceId === "KB-PRODUCT-LUNCH"));
+      const shown = await turn("请列出刚才的两个话题", { protocol: "v2.2", kind: "clarify", field: "policy_topic", reason: "ambiguous" });
+      const saved = (await port.read()).value;
+      assert.ok(saved?.version === 3 && saved.policyChoices?.candidates.length === 2);
+      assert.equal(saved.pendingReferenceKind, "policy"); assert.equal(saved.policyChoices.selectedRequestId, undefined);
+      assert.equal(queries.length, 2); assert.deepEqual(reads, [orderA, orderA]);
+      return { pid: process.pid, command: displayedCommand(shown.reply, `${orderA}：${policyFollowup}`, "话题"),
+        referenceRequestId: continued.requestId, sourceIds: continued.result!.verifiedPolicyTopic!.sources.map(source => source.sourceId) };
+    }
+    if (mode === "policy-select") {
+      assert.ok(input.oldCommand && input.referenceRequestId);
+      const before = (await port.read()).value;
+      assert.ok(before?.version === 3 && before.policyChoices);
+      const rejected = await turn(input.oldCommand); assert.equal(rejected.receipt?.outcome, "rejected");
+      const command = displayedCommand(rejected.reply, `${orderA}：${policyFollowup}`, "话题"); assert.notEqual(command, input.oldCommand);
+      const selected = await turn(command); assert.equal(selected.receipt?.outcome, "selected");
+      assert.equal(selected.receipt?.version, "reference-selection-v1");
+      if (selected.receipt?.version !== "reference-selection-v1") throw new Error("Missing policy receipt");
+      assert.equal(selected.receipt.presentationRequestId, rejected.requestId); assert.equal(selected.receipt.selectedRequestId, input.referenceRequestId);
+      const saved = (await port.read()).value;
+      assert.ok(saved?.version === 3 && saved.policyChoices);
+      assert.equal(saved.policyChoices.selectedRequestId, input.referenceRequestId);
+      assert.deepEqual(saved.policyChoices.candidates, before.policyChoices.candidates, "Selection does not renew policy TTL or rewrite source questions");
+      assert.equal(queries.length, 0); assert.deepEqual(reads, []);
+      return { pid: process.pid, referenceRequestId: input.referenceRequestId };
+    }
+    if (mode === "policy-restore") {
+      assert.ok(input.referenceRequestId);
+      const before = (await port.read()).value;
+      assert.ok(before?.version === 3 && before.policyChoices?.selectedRequestId === input.referenceRequestId);
+      const question = "再确认一下周日的使用安排。", continued = await turn(question, previousPolicy(question));
+      const topic = checkPolicy(continued, question, input.referenceRequestId);
+      assert.ok(queries[0]?.query.includes(policyFollowup)); assert.ok(!queries[0]?.query.includes(policyOther));
+      assert.equal(queries.length, 1); assert.deepEqual(reads, [orderA]);
+      const saved = (await port.read()).value;
+      assert.ok(saved?.version === 3 && saved.policyChoices?.selectedRequestId === continued.requestId);
+      return { pid: process.pid, referenceRequestId: continued.requestId, sourceIds: topic.sources.map(source => source.sourceId) };
+    }
+    if (mode === "amount-write") {
+      const shown = await turn(`查看 ${orderA} 的每券实付`, { protocol: "v2.2", kind: "order", orderRef: { kind: "explicit", orderId: orderA } });
+      const reference = shown.result?.verifiedAmountReference;
+      assert.ok(reference); assert.equal(reference.paidCents, 7980);
+      assert.ok(shown.reply && "text" in shown.reply); assert.match(shown.reply.text, /每券实付 79\.80 元/);
+      const saved = (await port.read()).value;
+      assert.ok(saved?.version === 3 && saved.amountChoices?.candidates.length === 1);
+      assert.equal(saved.amountChoices.candidates[0]!.reference.paidCents, 7980);
+      assert.equal(saved.amountChoices.candidates[0]!.reference.requestId, shown.requestId);
+      assert.equal(saved.amountChoices.selectedRequestId, undefined);
+      assert.doesNotMatch(JSON.stringify(saved.amountChoices), /token|presentation|sourceKey|groupOpenid|approval|confirmation/);
+      assert.deepEqual(reads, [orderA]); assert.equal(queries.length, 0);
+      return { pid: process.pid, referenceRequestId: shown.requestId, referenceOrderVersion: reference.orderVersion, paidCents: reference.paidCents };
+    }
+    if (mode === "amount-compare") {
+      assert.ok(input.referenceRequestId && input.referenceOrderVersion);
+      const compared = await turn("剩下未核销的那张券，实付和前面展示的一样吗？", host => ({ protocol: "v2.2", kind: "paid_amount_compare",
+        orderRef: { kind: "focus" }, amountRef: { requestId: host.itemPaidUnit?.requestId ?? "missing-host-amount" } }));
+      assert.equal(compared.result?.outcome, "ready"); assert.equal(compared.host?.itemPaidUnit?.requestId, input.referenceRequestId);
+      assert.equal(compared.host?.itemPaidUnit?.paidCents, 7980);
+      const comparison = compared.result?.evidence.amountComparison;
+      assert.ok(comparison); assert.equal(comparison.referencePaidCents, 7980); assert.equal(comparison.remainingUnitPaidCents, 6543);
+      assert.equal(comparison.comparisonEqual, false); assert.equal(comparison.refundApproved, false);
+      assert.equal(comparison.referenceRequestId, input.referenceRequestId); assert.equal(comparison.referenceOrderVersion, input.referenceOrderVersion);
+      assert.notEqual(comparison.currentOrderVersion, input.referenceOrderVersion);
+      assert.equal(compared.result?.evidence.order?.amounts.paidCents, 13086); assert.equal(compared.result?.evidence.operation, undefined);
+      assert.ok(compared.reply && "text" in compared.reply); assert.match(compared.reply.text, /65\.43 元.*79\.80 元不同/);
+      assert.match(compared.reply.text, /不代表.*批准.*未生成或提交退款/);
+      assert.deepEqual(reads, [orderA]); assert.equal(queries.length, 0);
+      const [rows] = await businessPool.execute<RowDataPacket[]>("SELECT (SELECT COUNT(*) FROM merchant_requests WHERE order_id = ?) AS tasks, (SELECT COUNT(*) FROM refund_operations WHERE order_id = ?) AS operations, (SELECT COUNT(*) FROM refunds WHERE order_id = ?) AS refunds", [orderA, orderA, orderA]);
+      assert.deepEqual([Number(rows[0]!.tasks), Number(rows[0]!.operations), Number(rows[0]!.refunds)], [0, 0, 0]);
+      return { pid: process.pid, referenceRequestId: comparison.referenceRequestId, paidCents: comparison.remainingUnitPaidCents };
+    }
     if (mode === "write") {
       for (const orderId of input.orders) await turn(`查看 ${orderId}`, { protocol: "v2.2", kind: "order", orderRef: { kind: "explicit", orderId } });
       const shown = await turn("刚才提到的那笔订单呢？", { protocol: "v2.2", kind: "clarify", field: "order", reason: "ambiguous" });
       const command = displayedCommand(shown.reply, orderB), saved = (await port.read()).value;
-      assert.equal(saved?.version, 2); assert.ok(saved?.version === 2 && saved.orderChoices?.pending);
+      assert.ok(saved && saved.version !== 1 && saved.orderChoices?.pending);
       assert.deepEqual(saved.orderChoices.candidates.map(row => row.orderId).sort(), [orderA, orderB].sort());
-      assert.equal(saved.requiresRestatement, true); assert.doesNotMatch(JSON.stringify(saved), /token|presentation|amountCents|paidCents/);
+      assert.equal(saved.requiresRestatement, true); assert.doesNotMatch(JSON.stringify(saved), /token|presentation/);
+      assert.doesNotMatch(JSON.stringify(saved.orderChoices), /amountCents|paidCents/);
       assert.deepEqual(reads, [orderA, orderB]);
       return { pid: process.pid, command, candidates: saved.orderChoices.candidates };
     }
     assert.ok(input.oldCommand); assert.ok(Number.isSafeInteger(input.expectedPaidCents));
     const before = (await port.read()).value;
-    assert.ok(before?.version === 2 && before.orderChoices?.pending);
+    assert.ok(before && before.version !== 1 && before.orderChoices?.pending);
     const rejected = await turn(input.oldCommand);
     assert.equal(rejected.receipt?.version, "reference-selection-v1"); assert.equal(rejected.receipt?.outcome, "rejected");
     assert.equal(rejected.result, undefined);
@@ -82,7 +214,7 @@ async function contextChild(mode: string, input: ChildInput) {
     if (selected.receipt?.version !== "reference-selection-v1") throw new Error("Missing reference receipt");
     assert.equal(selected.receipt.selectedOrderId, orderB); assert.equal(selected.receipt.presentationRequestId, rejected.requestId);
     const selectedValue = (await port.read()).value;
-    assert.ok(selectedValue?.version === 2 && selectedValue.orderChoices);
+    assert.ok(selectedValue && selectedValue.version !== 1 && selectedValue.orderChoices);
     assert.deepEqual(selectedValue.orderChoices.candidates, before.orderChoices.candidates,
       "Restart, redisplay and selection preserve the original candidate expiry");
     const fresh = await turn("这笔订单当前情况呢？", { protocol: "v2.2", kind: "order", orderRef: { kind: "focus" } });
@@ -95,13 +227,13 @@ async function contextChild(mode: string, input: ChildInput) {
   } finally { session?.dispose(); await Promise.all([contextPool.end(), businessPool.end()]); }
 }
 
-function runContextChild(mode: "write" | "recover", input: ChildInput) {
+function runContextChild(mode: ChildMode, input: ChildInput) {
   const child = spawnSync(process.execPath, [fileURLToPath(import.meta.url), `--context-child=${mode}`], {
     cwd: fileURLToPath(new URL("../", import.meta.url)), input: JSON.stringify(input), encoding: "utf8", timeout: 30_000, maxBuffer: 1024 * 1024,
   });
   // This output contains only synthetic identifiers/assertions; environment values are never serialized.
   assert.ifError(child.error); assert.equal(child.status, 0, child.stderr);
-  const output = JSON.parse(child.stdout.trim()) as { pid: number; command?: string; candidates?: Candidate[]; selectedOrderId?: string; paidCents?: number };
+  const output = JSON.parse(child.stdout.trim()) as ChildOutput;
   assert.equal(output.pid, child.pid); assert.notEqual(output.pid, process.pid);
   return output;
 }
@@ -121,8 +253,8 @@ export async function checkConversationStateDatabase() {
   const nonce = randomBytes(8).toString("hex"), app = `CS_DB_${nonce}`;
   const identity: QQIdentity = { appId: app, senderId: `owner_${nonce}` };
   const otherUser = { ...identity, senderId: `peer_${nonce}` }, otherApp = { ...identity, appId: `CS_ALT_${nonce}` };
-  const fixture = await createMerchantFixture(["approve", "approve", "approve", "approve", "approve", "approve"], { delayMs: 5000 });
-  const [orderA, orderB, writeOrder, noticeOrder, childA, childB] = fixture.orders as [string, string, string, string, string, string];
+  const fixture = await createMerchantFixture(Array.from({ length: 8 }, () => "approve" as const), { delayMs: 5000 });
+  const [orderA, orderB, writeOrder, noticeOrder, childA, childB, policyOrder, amountOrder] = fixture.orders as [string, string, string, string, string, string, string, string];
   const sessions: Session[] = [], sourceKeys = new Set<string>();
   const reads: string[] = [];
   let contexts!: ConversationStateStore, contextPool!: Pool, business!: CouponStore, merchant!: AfterSalesStore, refunds!: RefundStore;
@@ -359,6 +491,94 @@ export async function checkConversationStateDatabase() {
     }
     console.log(`[conversation-state] synthetic child ${writer.pid} exit -> child ${reader.pid}: old command rejected, actual new command selected, B fresh read PASS`);
 
+    const policyGroup = group("policy"); bind(policyGroup);
+    const policyInput: ChildInput = { identity, channel: policyGroup, orders: [policyOrder, amountOrder] };
+    const policyWriter = runContextChild("policy-write", policyInput); assert.ok(policyWriter.referenceRequestId);
+    const policyContinued = runContextChild("policy-continue", { ...policyInput, referenceRequestId: policyWriter.referenceRequestId });
+    assert.notEqual(policyWriter.pid, policyContinued.pid); assert.ok(policyContinued.command && policyContinued.referenceRequestId);
+    assert.ok(policyWriter.sourceIds?.includes("KB-SHOP-DEMO-1"));
+    console.log(`[conversation-state] policy child ${policyWriter.pid} exit -> ${policyContinued.pid}: single-topic previous performs fresh MySQL seed lexical retrieval PASS`);
+    const policySelected = runContextChild("policy-select", { ...policyInput, oldCommand: policyContinued.command,
+      referenceRequestId: policyContinued.referenceRequestId });
+    const policySnapshot = await bind(policyGroup).read();
+    assert.ok(policySnapshot.value?.version === 3 && policySnapshot.value.policyChoices?.selectedRequestId === policyContinued.referenceRequestId);
+    const policyRestored = runContextChild("policy-restore", { ...policyInput, referenceRequestId: policyContinued.referenceRequestId });
+    assert.equal(new Set([policyWriter.pid, policyContinued.pid, policySelected.pid, policyRestored.pid]).size, 4);
+    assert.ok(policyRestored.sourceIds?.includes("KB-SHOP-DEMO-1"));
+    console.log(`[conversation-state] policy children ${policyContinued.pid} -> ${policySelected.pid} -> ${policyRestored.pid}: old command rejected, actual new selection survives another process, selected branch re-retrieved PASS`);
+
+    const amountGroup = group("amount"); bind(amountGroup);
+    assert.ok(fixture.orders.includes(amountOrder));
+    // Only this fresh fixture is expanded to two separately redeemable coupons. Cleanup already follows its owned order.
+    admin(`START TRANSACTION;
+UPDATE orders SET status = 'partially_redeemed', total_cents = 15960, paid_cents = 15960 WHERE id = '${amountOrder}';
+UPDATE order_items SET quantity = 2, unit_price_cents = 7980, total_cents = 15960 WHERE order_id = '${amountOrder}';
+UPDATE payments SET amount_cents = 15960 WHERE order_id = '${amountOrder}';
+INSERT INTO coupons (id, order_item_id, status, expires_at, redeemed_at, redeemed_shop_id)
+  SELECT CONCAT(c.id, '-used'), c.order_item_id, 'redeemed', c.expires_at, UTC_TIMESTAMP(3), i.shop_id
+  FROM coupons c JOIN order_items i ON i.id = c.order_item_id WHERE i.order_id = '${amountOrder}';
+COMMIT;`);
+    const amountInput: ChildInput = { identity, channel: amountGroup, orders: [amountOrder, policyOrder] };
+    const amountWriter = runContextChild("amount-write", amountInput);
+    assert.equal(amountWriter.paidCents, 7980); assert.ok(amountWriter.referenceRequestId && amountWriter.referenceOrderVersion);
+    const amountSnapshot = await bind(amountGroup).read();
+    assert.ok(amountSnapshot.value?.version === 3 && amountSnapshot.value.amountChoices?.candidates.length === 1);
+    admin(`START TRANSACTION;
+UPDATE orders SET total_cents = 13086, paid_cents = 13086 WHERE id = '${amountOrder}';
+UPDATE order_items SET unit_price_cents = 6543, total_cents = 13086 WHERE order_id = '${amountOrder}';
+UPDATE payments SET amount_cents = 13086 WHERE order_id = '${amountOrder}';
+COMMIT;`);
+    const amountCompared = runContextChild("amount-compare", { ...amountInput, referenceRequestId: amountWriter.referenceRequestId,
+      referenceOrderVersion: amountWriter.referenceOrderVersion });
+    assert.notEqual(amountWriter.pid, amountCompared.pid); assert.equal(amountCompared.paidCents, 6543);
+    console.log(`[conversation-state] amount child ${amountWriter.pid} exit -> ${amountCompared.pid}: actual historical 7980 vs fresh 6543, unequal, refundApproved=false and zero refund writes PASS`);
+
+    for (const [channel, snapshot] of [[policyGroup, policySnapshot], [amountGroup, amountSnapshot]] as const) {
+      const port = bind(channel), current = await port.read();
+      await assert.rejects(port.write(snapshot, snapshot.value!), "v3 snapshots also reject revisions superseded by a later child");
+      for (const [who, otherChannel] of [[otherUser, channel], [otherApp, channel], [identity, `${channel}-other`]] as const) {
+        assert.equal((await bind(otherChannel, who).read()).value, undefined, "Policy questions and historical amounts cannot cross a trusted route");
+      }
+      const forged = structuredClone(snapshot.value!);
+      assert.ok(forged.version === 3);
+      const policyCandidate = forged.policyChoices?.candidates[0], amountCandidate = forged.amountChoices?.candidates[0];
+      assert.ok(policyCandidate || amountCandidate);
+      if (policyCandidate) policyCandidate.topic.orderId = "COUPON-1002";
+      if (amountCandidate) amountCandidate.reference.orderId = "COUPON-1002";
+      await assert.rejects(port.write(current, forged), "Every persisted policy/amount order is subject to current ownership");
+      await assert.rejects(port.write(current, { ...snapshot.value, selectedToken: "forged" } as unknown as Value));
+      assert.deepEqual(await port.read(), current);
+    }
+    const expiredPolicyGroup = group("policy-expired"), expiredPolicyPort = bind(expiredPolicyGroup);
+    const expiredPolicy = structuredClone(policySnapshot.value);
+    assert.ok(expiredPolicy?.version === 3 && expiredPolicy.policyChoices);
+    const selectedPolicyRequest = expiredPolicy.policyChoices.selectedRequestId; assert.ok(selectedPolicyRequest);
+    await expiredPolicyPort.write(await expiredPolicyPort.read(), expiredPolicy);
+    for (const candidate of expiredPolicy.policyChoices.candidates) if (candidate.topic.requestId === selectedPolicyRequest) candidate.expiresAt = Date.now() - 1;
+    corrupt(expiredPolicyGroup, expiredPolicy);
+    const expiredPolicyRead = (await expiredPolicyPort.read()).value;
+    assert.ok(expiredPolicyRead?.version === 3 && expiredPolicyRead.policyChoices);
+    assert.equal(expiredPolicyRead.policyChoices.selectedRequestId, undefined); assert.equal(expiredPolicyRead.policyChoices.candidates.length, 1);
+    assert.equal(expiredPolicyRead.policyChoices.selectionRequired, true, "Expired selected policy must not silently select the survivor");
+    const expiredPolicyTurn = await turn(await create(expiredPolicyGroup), expiredPolicyGroup, policyFollowup, {
+      protocol: "v2.2", kind: "policy", orderRef: { kind: "focus" }, question: policyFollowup,
+      questionContext: { kind: "previous", requestId: selectedPolicyRequest } });
+    assert.equal(expiredPolicyTurn.result?.outcome, "clarification"); assert.equal(expiredPolicyTurn.result?.evidence.knowledge.length, 0);
+    assert.deepEqual(expiredPolicyTurn.reads, []);
+    const expiredAmountGroup = group("amount-expired"), expiredAmountPort = bind(expiredAmountGroup);
+    const expiredAmount = structuredClone(amountSnapshot.value);
+    assert.ok(expiredAmount?.version === 3 && expiredAmount.amountChoices);
+    await expiredAmountPort.write(await expiredAmountPort.read(), expiredAmount);
+    expiredAmount.amountChoices.candidates[0]!.expiresAt = Date.now() - 1; corrupt(expiredAmountGroup, expiredAmount);
+    const expiredAmountRead = (await expiredAmountPort.read()).value;
+    assert.ok(expiredAmountRead?.version === 3 && expiredAmountRead.amountChoices);
+    assert.equal(expiredAmountRead.amountChoices.candidates.length, 0); assert.equal(expiredAmountRead.amountChoices.selectedRequestId, undefined);
+    const expiredCompare = await turn(await create(expiredAmountGroup), expiredAmountGroup, "剩下那张和之前实付一样吗？", {
+      protocol: "v2.2", kind: "paid_amount_compare", orderRef: { kind: "focus" }, amountRef: { requestId: amountWriter.referenceRequestId } });
+    assert.equal(expiredCompare.result?.outcome, "clarification"); assert.equal(expiredCompare.result?.evidence.amountComparison, undefined);
+    assert.deepEqual(expiredCompare.reads, []);
+    console.log("[conversation-state] v3 CAS/identity/ownership, expired selection and expired amount fail closed PASS");
+
     const transferredGroup = group("changed-ownership"), transferredPort = bind(transferredGroup);
     await transferredPort.write(await transferredPort.read(), { ...candidatesValue([{ orderId: childA, requestId: "formerly-owned", expiresAt }],
       { selectionRequired: false, pending: false }), requiresRestatement: false, focus: value(childA).focus });
@@ -372,7 +592,7 @@ export async function checkConversationStateDatabase() {
       assert.equal(changed.reply?.kind, "notice"); assert.equal(refundPrepares, previousPrepares);
       const saved = (await transferredPort.read()).value;
       assert.equal(saved?.requiresRestatement, true); assert.equal(saved?.focus, undefined);
-      assert.ok(saved?.version !== 2 || !saved.orderChoices?.candidates.length);
+      assert.ok(!saved || saved.version === 1 || !saved.orderChoices?.candidates.length);
     } finally {
       admin(`UPDATE orders SET customer_id = (SELECT customer_id FROM qq_identities WHERE app_id = '${identity.appId}' AND sender_id = '${identity.senderId}') WHERE id = '${childA}';`);
     }
@@ -421,7 +641,7 @@ export async function checkConversationStateDatabase() {
     faux.setResponses(responses(action("order"))); await qq.handle(message(qqGroup, "继续查看这笔订单"));
     assert.equal(getSupportResult(sessions.at(-1)!)?.evidence.order?.id, orderB);
     console.log("[conversation-state] real QQAgent local transport, 20-turn replacement and A-notification/B-focus isolation PASS");
-    console.log("PASS conversation state: real MySQL + Pi/faux, including two synthetic CLI processes; no paid model or QQ platform requests. Full O4 model/history recovery remains unverified.");
+    console.log("PASS conversation state: real MySQL + Pi/faux, including independent synthetic CLI processes; no paid model or QQ platform requests. Full O4 model/history recovery remains unverified.");
   } finally {
     await qq?.close();
     try {

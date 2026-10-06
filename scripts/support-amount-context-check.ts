@@ -54,6 +54,11 @@ export async function checkSupportAmountContext() {
   const survivor = structuredClone(choices); survivor.candidates[0]!.expiresAt = 1014;
   assert.equal(currentAmountChoices(survivor, binding, 1015)!.candidates.length, 1);
   assert.equal(resolveAmountReference(survivor, binding, 1015), undefined, "expiry cannot silently resolve a previously ambiguous list");
+  const empty = currentAmountChoices(survivor, binding, 1015 + amountChoiceTtlMs)!;
+  assert.equal(empty.candidates.length, 0); assert.equal(empty.selectionRequired, true); assert.equal(empty.overflow, true);
+  const repopulated = rememberAmountChoice(empty, binding, referenceA, 1016 + amountChoiceTtlMs)!;
+  assert.equal(resolveAmountReference(repopulated, binding, 1017 + amountChoiceTtlMs), undefined,
+    "repopulating an expired ambiguous list cannot manufacture a selection");
 
   let reads = 0, knowledge = 0, failReads = false, focus: string | undefined;
   const store = { getOrder: async (_identity: typeof identity, id: string) => {

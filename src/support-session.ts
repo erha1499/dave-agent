@@ -12,7 +12,7 @@ import type { SupportContextPort, SupportContextSnapshot, SupportContextValue } 
 import type { Reply } from "./reply.ts";
 import { normalizeModelSupportAction, modelSupportActionParameters } from "./support-context-action.ts";
 import { SupportController, type SupportCall, type SupportResult, type TrustedPolicyTopic } from "./support-controller.ts";
-import { amountChoiceNotice, amountChoicesVersion, currentAmountChoices, rememberAmountChoice, rememberOrderChoice,
+import { amountChoiceNotice, amountChoiceTtlMs, amountChoicesVersion, currentAmountChoices, rememberAmountChoice, rememberOrderChoice,
   resolveAmountReference, selectAmountChoice, selectAlternativeOrder, type TrustedAmountChoices, type TrustedOrderChoices } from "./support-context.ts";
 import { resolveSupportParameters } from "./support-parameters.ts";
 import { currentReferenceChoices, emptyReferenceChoices, referenceChoiceNotice, referenceChoiceTtlMs, rememberReferenceChoice,
@@ -40,12 +40,13 @@ type State = { next?: SupportPrompt; result?: SupportResult; focusOrderId?: stri
   policyChoices?: TrustedReferenceChoices; orderReferenceChoices?: TrustedReferenceChoices;
   selectedOrderId?: string; pendingReferenceKind?: "order" | "policy";
   presentations?: Partial<Record<"order" | "policy", { requestId: string; choices: TrustedReferenceChoices }>>;
+  amountPresentation?: TrustedAmountChoices;
   abort?: AbortController; turnError?: boolean; focusUnavailable?: boolean; invalidActions: number; actionStarted: boolean };
 const sessions = new WeakMap<AgentSession, State>();
 function clearReferences(state: State) {
   state.policyTopic = undefined; state.orderChoices = undefined; state.amountChoices = undefined; state.hostReceipt = undefined;
   state.policyChoices = undefined; state.orderReferenceChoices = undefined; state.selectedOrderId = undefined;
-  state.pendingReferenceKind = undefined; state.presentations = undefined;
+  state.pendingReferenceKind = undefined; state.presentations = undefined; state.amountPresentation = undefined;
 }
 
 export function readSupportArchitecture(env: NodeJS.ProcessEnv = process.env): "atomic" | "controller" {
@@ -139,7 +140,8 @@ export async function createSupportSession(
       contextSnapshot = await options.context!.write(expected, value);
       // A final publication already in flight may finish after cancellation.
       // Serialize its invalidation before a new prompt can read the record.
-      if ((value.focus || value.version === 2 && value.orderChoices) && (abort.signal.aborted || state.abort !== abort)) {
+      if ((value.focus || value.version !== 1 && value.orderChoices
+        || value.version === 3 && (value.policyChoices || value.amountChoices)) && (abort.signal.aborted || state.abort !== abort)) {
         contextSnapshot = await options.context!.write(contextSnapshot, blockedContext());
       }
     })();
@@ -171,18 +173,35 @@ export async function createSupportSession(
       || result?.evidence.order && result.evidence.order.id !== contextFocus.orderId)) {
       contextFocus = undefined; state.focusOrderId = undefined;
     }
-    const needsRestatement = state.turnError || !result && !selected || !contextFocus || contextFocus.expiresAt <= Date.now()
-      || Boolean(state.pendingReferenceKind) || ambiguousOrders
-      || Boolean(result && (result.outcome !== "ready" || ["policy", "refund_eligibility", "paid_amount_compare"].includes(result.action.kind)))
-      || Boolean(receipt && !selected);
-    const choices = !state.turnError && (result || receipt) ? currentReferenceChoices(state.orderReferenceChoices, binding) : undefined;
-    const value: SupportContextValue = choices ? { version: 2, requiresRestatement: needsRestatement,
-      ...(contextFocus && contextFocus.expiresAt > Date.now() ? { focus: contextFocus } : {}),
-      orderChoices: { candidates: choices.candidates.flatMap(row => row.reference.kind === "order"
+    const needsRestatement = state.turnError || !result && !receipt || !contextFocus || contextFocus.expiresAt <= Date.now()
+      || state.pendingReferenceKind === "order" || ambiguousOrders
+      || Boolean(result && result.outcome !== "ready" && result.outcome !== "clarification");
+    const completed = !state.turnError && Boolean(result || receipt);
+    const choices = completed ? currentReferenceChoices(state.orderReferenceChoices, binding) : undefined;
+    const policies = completed ? currentReferenceChoices(state.policyChoices, binding) : undefined;
+    const amounts = completed ? currentAmountChoices(state.amountChoices, binding) : undefined;
+    const base = { requiresRestatement: needsRestatement,
+      ...(contextFocus && contextFocus.expiresAt > Date.now() ? { focus: contextFocus } : {}) };
+    const orderChoices = choices ? { candidates: choices.candidates.flatMap(row => row.reference.kind === "order"
         ? [{ requestId: row.reference.requestId, orderId: row.reference.orderId, expiresAt: row.expiresAt }] : []),
-        overflow: choices.overflow, selectionRequired: choices.selectionRequired, pending: state.pendingReferenceKind === "order" } }
-      : { version: 1, requiresRestatement: needsRestatement,
-        ...(contextFocus && contextFocus.expiresAt > Date.now() ? { focus: contextFocus } : {}) };
+      overflow: choices.overflow, selectionRequired: choices.selectionRequired, pending: state.pendingReferenceKind === "order" } : undefined;
+    const selectedPolicy = policies?.candidates.find(row => row.token === policies.selectedToken)?.reference;
+    const selectedAmount = amounts?.candidates.find(row => row.token === amounts.selectedToken)?.reference;
+    const value: SupportContextValue = policies || amounts || completed && state.pendingReferenceKind === "policy"
+      ? { version: 3, ...base, ...(orderChoices ? { orderChoices } : {}),
+        ...(state.pendingReferenceKind ? { pendingReferenceKind: state.pendingReferenceKind } : {}),
+        ...(policies ? { policyChoices: { candidates: policies.candidates.flatMap(row => {
+          if (row.reference.kind !== "policy") return [];
+          const { sourceKey: _source, groupOpenid: _group, ...topic } = row.reference.topic;
+          return [{ topic, expiresAt: row.expiresAt }];
+        }), overflow: policies.overflow, selectionRequired: policies.selectionRequired,
+        ...(selectedPolicy?.kind === "policy" ? { selectedRequestId: selectedPolicy.topic.requestId } : {}) } } : {}),
+        ...(amounts ? { amountChoices: { candidates: amounts.candidates.map(row => {
+          const { sourceKey: _source, groupOpenid: _group, ...reference } = row.reference;
+          return { reference, expiresAt: row.expiresAt };
+        }), overflow: amounts.overflow, selectionRequired: amounts.selectionRequired,
+        ...(selectedAmount ? { selectedRequestId: selectedAmount.requestId } : {}) } } : {}) }
+      : orderChoices ? { version: 2, ...base, orderChoices } : { version: 1, ...base };
     try { await saveContext(value, abort); }
     catch {
       if (state.abort === abort) {
@@ -245,6 +264,9 @@ export async function createSupportSession(
       if (result.verifiedAmountReference && !result.needsAnswer && result.reply.kind === "order") {
         state.amountChoices = rememberAmountChoice(state.amountChoices, binding, result.verifiedAmountReference);
       } else if (result.outcome === "blocked" || result.outcome === "non_business") state.amountChoices = undefined;
+      const replyText = "text" in result.reply ? result.reply.text : "";
+      if (state.amountChoices && state.amountChoices.candidates.some(row =>
+        replyText.includes(`选择金额基准 ${row.token}`))) state.amountPresentation = structuredClone(state.amountChoices);
       if (result.outcome === "ready" && result.reply.kind === "order" && result.evidence.order) {
         state.orderChoices = rememberOrderChoice(state.orderChoices, { sourceKey, groupOpenid }, result.evidence.order.id, result.evidence.requestId);
         state.orderReferenceChoices = rememberReferenceChoice(state.orderReferenceChoices, binding,
@@ -381,7 +403,7 @@ export async function createSupportSession(
           contextFocus = next.value?.requiresRestatement ? undefined : next.value?.focus;
           contextOrderConfirmed = Boolean(contextFocus);
           state.focusOrderId = contextFocus?.orderId;
-          if (next.value?.version === 2 && next.value.orderChoices) {
+          if (next.value && next.value.version !== 1 && next.value.orderChoices) {
             const saved = next.value.orderChoices;
             let choices = emptyReferenceChoices("order", binding);
             // Reuse the existing selector and original deadlines, but issue new
@@ -395,10 +417,40 @@ export async function createSupportSession(
               selectionRequired: saved.selectionRequired || saved.overflow || saved.candidates.length > 1 };
             if (saved.pending || !contextFocus && (saved.selectionRequired || saved.overflow)) state.pendingReferenceKind = "order";
           }
+          if (next.value?.version === 3) {
+            const savedPolicies = next.value.policyChoices, savedAmounts = next.value.amountChoices;
+            if (savedPolicies) {
+              let choices = emptyReferenceChoices("policy", binding);
+              for (const row of savedPolicies.candidates) {
+                if (row.expiresAt <= Date.now()) continue;
+                choices = rememberReferenceChoice(choices, binding, { kind: "policy", topic: { ...row.topic, ...binding } },
+                  {}, row.expiresAt - referenceChoiceTtlMs)!;
+              }
+              const selectedToken = choices.candidates.find(row => row.reference.kind === "policy"
+                && row.reference.topic.requestId === savedPolicies.selectedRequestId)?.token;
+              state.policyChoices = { ...choices, overflow: savedPolicies.overflow,
+                selectionRequired: savedPolicies.selectionRequired || savedPolicies.overflow || savedPolicies.candidates.length > 1
+                  || Boolean(savedPolicies.selectedRequestId && !selectedToken), selectedToken };
+            }
+            if (savedAmounts) {
+              let choices = emptyAmountChoices();
+              for (const row of savedAmounts.candidates) {
+                if (row.expiresAt <= Date.now()) continue;
+                choices = rememberAmountChoice(choices, binding, { ...row.reference, ...binding }, row.expiresAt - amountChoiceTtlMs)!;
+              }
+              const selectedToken = choices.candidates.find(row => row.reference.requestId === savedAmounts.selectedRequestId)?.token;
+              state.amountChoices = { ...choices, overflow: savedAmounts.overflow,
+                selectionRequired: savedAmounts.selectionRequired || savedAmounts.overflow || savedAmounts.candidates.length > 1
+                  || Boolean(savedAmounts.selectedRequestId && !selectedToken), selectedToken };
+            }
+            if (state.pendingReferenceKind !== "order") state.pendingReferenceKind = next.value.pendingReferenceKind;
+          }
         }
         if (contextFocus && contextFocus.expiresAt <= Date.now()) {
           const choices = currentReferenceChoices(state.orderReferenceChoices, binding);
+          const policies = currentReferenceChoices(state.policyChoices, binding), amounts = currentAmountChoices(state.amountChoices, binding);
           clearReferences(state); state.focusOrderId = undefined; contextFocus = undefined; contextOrderConfirmed = false;
+          state.policyChoices = policies; state.amountChoices = amounts;
           // A recent authorized query may have produced candidates newer than
           // the original focus. Keep their deadlines, but require a new choice.
           if (choices) {
@@ -546,10 +598,13 @@ export async function createSupportSession(
       return;
     }
     const match = /^选择金额基准 ([a-f0-9-]{36})$/.exec(text.trim());
-    const selected = match && !promptOptions?.images?.length ? selectAmountChoice(state.amountChoices, binding, match[1]!) : undefined;
+    const offered = match && state.amountPresentation?.candidates.find(row => row.token === match[1]);
+    const candidate = match && state.amountChoices?.candidates.find(row => row.token === match[1]);
+    const selected = offered && candidate && offered.version === candidate.version && offered.expiresAt === candidate.expiresAt
+      && !promptOptions?.images?.length ? selectAmountChoice(state.amountChoices, binding, match![1]!) : undefined;
     // An invalid new choice invalidates the old selection; it cannot silently reuse it.
     state.amountChoices = selected ?? currentAmountChoices(state.amountChoices, binding) ?? emptyAmountChoices();
-    if (!selected) state.amountChoices.selectedToken = undefined;
+    if (!selected) { state.amountChoices.selectedToken = undefined; state.amountChoices.selectionRequired = true; }
     const reference = selected ? resolveAmountReference(selected, binding) : undefined;
     const reply: SupportHostReceipt["reply"] = { kind: "notice", text: reference
       ? `已选择 ${reference.orderId} 商品 ${reference.productId} 的每券实付 ${(reference.paidCents / 100).toFixed(2)} 元作为基准。请在下一条消息继续比较。仅支持同一订单；其他订单作为基准的比较尚不支持。此次选择不代表退款批准，也未提交退款。`
@@ -558,6 +613,7 @@ export async function createSupportSession(
       trustedRoute: { groupOpenid, messageId: current.messageId }, outcome: reference ? "selected" : "rejected",
       ...(reference ? { selectedRequestId: reference.requestId } : {}), choices: structuredClone(state.amountChoices), reply };
     state.hostReceipt = receipt;
+    if (!reference) state.amountPresentation = structuredClone(state.amountChoices);
     // Native non-triggering custom messages preserve the host event for the next
     // turn without asking the model to acknowledge a deterministic selection.
     try {

@@ -35,14 +35,15 @@ export function currentAmountChoices(choices: TrustedAmountChoices | undefined, 
   if (!bound(choices, binding) || choices!.version !== amountChoicesVersion || !Array.isArray(choices!.candidates)
     || choices!.candidates.length > 2 || typeof choices!.overflow !== "boolean" || typeof choices!.selectionRequired !== "boolean"
     || new Set(choices!.candidates.map(row => row.token)).size !== choices!.candidates.length
+    || new Set(choices!.candidates.map(row => row.reference.requestId)).size !== choices!.candidates.length
     || new Set(choices!.candidates.map(row => amountSource(row.reference))).size !== choices!.candidates.length
     || choices!.candidates.some(row => !/^[a-f0-9-]{36}$/.test(row.token) || !validAmount(row.reference, binding)
       || row.version !== amountVersion(row.reference) || !Number.isSafeInteger(row.expiresAt))) return undefined;
   const candidates = choices!.candidates.filter(row => row.expiresAt > now);
-  if (!candidates.length) return undefined;
   const selectedToken = candidates.some(row => row.token === choices!.selectedToken) ? choices!.selectedToken : undefined;
   return { ...structuredClone(choices!), candidates: structuredClone(candidates), selectedToken,
-    selectionRequired: choices!.selectionRequired || choices!.overflow || choices!.candidates.length > 1 };
+    selectionRequired: choices!.selectionRequired || choices!.overflow || choices!.candidates.length > 1
+      || Boolean(choices!.selectedToken && !selectedToken) };
 }
 export function rememberAmountChoice(previous: TrustedAmountChoices | undefined, binding: Binding,
   reference: TrustedAmountReference, now = Date.now()): TrustedAmountChoices | undefined {
@@ -68,7 +69,7 @@ export function resolveAmountReference(choices: TrustedAmountChoices | undefined
 }
 export function amountChoiceNotice(choices: TrustedAmountChoices | undefined, binding: Binding): string {
   const current = currentAmountChoices(choices, binding);
-  if (!current) return "缺少仍有效的历史实付展示。请先查询要作基准的订单，取得每券实付展示；用户提供的数字不能代替支付记录。";
+  if (!current?.candidates.length) return "缺少仍有效的历史实付展示。请先查询要作基准的订单，取得每券实付展示；用户提供的数字不能代替支付记录。";
   return "请明确选择用于比较的历史实付基准，订单焦点或模型引用不能代替你的选择。\n"
     + current.candidates.map(row => `${row.reference.orderId} / 商品 ${row.reference.productId}：每券实付 ${(row.reference.paidCents / 100).toFixed(2)} 元。\n选择金额基准 ${row.token}`).join("\n")
     + (current.overflow ? "\n历史展示超过两个，这里只列最近两个来源；如需其他来源，请重新查询该订单。" : "")
