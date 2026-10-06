@@ -56,8 +56,9 @@ export type StoreRead = { requestId: string; identity: QQIdentity; orderId: stri
 // Prices only aggregate reported usage; an unknown request never becomes zero cost.
 export function createC1ValidationGuard(fetcher: typeof fetch = fetch, now = Date.now, requestedLimits: C1ValidationLimits = c1ValidationLimits) {
   const limits = structuredClone(requestedLimits);
-  assert.ok([...operations.map(operation => limits.requests[operation]), limits.deadlineMs, limits.turnTimeoutMs]
-    .every(value => Number.isSafeInteger(value) && value > 0), "Request and time limits must be positive safe integers");
+  assert.ok(operations.every(operation => Number.isSafeInteger(limits.requests[operation]) && limits.requests[operation] >= 0)
+    && operations.some(operation => limits.requests[operation] > 0), "Request limits must be nonnegative safe integers with an enabled operation");
+  assert.ok([limits.deadlineMs, limits.turnTimeoutMs].every(value => Number.isSafeInteger(value) && value > 0), "Time limits must be positive safe integers");
   assert.ok([limits.estimatedUsd, limits.estimatedCny].every(value => Number.isFinite(value) && value > 0), "Cost limits must be positive and finite");
   const started = now(), requests: Request[] = [];
   let active: Active | undefined, stopReason: string | null = null, sealed = false;
@@ -74,7 +75,7 @@ export function createC1ValidationGuard(fetcher: typeof fetch = fetch, now = Dat
     if (now() - started >= limits.deadlineMs) stopReason = "run_deadline";
     else if (costs.agent.knownEstimatedCost + costs.support.knownEstimatedCost >= limits.estimatedUsd) stopReason = "usd_soft_stop";
     else if (costs.rerank.knownEstimatedCost >= limits.estimatedCny) stopReason = "cny_soft_stop";
-    else if (operations.some(operation => costs[operation].requests >= limits.requests[operation])) stopReason = "operation_request_limit";
+    else if (operations.some(operation => limits.requests[operation] > 0 && costs[operation].requests >= limits.requests[operation])) stopReason = "operation_request_limit";
     return stopReason;
   };
   return { requests, usage, stopped, remainingMs: () => Math.max(0, limits.deadlineMs - (now() - started)),
@@ -92,6 +93,7 @@ export function createC1ValidationGuard(fetcher: typeof fetch = fetch, now = Dat
         .filter((value): value is AbortSignal => Boolean(value)));
       signal.throwIfAborted();
       const reason = stopped(); if (reason) throw new Error(`Validation stopped before HTTP: ${reason}`);
+      if (limits.requests[operation] === 0) throw new Error(`Validation stopped before HTTP: operation_disabled:${operation}`);
       const request: Request = { operation, caseId: current.caseId, turn: current.turn, requestId: current.requestId,
         startedAt: new Date(now()).toISOString(), httpStatus: null, error: null, totalTokens: null, estimatedCost: null,
         currency: operation === "rerank" ? "CNY" : "USD", usageRecorded: false };
@@ -436,6 +438,16 @@ export async function checkC1ValidationExecutor() {
   await bounded.fetchFor("agent")("https://example.invalid"); await bounded.fetchFor("agent")("https://example.invalid");
   await assert.rejects(bounded.fetchFor("agent")("https://example.invalid"), /operation_request_limit/);
   assert.equal(bounded.requests.length, 2); assert.equal(bounded.usage().agent.estimatedCost, null);
+  const agentOnly = createC1ValidationGuard(fake, () => 0, { ...small, requests: { agent: 2, rerank: 0, support: 0 } });
+  agentOnly.setActive(active); const sentBeforeDisabled = sent;
+  assert.equal(agentOnly.stopped(), null, "Disabled operations must not stop an enabled experiment");
+  for (const operation of ["rerank", "support"] as const) {
+    await assert.rejects(agentOnly.fetchFor(operation)("https://example.invalid"), /operation_disabled/);
+  }
+  assert.equal(sent, sentBeforeDisabled); assert.equal(agentOnly.requests.length, 0);
+  await agentOnly.fetchFor("agent")("https://example.invalid"); await agentOnly.fetchFor("agent")("https://example.invalid");
+  await assert.rejects(agentOnly.fetchFor("agent")("https://example.invalid"), /operation_request_limit/);
+  assert.equal(agentOnly.requests.length, 2);
   for (const [operation, cost, reason] of [["support", .02, "usd_soft_stop"], ["rerank", .01, "cny_soft_stop"]] as const) {
     const own = createC1ValidationGuard(fake, () => 0, small); own.setActive(active);
     await own.fetchFor(operation)("https://example.invalid"); own.record(0, 10, cost);
@@ -447,7 +459,8 @@ export async function checkC1ValidationExecutor() {
   await assert.rejects(shortDeadline.fetchFor("agent")("https://example.invalid"), /run_deadline/);
   assert.equal(shortDeadline.requests.length, 0);
   for (const invalid of [{ ...small, deadlineMs: 0 }, { ...small, turnTimeoutMs: 1.5 }, { ...small, estimatedUsd: NaN },
-    { ...small, estimatedCny: Infinity }, { ...small, requests: { ...small.requests, agent: -1 } }]) {
+    { ...small, estimatedCny: Infinity }, { ...small, requests: { ...small.requests, agent: -1 } },
+    { ...small, requests: { agent: 0, rerank: 0, support: 0 } }]) {
     assert.throws(() => createC1ValidationGuard(fake, () => 0, invalid), /limits must be/);
   }
   const actor = { appId: "unit-app", senderId: "unit-owner" }, order = { source: "demo-database", id: "COUPON-9999", status: "paid" } as Order;
