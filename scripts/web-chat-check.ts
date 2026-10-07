@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
+import { readFile } from "node:fs/promises";
 import { request } from "node:http";
 import { pathToFileURL } from "node:url";
 import { fauxAssistantMessage, fauxProvider, fauxToolCall, getCurrentTools } from "@earendil-works/pi-ai";
@@ -38,13 +39,13 @@ export async function checkWebChat() {
   const address = server.address(); assert.ok(address && typeof address !== "string"); const port = address.port;
   async function http(path: string, method = "GET", body?: unknown, cookie?: string, headers: Record<string, string> = {}) {
     const bytes = body === undefined ? undefined : Buffer.isBuffer(body) ? body : Buffer.from(typeof body === "string" ? body : JSON.stringify(body));
-    return new Promise<{ status: number; data: any; cookie?: string; headers: import("node:http").IncomingHttpHeaders }>((resolve, reject) => {
+    return new Promise<{ status: number; data: any; bytes: Buffer; cookie?: string; headers: import("node:http").IncomingHttpHeaders }>((resolve, reject) => {
       const req = request({ hostname: "127.0.0.1", port, path, method, headers: {
         ...(method === "POST" ? { "Content-Type": "application/json", "X-Chat-Request": "1" } : {}),
         ...(cookie ? { Cookie: cookie } : {}), ...headers,
       } }, res => {
         const chunks: Buffer[] = []; res.on("data", data => chunks.push(data));
-        res.once("end", () => { const text = Buffer.concat(chunks).toString("utf8"); resolve({ status: res.statusCode!,
+        res.once("end", () => { const buffer = Buffer.concat(chunks), text = buffer.toString("utf8"); resolve({ status: res.statusCode!, bytes: buffer,
           data: res.headers["content-type"]?.includes("application/json") ? JSON.parse(text) : text,
           cookie: res.headers["set-cookie"]?.[0]?.split(";")[0], headers: res.headers }); });
       });
@@ -53,6 +54,18 @@ export async function checkWebChat() {
   }
   const send = (cookie: string, text: string, requestId = randomUUID()) => http("/api/chat/messages", "POST", { requestId, text }, cookie);
   try {
+    const sharedCss = await readFile(new URL("../web/evaluation/style.css", import.meta.url));
+    const sharedCssHash = createHash("sha256").update(sharedCss).digest("hex");
+    const ui = await http("/ui.css");
+    assert.equal(ui.status, 200); assert.deepEqual(ui.bytes, sharedCss, "chat serves the exact evaluation stylesheet instead of copying a theme");
+    assert.equal(ui.headers["content-type"], "text/css; charset=utf-8"); assert.equal(ui.headers["cache-control"], "no-store");
+    assert.match(String(ui.headers["content-security-policy"]), /style-src 'self'.*frame-ancestors 'none'/);
+    for (const path of ["/.env", "/web/evaluation/style.css", "/../evaluation/style.css", "/%2e%2e/evaluation/style.css", "/ui.css/more"])
+      assert.equal((await http(path)).status, 404, "only fixed static assets are public");
+    assert.equal((await http("/ui.css?path=.env")).status, 400);
+    assert.equal((await http("/ui.css", "GET", undefined, undefined, { Host: "evil.test" })).status, 403);
+    assert.equal((await http("/ui.css", "GET", undefined, undefined, { Origin: "https://evil.test" })).status, 403);
+    assert.equal(createHash("sha256").update(await readFile(new URL("../web/evaluation/style.css", import.meta.url))).digest("hex"), sharedCssHash);
     const config = await http("/api/chat/config"); assert.equal(config.status, 200); assert.equal(config.data.readOnly, true);
     assert.equal(config.data.version, 2); assert.deepEqual(config.data.defaults, { modelSelection: "configured", thinkingLevel: "off", maxTokens: 2048 });
     assert.deepEqual(config.data.options, { thinkingLevels: ["off", "high"], maxTokens: [512, 1024, 2048] });

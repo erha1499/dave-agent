@@ -52,6 +52,9 @@ export async function checkWebChatUI() {
   const ids = ['profile-select', 'new-chat', 'app-status', 'init-retry', 'chat-messages', 'chat-empty', 'starter-list', 'chat-form', 'chat-input', 'char-count', 'send-button', 'order-hints',
     'eval-link', 'chat-settings', 'settings-form', 'model-select', 'thinking-select', 'tokens-select', 'apply-settings', 'settings-status', 'active-settings'];
   const html = await readFile(new URL('../web/chat/index.html', import.meta.url), 'utf8');
+  const stylesheets = [...html.matchAll(/<link\b(?=[^>]*\brel=["']stylesheet["'])[^>]*\bhref=["']([^"']+)["'][^>]*>/g)].map(match => match[1]);
+  assert.equal(stylesheets[0], '/ui.css', 'chat must load the actual evaluation theme first');
+  assert.ok(stylesheets.length === 2 && /^(?:\.\/|\/)?style\.css$/.test(stylesheets[1]), 'only the shared theme and local chat layout stylesheet are loaded');
   for (const id of ids) assert.equal([...html.matchAll(new RegExp(`\\bid=["']${id}["']`, 'g'))].length, 1, `actual HTML must bind ${id} exactly once`);
   for (const [tag, id] of [['form', 'chat-form'], ['form', 'settings-form'], ['textarea', 'chat-input'],
     ['select', 'profile-select'], ['select', 'model-select'], ['select', 'thinking-select'], ['select', 'tokens-select']])

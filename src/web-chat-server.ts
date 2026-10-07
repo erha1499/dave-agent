@@ -7,9 +7,10 @@ import { WebChatError, WebChatSessions } from "./web-chat.ts";
 import { createWebChatAgentFactory, createWebChatSettingsCatalog } from "./web-chat-settings.ts";
 
 const pages = new Map([
-  ["/", ["index.html", "text/html; charset=utf-8"]],
-  ["/app.js", ["app.js", "text/javascript; charset=utf-8"]],
-  ["/style.css", ["style.css", "text/css; charset=utf-8"]],
+  ["/", ["../web/chat/index.html", "text/html; charset=utf-8"]],
+  ["/app.js", ["../web/chat/app.js", "text/javascript; charset=utf-8"]],
+  ["/style.css", ["../web/chat/style.css", "text/css; charset=utf-8"]],
+  ["/ui.css", ["../web/evaluation/style.css", "text/css; charset=utf-8"]],
 ]);
 const cookieName = "dave_chat";
 function capability(req: IncomingMessage) {
@@ -89,7 +90,7 @@ export function createWebChatServer(chat: WebChatSessions) {
       req.resume();
       const page = pages.get(url.pathname);
       if (req.method === "GET" && page) {
-        const body = await readFile(new URL(`../web/chat/${page[0]}`, import.meta.url));
+        const body = await readFile(new URL(page[0]!, import.meta.url));
         res.writeHead(200, { "Content-Type": page[1]! }).end(body); return;
       }
       json(404, { error: "页面或接口不存在。" });

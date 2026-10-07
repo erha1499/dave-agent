@@ -230,9 +230,16 @@ function renderChatSettings(syncForm = false) {
   els.tokensSelect.value = String(s.maxTokens ?? '');
   const actual = state.session && state.session.settings;
   const sm = state.session && state.session.model;
-  els.activeSettings.textContent = actual && sm
-    ? sm.provider + '/' + sm.id + ' · ' + (actual.thinkingLevel === 'high' ? '思考开启' : '思考关闭') + ' · 输出上限' + actual.maxTokens
-    : '';
+  els.activeSettings.replaceChildren();
+  if (actual && sm) {
+    const modelRow = element('div', null, 'settings-row');
+    modelRow.append(element('span', '模型', 'settings-row-label'), element('span', sm.provider + '/' + sm.id, 'settings-row-value mono'));
+    const thinkRow = element('div', null, 'settings-row');
+    thinkRow.append(element('span', '思考模式', 'settings-row-label'), element('span', actual.thinkingLevel === 'high' ? '思考开启' : '思考关闭', 'settings-row-value'));
+    const tokensRow = element('div', null, 'settings-row');
+    tokensRow.append(element('span', '输出上限', 'settings-row-label'), element('span', String(actual.maxTokens), 'settings-row-value mono'));
+    els.activeSettings.append(modelRow, thinkRow, tokensRow);
+  }
   let href = '';
   try {
     const u = new URL(config.evaluationUrl);
