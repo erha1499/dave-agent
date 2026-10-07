@@ -146,6 +146,24 @@ QQ 就绪后启动原有商家 worker：先更新到期任务，再扫描当前 
 
 每条通知最多领取一次：`pending → claimed → sent / deferred / unknown`。`sent` 表示 QQ API 明确接受，不能证明用户已读。发送失败或结果不明记为 `unknown`，不自动重发；进程在领取后退出，记录保留 `claimed`，重启也不重发，避免已送达但未落库的消息重复出现。重启只恢复尚未领取的 `pending` 通知；这保证至多一次主动尝试，不保证每个结果都主动送达，用户按订单号查询是恢复途径。商家轮询与通知各自只保留一个进行中的 Promise，慢模型不会阻塞其他任务到期处理。停机先停定时器并关闭 Agent、取消未发送的模型处理，再等待当前处理收尾；已开始的 HTTP 发送仍可能完成。未增加独立定时器或消息中间件。
 
+### 通知领取与失败恢复调用链审计（2026-10-08）
+
+本轮核验默认 atomic 的 D3 通知链。业务约束是原客户、原会话、原任务和原回复窗口不能被后续消息替换，商家批准不等于退款授权；面试追问是“为什么先排队再领取，发送成功但登记失败后如何恢复”。个人实现为路由保存、串行调度、领取状态和固定卡，复用 Pi 请求/取消、QQ SDK 和 MySQL；Controller 的零模型通知另作候选，不混用验收。预算30分钟，既有 `node scripts/merchant-notification-agent-check.ts` 离线检查一次，0远程模型/QQ/数据库请求；核对源码、检查和链接后收尾，不加消息中间件或重跑历史题集。
+
+以客户确认 `COUPON-2001` 后等待商家、期间继续咨询另一单为例，沿正式调用方追踪：
+
+| 环节 | 源码与实际行为 |
+| --- | --- |
+| 保存原路由 | [`qq.ts`](../src/qq.ts) 的用户确认 hook → [`confirmMerchantReply`](../src/after-sales-entry.ts) → [`AfterSalesStore.request`](../src/after-sales.ts)。任务和通知路由同事务创建；仅首次任务插入保存消息ID/时间，重复确认不刷新窗口，CLI不补造路由。 |
+| 到期与通知分开推进 | `qq.ts` 的 ready → `startMockMerchant → store.processDue → afterProcess` → [`dispatchMerchantNotifications`](../src/merchant-notifications.ts)。worker分别限制一个在途轮询和一个通知批次，慢Pi请求不阻塞商家期限推进；`listNotifications` 只选当前App的终态任务及pending通知，按创建时身份绑定代次和订单归属联查，批次上限20。 |
+| 排队后才领取 | dispatcher → [`QQAgent.resumeMerchant → enqueue`](../src/qq-agent.ts)。与用户共用“群＋发送者”队列；满队列返回busy且不领取。出队再次检查原消息窗口后才调用 `claimNotification`，条件UPDATE重新校验绑定/归属和pending状态，只有一个竞争者能领取；随后 `getTask(referenceTaskId)` 再读原任务。应用队列不替代数据库原子领取。 |
+| 通知不能变成确认 | 默认atomic只开放 `get_merchant_request`，跳过用户确认hook；即使模型查另一单或输出退款成功，发送仍使用出队后核验的原任务构造固定 `merchant_status`。终态卡没有退款确认按钮。Pi结果事件以不触发新轮的custom message写入内存，不能据此声称持久焦点或重启后聊天恢复。 |
+| 发送与登记有间隙 | `QQAgent.deliver → sendQQReply` 接受后，dispatcher才 `finishNotification`。窗口失效/禁用群/无有效任务为deferred；发送或交付后hook异常为unknown；落库失败则可能留在claimed并报状态不明。`qq.ts` 停机先停止worker新调度，再关闭/取消Agent并等候收尾；已开始的网络发送可能完成。 |
+
+例如QQ已经接受卡片、但写sent前进程退出，存储仍为claimed；重启扫描不会领取它，也不会用客户后来发的消息续原窗口。unknown同样不自动重发，尚未领取的pending仍可在有效窗口内尝试。由此保证的是本应用至多一次主动发送尝试，代价是可能漏通知；它不保证平台恰好一次送达或用户已读。客户可在原会话明确查询 `COUPON-2001` 协商进度，再重新读取订单/规则/批准并请求退款；通知状态本身不授权资金操作。改成超时重领会引入重复发送，只有业务明确要求送达重试且能处理重复时才考虑。
+
+**本轮结果：** 基于源码基线 `72e9f7d` 核对正式调用方，未发现需要修改生产代码的有证据缺陷。上述离线检查执行一次、退出0，覆盖队列满不领取、排队过期、固定原任务/路由、确认隔离、并发领取、unknown/claimed不重发、模型失败兜底及关闭中断。它使用实际Pi/faux和QQAgent，但Store状态由合成实现替代，所谓重启是重建Agent并保留合成状态；不能证明当前SQL原子性或真实进程退出。数据库条件UPDATE、连接重建和worker并发证据复用[2026-10-06工程复核](#本轮稳定主线工程复核2026-10-06)及[通知DB检查](../scripts/merchant-notification-db-check.ts)，本轮均未重跑。仅补本文和计划，0远程模型/真实QQ/数据库请求，默认配置与C1/O4/O5准入不变。
+
 ## 验证记录
 
 以下先说明各脚本的覆盖范围；历史通过记录不作为本次执行结果。同一进程内重建 Store、数据库连接或 QQAgent，只证明对象重建后的持久查询；真实进程退出后查询的本轮工程证据见[双子进程检查](#本轮稳定主线工程复核2026-10-06)，历史真实QQ机器人重启记录在后文单列。
