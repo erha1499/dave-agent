@@ -107,6 +107,21 @@ npm start
 
 本机证据为 `.runtime/p0-stable-check-review.json`、`p0-stable-final-review.json`、`p0-atomic-refund-process-db.log`、`p0-stable-final-validate.log` 和CLI修复前后日志，不入库。最终进程脚本SHA-256：`249dc8c787b8135047dad4ee3913b46fd79a55445edea02673741fe6263d5fdb`；DB日志SHA-256：`a5fe4cbee178b140afb86c71f3c7b910a07c9c3d16ca5107d462873698577b48`。复现按[启动前提](#启动)准备，纯合同用 `node scripts/atomic-refund-recovery-db-check.ts --check`；无需新应用、依赖或额外付费实验。
 
+### 退款确认调用链审计（2026-10-08）
+
+本轮只核验默认 atomic 主线的确认入口、展示门槛和事务，不扩展能力。真实约束是本人在原会话确认已展示的有效方案，金额来自存储，重复消息最多完成一笔模拟退款；面试追问是“模型输出确认文字、发送结果未知或两个进程同时确认，谁能决定执行”。个人实现为入口解析、固定回执和 RefundStore 授权/事务，复用 Pi 循环、QQ SDK 与 MySQL。预算为30分钟、既有两条离线检查各一次，0远程模型/QQ/数据库请求；源码和定向结果核对后收尾，不重跑历史实验。
+
+以已展示的79.80元方案及其实际操作编号为例，逐层跟踪：
+
+| 环节 | 实际调用与检查 |
+| --- | --- |
+| 原文进入宿主 | [`cli.ts`](../src/cli.ts) 的 `parseCliInput → confirmRefundReply` 保留业务原文；[`qq.ts`](../src/qq.ts) 只去掉开头的传输 @，在 [`QQAgent.enqueue`](../src/qq-agent.ts) 队列内调用确认 hook。[`refund-entry.ts`](../src/refund-entry.ts) 仅容忍首尾ASCII空格/tab，完整单行UUID才调用 Store；模型输出或通知事件不能进入此入口。 |
+| 方案开放确认 | [`agent.ts`](../src/agent.ts) 的 `prepare_refund` 只有订单参数，身份/会话由宿主闭包提供，金额由 Store 计算。`replyFromTools → renderReply → QQAgent.deliver` 展示当前工具结果的固定方案；`send → markRefundReplyPresented → markPresented` 成功后才开放确认。API接受不代表用户已读；首次方案发送/登记未成功时不开放确认，过期卡不尝试重新登记，两种失败均不自动重发。 |
+| 确认事务 | [`RefundStore.withOperation`](../src/refunds.ts) 先从编号定位订单，再 `lockOrder → current` 重新校验当前身份绑定、客户和原会话；UUID不是权限凭证。`confirm → eligible → decisionTime` 在锁内复核批准、金额、单券、付款及等待锁后的有效期，才写退款、订单、券和操作结果。同订单行锁让并发请求串行，后者读到 succeeded 后返回同一结果；[`refund_operations`](../db/06-refunds.sql) 每单唯一约束配合这一流程。应用内消息去重无法替代跨进程事务，也没有为此增加分布式锁。 |
+| 结果未知时恢复 | `confirmRefundReply` 捕获提交异常后提示在原会话按订单查询，不断言“未退款”；成功结果的发送失败不自动重发。明确订单查询读取持久结果，不能据此声称恢复了聊天历史、省略指代或真实银行到账。 |
+
+**本轮结果：** 基于源码基线 `4509d36` 审阅完整调用方，未发现需要修改生产代码的有证据缺陷。`node scripts/support-host-entry-check.ts` 与 `node scripts/refund-agent-check.ts` 各执行一次，均退出0；前者核验CLI原文与确认解析，后者用实际Pi/faux和本地发送核验六工具合同、排队确认、发送/登记失败不重发、过期卡、宿主重复幂等及丢失回执后查询。Store在该离线检查中由合成实现替代，不能把通过结果说成当前MySQL并发验收；真实事务、身份/群隔离与进程退出证据仍引用[2026-10-06工程复核](#本轮稳定主线工程复核2026-10-06)，本轮未重跑数据库、模型或QQ。仅补材料与计划状态，默认配置和C1/O4/O5准入状态不变。
+
 ## 确认与持久化边界
 
 每张演示订单只有一个协商任务和一个当前退款操作；重复协商保留原任务与原因。操作绑定可信 AppID、发送者、客户及原会话：QQ 必须由原用户在原群确认或查询，CLI 使用独立会话，不能换入口接管。
