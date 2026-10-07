@@ -97,6 +97,29 @@ D1 另加 `COUPON-2001/2002/2003`，均为客户一、单张未核销午餐券�
 
 数据库缺少法定节假日、特殊活动、实时库存、菜品明细和过敏原政策，询问这些内容时应说明缺口。所有“可申请退款”描述都是演示资格说明，不等于申请已受理、商家批准或资金到账。
 
+### 知识初始化与来源版本调用链审计（2026-10-08）
+
+本轮只审计“原创规则初始化 → 当前文档读取 → 离线快照与来源校验”，不新增入库服务。业务约束是不同平台政策不得串用，规则改动须能追溯，资格说明不得替代审批；面试追问是“有文档ID和SHA256，为什么仍不能证明数据库已更新或购买时政策适用”。个人实现为SQL规则、范围读取及快照/来源校验，复用MySQL存储、Pi工具循环和Node标准库。预算30分钟，下面两项既有离线检查各一次，0远程模型/真实QQ/数据库请求；核对源码、结果和链接即收尾，不重跑模型题集或改变准入。
+
+| 环节与源码入口 | 实际行为与证据范围 |
+| --- | --- |
+| 初始化：[`compose.yaml`](../compose.yaml)、[`01-schema.sql`](../db/01-schema.sql)、[`02-seed.sql`](../db/02-seed.sql) | Compose将`db/`只读挂载到镜像初始化目录，seed显式设置utf8mb4并插入8篇原创规则；每篇是一行完整文档，不经过爬虫、切块或向量入库。已有volume不重新seed，修改仓库SQL与重启不等于更新现有库。售后结构迁移另沿前文入口执行，不能用初始化命令冒称通用知识更新能力。 |
+| 稳定线上：[`agent.ts`](../src/agent.ts)的`search_faq → CouponStore.searchKnowledge/readKnowledgeDocuments`（[`coupon-store.ts`](../src/coupon-store.ts)） | 读取当前活跃且符合门店/套餐范围的行，词项排序返回最多5篇正文与`sourceId/scope`。没有返回内容哈希或`updated_at`；表中`updated_at`仅有插入默认值，没有`ON UPDATE`，且读取不选择该列。因此稳定ID或时间字段不能冒称内容版本、更新历史或购买时规则快照。订单归属及自由话术边界见[只读链审计](./retrieval.md#稳定只读咨询调用链审计2026-10-08)。 |
+| 独立参考语料：[`source.json`](../data/reference/kefu-harness/source.json)、[`loadRetrievalData`](../scripts/retrieval-data.ts) | 固定commit的原文、许可、说明和两份题集共5个文件，逐一核对SHA256/字节数，再校验字段、重复、范围、gold关联和35/136/76及选集11/44/26数量；失败直接停止。哈希证明文件与本地清单一致，不证明政策仍有效或适用于本店；这条链没有数据库写入。 |
+| 原创规则快照：[`loadAcceptanceDataset`](../scripts/acceptance-data.ts)、[`acceptance-source.json`](../data/acceptance-source.json) | 先核验SQL seed整体哈希、参考清单及固定数据哈希，再将8行seed的ID/范围/标题/正文/tags逐字段与`acceptance-online.json`比较。数据中的`online`是仓库SQL快照，并非实时数据库；`reference`独立保存上游规则。各加一条inactive原文副本只供离线范围负控，不入业务库。SQL解析只覆盖当前小型静态seed语法，格式变化也须显式审阅，不能绕过冻结检查。 |
+| 候选差异：[`createKnowledgeService`](../src/knowledge-service.ts)、[`contentHash`](../src/bailian.ts) | Controller候选在检索/判别前后重新读取范围内文档，比较整组对象哈希；净内容差异返回`source_changed`及空证据，接收后`trace.sources`另记录返回证据对象的内容哈希。它不是文件哈希、时间戳或政策有效性证明，也没有保存历史版本；稳定atomic的`search_faq`未走此服务。候选工程保护与C1自然语言准入分开。 |
+
+可在仓库根目录执行：
+
+```sh
+node scripts/acceptance-data-check.ts
+node scripts/knowledge-service-check.ts
+```
+
+第一条复用完整来源/快照入口及已有政策冲突例子：原创`KB-REFUND-EXPIRED`明确没有过期自动退款政策，上游`RF001`写“同样支持过期退”，断言二者留在不同corpus；它检查48/60/60三份数据及原始6道C1待验项，不执行这些题的模型判别。第二条用合成Store和替代提供商验证同ID正文变化、失效/换范围/删除后拒收，以及更新内容获得新版本；不是MySQL并发或真实模型语义验收。
+
+**验收与取舍：** 源码基线`0a61c0b`，Node`v26.10.0`；上述两项各一次退出0，外层耗时依次0.137/3.479秒（检查耗时，不是业务请求延迟）。15处新增本地链接/锚点及`git diff --check`通过。仅修改文档/计划，默认继续沿[稳定启动配置](./after-sales.md#启动)，C1/O4/O5仍未完成。复用整篇规则与SHA256无需新增依赖，代价是更新seed必须版本化审阅并维护冻结快照；当前库没有规则生效区间、购买时政策历史或通用发布流程。本轮未查询现有数据库，不能据离线通过声称其内容与seed一致；中文、只读权限及真实MySQL业务范围的历史证据见[验收范围](#验收范围)，不升级为本轮成绩。只有要支持实际规则更新或购买时政策判断时，才另立状态/版本/验收合同；不扩建外部知识入库平台。
+
 官方镜像会先给 `MYSQL_USER` 库级权限，并把数据库名中的下划线转义。`03-readonly.sql` 按账户撤销全部权限及授权权，再只对确切的 `dave_agent` 数据库授予固定账号 `dave_agent_read` **SELECT**：
 
 ```sql
