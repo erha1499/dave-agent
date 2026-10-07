@@ -28,6 +28,38 @@ node scripts/retrieval-baseline.ts
 
 业务端仍先执行原 SQL 门店/套餐范围校验，最多 200 个候选，再排序返回前 5 条。同义词只帮助召回，不能确定订单状态或退款资格。离线参考集按显式 `shopId` 过滤店铺文档；行业及 hard 的 `ctx` 保留但不参与改写或排序，也不使用相关标签推断范围。`ctx.verified` 是核销状态，不是身份认证。未知店铺在线会被数据库入口拒绝，离线过滤仅保证不返回别店文档，不能替代真实权限检查。
 
+## 稳定只读咨询调用链审计（2026-10-08）
+
+本轮仅核验默认 atomic 的“本人订单 → 公开规则 → 回复”链，补清其已实现保护与模型责任。业务约束是身份来自入口、订单不可越权、规则须适用当前套餐、未知事实不能承诺；面试追问是“订单卡和依据ID都真实，为什么仍不能保证整段回答正确”。个人实现为工具闭包、CouponStore授权/范围与回复选择，复用Pi循环、MySQL和Intl.Segmenter；Controller证据接收另属未准入候选。预算30分钟，既有reply检查与下列边界例子各一次，0远程模型/QQ/数据库请求；核对调用方、源码和结果后收尾，不扩大能力或重跑历史题集。
+
+| 环节 | 实际保护与边界 |
+| --- | --- |
+| 入口和工具 | [`qq.ts`](../src/qq.ts) 从可信SDK事件构造AppID/发送者，[`cli.ts`](../src/cli.ts) 使用合成绑定；两者选择atomic时调用 [`createCouponSession`](../src/agent.ts)。[`网页工厂`](../src/web-chat-settings.ts)也复用该函数，仅提供两只读工具。`get_order` 参数只有订单号，身份在宿主闭包内；模型声明客户ID不能覆盖身份。 |
+| 重新授权和快照 | [`CouponStore.getOrder`](../src/coupon-store.ts) 每次按订单＋当前身份绑定联查，同一只读REPEATABLE READ事务读取订单项、券、付款和退款。首次SELECT建立一致快照；下一次调用才读取后续提交，不能把`asOf`或聊天历史视作持续有效的授权。失败回滚，初始化/回滚不确定时丢弃连接。 |
+| 规则召回 | `searchKnowledge → readKnowledgeDocuments →` [`rankKnowledge`](../src/knowledge-retrieval.ts)。SQL校验活跃门店/套餐关联，过滤通用及显式范围的活跃规则，最多200候选，词项排序后取前5条。FAQ是公开规则，未绑定用户也能咨询；此入口不接收身份/订单，也不在宿主证明模型所传范围来自该用户刚查的订单。按订单范围查规则的调用次序仍由Prompt/Skill约束，不能冒称确定性授权链。 |
+| 回复与依据 | CLI/QQ只向 [`replyFromTools`](../src/reply-from-tools.ts) 传本轮工具结果；成功`get_order`的整数金额/状态生成订单卡，失败或旧轮结果不生成卡，格式异常返回notice。`search_faq`的合法sourceId加入依据列表，证明本轮召回过该ID；并未验证模型每句话由正文支持。订单卡后的`text`与普通answer仍保留模型话术，Markdown转义和限长仅约束展示。 |
+
+可在仓库根目录复现“可信字段不等于整段话术已验证”；这是主动注入矛盾文本的确定性例子，不是一次真实模型失败或发生率统计：
+
+```sh
+node --input-type=module <<'NODE'
+import assert from 'node:assert/strict';
+import { replyFromTools } from './src/reply-from-tools.ts';
+import { renderReply } from './src/reply.ts';
+const text = '示例模型话术：实付999.99元。';
+const facts = { source: 'demo-database', id: 'COUPON-1001', status: 'paid', amounts: { paidCents: 7980, refundedCents: 0 }, coupons: [{ status: 'unused' }] };
+const reply = replyFromTools(text, [{ toolName: 'get_order', isError: false, content: [{ type: 'text', text: JSON.stringify(facts) }] }]);
+assert.equal(reply.kind, 'order');
+assert.equal(reply.orders[0].paidCents, 7980);
+assert.equal(reply.text, text);
+assert.match(renderReply(reply).text, /实付：79.80 元/);
+assert.match(renderReply(reply).text, /实付999.99元/);
+console.log('PASS：订单字段可信，附带模型话术仍可能矛盾。');
+NODE
+```
+
+**验收与取舍：** 源码基线`70274b5`；`node scripts/reply-check.ts`及上面的例子各一次、均退出0。前者核验字段/模板与失败结果，后者核验可信金额和矛盾话术可以同时显示；均为直接调用本地回复函数，不是Pi/真实模型或数据库验收。仅补本文和计划，默认配置不切，C1/O4/O5状态不变。稳定演示仍沿[已验证配置与路径](./after-sales.md#启动)，真实模型只读历史保留[首次13/14、21/22、200/205及后续14/14、22/22、205/205](./evaluation.md#p1-第三轮核心业务收尾)：漏取套餐范围由提示修复，不能证明所有问法受宿主强制约束；[快照MySQL证据](./database.md#表关系与约束)亦为历史，本轮不重验。复用小语料词项召回与既有模板避免额外解析成本，代价是查询选择及自由话术仍需独立模型验收；扩大到自然语言政策承诺前，应按C1已有合同验证宿主范围/证据接收，不能把召回分数、卡片字段或依据ID当成该能力已准入。
+
 ## P0 / P1 同题集结果
 
 以下是本项目排序逻辑在原始参考标签上的基线，未调用上游检索器、Pi/模型或 QQ。真实客服还会通过模型生成 `search_faq` 参数，因此这些数值不是端到端客服通过率，也不是历史模型套件分数。
