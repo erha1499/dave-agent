@@ -98,7 +98,7 @@ HTTP v2：GET config在原字段上增加`defaults:{modelSelection,thinkingLevel
 
 `available`仅表示本机凭据配置与离线目录元数据可解析，不保证远程密钥认证、额度或服务可用。省略settings沿用`configured/off/2048`，默认无密钥仍能处理宿主到账指令；显式完整设置选择未就绪模型时400并保留旧会话。普通新对话/换客户遇到该默认无密钥配置时省略settings以保持兼容；默认无密钥下普通问答仍按既有503失败/会话失效处理。目录不输出凭据、来源或base URL。token是提供商请求预算，不保证输出固定字数；开启推理可能与回答共用预算，当前工程验证不宣称质量或费用收益。
 
-POST session兼容`{profileId}`，可增加完整`settings:{modelSelection,thinkingLevel,maxTokens}`，禁止未知字段与不完整设置；校验在旧会话失效前完成。返回及GET session增加`session.settings`与`session.model:{provider,id}`，只包含实际设置与已解析模型标识。POST messages继续仅允许原requestId和text，不接受中途配置。当前生效配置与未应用表单区分，应用按钮明确新建并清空上下文；普通新对话/换客户沿用已应用设置。不可用凭据只显示状态，不暴露来源或内容；配置目录不发远程发现请求。启动时固定服务端环境副本，修改.env需重启；网页选择不修改环境、QQ或评测台实验参数。
+POST session兼容`{profileId}`，可增加完整`settings:{modelSelection,thinkingLevel,maxTokens}`，禁止未知字段与不完整设置；校验在旧会话失效前完成。返回及GET session增加`session.settings`与`session.model:{provider,id}`，表示已接受的会话配置及离线目录解析的模型标识；新建会话返回时尚未创建Pi，字段本身不证明Pi已初始化、云端认证或参数接受。POST messages继续仅允许原requestId和text，不接受中途配置。当前生效配置与未应用表单区分，应用按钮明确新建并清空上下文；普通新对话/换客户沿用已应用设置。不可用凭据只显示状态，不暴露来源或内容；配置目录不发远程发现请求。启动时固定服务端环境副本，修改.env需重启；网页选择不修改环境、QQ或评测台实验参数。
 
 ### v2完成记录与演示
 
@@ -116,6 +116,26 @@ node scripts/web-chat-check.ts
 node scripts/web-chat-ui-check.mjs
 npm run validate
 ```
+
+## 网页会话参数生效调用链审计（2026-10-08）
+
+**本轮合同：** 真实约束是同一段历史不混用新旧模型配置，参数坏值或处理中切换不能删掉旧会话，设置不得扩大只读权限。面试追问是“页面显示已应用，究竟证明到了哪一步；如何定位到真正的Pi请求”。个人实现为目录、严格校验、会话替换、配置快照和请求检查；复用Pi生命周期、模型注册与已有只读工具，前端沿用Kimi K3 Max产物。本轮预算30分钟，仅审阅已提交源码和既有证据、补差异与链接；0新增模型/DB/QQ调用，没有明确缺陷不改代码或追加实验。
+
+固定依据为[`cb40012`](https://github.com/erha1499/dave-agent/tree/cb40012014c7e4bdf3e946635bc8b9aefcbdbf38)的八份源码/检查：`web-chat-server.ts`、`web-chat-settings.ts`、`web-chat.ts`、`agent.ts`、`model-selection.ts`、`web/chat/app.js`六份源码，加上后端/UI两份检查。按以下时点讲解，不能把本地配置、Pi getter、HTTP请求和云端效果合成一个“成功”。
+
+| 时点 | 调用路径与源码定位 | 实际承诺 |
+| --- | --- | --- |
+| 启动目录 | [web-chat-server.ts](https://github.com/erha1499/dave-agent/blob/cb40012014c7e4bdf3e946635bc8b9aefcbdbf38/src/web-chat-server.ts#L119)复制环境→`createWebChatSettingsCatalog`→`resolveModelSelection`；[web-chat-settings.ts](https://github.com/erha1499/dave-agent/blob/cb40012014c7e4bdf3e946635bc8b9aefcbdbf38/src/web-chat-settings.ts#L14)离线取得元数据、检查本机配置。 | 四个允许选择中，`configured`解析启动环境；`available`不检查云端密钥、额度或服务。环境修改需重启，不进行远程模型发现。 |
+| 表单提交 | [app.js](https://github.com/erha1499/dave-agent/blob/cb40012014c7e4bdf3e946635bc8b9aefcbdbf38/web/chat/app.js#L333)`resetConversation`→`POST /api/chat/session`；普通新对话/换客户读取`state.session.settings`，应用按钮才读取新表单。 | 草稿与已应用快照分开，改表单本身不改变当前历史或参数。服务端messages接口不接受中途配置。 |
+| 校验与替换 | [web-chat.ts](https://github.com/erha1499/dave-agent/blob/cb40012014c7e4bdf3e946635bc8b9aefcbdbf38/src/web-chat.ts#L63)`create`→`validateWebChatSettings`→busy/容量检查→旧会话`invalidate`→新Entry及cookie。 | 三字段、枚举、整数上限、模型能力及显式选择的就绪状态均由宿主检查；400/409发生在旧会话失效前。成功后清空历史并保存配置，尚未创建Pi。省略settings的无密钥默认兼容仅供宿主路径，并非跳过参数格式/能力检查。 |
+| 首次普通问答 | `send`先尝试完整到账宿主指令，未命中才调用[factory](https://github.com/erha1499/dave-agent/blob/cb40012014c7e4bdf3e946635bc8b9aefcbdbf38/src/web-chat-settings.ts#L56)：按selection缓存runtime→clone模型的maxTokens→`createCouponSession`→`setThinkingLevel`→getter复核→`runCliPrompt`。 | 推理或上限未实际保留则dispose并失败；每个Entry独立Pi会话，runtime缓存不共享对话历史。宿主到账命令不会创建所选生成模型，不能用它证明Pi参数生效。 |
+| Pi及执行边界 | [agent.ts](https://github.com/erha1499/dave-agent/blob/cb40012014c7e4bdf3e946635bc8b9aefcbdbf38/src/agent.ts#L149)已有2048上限与三个网页档一致；`createAgentSession`沿用内存会话、固定Prompt/Skill，factory未传售后写工具，`send`再次核对工具恰为`get_order/search_faq`。 | 换模型没有修改业务身份或增加写权限；Pi默认off随后由factory设为所选档。参数接线正确不证明模型话术、云端接受或费用收益。 |
+
+例子：应用`deepseek-v4-pro/high/512`后再把表单改为Flash/1024而不应用，换客户仍传Pro/high/512，刷新从GET session恢复该快照。发送`查询到账 银行卡`只证明宿主及页面接线；真正的Pi参数证据来自下一段替代HTTP断言。非法`maxTokens:"512"`或处理中应用返回400/409，旧cookie与上下文保留；**新Entry成功后**若factory/普通问答失败则按既有503失效整会话，并不回滚到被替换的旧历史。若成功替换但响应丢失，前端恢复旧显示并标记expired、要求重新开始，也不能声称服务端事务回滚。
+
+**证据与复现：** [后端检查](https://github.com/erha1499/dave-agent/blob/cb40012014c7e4bdf3e946635bc8b9aefcbdbf38/scripts/web-chat-check.ts#L277)的HTTP层采用faux factory；参数层直接调用`WebChatSessions`，用生产factory、原生Pi及替代fetch捕获请求。六个配置各一次普通问答，核对model、DeepSeek的`thinking/reasoning_effort/max_tokens`、Qwen的`enable_thinking/max_completion_tokens`及getter/只读工具；创建与宿主消息均不增加wire。它覆盖四个选择、off/high和三档token，**不是四×二×三的完整组合矩阵，也不是一批端到端云端验收**。[UI检查](https://github.com/erha1499/dave-agent/blob/cb40012014c7e4bdf3e946635bc8b9aefcbdbf38/scripts/web-chat-ui-check.mjs#L173)使用实际app/Node VM、自制DOM及合成HTTP，覆盖草稿、400/409保留、成功清空、刷新和换客户的已应用值，不证明真实浏览器布局。复现入口仍为`node scripts/web-chat-check.ts`与`node scripts/web-chat-ui-check.mjs`；[v2历史记录](#v2完成记录与演示)的11次faux与6次替代HTTP属于原轮，本轮未执行或增加样本，也未重验浏览器/MySQL/供应商/QQ。
+
+**取舍与收尾：** 新建会话比在旧Agent上切模型更容易复现参数与历史的对应关系，代价是丢弃旧上下文；先离线校验、后懒初始化避免应用设置及宿主指令产生云端请求，代价是远程认证失败要到首次普通问答才发现。factory每selection缓存一个runtime Promise，当前仅四个选择且环境固定；`createConfiguredModelRuntime`的离线初始化Promise若拒绝，也会保留在缓存中，重新建网页会话不会重建它，需重启服务。后续云端prompt失败不等于这个初始化缓存失败。本轮不增加健康探针、热更新或持久配置；初始化延迟、云端质量和费用收益未测量。源码与既有断言未发现此单会话配置链需要修复的明确缺陷，材料补齐即收尾，C1/O4/O5及商业能力状态不变。
 
 ## 视觉优化（2026-10-07）
 
