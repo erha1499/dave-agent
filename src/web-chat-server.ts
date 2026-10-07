@@ -75,9 +75,10 @@ export function createWebChatServer(chat: WebChatSessions) {
       if (req.method === "POST" && ["/api/chat/session", "/api/chat/messages"].includes(url.pathname)) {
         const body = await readBody(req);
         if (url.pathname === "/api/chat/session") {
-          if (typeof body.profileId !== "string" || Object.keys(body).some(key => !["profileId", "settings"].includes(key)))
-            throw new WebChatError(400, "新对话只接受 profileId 及完整 settings。");
-          const created = await chat.create(token, body.profileId, body.settings);
+          if (typeof body.profileId !== "string" || !Object.hasOwn(body, "sessionId")
+            || Object.keys(body).some(key => !["profileId", "settings", "sessionId"].includes(key)))
+            throw new WebChatError(400, "新对话只接受 profileId、sessionId 及完整 settings。");
+          const created = await chat.create(token, body.profileId, body.settings, body.sessionId);
           res.setHeader("Set-Cookie", `${cookieName}=${created.token}; HttpOnly; SameSite=Strict; Path=/`);
           json(200, { session: created.session, messages: created.messages }); return;
         }

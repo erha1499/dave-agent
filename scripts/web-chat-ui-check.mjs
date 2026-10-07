@@ -82,6 +82,8 @@ export async function checkWebChatUI() {
     if (path === '/api/chat/config') return response(config);
     if (path === '/api/chat/session' && body === undefined) return response({ session, messages: [] });
     if (path === '/api/chat/session') {
+      assert.ok(Object.hasOwn(body, 'sessionId'), 'creation/reset always declares UUID or null');
+      if (body.sessionId !== (session?.id ?? null)) return response({ error: '页面会话已失效，请重新连接。' }, 401);
       if (resetError) return response({ error: '当前消息仍在处理中' }, resetError);
       const settings = body.settings ?? defaults;
       const selected = models.find(model => model.id === settings.modelSelection);
@@ -154,6 +156,7 @@ export async function checkWebChatUI() {
   stale.resolve(response({ sessionId: 'old-session', requestId: stale.body.requestId, reply: { kind: 'answer', text: '旧客户数据' }, durationMs: 1, origin: 'host' }));
   await tick(); assert.ok(!nodes.get('chat-messages').textContent.includes('旧客户数据'), 'mismatched session receipt is not displayed');
   await send('服务故障样例'); const unavailable = pending.shift();
+  session = null; // The actual server invalidates the failed conversation before returning 503.
   unavailable.resolve(response({ error: '本轮未能完成，会话已清空。' }, 503)); await tick();
   assert.equal(input.value, '服务故障样例'); const attempts = posts().length;
   form.fire('submit'); await tick(); assert.equal(posts().length, attempts, '503-invalidated context requires a new conversation');
@@ -164,6 +167,17 @@ export async function checkWebChatUI() {
   recovered.resolve(response({ sessionId: session.id, requestId: recovered.body.requestId,
     reply: { kind: 'answer', text: '合成恢复结果' }, durationMs: 1, origin: 'host' })); await tick();
   assert.equal(input.value, '');
+
+  const external = { ...session, id: randomUUID(), profileId: 'demo-a', label: '客户 demo-a' };
+  session = external; input.value = '旧客户 B 草稿'; input.fire('input');
+  const creationsBefore = calls.filter(call => call.path === '/api/chat/session' && call.body).length;
+  nodes.get('new-chat').fire('click'); await tick();
+  assert.equal(session.id, external.id, 'stale reset never deletes the external replacement');
+  assert.equal(input.value, '旧客户 B 草稿', 'rejected reset retains the old draft');
+  nodes.get('init-retry').fire('click'); await tick();
+  assert.equal(session.id, external.id); assert.equal(select.value, 'demo-a'); assert.equal(input.value, '', 'reconnecting a different customer clears the old draft');
+  assert.equal(calls.filter(call => call.path === '/api/chat/session' && call.body).length, creationsBefore + 1,
+    'reconnect adopts the existing session through GET without another reset POST');
 
   const modelSelect = nodes.get('model-select'), thinkingSelect = nodes.get('thinking-select'), tokensSelect = nodes.get('tokens-select');
   const settingsForm = nodes.get('settings-form'), active = nodes.get('active-settings');
@@ -195,6 +209,11 @@ export async function checkWebChatUI() {
   nodes.get('new-chat').fire('click'); await tick();
   assert.deepEqual(calls.filter(call => call.path === '/api/chat/session' && call.body).at(-1).body.settings, applied, 'new conversations preserve applied parameters');
   assert.equal(input.disabled, false); assert.equal(nodes.get('chat-messages').textContent.includes('服务故障样例'), false);
+  await send('配置恢复检查'); const settingsFailure = pending.shift();
+  session = null; settingsFailure.resolve(response({ error: '本轮未能完成，会话已清空。' }, 503)); await tick();
+  nodes.get('init-retry').fire('click'); await tick();
+  assert.deepEqual(session.settings, applied, '503 reconnect preserves the actually applied settings');
+  assert.equal(input.value, '配置恢复检查', 'same-customer reconnect keeps the failed draft');
   models[0].available = false;
   session = { id: randomUUID(), profileId: 'demo-a', label: profile('demo-a').label, settings: structuredClone(defaults), model: { provider: 'deepseek', id: 'deepseek-flash' } };
   runInContext('initialize()', context); await tick();

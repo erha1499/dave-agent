@@ -267,7 +267,7 @@ function renderChatSettings(syncForm = false) {
   updateSettingsControls();
 }
 
-async function initialize() {
+async function initialize(preferredProfileId) {
   if (state.initializing) return;
   state.initializing = true; state.initialized = false;
   setBusy(true); els.initRetry.hidden = true;
@@ -280,10 +280,19 @@ async function initialize() {
     let data = await api('/api/chat/session');
     if (gen !== state.generation) return;
     if (data && data.session === null) {
-      data = await api('/api/chat/session', { profileId: config.profiles[0].id });
+      const pid = config.profiles.some((p) => p.id === preferredProfileId) ? preferredProfileId : config.profiles[0].id;
+      const body = { profileId: pid, sessionId: null };
+      const oldSettings = state.session && state.session.profileId === preferredProfileId && validateSettings(state.session.settings, config) ? state.session.settings : null;
+      if (oldSettings) {
+        const dm = (Array.isArray(config.models) ? config.models : []).find((m) => m.id === 'configured');
+        const isDefault = settingsEqual(oldSettings, { modelSelection: 'configured', thinkingLevel: 'off', maxTokens: 2048 });
+        if (!(isDefault && (!dm || dm.available === false))) body.settings = oldSettings;
+      }
+      data = await api('/api/chat/session', body);
       if (gen !== state.generation) return;
     }
     if (!data || !data.session || !validateSession(data, config) || !config.profiles.some((p) => p.id === data.session.profileId)) throw new Error('session');
+    if (state.profileId && state.profileId !== data.session.profileId) els.chatInput.value = '';
     state.config = config; state.session = data.session; state.messages = data.messages; state.profileId = data.session.profileId;
     state.initialized = true; state.expired = false; state.failedAttempt = null;
     state.settingsError = ''; state.settingsApplying = false;
@@ -358,7 +367,7 @@ async function resetConversation(profileId, preserveDraft = false, newSettings =
   if (applying) { state.settingsError = ''; setStatus('正在应用设置…', false); }
   var gen = ++state.generation;
   try {
-    var body = { profileId: profileId };
+    var body = { profileId: profileId, sessionId: oldId };
     if (sendSettings) body.settings = reqSettings;
     var data = await api('/api/chat/session', body);
     if (gen !== state.generation) return;
@@ -421,7 +430,7 @@ function bindUIEvents() {
   });
   els.initRetry.addEventListener("click", function () {
     if (state.busy) return;
-    if (state.expired) resetConversation(state.profileId, true);
+    if (state.expired) initialize(state.profileId);
     else initialize();
   });
   els.settingsForm.addEventListener("submit", function (event) {

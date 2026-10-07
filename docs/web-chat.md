@@ -1,6 +1,6 @@
 # 网页客服问答
 
-日期：2026-10-08；状态：只读问答首版、会话设置v2及消息会话前置条件已实现并工程验证。设置沿用下文v2合同，当前消息合同追加[旧页拒收前置条件](#旧页消息拒收与迟到-cookie2026-10-08)；首版合同与历史证据分列保留。前端由实际Kimi CLI K3 / Max完成，Codex完成后端与独立联调。
+日期：2026-10-08；状态：只读问答首版、会话设置v2及消息/重置会话前置条件已实现并工程验证。设置沿用下文v2合同，当前消息与新建/替换分别追加[消息前置条件](#旧页消息拒收与迟到-cookie2026-10-08)及[重置前置条件](#旧页重置的会话前置条件2026-10-08)；首版合同与历史证据分列保留。前端由实际Kimi CLI K3 / Max完成，Codex完成后端与独立联调。
 
 ## P0与范围
 
@@ -23,6 +23,8 @@ API合同由Codex冻结后追加在本页；Kimi只依合同构建，不硬编�
 角色选择允许作者主动扮演客户A或B。本轮证明固定服务端映射、所选身份的订单归属与上下文隔离，不证明真实用户登录鉴权，也不限制演示客户A切换成B；不能将这个入口直接当成公网客户认证。
 
 ## 首版HTTP合同（实施前冻结）
+
+以下是首版历史接口，保留当轮合同与结果。当前配置按会话设置v2，消息按[消息会话前置条件](#旧页消息拒收与迟到-cookie2026-10-08)，新建/替换按[重置会话前置条件](#旧页重置的会话前置条件2026-10-08)；调用当前接口不能继续使用历史两字段消息或不带sessionId的新建正文。
 
 本机`http://127.0.0.1:3002/`，同源cookie（HttpOnly、SameSite=Strict、Path=/）；POST必须`Content-Type: application/json`、`X-Chat-Request: 1`，不接受查询参数。Host/Origin/Fetch-Site校验沿用本机工作台边界；body最多8KiB，消息1..2000字符（原文保留）。无CORS、无外部字体/CDN或密钥表单。
 
@@ -100,7 +102,30 @@ node --env-file-if-exists=.env src/web-chat-server.ts
 
 **验证与失败留痕：** Node `v26.10.0`；两个根因在修复前由本地真实Node HTTP各一次复现（2/2已执行、0通过、2失败，基线脚本以捕获这两项失败为成功退出条件），未访问DB或模型。修复后[后端入口](../scripts/web-chat-check.ts)两项根因及缓存负控3/3通过；[UI入口](../scripts/web-chat-ui-check.mjs)以实际app源码/VM/合成fetch检查每条消息带页面会话ID，[真实问答入口](../scripts/web-chat-live-check.ts)只同步合同，未执行`--live`。生产修复的一次完整`npm run validate`退出0；独审建议补缓存负控后，后端定向及最终类型检查通过。定向/完整检查复用了同一组11次faux与6组原生Pi替代HTTP，重复执行不计独立模型样本。首次类型检查因`every`未收窄unknown失败，改显式字段typeof后通过；Kimi补丁首个机械白名单因JSON字段顺序拒收且未写文件，核对等价顺序后原样应用，未重跑生成。唯一实际Kimi CLI生成经wire元数据核验`kimi-code/k3`/`max`，CLI用时9.549秒，用量/费用未知。基线本地日志与Kimi记录保留在忽略的`.runtime`，不入库。
 
-本片已实现并工程验证，0业务远程模型/DB/QQ/资金请求，固定题/gold/原始结果、默认atomic/lexical/memory/id及C1/O4/O5不变。只保证消息入场与消息响应cookie；并发create响应的cookie竞争、旧页主动reset、多标签页浏览器状态同步及在途响应跨generation的实际Chrome验收仍未补验，不冒称全部多页竞争已解决。已有标签页加载的旧两字段代码会被400拒绝，更新后须刷新；语雀旧篇的单页保证不自动升级，应沿本节证据单独更新材料。预算内收尾，不追加模型或DB批次。
+本片已实现并工程验证，0业务远程模型/DB/QQ/资金请求，固定题/gold/原始结果、默认atomic/lexical/memory/id及C1/O4/O5不变。只保证消息入场与消息响应cookie；并发create响应的cookie竞争、旧页主动reset（后续单独修复见下节）、多标签页浏览器状态同步及在途响应跨generation的实际Chrome验收仍未补验，不冒称全部多页竞争已解决。已有标签页加载的旧两字段代码会被400拒绝，更新后须刷新；语雀旧篇的单页保证不自动升级，应沿本节证据单独更新材料。预算内收尾，不追加模型或DB批次。
+
+## 旧页重置的会话前置条件（2026-10-08）
+
+**P0与停止条件：** 两个标签页共享cookie，旧页的“新对话／换客户／应用设置”不能清空另一页的新会话；正文或配置等待期间的旧请求也不能补建第三会话并覆盖新cookie。面试追问是“为什么只校验消息UUID仍会丢会话，检查为什么必须放在最后一次await之后”。Codex补宿主/HTTP合同与确定性检查；前端只由实际Kimi CLI K3/Max生成小补丁，复用Pi、现有Entry和原生UI。基线`1ff40cffe8a2cef497412750a0425748561ad756`；30分钟、两个本地HTTP失败复现、一次Kimi生成（若独审发现原能力回归，最多一次定向补缺）、一组定向与项目要求检查；0业务远程模型/DB/QQ。按预算收尾，不扩建会话存储、不追加模型评测。
+
+**冻结合同：** `POST /api/chat/session`必填`sessionId: UUID|null`，仍只允许`profileId`及可选完整`settings`。UUID表示替换页面正在显示的会话，null表示初次或已确认失效的恢复；宿主在配置await后、busy检查及删除前严格比较当前cookie对应UUID（无可用Entry为null）。字段缺失/非法400、不匹配401且无Set-Cookie；正常忙碌409与参数400保留。UUID仅作并发前提，cookie仍提供服务端身份定位。普通重置携带页面UUID；失效后的重新连接先GET，现有会话直接接回，只有null才用null创建；客户改变时清除旧草稿，503同客户恢复保留草稿及原已应用设置；配置不可用时沿既有校验拒绝，默认configured无密钥的宿主兼容路径继续省略settings。无cookie初次创建及null恢复之间的响应cookie竞争仍未覆盖，不能称全部多页竞态已解决。
+
+**调用链与取舍：** [app.js](../web/chat/app.js)的`resetConversation`声明旧UUID；[HTTP入口](../src/web-chat-server.ts)读完正文，再调用[宿主create](../src/web-chat.ts)。cookie只定位当前Entry，不能证明旧页有意删除它。`create`等待配置、校验参数后，以当前UUID/null比较请求前提；比较到失效/创建之间无await，在本进程内竞争替换只接受一次。只在HTTP或await前检查仍会漏掉正文/配置等待窗口；前端generation只挡旧正文显示，挡不住服务器删除或浏览器处理Set-Cookie。复用原Map及同步执行段，比加全局锁或持久化会话简单；不改变Pi循环，也不添加登录能力。
+
+| 工程反例/控制 | 本轮结果与检查范围 |
+| --- | --- |
+| 旧页A＋新cookie B重置；B已有两条历史 | HTTP及直接create均401、无Set-Cookie，B的UUID/历史精确不变 |
+| session正文分块，另一请求先替换A | 用服务端request事件屏障，补完旧正文后401，无Set-Cookie，新B仍可查询 |
+| 两个直接create经过同一配置await竞争旧UUID | 仅一个成功，另一个401；不证明跨进程互斥 |
+| 初次null、活会话配null、缺/非法UUID | 初次正常；活会话null为401；缺字段/两种坏值为400；原busy409/坏设置400回归保留 |
+| 503与TTL恢复 | 实际HTTP503后GET null→POST null成功；30分钟受控Date.now使Entry失效，旧UUID拒绝、null恢复。TTL是受控时钟，不是实等30分钟 |
+| 实际app的重新连接 | VM/合成fetch验证接回另一客户不POST、不删除且清旧草稿；503同客户保留草稿和已应用Pro/high/512参数；默认无密钥的普通reset回归保留，initialize恢复分支本轮仅静态核对 |
+
+**证据与失败：** 基线两项本地Node HTTP反例2/2执行、0通过、2失败：旧页面不带前提的重置返回200并删除B；旧正文补完返回200及新的cookie，B仍在Map但浏览器可被切到第三会话。原记录保留忽略目录`.runtime/web-reset-baseline.json`，不回填为修后成绩。修后[后端入口](../scripts/web-chat-check.ts)覆盖上表前五组，[实际UI/合成传输入口](../scripts/web-chat-ui-check.mjs)覆盖最后组；[真实问答入口](../scripts/web-chat-live-check.ts)仅同步null新建合同，未执行`--live`。首次定向检查因本轮给既有B增加历史，改变原Pi捕获断言而失败，隔离合成会话后通过；第一Kimi候选的503参数恢复断言失败，保留日志后仅做一次定向补缺，不通过删断言收尾。正文检查的20ms等待已替换为事件屏障；一次TTL补丁上下文不匹配未写入，定位后修正。
+
+Node `v26.10.0`；最终UI定向、完整`npm run validate`（含后端/UI、类型及既有项目检查）均退出0，独审及文档差异/链接通过。定向与完整检查重复使用既有11次faux及6组原生Pi替代HTTP，不计独立真实模型样本。实际Kimi CLI `kimi-code/k3`、`model=k3`、`thinkingEffort=max`两次生成分别128.887/38.699秒，共167.586秒，wire元数据核验；用量/费用未知。业务远程模型/DB/QQ/资金请求均0。验证时生产SHA256：`src/web-chat.ts=f9457f8c66ad0967ba23aeb66d582bcce4a728336b2c5c16ae1861f413efa063`、`src/web-chat-server.ts=88d6bb26d7e184dbe3e93812628779d6d75377bfafad299de6971be4a54d3620`、`web/chat/app.js=5794130732c4bda0ded83affc829672c17eacdb828fda59cea127118a701c937`。
+
+**收尾与演示边界：** 本片已修复并工程验证；客户端新增一个UUID/null字段，宿主增加一次本地比较，正常重置无额外DB或模型调用，失效重新连接增加GET；时延收益未测量。复现用`node scripts/web-chat-check.ts`、`node scripts/web-chat-ui-check.mjs`，可从表中任一失败追到宿主最终比较及固定证据。仅本机合成身份、内存会话和只读入口；无cookie初次创建/并发null恢复的cookie响应竞争、真实Chrome多页/跨generation、跨进程恢复、当前MySQL/真实QQ均未补验。旧页面不含新字段会400，须刷新载入新合同；本轮不重启常驻业务服务、不部署。固定题/gold/结果及atomic/lexical/memory/id、C1/O4/O5准入不变，预算内收尾，不追加实验。后续优先用此入口讲清“拒绝旧页删除为什么需要服务端前提”；剩余null窗口若值得做，另立有界合同。
 
 ## 问答页设置与评测导航（2026-10-07，本轮实施合同）
 

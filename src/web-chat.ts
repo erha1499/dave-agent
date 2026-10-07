@@ -14,6 +14,7 @@ const identities: Record<string, QQIdentity> = {
   "demo-a": { appId: "TEST_APP", senderId: "TEST_USER1" },
   "demo-b": { appId: "TEST_APP", senderId: "TEST_USER2" },
 };
+const uuidPattern = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/iu;
 type ReadReply = Extract<Reply, { kind: "answer" | "notice" | "order" }>;
 export type WebChatMessage = { id: string; role: "user" | "assistant"; text: string; reply?: ReadReply };
 type PublicSession = { id: string; profileId: string; label: string; settings: WebChatSettings; model: { provider: string; id: string } };
@@ -60,8 +61,10 @@ export class WebChatSessions {
     const { metadata: _metadata, ...settings } = await this.catalog;
     return { version: 2, simulation: true, readOnly: true, profiles: webChatProfiles, limits: { messageCharacters: 2000 }, ...structuredClone(settings) };
   }
-  async create(token: string | undefined, profileId: string, input?: unknown) {
+  async create(token: string | undefined, profileId: string, input?: unknown, sessionId: unknown = null) {
     if (this.closed) throw new WebChatError(503, "客服服务已停止。");
+    if (sessionId !== null && (typeof sessionId !== "string" || !uuidPattern.test(sessionId)))
+      throw new WebChatError(400, "新对话须声明有效的页面会话编号或 null。");
     const profile = webChatProfiles.find(row => row.id === profileId);
     if (!profile) throw new WebChatError(400, "请选择有效的客户。");
     const catalog = await this.catalog;
@@ -71,6 +74,7 @@ export class WebChatSessions {
     catch (error) { throw new WebChatError(400, error instanceof Error ? error.message : "模型设置无效。"); }
     const model = catalog.models.find(row => row.id === settings.modelSelection)!;
     const previous = this.find(token);
+    if ((previous?.public.id ?? null) !== sessionId) throw new WebChatError(401, "页面会话已失效，请重新连接。");
     if (previous?.busy) throw new WebChatError(409, "当前消息仍在处理中，请等待后再新建对话。");
     // ponytail: 20 ephemeral local demo sessions; require login/persistence before public or long-lived use.
     if (!previous && this.entries.size >= 20) throw new WebChatError(429, "当前会话数量已达上限，请稍后重试。");
@@ -82,7 +86,7 @@ export class WebChatSessions {
     return { token: capability, ...structuredClone({ session: entry.public, messages: entry.messages }) };
   }
   async send(token: string | undefined, requestId: string, text: string, sessionId: string): Promise<WebChatResult> {
-    if (![requestId, sessionId].every(id => typeof id === "string" && /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/iu.test(id))
+    if (![requestId, sessionId].every(id => typeof id === "string" && uuidPattern.test(id))
       || typeof text !== "string" || !text.trim() || text.length > 2000) throw new WebChatError(400, "消息须为 1..2000 字及有效的 UUID 请求编号。");
     const entry = this.find(token);
     if (!entry) throw new WebChatError(401, "会话已失效，请新建对话。");

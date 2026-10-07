@@ -27,7 +27,7 @@ async function run() {
     return response.json();
   }
   try {
-    const created = await request("/api/chat/session", { profileId: "demo-a" });
+    const created = await request("/api/chat/session", { profileId: "demo-a", sessionId: null });
     assert.equal(created.session?.profileId, "demo-a");
     for (const text of questions) {
       const requestId = randomUUID(), started = performance.now();
