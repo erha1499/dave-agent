@@ -32,7 +32,7 @@ async function run() {
     for (const text of questions) {
       const requestId = randomUUID(), started = performance.now();
       result.executed++; result.notExecuted--;
-      const receipt = await request("/api/chat/messages", { requestId, text });
+      const receipt = await request("/api/chat/messages", { sessionId: created.session.id, requestId, text });
       result.turns.push({ requestId, text, receipt, clientDurationMs: performance.now() - started });
       assert.equal(receipt.sessionId, created.session.id);
       assert.equal(receipt.requestId, requestId);

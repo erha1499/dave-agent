@@ -81,11 +81,12 @@ export class WebChatSessions {
     this.entries.set(capability, entry);
     return { token: capability, ...structuredClone({ session: entry.public, messages: entry.messages }) };
   }
-  async send(token: string | undefined, requestId: string, text: string): Promise<WebChatResult> {
-    if (typeof requestId !== "string" || !/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/iu.test(requestId)
+  async send(token: string | undefined, requestId: string, text: string, sessionId: string): Promise<WebChatResult> {
+    if (![requestId, sessionId].every(id => typeof id === "string" && /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/iu.test(id))
       || typeof text !== "string" || !text.trim() || text.length > 2000) throw new WebChatError(400, "消息须为 1..2000 字及有效的 UUID 请求编号。");
     const entry = this.find(token);
     if (!entry) throw new WebChatError(401, "会话已失效，请新建对话。");
+    if (entry.public.id !== sessionId) throw new WebChatError(401, "页面会话已失效，请重新连接。");
     const previous = entry.requests.get(requestId);
     if (previous && previous.text !== text) throw new WebChatError(400, "同一请求编号不能用于不同原文。");
     if (previous?.result) return structuredClone(previous.result);

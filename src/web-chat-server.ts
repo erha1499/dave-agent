@@ -78,13 +78,14 @@ export function createWebChatServer(chat: WebChatSessions) {
           if (typeof body.profileId !== "string" || Object.keys(body).some(key => !["profileId", "settings"].includes(key)))
             throw new WebChatError(400, "新对话只接受 profileId 及完整 settings。");
           const created = await chat.create(token, body.profileId, body.settings);
-          res.setHeader("Set-Cookie", `${cookieName}=${created.token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=1800`);
+          res.setHeader("Set-Cookie", `${cookieName}=${created.token}; HttpOnly; SameSite=Strict; Path=/`);
           json(200, { session: created.session, messages: created.messages }); return;
         }
-        if (Object.keys(body).length !== 2 || !Object.hasOwn(body, "text") || !Object.hasOwn(body, "requestId")
-          || typeof body.text !== "string" || typeof body.requestId !== "string") throw new WebChatError(400, "发送消息只接受 requestId 和 text。");
-        const result = await chat.send(token, body.requestId, body.text);
-        res.setHeader("Set-Cookie", `${cookieName}=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=1800`);
+        if (Object.keys(body).length !== 3 || !["text", "requestId", "sessionId"].every(key => Object.hasOwn(body, key))
+          || typeof body.text !== "string" || typeof body.requestId !== "string" || typeof body.sessionId !== "string")
+          throw new WebChatError(400, "发送消息只接受 sessionId、requestId 和 text。");
+        const result = await chat.send(token, body.requestId, body.text, body.sessionId);
+        // Only creation sets the cookie: a late message response must not replace or clear a newer conversation.
         json(200, result); return;
       }
       req.resume();
@@ -96,7 +97,6 @@ export function createWebChatServer(chat: WebChatSessions) {
       json(404, { error: "页面或接口不存在。" });
     } catch (error) {
       req.resume();
-      if (error instanceof WebChatError && [401, 503].includes(error.status)) res.setHeader("Set-Cookie", `${cookieName}=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0`);
       json(error instanceof WebChatError ? error.status : 503,
         { error: error instanceof WebChatError ? error.message : "客服服务暂时不可用，请稍后重试。" });
     }

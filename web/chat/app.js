@@ -309,7 +309,7 @@ async function submitMessage(event) {
   setBusy(true);
   setStatus('正在查询');
   try {
-    const res = await api('/api/chat/messages', { requestId, text });
+    const res = await api('/api/chat/messages', { requestId, sessionId: sid, text });
     if (gen !== state.generation || !state.session || state.session.id !== sid) return;
     if (!res || res.sessionId !== sid || res.requestId !== requestId || !validateReply(res.reply)) throw new Error('响应校验失败');
     state.messages.push({ id: requestId + ':user', role: 'user', text });

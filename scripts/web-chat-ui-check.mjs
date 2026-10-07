@@ -90,6 +90,7 @@ export async function checkWebChatUI() {
       return response({ session, messages: [] });
     }
     assert.equal(path, '/api/chat/messages');
+    assert.equal(body.sessionId, session.id, 'every message declares the page session before HTTP execution');
     return new Promise((resolve, reject) => pending.push({ body, resolve, reject }));
   };
   const document = { getElementById: id => nodes.get(id), createElement: tag => new Element(tag), createTextNode: text => Object.assign(new Element(), { textContent: text }),
