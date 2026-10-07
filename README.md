@@ -53,6 +53,14 @@ npm start
 
 CLI 只支持预置合成身份 `TEST_APP + TEST_USER1/TEST_USER2`，`.env` 的 `CLI_DEMO_USER` 默认 `TEST_USER1`，对应 `customer-demo-1`。可连续提问“我的团购券还能退吗？”、“订单号是 COUPON-1001”；应查到实付 79.80 元、未核销券及适用规则。`COUPON-1002` 属于第二客户，首客户查询应拒绝。修改模型配置即可换用 Pi 支持的模型；凭据仅来自应用运行时环境。
 
+网页问答入口独立运行，不影响3001评测工作台：
+
+```sh
+node --env-file-if-exists=.env src/web-chat-server.ts
+```
+
+打开 [网页客服](http://127.0.0.1:3002/)，可选择两个合成客户，进行普通问答、本人订单查询或`查询到账 银行卡`。首版仅开放只读工具，历史在进程内；普通问答会使用配置的真实模型，到账命令由宿主处理。启动要求现有`dave_agent_read`只读数据库账户；页面由Kimi CLI K3 Max完成，接口、验收与限制见[网页说明](./docs/web-chat.md)。
+
 ## 模拟售后（D1 / D2 / D3）
 
 ```sh

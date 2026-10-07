@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dave 客服</title>
+  <link rel="stylesheet" href="./style.css">
+  <script src="./app.js" defer></script>
+</head>
+<body>
+  <header class="app-header">
+    <h1>Dave 客服</h1>
+    <small>模拟数据 · 只读咨询</small>
+    <label for="profile-select">演示客户</label>
+    <select id="profile-select" disabled></select>
+    <button type="button" id="new-chat" disabled>新对话</button>
+    <p role="status" aria-live="polite" id="app-status"></p>
+    <button type="button" id="init-retry" hidden>重试连接</button>
+  </header>
+  <div class="app-layout">
+    <main class="chat-panel">
+      <section class="messages" id="chat-messages" aria-label="聊天记录" role="log" aria-live="polite" aria-relevant="additions">
+        <div id="chat-empty">
+          <p>有什么可以帮你？</p>
+          <ul id="starter-list"></ul>
+        </div>
+      </section>
+      <form id="chat-form" class="composer">
+        <label for="chat-input">你的问题</label>
+        <textarea id="chat-input" maxlength="2000" rows="3" disabled></textarea>
+        <span id="char-count">0/2000</span>
+        <button type="submit" id="send-button" disabled>发送</button>
+        <small>Enter 发送 / Shift+Enter 换行</small>
+      </form>
+    </main>
+    <aside class="sidebar">
+      <details>
+        <summary>订单提示</summary>
+        <div id="order-hints"></div>
+      </details>
+    </aside>
+  </div>
+</body>
+</html>
