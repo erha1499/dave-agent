@@ -50,7 +50,7 @@ function inputs(context: TranscriptContext, tools: string[]) {
     assert.deepEqual(getCurrentTools(context.messages).map(item => item.name).sort(), tools);
   } catch (error) { modelErrors.push(error); throw error; }
 }
-function agent() {
+function agent(merchantEvents: "model" | "host" = "model", afterCreate?: () => void) {
   return new QQAgent(async msg => {
     assert.equal(msg.senderId, identity.senderId); assert.equal(msg.groupOpenid, group);
     const session = await createCouponSession(identity, {} as CouponStore, runtime, faux.getModel(), {
@@ -64,16 +64,16 @@ function agent() {
       } as unknown as AfterSalesStore,
       refunds: { async prepare() { prepareCalls++; throw new Error("event must not prepare refunds"); } } as unknown as RefundStore,
     });
-    sessions.push(session); return session;
+    sessions.push(session); afterCreate?.(); return session;
   }, async (target, _text, reply, requester) => {
     attempts.push({ target, reply, requester });
     if (failSend) throw new Error("synthetic private send uncertainty");
-  }, text => logs.push(text), 1000, async msg => { hooks.push(msg.messageId!); return undefined; });
+  }, text => logs.push(text), 1000, async msg => { hooks.push(msg.messageId!); return undefined; }, undefined, { merchantEvents });
 }
 function persistence(overrides: Partial<MerchantNotification> = {}) {
   const item: MerchantNotification = { ...identity, groupOpenid: group, messageId: "original-confirmation",
     timestamp: new Date().toISOString(), taskId: task.taskId, orderId: task.orderId, sourceKey, ...overrides };
-  const state = { status: "pending", claims: 0, reads: 0, finishes: 0, current: task as MerchantTask | undefined };
+  const state = { status: "pending", claims: 0, reads: 0, finishes: 0, current: task as MerchantTask | undefined, readError: false };
   const store = {
     async listNotifications(appId: string) {
       assert.equal(appId, identity.appId); return state.status === "pending" ? [{ ...item }] : [];
@@ -83,9 +83,12 @@ function persistence(overrides: Partial<MerchantNotification> = {}) {
       if (state.status !== "pending") return false;
       state.status = "claimed"; return true;
     },
-    async getTask(actual: QQIdentity, key: string, orderId: string) {
+    async getTask(actual: QQIdentity, key: string, orderId: string, options?: { referenceTaskId: string }) {
       assert.deepEqual(actual, identity); assert.equal(key, item.sourceKey); assert.equal(orderId, item.orderId);
-      state.reads++; return state.current;
+      assert.deepEqual(options, { referenceTaskId: item.taskId });
+      state.reads++;
+      if (state.readError) throw new Error("synthetic authorization read failure");
+      return state.current;
     },
     async finishNotification(taskId: string, appId: string, status: string) {
       assert.equal(taskId, item.taskId); assert.equal(appId, identity.appId); assert.equal(state.status, "claimed");
@@ -136,7 +139,7 @@ try {
   assert.equal(busy.state.status, "pending"); assert.equal(busy.state.claims, 0, "a full queue must not consume its pending notification");
   assert.equal(resolutions, 0); assert.equal(attempts.length, 0, "events must not send a busy reply or interrupt the active user turn");
   release.resolve(); await Promise.all([first, last]); assert.equal(await event, "sent");
-  assert.equal(resolutions, 1); assert.equal(prepareCalls, 0);
+  assert.equal(resolutions, 2); assert.equal(prepareCalls, 0);
   assert.deepEqual(hooks, ["user-first", "user-last"], "business event text must never reach the confirmation hook");
   assert.deepEqual(attempts.map(item => item.target.msgId), ["user-first", "event", "user-last"]);
   assertCard(1, "event"); assert.deepEqual(sessions[0]!.getActiveToolNames().sort(), allTools);
@@ -162,6 +165,37 @@ try {
   assert.equal(validQQMessage(invalid), false);
   assert.equal(await qq.resumeMerchant(invalid, async () => { assert.fail("invalid route must not resolve"); }), "deferred");
 } finally { await qq.close(); }
+
+// Authorization can change after dequeue, while Pi or session creation is awaited.
+for (const path of ["model", "fallback", "host", "read-error", "wrong-task", "pending"] as const) {
+  const test = persistence(), before: number = attempts.length, beforeCalls = faux.state.callCount;
+  const inFlight = deferred(), continueEvent = deferred();
+  qq = agent(path === "host" ? "host" : "model", path === "host" ? () => { test.state.current = undefined; } : undefined);
+  try {
+    if (path !== "host") faux.setResponses([async context => {
+      inputs(context, ["get_merchant_request"]); inFlight.resolve(); await continueEvent.promise;
+      return fauxAssistantMessage(path === "fallback" ? "" : "商家结果已完成");
+    }]);
+    const tick = dispatchMerchantNotifications(test.store, qq, identity.appId, [group]);
+    if (path !== "host") {
+      await inFlight.promise;
+      assert.equal(test.state.status, "claimed"); assert.equal(test.state.reads, 1);
+      if (path === "read-error") test.state.readError = true;
+      else if (path === "wrong-task") test.state.current = { ...task, taskId: "00000000-0000-4000-8000-000000000099" };
+      else if (path === "pending") test.state.current = { ...task, status: "pending", completedAt: null };
+      else test.state.current = undefined;
+      continueEvent.resolve();
+    }
+    await tick;
+    assert.equal(test.state.status, "deferred", `${path}: lost authorization must defer, not send an old result`);
+    assert.equal(attempts.length, before, path); assert.equal(test.state.reads, 2, path);
+    assert.equal(test.state.claims, 1, "send-time authorization must not claim again");
+    assert.equal(test.state.finishes, 1); assert.equal(prepareCalls, 0);
+    assert.equal(faux.state.callCount, beforeCalls + (path === "host" ? 0 : 1));
+    await dispatchMerchantNotifications(test.store, qq, identity.appId, [group]);
+    assert.equal(attempts.length, before, "a deferred notification is not retried");
+  } finally { continueEvent.resolve(); await qq.close(); }
+}
 
 // Re-check the original reply window after waiting in the conversation queue, before claiming or prompting.
 const queueStarted = deferred(), queueRelease = deferred();
@@ -246,5 +280,5 @@ try {
   assert.equal(closed.state.status, "deferred"); assert.equal(attempts.length, beforeClosed);
   assert.equal(faux.getPendingResponseCount(), 0); assert.deepEqual(modelErrors, []);
   assert.ok(!logs.join("\n").includes("synthetic private"));
-  console.log("商家结果续接离线检查通过：真实 Pi 队列串行、原 Prompt/只读工具、宿主固定原单回执、确认隔离、排队过期、身份与群限制、原消息路由、并发领取、失败不重发、重启跳过已领取、模型失败兜底、关闭中断在途通知且不补发。数据库原子性另行验证。");
+  console.log("商家结果续接离线检查通过：真实 Pi 队列串行、原 Prompt/只读工具、宿主固定原单回执、确认隔离、排队过期、身份与群限制、发送前重绑/读取异常/错任务/非终态拒发、原消息路由、并发领取、失败不重发、重启跳过已领取、模型失败兜底、关闭中断在途通知且不补发。数据库原子性另行验证。");
 } finally { failSend = false; await qq.close(); }

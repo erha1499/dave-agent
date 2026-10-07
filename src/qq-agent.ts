@@ -66,7 +66,7 @@ export class QQAgent {
     await this.enqueue(msg);
   }
 
-  // Only the host supplies this resolver; business events never enter the user-confirmation hook.
+  // The host resolver is called after dequeue and before sending; repeated reads must not reclaim.
   async resumeMerchant(msg: QQBotInboundMessage, resolve: () => Promise<MerchantTask | undefined>): Promise<ContinuationOutcome> {
     return this.enqueue(msg, resolve);
   }
@@ -104,6 +104,19 @@ export class QQAgent {
       let merchant: MerchantTask | undefined;
       let activeTools: string[] | undefined;
       let supportRun = false;
+      const deliverMerchant = async (): Promise<ContinuationOutcome> => {
+        let current: MerchantTask | undefined;
+        try { current = await resolve!(); } catch {
+          this.log("[agent] 通知发送前授权读取失败；未发送。");
+        }
+        if (!merchant || !current || current.status === "pending" || current.taskId !== merchant.taskId
+          || current.orderId !== merchant.orderId || this.closed || !validQQMessage(msg)) {
+          failed = true;
+          return "deferred";
+        }
+        merchant = current;
+        return await this.deliver(msg, { kind: "merchant_status", task: current }) ? "sent" : "unknown";
+      };
       try {
         if (resolve) {
           merchant = await resolve();
@@ -119,9 +132,10 @@ export class QQAgent {
         if (this.closed || !validQQMessage(msg)) return;
         const session = conversation.session;
         if (merchant && this.merchantEvents === "host") {
+          outcome = await deliverMerchant();
+          if (outcome === "deferred") return;
           const reply: Reply = { kind: "merchant_status", task: merchant };
-          const delivered = await this.deliver(msg, reply);
-          outcome = delivered ? "sent" : "unknown";
+          const delivered = outcome === "sent";
           conversation.turns++;
           // A business event records a fact, never user consent or a new order selection.
           await session.sendCustomMessage({ customType: "merchant-result", content: renderReply(reply).text, display: true }, { triggerTurn: false });
@@ -169,14 +183,15 @@ export class QQAgent {
         conversation.turns++;
         const results = session.messages.slice(previousMessageCount).flatMap(message =>
           message.role === "toolResult" && session.getActiveToolNames().includes(message.toolName) ? [message] : []);
-        // The host reloaded this exact task after dequeue; a model cannot redirect a notification to another order.
+        if (!validQQMessage(msg) || this.closed) return;
+        // Reauthorize after the model wait; the model cannot redirect the fixed task or restore consent.
         const reply: Reply = merchant ? { kind: "merchant_status", task: merchant }
           : supportReply(session, text) ?? replyFromTools(text!, results);
-        if (!validQQMessage(msg) || this.closed) return;
-        const delivered = await this.deliver(msg, reply);
-        outcome = delivered ? "sent" : "unknown";
+        outcome = merchant ? await deliverMerchant() : await this.deliver(msg, reply) ? "sent" : "unknown";
+        if (outcome === "deferred") return;
+        const delivered = outcome === "sent";
         if (merchant) {
-          await session.sendCustomMessage({ customType: "merchant-result", content: renderReply(reply).text, display: true }, { triggerTurn: false });
+          await session.sendCustomMessage({ customType: "merchant-result", content: renderReply({ kind: "merchant_status", task: merchant }).text, display: true }, { triggerTurn: false });
         }
         const tools = results.filter(result => !result.isError).map(result => result.toolName);
         const toolErrors = results.filter(result => result.isError).map(result => result.toolName);
@@ -191,10 +206,9 @@ export class QQAgent {
         if (!resolve || merchant) {
           // Known durable business facts remain usable when the model fails. Never retry an attempted send.
           if (outcome === "deferred" && validQQMessage(msg) && !this.closed) {
-            const delivered = await this.deliver(msg, merchant ? { kind: "merchant_status", task: merchant }
-              : supportRun && conversation.session ? supportReply(conversation.session)!
-              : "客服暂时无法处理这条消息，请稍后重试。");
-            outcome = delivered ? "sent" : "unknown";
+            outcome = merchant ? await deliverMerchant() : await this.deliver(msg,
+              supportRun && conversation.session ? supportReply(conversation.session)!
+              : "客服暂时无法处理这条消息，请稍后重试。") ? "sent" : "unknown";
           }
         }
       } finally {

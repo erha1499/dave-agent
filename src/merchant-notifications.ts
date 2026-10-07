@@ -26,7 +26,7 @@ export async function dispatchMerchantNotifications(
     let outcome: "busy" | "sent" | "deferred" | "unknown" = "deferred";
     if (allowedGroups.includes(item.groupOpenid) && validQQMessage(msg)) {
       outcome = await agent.resumeMerchant(msg, async () => {
-        claimed = await store.claimNotification(item.taskId, appId);
+        if (!claimed) claimed = await store.claimNotification(item.taskId, appId);
         if (!claimed) return undefined;
         const task = await store.getTask({ appId, senderId: item.senderId }, item.sourceKey, item.orderId, { referenceTaskId: item.taskId });
         return task?.taskId === item.taskId && task.status !== "pending" ? task : undefined;

@@ -226,6 +226,21 @@ QQ 就绪后启动原有商家 worker：先更新到期任务，再扫描当前 
 
 **本轮结果：** 基于源码基线 `72e9f7d` 核对正式调用方，未发现需要修改生产代码的有证据缺陷。上述离线检查执行一次、退出0，覆盖队列满不领取、排队过期、固定原任务/路由、确认隔离、并发领取、unknown/claimed不重发、模型失败兜底及关闭中断。它使用实际Pi/faux和QQAgent，但Store状态由合成实现替代，所谓重启是重建Agent并保留合成状态；不能证明当前SQL原子性或真实进程退出。数据库条件UPDATE、连接重建和worker并发证据复用[2026-10-06工程复核](#本轮稳定主线工程复核2026-10-06)及[通知DB检查](../scripts/merchant-notification-db-check.ts)，本轮均未重跑。仅补本文和计划，0远程模型/真实QQ/数据库请求，默认配置与C1/O4/O5准入不变。
 
+### 通知发送前身份复核（2026-10-08）
+
+业务约束：创建任务时绑定的身份代次与订单归属在通知发送前仍须有效，出队读取不能授权随后整段模型等待。面试追问是“商家通知已经领取，模型等待期间解绑或重绑，旧客户结果会不会发出”。本轮先以实际 Pi/faux、dispatcher 和 QQAgent 的受控等待复现，再只在现有发送路径复用 `getTask(referenceTaskId)` 复核；个人贡献是复核时点与拒发边界，复用 Pi 生命周期、现有身份联查和领取状态，不增加数据库表或模型角色。
+
+验收覆盖正常模型结果、模型失败兜底和零模型宿主通知；在首次授权读取后改变合成授权结果，断言不发送、不重复领取、不执行资金操作。身份读取异常也须拒发；正常通知仍使用原任务和原路由。预算30分钟、0远程模型/真实QQ/数据库请求：一次修复前定向复现、一次修复后定向回归及项目要求的最终 `validate`；失败只修受影响代码，不重跑模型题集。复核时点定义为发送前最后一次授权读取的快照；数据库读取与QQ网络发送不在同一事务，不能承诺发送已开始后撤销立即生效。
+
+
+**实现与取舍：** [`QQAgent.enqueue`](../src/qq-agent.ts) 的局部 `deliverMerchant` 覆盖普通模型、模型失败兜底和零模型宿主通知；[`dispatchMerchantNotifications`](../src/merchant-notifications.ts) 的同一 resolver 仅首次领取，第二次只复用 [`AfterSalesStore.getTask`](../src/after-sales.ts) 的精确任务/创建时身份代次/当前订单归属联查。复核拒收、异常、错任务或非终态都返回 deferred；渲染使用第二次读取的任务，拒发时丢弃当前 Pi Session，避免保留本轮旧事实。未改变确认/退款边界、状态表或默认 atomic + lexical + memory + id。相对原路径，每次走到发送边界增加1条授权 SELECT（任务读取1→2），并增加数据库不可用时的漏通知概率；查询延迟未测量。不持有数据库锁等待QQ网络，最后读取快照之后的解绑仍不能原子撤回已开始发送。
+
+**实际证据：** 源码基线 `fc0fe64`；Node v26.10.0，复用 Pi 1.0.0。修复前 `node scripts/merchant-notification-agent-check.ts` 单次在首个 model 场景断言失败：已领取、首次读取后受控等待，合成授权失效却仍 sent；退出1、外层0.702秒，后五项未执行，不能算六项失败。修复后同入口一次退出0、外层0.375秒，新增6/6拒发场景覆盖正常模型、空回复兜底、Session创建后host通知、读取异常、错任务及pending；均读取两次、仅领取一次、无发送/准备，deferred再次调度不重试。正常发送及并发领取、unknown/claimed不重发等原断言仍通过。前置typecheck发现新增测试变量的TS7022推断错误，显式类型修正后最终 `npm run validate` 退出0，包含宿主通知回归；聚合重复同一用例不算独立样本。独立只读审阅无阻断。
+
+源码SHA256：`src/qq-agent.ts=febde3ea659e30ecc21f289fe1df734ea4cee309268de32dd3bd42513e0ac225`；`src/merchant-notifications.ts=63fa4fea4ba027b883e48ac4ce8b90822b729a59bac0c0b8666f01f93b62eb1b`。检查入口：[merchant-notification-agent-check.ts](../scripts/merchant-notification-agent-check.ts)（SHA256 `29d46b5ba648dd68e355301cf66afc4f23fa4404fa2b46f8ff352c741c0fae21`）；[support-notification-check.ts](../scripts/support-notification-check.ts)（`e8a971875f056193fabe261a465dc151663638fd21d803464f578e83b2317259`）。
+
+本轮为实际Pi/dispatcher/QQAgent与合成Store授权、脚本模型及本地发送记录；0远程模型/真实QQ/数据库/真实资金请求，不证明实际MySQL重绑并发或平台接受时刻。拒发后的Session清理由源码与独审核对，未单独验收后续普通请求重建。旧固定manifest/gold、原始成绩及O4历史合同未改；O4 rotation原严格调用序列只有一次任务读取，新源码若启动新批次须先版本化该实现合同，不能据本次validate冒称新O4集成通过。C1/O4/O5仍未完成；按预声明次数收尾，不追加模型或DB批次。下一步若补实库证据，只为末次精确任务读取单立隔离重绑合同；真实QQ须用户参与。
+
 ## 验证记录
 
 以下先说明各脚本的覆盖范围；历史通过记录不作为本次执行结果。同一进程内重建 Store、数据库连接或 QQAgent，只证明对象重建后的持久查询；真实进程退出后查询的本轮工程证据见[双子进程检查](#本轮稳定主线工程复核2026-10-06)，历史真实QQ机器人重启记录在后文单列。

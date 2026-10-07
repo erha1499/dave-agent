@@ -170,7 +170,7 @@ try {
   const test = persistence(), before = attempts.length, modelCalls = faux.state.callCount;
   faux.setResponses([]);
   await Promise.all([1, 2].map(() => dispatchMerchantNotifications(test.store, qq, identity.appId, [group])));
-  assert.equal(test.state.status, "sent"); assert.equal(test.state.reads, 1); assert.equal(test.state.finishes, 1);
+  assert.equal(test.state.status, "sent"); assert.equal(test.state.reads, 2); assert.equal(test.state.finishes, 1);
   assert.equal(attempts.length, before + 1); card(before, test.item.messageId);
   assert.equal(faux.state.callCount, modelCalls);
   await dispatchMerchantNotifications(test.store, qq, identity.appId, [group]);
