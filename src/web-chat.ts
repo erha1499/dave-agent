@@ -7,8 +7,8 @@ import { renderReply, type Reply } from "./reply.ts";
 import { createWebChatSettingsCatalog, validateWebChatSettings, type WebChatSettings, type WebChatSettingsCatalog } from "./web-chat-settings.ts";
 
 export const webChatProfiles = [
-  { id: "demo-a", label: "演示客户 A", orderHints: ["COUPON-1001"], examples: ["查询我的订单 COUPON-1001", "团购券需要预约吗？", "查询到账 银行卡"] },
-  { id: "demo-b", label: "演示客户 B", orderHints: ["COUPON-1002"], examples: ["查询我的订单 COUPON-1002", "团购券需要预约吗？", "查询到账 电子钱包"] },
+  { id: "demo-a", label: "客户 A", orderHints: ["COUPON-1001"], examples: ["查询我的订单 COUPON-1001", "团购券需要预约吗？", "查询到账 银行卡"] },
+  { id: "demo-b", label: "客户 B", orderHints: ["COUPON-1002"], examples: ["查询我的订单 COUPON-1002", "团购券需要预约吗？", "查询到账 电子钱包"] },
 ] as const;
 const identities: Record<string, QQIdentity> = {
   "demo-a": { appId: "TEST_APP", senderId: "TEST_USER1" },
@@ -63,7 +63,7 @@ export class WebChatSessions {
   async create(token: string | undefined, profileId: string, input?: unknown) {
     if (this.closed) throw new WebChatError(503, "客服服务已停止。");
     const profile = webChatProfiles.find(row => row.id === profileId);
-    if (!profile) throw new WebChatError(400, "请选择有效的演示客户。");
+    if (!profile) throw new WebChatError(400, "请选择有效的客户。");
     const catalog = await this.catalog;
     if (this.closed) throw new WebChatError(503, "客服服务已停止。");
     let settings: WebChatSettings;

@@ -9,6 +9,7 @@ function setStatus(text,isError=false){els.appStatus.textContent=text;els.appSta
 function setBusy(value){
   state.busy=Boolean(value);
   const locked=state.busy||!state.initialized;
+  els.evalLink.setAttribute("aria-disabled",locked?"true":"false");
   els.chatInput.disabled=locked;
   els.profileSelect.disabled=locked;
   els.initRetry.disabled=state.busy;
@@ -246,16 +247,18 @@ function renderChatSettings(syncForm = false) {
     const port = Number(u.port);
     if (u.protocol === 'http:'
       && (u.hostname === '127.0.0.1' || u.hostname === 'localhost')
-      && u.port !== '' && Number.isInteger(port) && port >= 1 && port <= 65535
+      && u.port !== '' && Number.isInteger(port) && port >= 1024 && port <= 65535
       && !u.username && !u.password
       && u.pathname === '/' && !u.search && !u.hash) {
-      href = u.href;
+      const current = new URL(window.location.origin);
+      if (current.hostname === '127.0.0.1' || current.hostname === 'localhost') {
+        u.hostname = current.hostname;
+        href = u.href;
+      }
     }
   } catch (e) {}
   if (href) {
     els.evalLink.href = href;
-    els.evalLink.target = '_blank';
-    els.evalLink.rel = 'noopener noreferrer';
     els.evalLink.hidden = false;
   } else {
     els.evalLink.removeAttribute('href');
@@ -437,6 +440,16 @@ function bindUIEvents() {
   });
   els.thinkingSelect.addEventListener("change", onSettingsChange);
   els.tokensSelect.addEventListener("change", onSettingsChange);
+  els.evalLink.addEventListener("click", function (event) {
+    if (state.busy || !state.initialized) {
+      event.preventDefault();
+    }
+  });
+  window.addEventListener("pageshow", function (event) {
+    if (event.persisted === true) {
+      window.location.reload();
+    }
+  });
   updateCount();
 }
 

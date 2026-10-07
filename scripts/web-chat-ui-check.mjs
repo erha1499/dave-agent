@@ -36,7 +36,7 @@ class Element {
 }
 const walk = node => [node, ...node.children.flatMap(walk)];
 const tick = async () => { await setImmediate(); await setImmediate(); };
-const profile = id => ({ id, label: `演示客户 ${id}`, orderHints: [id === 'demo-a' ? 'COUPON-1001' : 'COUPON-1002'], examples: ['查询到账 银行卡'] });
+const profile = id => ({ id, label: `客户 ${id}`, orderHints: [id === 'demo-a' ? 'COUPON-1001' : 'COUPON-1002'], examples: ['查询到账 银行卡'] });
 const response = (body, status = 200) => ({ ok: status >= 200 && status < 300, status, json: async () => structuredClone(body) });
 const defaults = { modelSelection: 'configured', thinkingLevel: 'off', maxTokens: 2048 };
 const models = [
@@ -55,6 +55,13 @@ export async function checkWebChatUI() {
   const stylesheets = [...html.matchAll(/<link\b(?=[^>]*\brel=["']stylesheet["'])[^>]*\bhref=["']([^"']+)["'][^>]*>/g)].map(match => match[1]);
   assert.equal(stylesheets[0], '/ui.css', 'chat must load the actual evaluation theme first');
   assert.ok(stylesheets.length === 2 && /^(?:\.\/|\/)?style\.css$/.test(stylesheets[1]), 'only the shared theme and local chat layout stylesheet are loaded');
+  assert.doesNotMatch(html, /target=["']_blank["']|模拟数据|演示客户/, 'ordinary chat chrome uses product language and same-tab navigation');
+  const evaluationHtml = await readFile(new URL('../web/evaluation/index.html', import.meta.url), 'utf8');
+  const mainNavigation = evaluationHtml.match(/<nav\b[^>]*aria-label=["']主导航["'][^>]*>[\s\S]*?<\/nav>/)?.[0];
+  assert.ok(mainNavigation, 'evaluation retains the same top-level product navigation');
+  assert.match(mainNavigation, /href=["']\/chat["'][^>]*>客服问答<\/a>/, 'evaluation exposes a fixed return path');
+  assert.match(mainNavigation, /<a\b[^>]*aria-current=["']page["'][^>]*>评测工作台<\/a>/, 'evaluation marks the current product page');
+  assert.doesNotMatch(mainNavigation, /target=["']_blank["']/);
   for (const id of ids) assert.equal([...html.matchAll(new RegExp(`\\bid=["']${id}["']`, 'g'))].length, 1, `actual HTML must bind ${id} exactly once`);
   for (const [tag, id] of [['form', 'chat-form'], ['form', 'settings-form'], ['textarea', 'chat-input'],
     ['select', 'profile-select'], ['select', 'model-select'], ['select', 'thinking-select'], ['select', 'tokens-select']])
@@ -65,7 +72,8 @@ export async function checkWebChatUI() {
   nodes.get('chat-messages').append(nodes.get('chat-empty'));
   nodes.get('chat-empty').append(nodes.get('starter-list'));
   new Element('details').append(nodes.get('order-hints'));
-  const docEvents = new Map(), pending = [], calls = [];
+  const docEvents = new Map(), windowEvents = new Map(), pending = [], calls = [];
+  let navigationReloads = 0;
   let session = null, resetError = 0;
   const fetch = async (url, options = {}) => {
     const path = String(url), body = options.body ? JSON.parse(options.body) : undefined;
@@ -87,7 +95,8 @@ export async function checkWebChatUI() {
   const document = { getElementById: id => nodes.get(id), createElement: tag => new Element(tag), createTextNode: text => Object.assign(new Element(), { textContent: text }),
     querySelector: selector => nodes.get(selector.replace(/^#/, '')), addEventListener: (name, fn) => docEvents.set(name, fn), readyState: 'complete' };
   const context = createContext({ document, fetch, crypto: { randomUUID }, console, Headers, URL, AbortController, setTimeout, clearTimeout, structuredClone,
-    window: { addEventListener() {}, innerWidth: 1440, location: { origin: 'http://127.0.0.1:3002' } } });
+    window: { addEventListener: (name, fn) => windowEvents.set(name, fn), innerWidth: 1440,
+      location: { origin: 'http://127.0.0.1:3002', reload: () => { navigationReloads++; } } } });
   const source = await readFile(new URL('../web/chat/app.js', import.meta.url), 'utf8');
   runInContext(source, context); docEvents.get('DOMContentLoaded')?.(); await tick();
   const input = nodes.get('chat-input'), form = nodes.get('chat-form'), select = nodes.get('profile-select');
@@ -99,6 +108,10 @@ export async function checkWebChatUI() {
   await send(' '.repeat(2)); await send('字'.repeat(2001)); assert.equal(posts().length, 0, 'invalid drafts do not send');
   const draft = '查询到账 银行卡 ';
   await send(draft); assert.equal(posts().length, 1); assert.equal(select.disabled, true);
+  let preventedNavigation = false;
+  nodes.get('eval-link').fire('click', { preventDefault: () => { preventedNavigation = true; } });
+  assert.equal(preventedNavigation, true, 'in-flight chat does not lose its active page through the evaluation link');
+  assert.equal(nodes.get('eval-link').getAttribute('aria-disabled'), 'true');
   assert.equal(nodes.get('model-select').disabled, true, 'settings cannot change during a turn');
   assert.equal(nodes.get('apply-settings').disabled, true);
   form.fire('submit'); input.fire('keydown', { key: 'Enter', isComposing: true }); await tick(); assert.equal(posts().length, 1);
@@ -109,6 +122,10 @@ export async function checkWebChatUI() {
   const retry = pending.shift();
   retry.resolve(response({ sessionId: session.id, requestId: originalId, reply: { kind: 'notice', text: '<img src=x onerror=alert(1)> 不能核实', evidenceIds: ['<script>'] }, durationMs: 1, origin: 'host' }));
   await tick();
+  preventedNavigation = false;
+  nodes.get('eval-link').fire('click', { preventDefault: () => { preventedNavigation = true; } });
+  assert.equal(preventedNavigation, false, 'completed chat can navigate to evaluation');
+  assert.equal(nodes.get('eval-link').getAttribute('aria-disabled'), 'false');
   assert.ok(nodes.get('chat-messages').textContent.includes('<img src=x onerror=alert(1)>'));
   assert.ok(walk(nodes.get('chat-messages')).some(node => node.className.split(' ').includes('notice')), 'business notice is visibly distinct');
   await send('本人订单'); const order = pending.shift();
@@ -186,12 +203,31 @@ export async function checkWebChatUI() {
   select.value = 'demo-b'; select.fire('change'); await tick();
   assert.equal(select.value, 'demo-b'); assert.equal(calls.filter(call => call.path === '/api/chat/session' && call.body).at(-1).body.settings, undefined);
   models[0].available = true;
+  context.window.location.origin = 'http://localhost:3002';
+  config.evaluationUrl = 'http://127.0.0.1:3011/';
+  runInContext('initialize()', context); await tick();
+  assert.equal(nodes.get('eval-link').getAttribute('href') ?? nodes.get('eval-link').href, 'http://localhost:3011/', 'navigation retains the current loopback hostname and configured port');
+  assert.notEqual(nodes.get('eval-link').target, '_blank', 'evaluation opens in the same tab');
+  context.window.location.origin = 'http://evil.test:3002';
+  runInContext('initialize()', context); await tick();
+  assert.equal(nodes.get('eval-link').hidden, true, 'untrusted page host cannot enable local navigation');
+  context.window.location.origin = 'http://127.0.0.1:3002';
+  for (const invalid of ['http://127.0.0.1:80/', 'http://127.0.0.1:3001/?target=evil', 'http://127.0.0.1:3001/#secret', 'http://u:p@127.0.0.1:3001/', 'http://127.0.0.1:3001/other']) {
+    config.evaluationUrl = invalid;
+    runInContext('initialize()', context); await tick();
+    assert.equal(nodes.get('eval-link').hidden, true, 'invalid catalog navigation stays inaccessible');
+  }
   config.evaluationUrl = 'https://evil.test/';
   runInContext('initialize()', context); await tick();
   assert.ok(!(nodes.get('eval-link').getAttribute('href') ?? nodes.get('eval-link').href ?? '').includes('evil.test'), 'catalog must not create an external navigation');
   config.evaluationUrl = 'http://127.0.0.1:3001/';
   runInContext('initialize()', context); await tick();
   assert.equal(input.disabled, false);
+  assert.ok(windowEvents.has('pageshow'), 'BFCache restoration must recheck the server session');
+  windowEvents.get('pageshow')({ persisted: false });
+  assert.equal(navigationReloads, 0, 'normal page loads do not reload in a loop');
+  windowEvents.get('pageshow')({ persisted: true });
+  assert.equal(navigationReloads, 1, 'restored DOM is not accepted as current identity or model state');
   console.log('PASS web chat UI: real app code, synthetic HTTP; raw draft/UUID, busy/IME, safe Reply rendering, resets/stale receipts; settings draft vs active, failures, apply/refresh, identity/new-chat snapshot and evaluation link; 0 remote/model/DB/QQ.');
 }
 

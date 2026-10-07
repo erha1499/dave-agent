@@ -35,7 +35,8 @@ async function readExperimentRequest(req: import("node:http").IncomingMessage): 
 }
 
 export function createEvaluationServer(store: Pick<EvalStore, "listRuns" | "getRun" | "getBatch" | "ping">,
-  experiments?: Pick<ExperimentJobs, "list" | "get" | "start">) {
+  experiments?: Pick<ExperimentJobs, "list" | "get" | "start">, chatPortText = "3002") {
+  if (!/^\d{4,5}$/u.test(chatPortText) || Number(chatPortText) < 1024 || Number(chatPortText) > 65535) throw new Error("CHAT_PORT 无效。");
   return createServer({ requestTimeout: 10_000, headersTimeout: 10_000, maxHeaderSize: 8192 }, async (req, res) => {
     const allowedHosts = [`127.0.0.1:${req.socket.localPort}`, `localhost:${req.socket.localPort}`];
     const json = (status: number, body: unknown) => res.writeHead(status, { "Content-Type": "application/json; charset=utf-8" }).end(JSON.stringify(body));
@@ -69,6 +70,13 @@ export function createEvaluationServer(store: Pick<EvalStore, "listRuns" | "getR
       return;
     }
     try {
+      if (url.pathname === "/chat") {
+        if (url.search || url.hash || req.headers["transfer-encoding"] || Number(req.headers["content-length"] ?? "0") > 0) {
+          json(400, { error: "客服导航不接受参数或正文。" }); return;
+        }
+        const hostname = req.headers.host!.split(":")[0]!;
+        res.writeHead(302, { Location: `http://${hostname}:${Number(chatPortText)}/` }).end(); return;
+      }
       if (url.pathname.startsWith("/api/experiments")) {
         if (url.search) { json(400, { error: "实验接口不接受查询参数。" }); return; }
         if (!experiments) { json(503, { error: "实验执行入口未启用。" }); return; }
@@ -143,7 +151,7 @@ async function main() {
   const experiments = new ExperimentJobs();
   try {
     await store.ping();
-    const server = createEvaluationServer(store, experiments);
+    const server = createEvaluationServer(store, experiments, process.env.CHAT_PORT ?? "3002");
     await new Promise<void>((resolve, reject) => {
       server.once("error", reject);
       server.listen(Number(portText), "127.0.0.1", resolve);

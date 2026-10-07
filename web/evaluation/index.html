@@ -11,16 +11,17 @@
 </head>
 <body>
   <header class="masthead">
-    <a class="brand" href="/" aria-label="Dave Agent 评测工作台首页"><span class="brand-mark" aria-hidden="true">d.</span><div>Dave Agent <h1>评测工作台</h1></div></a>
-    <div class="header-meta"><span class="local-dot" aria-hidden="true"></span> 本机 <button id="refresh" class="quiet-button" type="button">刷新记录</button></div>
+    <a class="brand" href="/chat" aria-label="Dave Agent 本地生活客服首页"><span class="brand-mark" aria-hidden="true">d.</span><div>Dave Agent <h1>本地生活客服</h1></div></a>
+    <div class="header-meta"><button id="refresh" class="quiet-button" type="button">刷新记录</button></div>
   </header>
   <main>
-    <div class="toolbar"><nav class="tabs" aria-label="评测视图"><button id="overview-tab" class="tab active" type="button" aria-current="page">运行总览</button><button id="compare-tab" class="tab" type="button">版本对比</button><button id="experiments-tab" class="tab" type="button">实验调试</button></nav><label class="kind-filter">评测类型 <select id="kind"><option value="model">真实模型</option><option value="engineering">工程检查</option></select></label></div>
+    <div class="toolbar"><nav class="tabs" aria-label="主导航"><a href="/chat" class="tab">客服问答</a><a href="/" class="tab active" aria-current="page">评测工作台</a></nav><label class="kind-filter">评测类型 <select id="kind"><option value="model">真实模型</option><option value="engineering">工程检查</option></select></label></div>
+    <nav class="tabs tabs-secondary" aria-label="评测视图"><button id="overview-tab" class="tab active" type="button" aria-current="page">运行总览</button><button id="compare-tab" class="tab" type="button">版本对比</button><button id="experiments-tab" class="tab" type="button">实验调试</button></nav>
     <div id="notice" class="notice" role="status" aria-live="polite" hidden></div>
     <section id="overview" class="overview-layout" aria-label="评测运行总览"><aside class="run-sidebar"><div class="section-label"><h2>运行记录</h2><span id="record-count" aria-live="polite" title="最多显示最新 50 次运行"></span></div><div id="run-list" class="run-list"></div></aside><div id="run-detail" class="detail-pane"></div></section>
     <section id="comparison" aria-label="版本对比" hidden><div class="compare-picker"><div class="picker-fields"><label>基线 A<select id="baseline"><option value="">选择运行</option></select></label><span class="versus" aria-hidden="true">→</span><label>候选 B<select id="candidate"><option value="">选择运行</option></select></label><button id="compare-button" class="primary-button" type="button">开始对比</button></div></div><div id="compare-detail"></div></section>
     <section id="experiments" aria-label="实验调试" hidden></section>
   </main>
-  <footer><span>仅代表当前评测集 · 缺失数据不计为 0 · 回答效果本轮不评测</span><span>Dave Agent · Local Eval Console</span></footer>
+  <footer><span>仅代表当前评测集 · 缺失数据不计为 0 · 回答效果本轮不评测</span><span>Dave Agent · 评测工作台</span></footer>
 </body>
 </html>

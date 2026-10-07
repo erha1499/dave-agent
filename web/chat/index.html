@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="color-scheme" content="light">
-  <title>Dave 客服 · 本地生活团购券</title>
+  <title>Dave Agent · 本地生活客服</title>
   <link rel="stylesheet" href="/ui.css">
   <link rel="stylesheet" href="./style.css">
   <script src="./app.js" defer></script>
@@ -12,15 +12,15 @@
 <body class="chat-page">
   <header class="masthead">
     <a class="brand" href="./" aria-label="Dave Agent 客服首页"><span class="brand-mark" aria-hidden="true">d.</span><div>Dave Agent <h1>本地生活客服</h1></div></a>
-    <div class="header-meta"><span>模拟数据 · 只读咨询</span><button type="button" id="new-chat" class="quiet-button" disabled>新对话</button></div>
+    <div class="header-meta"><button type="button" id="new-chat" class="quiet-button" disabled>新对话</button></div>
   </header>
   <main>
     <div class="toolbar">
       <nav class="tabs" aria-label="主导航">
         <a href="./" class="tab active" aria-current="page">客服问答</a>
-        <a id="eval-link" class="tab" target="_blank" rel="noopener noreferrer" hidden>评测工作台</a>
+        <a id="eval-link" class="tab" hidden>评测工作台</a>
       </nav>
-      <label class="kind-filter" for="profile-select">演示客户 <select id="profile-select" disabled></select></label>
+      <label class="kind-filter" for="profile-select">客户 <select id="profile-select" disabled></select></label>
     </div>
     <div class="chat-layout">
       <section class="chat-main" aria-label="客服对话">

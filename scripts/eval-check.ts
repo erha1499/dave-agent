@@ -64,7 +64,13 @@ malformed.receive({ type: "tool_execution_start", toolName: "get_order", toolCal
 assert.doesNotThrow(() => malformed.receive({ type: "tool_execution_end", toolName: "get_order", toolCallId: "malformed", isError: true, result: { content: 1 } }));
 assert.equal(malformed.finish().failed, true);
 
-const server = createEvaluationServer({ ping: async () => {}, listRuns: async () => [], getRun: async () => undefined, getBatch: async () => [] });
+const mockStore = { ping: async () => {}, listRuns: async () => [], getRun: async () => undefined, getBatch: async () => [] };
+const navigationRequest = (url: string, headers: Record<string, string>) => new Promise<{ status?: number; headers: import("node:http").IncomingHttpHeaders }>((resolve, reject) => {
+  request(url, { headers }, response => { response.resume(); resolve({ status: response.statusCode, headers: response.headers }); }).on("error", reject).end();
+});
+for (const invalid of ["", " 3002", "3002 ", "1023", "65536", "https://evil.test", "3002/path"])
+  assert.throws(() => createEvaluationServer(mockStore, undefined, invalid), /CHAT_PORT/);
+const server = createEvaluationServer(mockStore);
 try {
   await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve));
   const address = server.address();
@@ -82,6 +88,24 @@ try {
   assert.equal((await fetch(`${base}/api/runs/00000000-0000-0000-0000-000000000000`)).status, 404);
   assert.equal((await fetch(`${base}/.env`)).status, 404);
   assert.equal((await fetch(`${base}/api/runs`, { method: "POST" })).status, 405);
+  for (const hostname of ["127.0.0.1", "localhost"]) {
+    const navigation: Awaited<ReturnType<typeof navigationRequest>> = await navigationRequest(`${base}/chat`, { Host: `${hostname}:${address.port}` });
+    assert.equal(navigation.status, 302); assert.equal(navigation.headers.location, `http://${hostname}:3002/`);
+    assert.equal(navigation.headers["cache-control"], "no-store");
+    assert.match(String(navigation.headers["content-security-policy"]), /frame-ancestors 'none'/);
+  }
+  assert.equal((await fetch(`${base}/chat?target=https://evil.test`, { redirect: "manual" })).status, 400);
+  assert.equal((await fetch(`${base}/chat`, { method: "POST", body: "target=https://evil.test", redirect: "manual" })).status, 405);
+  assert.equal((await navigationRequest(`${base}/chat`, { Host: "evil.test" })).status, 403);
+  assert.equal((await fetch(`${base}/chat`, { headers: { Origin: "https://evil.test" }, redirect: "manual" })).status, 403);
+  assert.equal((await fetch(`${base}/chat`, { headers: { "Sec-Fetch-Site": "cross-site" }, redirect: "manual" })).status, 403);
+  const bodyNavigation = await new Promise<number | undefined>((resolve, reject) => {
+    const body = "target=https://evil.test";
+    request(`${base}/chat`, { method: "GET", headers: { "Content-Length": Buffer.byteLength(body) } }, response => {
+      response.resume(); resolve(response.statusCode);
+    }).on("error", reject).end(body);
+  });
+  assert.equal(bodyNavigation, 400);
   const rejectedHost = await new Promise<number | undefined>((resolve, reject) => {
     request(base, { headers: { Host: `untrusted.test:${address.port}` } }, response => {
       response.resume(); resolve(response.statusCode);
@@ -93,6 +117,17 @@ try {
 } finally {
   await new Promise<void>(resolve => server.close(() => resolve()));
 }
+
+const customPortServer = createEvaluationServer(mockStore, undefined, "3102");
+try {
+  await new Promise<void>(resolve => customPortServer.listen(0, "127.0.0.1", resolve));
+  const address = customPortServer.address(); assert.ok(address && typeof address === "object");
+  for (const hostname of ["127.0.0.1", "localhost"]) {
+    const navigation: Awaited<ReturnType<typeof navigationRequest>> = await navigationRequest(`http://127.0.0.1:${address.port}/chat`, { Host: `${hostname}:${address.port}` });
+    assert.equal(navigation.status, 302); assert.equal(navigation.headers.location, `http://${hostname}:3102/`);
+  }
+  console.log("PASS 本机双向导航：固定默认/自定义端口、保持hostname，来源/参数/正文拒绝；0 真实模型/DB/QQ。");
+} finally { await new Promise<void>(resolve => customPortServer.close(() => resolve())); }
 
 await import("./eval-analysis-check.ts");
 await import("./objective-eval-check.ts");

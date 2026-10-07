@@ -104,7 +104,7 @@ export function createWebChatServer(chat: WebChatSessions) {
 }
 
 async function main() {
-  const port = process.env.CHAT_PORT || "3002";
+  const port = process.env.CHAT_PORT ?? "3002";
   if (!/^\d{4,5}$/u.test(port) || Number(port) < 1024 || Number(port) > 65535) throw new Error("CHAT_PORT 无效。");
   const config = readDatabaseConfig();
   if (config.user !== "dave_agent_read") throw new Error("网页首版仅支持项目只读数据库账户。");
