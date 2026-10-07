@@ -18,6 +18,7 @@ import { createSupportSession, readSupportArchitecture, readSupportContextMode }
 import { ConversationStateStore } from "./conversation-state.ts";
 import { createKnowledgeService } from "./knowledge-service.ts";
 import { readKnowledgeParameters, resolveSupportRunParameters } from "./support-parameters.ts";
+import { createArrivalConsultation } from "./arrival-consultation.ts";
 
 // Remove the leading transport mention/spaces (QQ may already have removed the mention).
 // Stripping embedded mentions/faces or trimming
@@ -70,6 +71,7 @@ async function main() {
   const replyFormat = readQQReplyFormat();
   const replyButtons = readQQReplyButtons();
   const store = new CouponStore(createPool(readDatabaseConfig()));
+  const arrival = createArrivalConsultation(store);
   const contexts = contextMode === "mysql" ? new ConversationStateStore(createPool(readAfterSalesDatabaseConfig())) : undefined;
   const knowledge = architecture === "controller" ? createKnowledgeService(store, { mode: parameters.knowledgeMode,
     applicability: parameters.knowledgeApplicability, queryMode: parameters.knowledgeQueryMode, supportProfile: parameters.knowledgeSupport, supportModel: parameters.knowledgeSupportModel, supportPrompt: parameters.knowledgeSupportPrompt, threshold: parameters.knowledgeThreshold, timeoutMs: parameters.knowledgeTimeoutMs }) : undefined;
@@ -134,8 +136,10 @@ async function main() {
       console.log,
       60_000,
       async (msg) => {
-        if (!afterSales) return undefined;
         const identity = { appId: options.appId, senderId: msg.senderId };
+        const consultation = await arrival(identity, msg.content);
+        if (consultation !== undefined) return consultation;
+        if (!afterSales) return undefined;
         const sourceKey = merchantSourceKey(identity, msg.groupOpenid!);
         return (refunds ? await confirmRefundReply(refunds, identity, sourceKey, msg.content) : undefined)
           ?? confirmMerchantReply(afterSales, identity, sourceKey, msg.content, {

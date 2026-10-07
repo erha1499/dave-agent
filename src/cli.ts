@@ -18,6 +18,7 @@ import { createKnowledgeService } from "./knowledge-service.ts";
 import { readKnowledgeParameters, resolveSupportRunParameters } from "./support-parameters.ts";
 import { modelSelections, type ModelSelection } from "./model-selection.ts";
 import { createSupportQuestionClient } from "./support-question-client.ts";
+import { createArrivalConsultation } from "./arrival-consultation.ts";
 
 export function readCliQuestionOptions(architecture: "atomic" | "controller", env: NodeJS.ProcessEnv = process.env):
   { questionContract: "v2" } | { questionContract: "v3"; modelSelection: ModelSelection; timeoutMs: number } {
@@ -48,7 +49,17 @@ export function parseCliInput(text: string): { kind: "exit" } | { kind: "empty" 
 export async function runCliPrompt(
   session: AgentSession, text: string, write: (text: string) => Promise<void>,
   afterDeliver?: (reply: Reply) => Promise<void>,
+  beforePrompt?: (text: string) => Promise<Reply | undefined>,
 ) {
+  const hostReply = await beforePrompt?.(text);
+  if (hostReply !== undefined) {
+    await write(`客服：${renderReply(hostReply).text}\n`);
+    await afterDeliver?.(hostReply);
+    // A read-only rule receipt is history, never consent or an Agent turn.
+    try { await session.sendCustomMessage({ customType: "arrival-consultation", content: renderReply(hostReply).text, display: true }, { triggerTurn: false }); }
+    catch { /* Delivery already succeeded; do not retry the consultation or send. */ }
+    return hostReply;
+  }
   const previous = session.messages.length;
   const requestId = randomUUID();
   prepareSupportPrompt(session, { requestId, groupOpenid: "cli", messageId: requestId });
@@ -79,6 +90,7 @@ async function main() {
   const senderId = process.env.CLI_DEMO_USER || "TEST_USER1";
   if (!["TEST_USER1", "TEST_USER2"].includes(senderId)) throw new Error("CLI_DEMO_USER 仅支持 TEST_USER1 或 TEST_USER2 合成身份。");
   const store = new CouponStore(createPool(readDatabaseConfig()));
+  const arrival = createArrivalConsultation(store);
   const contexts = contextMode === "mysql" ? new ConversationStateStore(createPool(readAfterSalesDatabaseConfig())) : undefined;
   const knowledge = architecture === "controller" ? createKnowledgeService(store, { mode: parameters.knowledgeMode,
     applicability: parameters.knowledgeApplicability, queryMode: parameters.knowledgeQueryMode, supportProfile: parameters.knowledgeSupport, supportModel: parameters.knowledgeSupportModel, supportPrompt: parameters.knowledgeSupportPrompt, threshold: parameters.knowledgeThreshold, timeoutMs: parameters.knowledgeTimeoutMs }) : undefined;
@@ -125,7 +137,8 @@ async function main() {
           }
           await runCliPrompt(session, text,
             output => new Promise<void>((resolve, reject) => stdout.write(output, error => error ? reject(error) : resolve())),
-            refunds ? reply => markRefundReplyPresented(refunds, identity, sourceKey, reply) : undefined);
+            refunds ? reply => markRefundReplyPresented(refunds, identity, sourceKey, reply) : undefined,
+            text => arrival(identity, text));
         } catch (error) {
           console.error(error instanceof Error ? error.message : "本轮处理失败。");
         }

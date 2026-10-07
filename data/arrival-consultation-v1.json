@@ -1,0 +1,46 @@
+{
+  "version": 1,
+  "simulation": true,
+  "documents": [
+    {
+      "source": {
+        "id": "ARRIVAL-BANK-V1",
+        "title": "项目原创模拟银行卡退款到账规则 v1",
+        "body": "【项目原创模拟规则，非真实平台或银行政策】假设退款已审核通过并已发起，银行卡渠道通常在3–7个工作日到账。本条只用于 dave-agent 演示域内的规则咨询；用户所选渠道不是实际支付记录，本条不能证明具体退款已经批准、发起或到账，也不授权办理退款。",
+        "tags": ["退款", "到账", "银行卡"],
+        "shopId": null,
+        "productId": null,
+        "status": "active"
+      },
+      "coverage": {
+        "version": "arrival-bank-v1",
+        "channel": "银行卡",
+        "prerequisites": ["refund_approved", "refund_initiated"],
+        "businessDays": { "minimum": 3, "maximum": 7 },
+        "quote": "假设退款已审核通过并已发起，银行卡渠道通常在3–7个工作日到账。",
+        "sourceHash": "d48f26c2aaa3f560043b1d47d6c8aad4d94b11d15436becf38c11709693d8651",
+        "scope": { "shopId": null, "productId": null }
+      }
+    },
+    {
+      "source": {
+        "id": "ARRIVAL-WALLET-V1",
+        "title": "项目原创模拟电子钱包退款到账规则 v1",
+        "body": "【项目原创模拟规则，非真实平台或银行政策】假设退款已审核通过并已发起，电子钱包渠道通常在1–3个工作日到账。本条只用于 dave-agent 演示域内的规则咨询；用户所选渠道不是实际支付记录，本条不能证明具体退款已经批准、发起或到账，也不授权办理退款。",
+        "tags": ["退款", "到账", "电子钱包"],
+        "shopId": null,
+        "productId": null,
+        "status": "active"
+      },
+      "coverage": {
+        "version": "arrival-wallet-v1",
+        "channel": "电子钱包",
+        "prerequisites": ["refund_approved", "refund_initiated"],
+        "businessDays": { "minimum": 1, "maximum": 3 },
+        "quote": "假设退款已审核通过并已发起，电子钱包渠道通常在1–3个工作日到账。",
+        "sourceHash": "22a8491130784985c913b03a6f711783f63671aaadf1efe6796e91fd3db136ab",
+        "scope": { "shopId": null, "productId": null }
+      }
+    }
+  ]
+}

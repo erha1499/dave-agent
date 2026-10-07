@@ -49,6 +49,8 @@ await import("./support-clarification-check.ts");
 const { checkSupportAmountContext } = await import("./support-amount-context-check.ts");
 await checkSupportAmountContext();
 await import("./support-host-entry-check.ts");
+await (await import("./arrival-consultation-check.ts")).checkArrivalConsultation();
+await (await import("./arrival-entry-check.ts")).checkArrivalEntry();
 (await import("./atomic-refund-recovery-db-check.ts")).checkAtomicRefundRecovery();
 await import("./support-session-race-check.ts");
 await import("./support-evidence-context-check.ts");
