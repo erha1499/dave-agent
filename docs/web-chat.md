@@ -1,6 +1,6 @@
-# 网页客服问答首版
+# 网页客服问答
 
-日期：2026-10-07；状态：首版已实现并验收。用户优先希望用网页演示客服，前端由实际Kimi CLI K3 / Max完成，Codex完成后端与独立联调。
+日期：2026-10-07；状态：只读问答首版及会话设置v2已实现并验收。当前HTTP使用下文v2合同，首版合同与历史证据分列保留。前端由实际Kimi CLI K3 / Max完成，Codex完成后端与独立联调。
 
 ## P0与范围
 
@@ -60,7 +60,40 @@ node --env-file-if-exists=.env src/web-chat-server.ts
 
 低成本演示可先发`查询到账 银行卡`，再切客户B发`查询到账 COUPON-1001 银行卡`查看归属拒绝；完整命令不会调用模型。普通问答或订单示例仅填草稿，点击发送才会调用真实模型。新对话清空服务端上下文，刷新保留当前内存历史；服务端失效后须新建会话，不能在旧身份下盲重试。
 
-## 本轮验收记录
+## 问答页设置与评测导航（2026-10-07，本轮实施合同）
+
+用户已选择“聊天模型参数＋评测入口”。这轮补齐演示入口与配置可核验性，首版不展示模型参数的限制由此更新；完整检索、Controller及评测实验参数仍复用3001工作台。
+
+- **真实业务约束：** 两合成客户与两只读工具保持现有边界。参数只随新会话生效，当前处理期间不得切换；校验失败保留旧会话和草稿。页面不能填写密钥、任意模型、URL、身份或Prompt，不提供关闭业务保护的开关。
+- **面试追问：** 如何确保页面选择真正进入Pi请求、刷新恢复实际配置，而非仅改变UI？如何让比较可复现，并避免同一历史混用模型以及设置失败误删上下文？
+- **个人实现与复用：** Codex实现严格会话设置合同、服务器允许目录、配置快照、原生Pi接线与独立检查；复用model-selection与只读会话，不修改Pi核心或QQ。实际Kimi CLI K3 Max负责三份聊天静态文件，原生导航、可收起控件与实际配置显示，无新增依赖。
+- **验收与演示证据：** 原生Pi＋本地替代HTTP证明实际模型、推理与token参数；验证坏值、不可用选项、409回滚、刷新恢复、换客户保持已应用配置。实际浏览器查看宽窄屏、应用新会话、到账只读命令及既有评测导航；工程接线不声称模型质量或A/B收益。
+- **投入预算与停止：** 一轮页面与参数接线，0业务远程模型、0QQ、0数据库写入；不重跑首版已关闭的两回合预算或历史题集。Kimi有界生成，确定性定向检查与最终validate通过即收尾提交推送；持久历史、更多参数、退款与公网另定范围。
+
+HTTP v2：GET config在原字段上增加`defaults:{modelSelection,thinkingLevel,maxTokens}`、`models:[{id,label,provider,modelId,available,supportsThinking}]`、`options:{thinkingLevels:['off','high'],maxTokens:[512,1024,2048]}`及`evaluationUrl`（服务器校验EVAL_PORT产生的本机链接）。模型选择复用`configured/deepseek-flash/deepseek-v4-pro/qwen3.7-plus-2026-05-26`目录；推理只提供关闭/开启，开启映射Pi high，不将提供商不支持的多个强度冒称独立效果。
+
+`available`仅表示本机凭据配置与离线目录元数据可解析，不保证远程密钥认证、额度或服务可用。省略settings沿用`configured/off/2048`，默认无密钥仍能处理宿主到账指令；显式完整设置选择未就绪模型时400并保留旧会话。普通新对话/换客户遇到该默认无密钥配置时省略settings以保持兼容；默认无密钥下普通问答仍按既有503失败/会话失效处理。目录不输出凭据、来源或base URL。token是提供商请求预算，不保证输出固定字数；开启推理可能与回答共用预算，当前工程验证不宣称质量或费用收益。
+
+POST session兼容`{profileId}`，可增加完整`settings:{modelSelection,thinkingLevel,maxTokens}`，禁止未知字段与不完整设置；校验在旧会话失效前完成。返回及GET session增加`session.settings`与`session.model:{provider,id}`，只包含实际设置与已解析模型标识。POST messages继续仅允许原requestId和text，不接受中途配置。当前生效配置与未应用表单区分，应用按钮明确新建并清空上下文；普通新对话/换客户沿用已应用设置。不可用凭据只显示状态，不暴露来源或内容；配置目录不发远程发现请求。启动时固定服务端环境副本，修改.env需重启；网页选择不修改环境、QQ或评测台实验参数。
+
+### v2完成记录与演示
+
+- **代码与复用：** [web-chat-settings.ts](../src/web-chat-settings.ts)复用既有模型目录与Pi注册，返回四个允许选项的就绪/推理状态；严格验证设置，并按选择惰性缓存runtime。生产与工程检查共用`createWebChatAgentFactory`，传入模型clone的token上限、调用原生`setThinkingLevel`，核验实际getter没有夹档；不改变共享模型或Pi核心。`WebChatSessions`先校验再替换会话，只读工具与旧身份、超时、幂等和原文边界保持。
+- **工程结果：** `node scripts/web-chat-check.ts`通过，既有11次Pi faux回调与新增6次原生SDK替代HTTP分列。新增检查覆盖四目录项、DeepSeek/Qwen的off/high和512/1024/2048档，捕获DeepSeek `thinking`/`reasoning_effort`/`max_tokens`，Qwen `enable_thinking`/`max_completion_tokens`（无reasoning_effort）。未知模型、坏字段/类型、未配置、不支持推理、端口无效、失败保留旧cookie、刷新及换客户快照、忙碌409与默认无密钥宿主均检查。0远程/DB/QQ；这是SDK接线证明，未验证云端接受、模型回答质量或费用。
+- **Kimi来源与失败：** 实际CLI `2.1.1`、`kimi-code/k3`、K3/Max，本轮11份生成/修正call的wire元数据、候选及生产SHA在忽略的`.runtime/kimi-chat-v2-provenance.json`。采用独立stdout片段机械合并；`history/messages`、把selection当对象、CSS class/ID错配的候选在合并前拒收，由Kimi定向小修正。无新增依赖，Codex未代写前端；CLI用量与费用未采集，不补零。
+- **独立UI工程检查：** 执行实际app的`node scripts/web-chat-ui-check.mjs`通过。除原有原文/UUID、XSS/金额/Reply、键盘与会话检查外，新增设置草稿不冒称已应用、忙碌禁用、400/409保留历史/输入/form、成功应用清空上下文、刷新恢复、换客户/新对话用已应用参数、无key默认兼容、未配置选项禁用及外部评测URL不生成链接。0远程/DB/QQ。
+- **实际浏览器：** 测试Pro/high/512的未应用→应用→刷新，改表单为Flash/1024后换客户仍保持实际Pro配置。共3条宿主指令：全局银行卡咨询、B查询A的1001拒绝、恢复默认后全局银行卡；实际只读数据库接线，0业务模型/QQ/写入。点击评测入口成功打开3001既有历史工作台，没有启动实验；实际1280×720、600×800、390×844均无横向溢出，390展开设置可正常纵向滚动。宽屏及手机完整页面截图保留`.runtime/web-chat-v2-desktop.jpg`、`web-chat-v2-mobile.jpg`（后者390×1111），浏览器采集到0条error/warn。验收后恢复`configured/off/2048`，视口已复原。
+- **收尾：** 最终`npm run validate`退出0，包含新增后端与UI检查；独立后端、前端及差异审阅通过。原package/lock与.idea工作区改动保留，不纳入本轮；首版2个真实回合的预算仍关闭，历史C1/O4/O5结果与未准入状态不改。不因设置接通认领新模型A/B或生产效果。
+
+复现：同时启动网页与评测服务（均读取本机.env），打开3002，展开“聊天设置”，选择模型/推理/token后观察“设置未应用”；点击“应用并新建对话”核对页头实际配置，发`查询到账 银行卡`，刷新查看历史与配置。修改未应用表单后换客户，页头仍为已应用值；从“评测工作台”进入原有历史、对比与实验调试。这里只读宿主演示不调用模型；普通问答才会消耗所选模型。确认演示完恢复默认，避免将未实测的不同模型/推理模式当成已验证质量提升。
+
+```sh
+node scripts/web-chat-check.ts
+node scripts/web-chat-ui-check.mjs
+npm run validate
+```
+
+## 首版验收记录
 
 - 本机运行配置为`deepseek/deepseek-flash`（环境未覆盖MODEL_ID，沿用`resolveModelSelection`默认）；Pi SDK `1.0.0`，验证Node `26.10.0`。普通入口保持atomic与既有Prompt/Skill及两只读工具；本轮不切QQ或实验候选配置。供应商模型未另有不可变快照，不能将这一ID视为永久固定权重。
 - 后端确定性检查`node scripts/web-chat-check.ts`通过，11次本地faux回调，0远程模型/DB/QQ：实际HTTP与原生Pi只读工具、两身份隔离、完整原文/请求去重、忙碌、新对话、断连回放、createAgent迟到dispose、native prompt超时abort/signal及迟到回复隔离。非法来源、重复header、公开UUID冒充cookie、绝对URL及隐藏诊断另经独立负控。最新类型检查、后端独审通过。

@@ -2,9 +2,9 @@ import { createServer, type IncomingMessage } from "node:http";
 import { readFile } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
 import { createPool, type RowDataPacket } from "mysql2/promise";
-import { createConfiguredModelRuntime, createCouponSession } from "./agent.ts";
 import { CouponStore, readDatabaseConfig } from "./coupon-store.ts";
-import { WebChatError, WebChatSessions, webChatProfiles } from "./web-chat.ts";
+import { WebChatError, WebChatSessions } from "./web-chat.ts";
+import { createWebChatAgentFactory, createWebChatSettingsCatalog } from "./web-chat-settings.ts";
 
 const pages = new Map([
   ["/", ["index.html", "text/html; charset=utf-8"]],
@@ -66,7 +66,7 @@ export function createWebChatServer(chat: WebChatSessions) {
       if (url.search) throw new WebChatError(400, "客服入口不接受查询参数。");
       const token = capability(req);
       if (req.method === "GET" && url.pathname === "/api/chat/config") {
-        req.resume(); json(200, { version: 1, simulation: true, readOnly: true, profiles: webChatProfiles, limits: { messageCharacters: 2000 } }); return;
+        req.resume(); json(200, await chat.config()); return;
       }
       if (req.method === "GET" && url.pathname === "/api/chat/session") {
         req.resume(); json(200, chat.get(token)); return;
@@ -74,8 +74,9 @@ export function createWebChatServer(chat: WebChatSessions) {
       if (req.method === "POST" && ["/api/chat/session", "/api/chat/messages"].includes(url.pathname)) {
         const body = await readBody(req);
         if (url.pathname === "/api/chat/session") {
-          if (Object.keys(body).length !== 1 || typeof body.profileId !== "string") throw new WebChatError(400, "新对话只接受 profileId。");
-          const created = chat.create(token, body.profileId);
+          if (typeof body.profileId !== "string" || Object.keys(body).some(key => !["profileId", "settings"].includes(key)))
+            throw new WebChatError(400, "新对话只接受 profileId 及完整 settings。");
+          const created = await chat.create(token, body.profileId, body.settings);
           res.setHeader("Set-Cookie", `${cookieName}=${created.token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=1800`);
           json(200, { session: created.session, messages: created.messages }); return;
         }
@@ -114,12 +115,9 @@ async function main() {
     if (!grants.length || !grants.every(line => /^GRANT (?:USAGE ON \*\.\*|SELECT ON `[^`]+`\.\*) TO /u.test(line) && !/WITH GRANT OPTION/u.test(line))
       || !grants.some(line => /^GRANT SELECT /u.test(line))) throw new Error("网页账户必须只有只读权限。");
     await store.ping();
-    let runtime: Promise<Awaited<ReturnType<typeof createConfiguredModelRuntime>>> | undefined;
-    chat = new WebChatSessions(store, async (identity) => {
-      runtime ??= createConfiguredModelRuntime();
-      const configured = await runtime;
-      return createCouponSession(identity, store, configured.modelRuntime, configured.model);
-    });
+    const env = { ...process.env }, catalog = createWebChatSettingsCatalog(env);
+    await catalog;
+    chat = new WebChatSessions(store, createWebChatAgentFactory(store, env), 60_000, catalog);
     const server = createWebChatServer(chat);
     await new Promise<void>((resolve, reject) => { server.once("error", reject); server.listen(Number(port), "127.0.0.1", resolve); });
     console.log(`网页客服：http://127.0.0.1:${port}（合成数据，仅只读咨询）`);

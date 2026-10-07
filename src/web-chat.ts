@@ -4,6 +4,7 @@ import type { CouponStore, QQIdentity } from "./coupon-store.ts";
 import { createArrivalConsultation } from "./arrival-consultation.ts";
 import { runCliPrompt } from "./cli.ts";
 import { renderReply, type Reply } from "./reply.ts";
+import { createWebChatSettingsCatalog, validateWebChatSettings, type WebChatSettings, type WebChatSettingsCatalog } from "./web-chat-settings.ts";
 
 export const webChatProfiles = [
   { id: "demo-a", label: "演示客户 A", orderHints: ["COUPON-1001"], examples: ["查询我的订单 COUPON-1001", "团购券需要预约吗？", "查询到账 银行卡"] },
@@ -15,7 +16,7 @@ const identities: Record<string, QQIdentity> = {
 };
 type ReadReply = Extract<Reply, { kind: "answer" | "notice" | "order" }>;
 export type WebChatMessage = { id: string; role: "user" | "assistant"; text: string; reply?: ReadReply };
-type PublicSession = { id: string; profileId: string; label: string };
+type PublicSession = { id: string; profileId: string; label: string; settings: WebChatSettings; model: { provider: string; id: string } };
 export type WebChatResult = { sessionId: string; requestId: string; reply: ReadReply; durationMs: number; origin: "host" | "agent" };
 type Entry = { public: PublicSession; identity: QQIdentity; messages: WebChatMessage[]; touched: number;
   agent?: AgentSession; busy: boolean; active: boolean; abort?: AbortController;
@@ -30,11 +31,13 @@ export class WebChatSessions {
   private entries = new Map<string, Entry>();
   private closed = false;
   private store: Pick<CouponStore, "getOrder">;
-  private createAgent: (identity: QQIdentity, id: string) => Promise<AgentSession>;
+  private createAgent: (identity: QQIdentity, id: string, settings: WebChatSettings) => Promise<AgentSession>;
   private timeoutMs: number;
-  constructor(store: Pick<CouponStore, "getOrder">, createAgent: (identity: QQIdentity, id: string) => Promise<AgentSession>, timeoutMs = 60_000) {
+  private catalog: Promise<WebChatSettingsCatalog>;
+  constructor(store: Pick<CouponStore, "getOrder">, createAgent: (identity: QQIdentity, id: string, settings: WebChatSettings) => Promise<AgentSession>,
+    timeoutMs = 60_000, catalog: Promise<WebChatSettingsCatalog> = createWebChatSettingsCatalog()) {
     if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 120_000) throw new Error("网页处理超时无效。");
-    this.store = store; this.createAgent = createAgent; this.timeoutMs = timeoutMs;
+    this.store = store; this.createAgent = createAgent; this.timeoutMs = timeoutMs; this.catalog = catalog;
   }
   private invalidate(token: string, entry: Entry) {
     this.entries.delete(token); entry.active = false; entry.abort?.abort();
@@ -53,17 +56,27 @@ export class WebChatSessions {
     const entry = this.find(token);
     return entry ? structuredClone({ session: entry.public, messages: entry.messages }) : { session: null, messages: [] };
   }
-  create(token: string | undefined, profileId: string) {
+  async config() {
+    const { metadata: _metadata, ...settings } = await this.catalog;
+    return { version: 2, simulation: true, readOnly: true, profiles: webChatProfiles, limits: { messageCharacters: 2000 }, ...structuredClone(settings) };
+  }
+  async create(token: string | undefined, profileId: string, input?: unknown) {
     if (this.closed) throw new WebChatError(503, "客服服务已停止。");
     const profile = webChatProfiles.find(row => row.id === profileId);
     if (!profile) throw new WebChatError(400, "请选择有效的演示客户。");
+    const catalog = await this.catalog;
+    if (this.closed) throw new WebChatError(503, "客服服务已停止。");
+    let settings: WebChatSettings;
+    try { settings = validateWebChatSettings(input, catalog); }
+    catch (error) { throw new WebChatError(400, error instanceof Error ? error.message : "模型设置无效。"); }
+    const model = catalog.models.find(row => row.id === settings.modelSelection)!;
     const previous = this.find(token);
     if (previous?.busy) throw new WebChatError(409, "当前消息仍在处理中，请等待后再新建对话。");
     // ponytail: 20 ephemeral local demo sessions; require login/persistence before public or long-lived use.
     if (!previous && this.entries.size >= 20) throw new WebChatError(429, "当前会话数量已达上限，请稍后重试。");
     if (previous) this.invalidate(token!, previous);
     const capability = randomBytes(32).toString("base64url");
-    const entry: Entry = { public: { id: randomUUID(), profileId, label: profile.label }, identity: { ...identities[profileId]! },
+    const entry: Entry = { public: { id: randomUUID(), profileId, label: profile.label, settings, model: { provider: model.provider, id: model.modelId } }, identity: { ...identities[profileId]! },
       messages: [], touched: Date.now(), busy: false, active: true, requests: new Map(), turns: 0 };
     this.entries.set(capability, entry);
     return { token: capability, ...structuredClone({ session: entry.public, messages: entry.messages }) };
@@ -93,7 +106,7 @@ export class WebChatSessions {
           content: JSON.stringify({ userText: text, reply }) }, { triggerTurn: false });
       } else {
         if (!entry.agent) {
-          const agent = await this.createAgent({ ...entry.identity }, entry.public.id);
+          const agent = await this.createAgent({ ...entry.identity }, entry.public.id, { ...entry.public.settings });
           if (!entry.active || abort.signal.aborted) { agent.dispose(); throw new Error("网页会话已失效"); }
           entry.agent = agent;
           if (agent.getActiveToolNames().sort().join(",") !== "get_order,search_faq") throw new Error("网页工具必须只读");

@@ -7,9 +7,10 @@ import { createCouponSession, createModelRuntime } from "../src/agent.ts";
 import type { CouponStore, QQIdentity } from "../src/coupon-store.ts";
 import { WebChatSessions } from "../src/web-chat.ts";
 import { createWebChatServer } from "../src/web-chat-server.ts";
+import { createWebChatAgentFactory, createWebChatSettingsCatalog, validateWebChatSettings, type WebChatSettings } from "../src/web-chat-settings.ts";
 
 export async function checkWebChat() {
-  const runtime = await createModelRuntime(), faux = fauxProvider(); runtime.registerNativeProvider(faux.provider);
+  const runtime = await createModelRuntime(), faux = fauxProvider({ models: [{ id: "web-faux", reasoning: true }] }); runtime.registerNativeProvider(faux.provider);
   let factories = 0, requests = 0, block: Promise<void> | undefined, onRead: (() => void) | undefined;
   const reads: Array<{ identity: QQIdentity; orderId: string }> = [];
   const store = {
@@ -26,7 +27,12 @@ export async function checkWebChat() {
     },
     async searchKnowledge() { return [{ source: "demo-knowledge", sourceId: "KB-WEB-SYNTHETIC", title: "合成规则", body: "仅演示只读咨询", scope: { shopId: null, productId: null } }]; },
   } as unknown as CouponStore;
-  const chat = new WebChatSessions(store, async identity => { factories++; return createCouponSession(identity, store, runtime, faux.getModel()); }, 2000);
+  const catalog = createWebChatSettingsCatalog({ DEEPSEEK_API_KEY: "synthetic-key", DASHSCOPE_API_KEY: "synthetic-bailian-key" });
+  const chat = new WebChatSessions(store, async (identity, _id, settings) => {
+    factories++;
+    const session = await createCouponSession(identity, store, runtime, { ...faux.getModel(), maxTokens: settings.maxTokens });
+    session.setThinkingLevel(settings.thinkingLevel); return session;
+  }, 2000, catalog);
   const server = createWebChatServer(chat);
   await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve));
   const address = server.address(); assert.ok(address && typeof address !== "string"); const port = address.port;
@@ -48,6 +54,11 @@ export async function checkWebChat() {
   const send = (cookie: string, text: string, requestId = randomUUID()) => http("/api/chat/messages", "POST", { requestId, text }, cookie);
   try {
     const config = await http("/api/chat/config"); assert.equal(config.status, 200); assert.equal(config.data.readOnly, true);
+    assert.equal(config.data.version, 2); assert.deepEqual(config.data.defaults, { modelSelection: "configured", thinkingLevel: "off", maxTokens: 2048 });
+    assert.deepEqual(config.data.options, { thinkingLevels: ["off", "high"], maxTokens: [512, 1024, 2048] });
+    assert.equal(config.data.evaluationUrl, "http://127.0.0.1:3001/"); assert.equal(config.data.models.length, 4);
+    assert.ok(config.data.models.every((row: any) => row.available && row.supportsThinking));
+    assert.doesNotMatch(JSON.stringify(config.data), /synthetic-key|synthetic-bailian-key|apiKey|metadata/);
     assert.deepEqual(config.data.profiles.map((row: any) => row.id), ["demo-a", "demo-b"]);
     assert.match(String(config.headers["content-security-policy"]), /script-src 'self'.*frame-ancestors 'none'/);
     assert.deepEqual((await http("/api/chat/session")).data, { session: null, messages: [] });
@@ -64,6 +75,17 @@ export async function checkWebChat() {
     const b = await http("/api/chat/session", "POST", { profileId: "demo-b" });
     assert.equal(a.status, 200); assert.ok(a.cookie && b.cookie); assert.notEqual(a.data.session.id, b.data.session.id);
     assert.match(a.headers["set-cookie"]![0]!, /HttpOnly; SameSite=Strict; Path=\//);
+    assert.deepEqual(a.data.session.settings, config.data.defaults); assert.deepEqual(a.data.session.model, { provider: "deepseek", id: "deepseek-flash" });
+    for (const settings of [null, {}, { modelSelection: "configured", thinkingLevel: "off" },
+      { modelSelection: "arbitrary", thinkingLevel: "off", maxTokens: 512 },
+      { modelSelection: "configured", thinkingLevel: "max", maxTokens: 512 },
+      { modelSelection: "configured", thinkingLevel: "off", maxTokens: "512" },
+      { modelSelection: "configured", thinkingLevel: "off", maxTokens: 513 },
+      { modelSelection: "configured", thinkingLevel: "off", maxTokens: 512, apiKey: "bad" }]) {
+      const invalid = await http("/api/chat/session", "POST", { profileId: "demo-b", settings }, a.cookie);
+      assert.equal(invalid.status, 400); assert.equal(invalid.cookie, undefined);
+      assert.equal((await http("/api/chat/session", "GET", undefined, a.cookie)).data.session.id, a.data.session.id);
+    }
     for (const body of [{ requestId: randomUUID(), text: " " }, { requestId: "bad", text: "咨询" }, { requestId: randomUUID(), text: "a".repeat(2001) },
       { requestId: randomUUID(), text: "咨询", customerId: "other" }, { text: "咨询" }])
       assert.equal((await http("/api/chat/messages", "POST", body, a.cookie)).status, 400);
@@ -78,6 +100,14 @@ export async function checkWebChat() {
     assert.equal(reads.at(-1)!.identity.senderId, "TEST_USER2");
     const history = (await http("/api/chat/session", "GET", undefined, a.cookie)).data.messages;
     assert.equal(history[0].text, raw); assert.deepEqual(history[1].reply, first.data.reply);
+    const chosen = { modelSelection: "qwen3.7-plus-2026-05-26", thinkingLevel: "high", maxTokens: 512 };
+    const tuned = await http("/api/chat/session", "POST", { profileId: "demo-a", settings: chosen });
+    assert.equal(tuned.status, 200); assert.ok(tuned.cookie); assert.deepEqual(tuned.data.session.settings, chosen);
+    assert.deepEqual(tuned.data.session.model, { provider: "bailian", id: chosen.modelSelection });
+    assert.deepEqual((await http("/api/chat/session", "GET", undefined, tuned.cookie)).data.session.settings, chosen);
+    const tunedOther = await http("/api/chat/session", "POST", { profileId: "demo-b", settings: chosen }, tuned.cookie);
+    assert.equal(tunedOther.status, 200); assert.ok(tunedOther.cookie); assert.deepEqual(tunedOther.data.session.settings, chosen);
+    assert.equal((await send(tunedOther.cookie, "查询到账 银行卡")).data.origin, "host"); assert.equal(factories, 0);
 
     let declarations: string[] = [], userTexts: string[] = [], hostHistory = "";
     faux.setResponses([
@@ -135,6 +165,10 @@ export async function checkWebChat() {
     assert.equal((await send(b.cookie, "查询到账 COUPON-1002 银行卡", pendingId)).status, 409);
     const resetBusy = await http("/api/chat/session", "POST", { profileId: "demo-a" }, b.cookie);
     assert.equal(resetBusy.status, 409); assert.equal(resetBusy.cookie, undefined);
+    const settingsBusy = await http("/api/chat/session", "POST", { profileId: "demo-b",
+      settings: { modelSelection: "deepseek-v4-pro", thinkingLevel: "high", maxTokens: 512 } }, b.cookie);
+    assert.equal(settingsBusy.status, 409); assert.equal(settingsBusy.cookie, undefined);
+    assert.deepEqual((await http("/api/chat/session", "GET", undefined, b.cookie)).data.session.settings, config.data.defaults);
     release(); block = undefined; assert.equal((await pending).status, 200);
     // A disconnected browser cannot know whether delivery completed; replay its exact UUID instead of rerunning a turn.
     block = new Promise<void>(resolve => { release = resolve; });
@@ -154,11 +188,11 @@ export async function checkWebChat() {
     assert.equal(reset.status, 200); assert.ok(reset.cookie); assert.notEqual(reset.data.session.id, b.data.session.id); assert.deepEqual(reset.data.messages, []);
 
     const timeoutChat = new WebChatSessions(store, async () => { throw new Error("must remain host"); }, 25);
-    const old = timeoutChat.create(undefined, "demo-a");
+    const old = await timeoutChat.create(undefined, "demo-a");
     block = new Promise<void>(resolve => { release = resolve; });
     await assert.rejects(timeoutChat.send(old.token, randomUUID(), "查询到账 COUPON-1001 银行卡"), error => error instanceof Error && Reflect.get(error, "status") === 503);
     assert.equal(timeoutChat.get(old.token).session, null);
-    const replacement = timeoutChat.create(undefined, "demo-b"); release(); block = undefined;
+    const replacement = await timeoutChat.create(undefined, "demo-b"); release(); block = undefined;
     await new Promise<void>(resolve => setTimeout(resolve, 10)); assert.deepEqual(timeoutChat.get(replacement.token).messages, []);
     timeoutChat.close();
 
@@ -174,11 +208,11 @@ export async function checkWebChat() {
       if (identity.senderId === "TEST_USER1") { enteredFactory(); await factoryGate; return lateCreated; }
       return createCouponSession(identity, store, runtime, faux.getModel());
     }, 30);
-    const lateFactorySession = factoryChat.create(undefined, "demo-a");
+    const lateFactorySession = await factoryChat.create(undefined, "demo-a");
     const lateFactoryTurn = factoryChat.send(lateFactorySession.token, randomUUID(), "旧会话创建迟到");
     await factoryEntered;
     await assert.rejects(lateFactoryTurn, error => error instanceof Error && Reflect.get(error, "status") === 503);
-    const newFactorySession = factoryChat.create(undefined, "demo-b");
+    const newFactorySession = await factoryChat.create(undefined, "demo-b");
     faux.setResponses([() => { requests++; return fauxAssistantMessage("新身份的独立回复"); }]);
     assert.equal((await factoryChat.send(newFactorySession.token, randomUUID(), "新身份正常问题")).reply.text, "新身份的独立回复");
     releaseFactory(); await new Promise<void>(resolve => setTimeout(resolve, 10));
@@ -203,12 +237,12 @@ export async function checkWebChat() {
     faux.setResponses([async (_context, options) => {
       requests++; providerSignal = options?.signal; enteredProvider(); await providerGate; return fauxAssistantMessage("迟到的旧身份回复");
     }]);
-    const latePromptSession = promptChat.create(undefined, "demo-a");
+    const latePromptSession = await promptChat.create(undefined, "demo-a");
     const latePromptTurn = promptChat.send(latePromptSession.token, randomUUID(), "旧身份正在生成");
     await providerEntered;
     await assert.rejects(latePromptTurn, error => error instanceof Error && Reflect.get(error, "status") === 503);
     assert.ok(abortedNative >= 1); assert.equal(disposedNative, 1); assert.equal(providerSignal?.aborted, true);
-    const newPromptSession = promptChat.create(undefined, "demo-b");
+    const newPromptSession = await promptChat.create(undefined, "demo-b");
     faux.setResponses([() => { requests++; return fauxAssistantMessage("当前身份的回复"); }]);
     assert.equal((await promptChat.send(newPromptSession.token, randomUUID(), "当前身份的问题")).reply.text, "当前身份的回复");
     releaseProvider(); await new Promise<void>(resolve => setTimeout(resolve, 10));
@@ -220,10 +254,91 @@ export async function checkWebChat() {
     assert.equal((await send(reset.cookie, "查询到账 银行卡")).status, 429);
     assert.equal((await http("/api/chat/session", "GET", undefined, reset.cookie)).data.messages.length, 40);
     const full = new WebChatSessions(store, async () => { throw new Error("unused"); });
-    for (let row = 0; row < 20; row++) full.create(undefined, "demo-a");
-    assert.throws(() => full.create(undefined, "demo-b"), error => error instanceof Error && Reflect.get(error, "status") === 429); full.close();
+    for (let row = 0; row < 20; row++) await full.create(undefined, "demo-a");
+    await assert.rejects(full.create(undefined, "demo-b"), error => error instanceof Error && Reflect.get(error, "status") === 429); full.close();
     console.log(`网页客服检查通过：实际 Node HTTP / Pi faux，身份与只读工具、原文去重、实际 Reply、换身份/新会话、忙碌、超时及有界历史；${requests} 次本地 faux 调用，0 远程/DB/QQ。`);
   } finally { chat.close(); server.closeAllConnections(); await new Promise<void>(resolve => server.close(() => resolve())); }
+  await checkWebChatSettings();
+}
+
+async function checkWebChatSettings() {
+  const originalFetch = globalThis.fetch;
+  const env = { DEEPSEEK_API_KEY: "synthetic-deepseek", DASHSCOPE_API_KEY: "synthetic-bailian", EVAL_PORT: "3011" };
+  const wires: Array<Record<string, any>> = [];
+  const store = { async getOrder() { throw new Error("unexpected DB read"); }, async searchKnowledge() { throw new Error("unexpected DB read"); } } as unknown as CouponStore;
+  globalThis.fetch = async (url, init) => {
+    assert.ok(["https://api.deepseek.com/chat/completions", "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions"].includes(String(url)), "unknown endpoint never reaches a network");
+    const headers = new Headers(init?.headers), body = JSON.parse(String(init?.body));
+    assert.equal(headers.get("authorization"), `Bearer ${String(url).includes("dashscope") ? env.DASHSCOPE_API_KEY : env.DEEPSEEK_API_KEY}`);
+    wires.push(body);
+    const chunk = (delta: object, finish_reason: string | null) => `data: ${JSON.stringify({ id: `web_wire_${wires.length}`, object: "chat.completion.chunk", created: 1,
+      model: body.model, choices: [{ index: 0, delta, finish_reason }] })}\n\n`;
+    return new Response(chunk({ role: "assistant", content: "本地替代 HTTP 回复，不代表模型质量。" }, null) + chunk({}, "stop") + "data: [DONE]\n\n",
+      { headers: { "content-type": "text/event-stream" } });
+  };
+  let chat: WebChatSessions | undefined;
+  try {
+    const catalog = createWebChatSettingsCatalog(env), resolved = await catalog;
+    assert.equal(wires.length, 0, "offline catalog never discovers models remotely");
+    assert.equal(resolved.evaluationUrl, "http://127.0.0.1:3011/");
+    for (const port of ["", " 3001", "3001 ", "100", "65536", "https://bad"])
+      await assert.rejects(createWebChatSettingsCatalog({ EVAL_PORT: port }), /EVAL_PORT/);
+    const nonReasoning = await createWebChatSettingsCatalog({ MODEL_PROVIDER: "openai", MODEL_ID: "gpt-4.1-mini", MODEL_API_KEY: "synthetic-openai" });
+    assert.equal(nonReasoning.models[0]!.supportsThinking, false);
+    assert.throws(() => validateWebChatSettings({ modelSelection: "configured", thinkingLevel: "high", maxTokens: 512 }, nonReasoning), /不支持开启推理/);
+    const absentModel = await createWebChatSettingsCatalog({ DEEPSEEK_API_KEY: "synthetic", MODEL_ID: "missing-model" });
+    assert.equal(absentModel.models[0]!.available, false);
+    assert.throws(() => validateWebChatSettings({ modelSelection: "configured", thinkingLevel: "off", maxTokens: 512 }, absentModel), /不支持所选输出/);
+
+    const noKeys = await createWebChatSettingsCatalog();
+    assert.ok(noKeys.models.every(model => !model.available));
+    const hostOnly = new WebChatSessions(store, async () => { throw new Error("no model should initialize"); }, 2000, Promise.resolve(noKeys));
+    const host = await hostOnly.create(undefined, "demo-a");
+    assert.equal((await hostOnly.send(host.token, randomUUID(), "查询到账 银行卡")).origin, "host");
+    await assert.rejects(hostOnly.create(host.token, "demo-b", noKeys.defaults), /当前不可用/);
+    assert.equal(hostOnly.get(host.token).session?.id, host.session.id);
+    const nextHost = await hostOnly.create(host.token, "demo-b");
+    assert.deepEqual(nextHost.session.settings, noKeys.defaults); hostOnly.close();
+    assert.equal(wires.length, 0);
+
+    const factory = createWebChatAgentFactory(store, env);
+    const actualSessions: Awaited<ReturnType<typeof factory>>[] = [];
+    chat = new WebChatSessions(store, async (...args) => { const session = await factory(...args); actualSessions.push(session); return session; }, 2000, catalog);
+    const cases: WebChatSettings[] = [
+      { modelSelection: "configured", thinkingLevel: "off", maxTokens: 512 },
+      { modelSelection: "deepseek-flash", thinkingLevel: "high", maxTokens: 1024 },
+      { modelSelection: "deepseek-v4-pro", thinkingLevel: "off", maxTokens: 2048 },
+      { modelSelection: "deepseek-v4-pro", thinkingLevel: "high", maxTokens: 512 },
+      { modelSelection: "qwen3.7-plus-2026-05-26", thinkingLevel: "off", maxTokens: 1024 },
+      { modelSelection: "qwen3.7-plus-2026-05-26", thinkingLevel: "high", maxTokens: 2048 },
+    ];
+    let cookie: string | undefined;
+    for (const settings of cases) {
+      const before: number = wires.length;
+      const created = await chat.create(cookie, "demo-a", settings); cookie = created.token;
+      assert.equal(wires.length, before, "creating/resetting settings does not prompt the model");
+      assert.deepEqual(chat.get(cookie).session?.settings, settings, "refresh exposes the actually applied snapshot");
+      assert.equal((await chat.send(cookie, randomUUID(), "查询到账 电子钱包")).origin, "host");
+      assert.equal(wires.length, before, "host consultation never initializes a selected generation model");
+      const result = await chat.send(cookie, randomUUID(), "普通合成问答，不查询任何订单");
+      assert.equal(result.origin, "agent"); assert.equal(wires.length, before + 1);
+      const wire = wires.at(-1)!, qwen = settings.modelSelection === "qwen3.7-plus-2026-05-26";
+      assert.equal(wire.model, created.session.model.id); assert.deepEqual(created.session.model,
+        { provider: qwen ? "bailian" : "deepseek", id: settings.modelSelection === "configured" ? "deepseek-flash" : settings.modelSelection });
+      assert.equal(wire[qwen ? "max_completion_tokens" : "max_tokens"], settings.maxTokens);
+      assert.equal(wire[qwen ? "max_tokens" : "max_completion_tokens"], undefined);
+      if (qwen) { assert.equal(wire.enable_thinking, settings.thinkingLevel === "high"); assert.equal(wire.reasoning_effort, undefined); assert.equal(wire.thinking, undefined); }
+      else { assert.deepEqual(wire.thinking, { type: settings.thinkingLevel === "high" ? "enabled" : "disabled" });
+        assert.equal(wire.reasoning_effort, settings.thinkingLevel === "high" ? "high" : undefined); }
+      const native = actualSessions.at(-1)!;
+      assert.deepEqual(native.getActiveToolNames().sort(), ["get_order", "search_faq"]);
+      assert.equal(native.thinkingLevel, settings.thinkingLevel); assert.equal(native.model?.maxTokens, settings.maxTokens);
+    }
+    const preserved = await chat.create(cookie, "demo-b", cases.at(-1)); cookie = preserved.token;
+    assert.deepEqual(preserved.session.settings, cases.at(-1)); assert.deepEqual(preserved.messages, []);
+    assert.equal(wires.length, 6);
+    console.log("网页参数检查通过：4 个目录选项、完整配置快照、默认无密钥宿主兼容、坏设置保留旧会话；6 次原生 Pi 替代 HTTP 验证模型、off/high 与 512/1024/2048 实际请求；0 远程/DB/QQ。");
+  } finally { chat?.close(); globalThis.fetch = originalFetch; }
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) await checkWebChat();

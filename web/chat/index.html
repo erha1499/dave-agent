@@ -11,6 +11,11 @@
   <header class="app-header">
     <h1>Dave 客服</h1>
     <small>模拟数据 · 只读咨询</small>
+    <nav class="app-nav" aria-label="主导航">
+      <a href="#" class="active" aria-current="page">客服问答</a>
+      <a id="eval-link" target="_blank" rel="noopener noreferrer" hidden>评测工作台</a>
+    </nav>
+    <span class="badge" id="active-settings">连接中…</span>
     <label for="profile-select">演示客户</label>
     <select id="profile-select" disabled></select>
     <button type="button" id="new-chat" disabled>新对话</button>
@@ -34,6 +39,27 @@
       </form>
     </main>
     <aside class="sidebar">
+      <details id="chat-settings">
+        <summary>聊天设置</summary>
+        <form id="settings-form">
+          <label for="model-select">模型</label>
+          <select id="model-select" disabled></select>
+          <label for="thinking-select">思考模式</label>
+          <select id="thinking-select" disabled>
+            <option value="off">关闭</option>
+            <option value="high">开启</option>
+          </select>
+          <label for="tokens-select">输出上限 (Token)</label>
+          <select id="tokens-select" disabled>
+            <option value="512">512</option>
+            <option value="1024">1024</option>
+            <option value="2048" selected>2048</option>
+          </select>
+          <button type="submit" id="apply-settings" disabled>应用并新建对话</button>
+          <small>会清空当前对话。</small>
+          <p role="status" aria-live="polite" id="settings-status"></p>
+        </form>
+      </details>
       <details>
         <summary>订单提示</summary>
         <div id="order-hints"></div>
