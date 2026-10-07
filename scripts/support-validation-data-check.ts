@@ -187,15 +187,19 @@ export function validateSupportValidationDataset(value: unknown): SupportValidat
 }
 
 const hash = (value: Buffer | string) => createHash("sha256").update(value).digest("hex");
-const implementationContractPath = "data/support-v2-validation-contract-v2.json";
-const implementationContractSha256 = "d6e2e9a898428979a1aa3c8f59e71199eb4389d5786119876902ec01c83a30cf";
+const implementationContractPath = "data/support-v2-validation-contract-v3.json";
+const implementationContractSha256 = "f34b48c81b2d1b43c7ac369cbe2f40df5907e7968686f9391348452732b3e587";
+const previousContractSha256 = "d6e2e9a898428979a1aa3c8f59e71199eb4389d5786119876902ec01c83a30cf";
 
 // The sidecar is an explicit implementation revision, not an equivalence claim.
 // Pin its bytes so changing source + manifest together still requires a reviewed checker update.
 function readImplementationContract(bytes: Buffer, sourceBytes: Buffer) {
   assert.equal(hash(bytes), implementationContractSha256, "implementation revision drift");
   const revision = JSON.parse(bytes.toString()), source = JSON.parse(sourceBytes.toString());
-  assert.equal(revision.version, 2);
+  assert.equal(revision.version, 3);
+  assert.equal(revision.previousImplementation.path, "data/support-v2-validation-contract-v2.json");
+  assert.equal(revision.previousImplementation.sha256, previousContractSha256);
+  assert.equal(revision.previousImplementation.sourceSha256, "1100a2158af2e368e4e13706fc850c901bda647e3b874850f1c4d593c3a3a5d1");
   assert.equal(revision.baselineSource.path, "data/support-v2-validation-source.json");
   assert.equal(revision.baselineSource.sha256, hash(sourceBytes), "frozen source manifest drift");
   assert.deepEqual(revision.dataset, source.dataset, "fixed gold must not change with implementation");
@@ -246,9 +250,9 @@ function assertFrozenContract(path: string, bytes: Buffer, expected: string) {
 function assertRevisedContract(path: string, bytes: Buffer, expected: string, revision: ReturnType<typeof readImplementationContract>) {
   if (path !== revision.change.path) return assertFrozenContract(path, bytes, expected);
   assert.equal(expected, revision.change.fromSha256, "revision must name the original implementation");
-  assert.equal(hash(bytes), revision.change.toSha256, `implementation v2 drift: ${path}`);
-  return { path, frozenSha256: expected, actualSha256: hash(bytes), revision: 2, byteEquivalent: false,
-    change: "task binding generation and strict automatic references/notifications; fixed gold unchanged, not executed" };
+  assert.equal(hash(bytes), revision.change.toSha256, `implementation v3 drift: ${path}`);
+  return { path, frozenSha256: expected, actualSha256: hash(bytes), revision: 3, byteEquivalent: false,
+    change: "task binding/notification provenance plus post-lock deadline acceptance; fixed gold unchanged, not executed" };
 }
 
 export async function loadSupportValidationData() {
@@ -256,6 +260,7 @@ export async function loadSupportValidationData() {
   const sourceBytes = await readFile(new URL("../data/support-v2-validation-source.json", import.meta.url));
   const source = JSON.parse(sourceBytes.toString());
   const revision = readImplementationContract(await readFile(new URL(`../${implementationContractPath}`, import.meta.url)), sourceBytes);
+  assert.equal(hash(await readFile(new URL(`../${revision.previousImplementation.path}`, import.meta.url))), previousContractSha256, "previous implementation contract drift");
   assert.equal(hash(await readFile(new URL(`../${revision.migration.path}`, import.meta.url))), revision.migration.sha256, "implementation migration drift");
   assert.equal(source.version, 1); assert.equal(source.validationPolicy, "fixed-validation-not-blind");
   assert.equal(source.dataset.path, "data/support-v2-validation.json"); assert.equal(source.dataset.sha256, hash(bytes)); assert.equal(source.dataset.bytes, bytes.length);
@@ -294,7 +299,7 @@ const sourceBytes = await readFile(new URL("../data/support-v2-validation-source
 const revisionBytes = await readFile(new URL(`../${implementationContractPath}`, import.meta.url));
 assert.throws(() => readImplementationContract(revisionBytes, Buffer.concat([sourceBytes, Buffer.from("\n")])));
 for (const mutate of [
-  (copy: typeof revision) => { copy.version = 3; },
+  (copy: typeof revision) => { copy.version = 4; },
   (copy: typeof revision) => { copy.change.path = "src/refunds.ts"; },
   (copy: typeof revision) => { copy.change.fromSha256 = "0".repeat(64); },
   (copy: typeof revision) => { copy.change.toSha256 = "0".repeat(64); },
@@ -311,7 +316,7 @@ assert.ok(ledgerCompatibility && "businessOracle" in ledgerCompatibility && ledg
 assert.equal(ledgerCompatibility.byteEquivalent, false);
 assert.equal(ledgerCompatibility.businessOracle.byteEquivalent, true);
 assert.equal(ledgerCompatibility.attributionRevision.contract, attributionRevision.contract);
-console.log("Support validation keeps original gold/source hashes; implementation v2 changes task binding/notification semantics. Business oracle bytes remain frozen; provider role/currency ledger is a reviewed hash-pinned attribution revision, not whole-file equivalence or business execution.");
+console.log("Support validation keeps original gold/source hashes; implementation v3 preserves task binding/notifications and adds post-lock deadline acceptance. Business oracle bytes remain frozen; provider role/currency ledger is a reviewed hash-pinned attribution revision, not whole-file equivalence or business execution.");
 function rejects(mutate: (copy: SupportValidationDataset) => void) {
   const copy = structuredClone(data); mutate(copy); assert.throws(() => validateSupportValidationDataset(copy));
 }

@@ -243,8 +243,10 @@ export class AfterSalesStore {
       || (result.status === "approved" ? !Number.isSafeInteger(result.approvedAmountCents) || (result.approvedAmountCents ?? 0) <= 0 : result.approvedAmountCents !== null)) {
       throw new BusinessError("模拟商家回调格式无效。");
     }
-    return this.controlled(async () => {
-      const [changed] = await this.pool.execute<ResultSetHeader>(`UPDATE merchant_requests
+    return this.transaction(async connection => {
+      // The UPDATE's DB timestamp must start after the task lock has been acquired.
+      await connection.execute("SELECT task_id FROM merchant_requests WHERE task_id = ? AND order_id = ? FOR UPDATE", [result.taskId, result.orderId]);
+      const [changed] = await connection.execute<ResultSetHeader>(`UPDATE merchant_requests
         SET status = ?, approved_amount_cents = ?, completed_at = UTC_TIMESTAMP(3)
         WHERE task_id = ? AND order_id = ? AND status = 'pending' AND deadline_at > UTC_TIMESTAMP(3)
         AND (? IS NULL OR ? <= amount_cents)`,

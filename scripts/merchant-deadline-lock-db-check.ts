@@ -85,15 +85,35 @@ VALUES ('${taskId}', '${orderId}', 'synthetic-deadline-customer', '${"a".repeat(
     completed_at < deadline_at AS completion_field_before_deadline, UTC_TIMESTAMP(3) AS returned_at
     FROM merchant_requests WHERE task_id = ?`, [taskId]);
   const final = rows[0]!;
-  assert.equal(final.status, accepted ? "approved" : "pending");
-  assert.equal(final.approved_amount_cents, accepted ? 7980 : null);
+  assert.equal(accepted, false, "a lock wait crossing the deadline must not authorize a result");
+  assert.equal(final.status, "pending");
+  assert.equal(final.approved_amount_cents, null);
+  assert.equal(final.completed_at, null);
   const source = await readFile(new URL("../src/after-sales.ts", import.meta.url));
-  evidence = { check: "merchant-deadline-lock-characterization", version: details[0]!.version,
+  evidence = { check: "merchant-deadline-lock-regression-v2", version: details[0]!.version,
     isolation: details[0]!.isolation_level, sourceSha256: createHash("sha256").update(source).digest("hex"),
     deadlineAt: releasedAfter.deadline_at, waitingObservedAt: waitingAt,
     lockReleaseLowerBound: releasedAfter.observed_at, accepted, status: final.status,
     completedAt: final.completed_at, completionFieldBeforeDeadline: Boolean(final.completion_field_before_deadline),
     returnedAt: final.returned_at };
+  // Reuse the same isolated row; no global worker scan or business database writes.
+  const callback = { taskId, orderId, status: "approved" as const, approvedAmountCents: 7980 };
+  admin(`UPDATE \`${database}\`.merchant_requests SET deadline_at = UTC_TIMESTAMP(3) + INTERVAL 8 SECOND WHERE task_id = '${taskId}';`);
+  assert.equal(await store.applyResult({ ...callback, taskId: randomUUID() }), false);
+  assert.equal(await store.applyResult({ ...callback, orderId: "COUPON-2998" }), false);
+  assert.equal(await store.applyResult({ ...callback, approvedAmountCents: 7981 }), false);
+  assert.equal(await store.applyResult(callback), true);
+  assert.equal(await store.applyResult(callback), false);
+  assert.equal(await store.applyResult({ ...callback, status: "rejected", approvedAmountCents: null }), false);
+  admin(`UPDATE \`${database}\`.merchant_requests SET status = 'pending', approved_amount_cents = NULL,
+    completed_at = NULL, deadline_at = UTC_TIMESTAMP(3) + INTERVAL 8 SECOND WHERE task_id = '${taskId}';`);
+  assert.equal(await store.applyResult({ ...callback, status: "rejected", approvedAmountCents: null }), true);
+  assert.equal(await store.applyResult(callback), false);
+  const [rejected] = await pool.execute<RowDataPacket[]>("SELECT status, approved_amount_cents, completed_at FROM merchant_requests WHERE task_id = ?", [taskId]);
+  assert.equal(rejected[0]!.status, "rejected");
+  assert.equal(rejected[0]!.approved_amount_cents, null);
+  assert.ok(rejected[0]!.completed_at);
+  evidence.normalAndBoundaryChecks = 8;
 } catch (error) { errors.push(error); } finally {
   const rolledBack = await Promise.allSettled([blocker?.rollback()]);
   blocker?.release();
