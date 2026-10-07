@@ -75,7 +75,7 @@ Webhook 协议允许回调端口 `80/443/8080/8443`，要求 HTTPS。可以由�
 | `payload.d.group_openid` | 群路由标识，不是界面显示的 QQ 群号 |
 | `payload.d.author.member_openid` | 发送者标识，不是昵称或可自行填写的 QQ 号 |
 
-每个进程只服务一个 AppID，因此会话键采用 `group_openid + member_openid`，机器人身份由进程隔离。不同用户隔离，同一用户消息串行；业务异步回调续接尚未实现。订单身份则由可信 AppID＋发送者标识查询 `qq_identities`，每次工具执行都检查绑定及归属，不使用用户正文、昵称或 CLI 默认客户身份。官方文档说明群 @ 的 `content` 已去掉机器人 mention 前缀；过滤依据可信事件类型，不能把文本中的昵称当作身份。[群 @ 事件](https://bot.q.qq.com/wiki/develop/api-v2/autogen/event/group_at_message_create.html)
+每个进程只服务一个 AppID，因此会话键采用 `group_openid + member_openid`，机器人身份由进程隔离。不同用户隔离，同一用户消息串行；D3 商家结果已通过同一队列续接，窗口与恢复边界见[商家结果续接](#d3-商家结果续接)。订单身份则由可信 AppID＋发送者标识查询 `qq_identities`，每次工具执行都检查绑定及归属，不使用用户正文、昵称或 CLI 默认客户身份。官方文档说明群 @ 的 `content` 已去掉机器人 mention 前缀；过滤依据可信事件类型，不能把文本中的昵称当作身份。[群 @ 事件](https://bot.q.qq.com/wiki/develop/api-v2/autogen/event/group_at_message_create.html)
 
 未绑定用户可以问通用规则，不能查订单。宿主将可信事件身份记录在被 Git 忽略的 `.runtime/qq-identities/`，绑定日志只输出匿名代号，不公开真实发送者标识。本机管理员先核对发信人，再选择其对应的演示客户并运行 `qq:bind`；脚本通过容器管理员权限写入映射，不能覆盖已有绑定。不能将所有成员自动绑定为客户一，也不能让用户通过对话自行指定客户 ID。绑定完成后原会话下一次查询即生效。
 
@@ -105,7 +105,7 @@ Webhook 协议允许回调端口 `80/443/8080/8443`，要求 HTTPS。可以由�
 
 腾讯 SDK 已实现地址验证 `op:13`、普通事件 Ed25519 验签、事件分发和 HTTP ACK。当前 Webhook 实现将事件处理放到后台，立即返回 HTTP 200 与 `{"op":12,"d":0}`；普通事件缺失或错误签名会返回 401。地址验证走独立路径，不能把它当成用户消息交给 Pi。[Webhook 源码](https://github.com/tencent-connect/qqbot-nodejs/blob/ca55d9c395b582b7fcfad0ec27209c35dd04e0b3/src/protocol/transport/webhook.ts)
 
-ACK 只说明收到事件，不证明模型成功、退款成功或事件已持久保存。当前宿主负责测试群白名单、Pi 会话队列、模型超时与发送失败记录，Webhook 请求体限制为 64 KiB。最多 20 个内存会话，每会话最多 3 条在途消息（含正在处理）；模型限时 60 秒，空闲 30 分钟清理，20 轮后换新上下文。自动压缩关闭，模型输出最多 2048 token；输出长度按上述模板限制，并在发送前重新检查原消息仍处于 4 分 30 秒回复余量内。SDK 去重中间件使用进程内状态，重启后丢失，不能替代业务幂等或持久事件队列。
+ACK 只说明收到事件，不证明模型成功、退款成功或事件已持久保存。当前宿主负责测试群白名单、Pi 会话队列、模型超时与发送失败记录，Webhook 请求体限制为 64 KiB。最多 20 个内存会话，每会话最多 3 条在途消息（含正在处理）；Pi prompt 限时 60 秒，空闲 30 分钟清理，20 轮后换新上下文。自动压缩关闭，模型输出最多 2048 token；输出长度按上述模板限制，并在发送前重新检查原消息仍处于 4 分 30 秒回复余量内。SDK 去重中间件使用进程内状态，重启后丢失，不能替代业务幂等或持久事件队列。
 
 发布包的 `msg_seq` 由时间和随机数生成，并非每个原消息的持久递增计数；重新调用发送会生成新序号，不能把 SDK 发送当成业务幂等保障。SDK 的群级并发中间件也不能替代我们的“群＋发送者”会话队列；初期不用 SDK 自带历史缓冲，由 Pi 统一管理对话。[发送实现](https://github.com/tencent-connect/qqbot-nodejs/blob/ca55d9c395b582b7fcfad0ec27209c35dd04e0b3/src/protocol/api/routes.ts)、[并发中间件](https://github.com/tencent-connect/qqbot-nodejs/blob/ca55d9c395b582b7fcfad0ec27209c35dd04e0b3/src/middleware/concurrency-guard.ts)
 
@@ -114,6 +114,24 @@ ACK 只说明收到事件，不证明模型成功、退款成功或事件已持�
 API 当前通过 `AppID + AppSecret` 获取 AccessToken：`POST https://api.bot.qq.com/app/getAppAccessToken`，请求字段为 `appId/clientSecret`；调用 API 使用 `Authorization: QQBot <AccessToken>`。有效期按返回的 `expires_in` 处理，通常不超过 7200 秒，接近到期 60 秒内可获取新 token。优先复用 SDK 的缓存和刷新；不要沿用已弃用的静态 Token 方案。[接口调用与鉴权](https://bot.q.qq.com/wiki/develop/api-v2/dev-prepare/interface-framework/api-use.html)
 
 SDK `1.0.4` 的默认 API / Token 域名仍是 `api.sgroup.qq.com` / `bots.qq.com`，与当前文档有差异。实例的 `baseUrl` 和 `tokenBaseUrl` 均已设为 `https://api.bot.qq.com`，真实获取 token、网关连接和群消息发送已成功。旧地址是否继续兼容，本轮没有实际调用证据；无需为这个差异 fork SDK。[配置透传对照](https://github.com/tencent-connect/qqbot-nodejs/blob/ca55d9c395b582b7fcfad0ec27209c35dd04e0b3/src/QQBot.ts)，该段已同时核对 npm 发布源码和编译产物。
+
+### 会话排队与超时恢复调用链审计（2026-10-08）
+
+**本轮 P0 合同：** 业务约束是同一用户的确认/查询按到达顺序执行，不串入其他会话，也不把超时或未知发送当作成功。面试追问是“一个用户卡住时，其他人能否继续；超时后旧请求会不会发出迟到回复；60秒到底覆盖哪些等待”。个人实现为入口校验、按群＋用户的Promise队列、取消/替换会话与发送门槛；复用腾讯SDK通信/中间件、Pi工具循环/取消接口及已有业务重新授权。本轮只审计这一链、修正文档状态与时间范围，沿用[稳定atomic演示配置](./after-sales.md#启动)。预算30分钟，既有离线检查仅一次（命令超时90秒），0远程模型/真实QQ/数据库请求；核对源码、检查及证据范围后收尾，不扩建队列或重新跑候选实验。
+
+| 请求经过哪里 | 实际行为与讲解边界 |
+| --- | --- |
+| [qq.ts：main / sanitizeQQContent](../src/qq.ts) → [QQAgent.handle / enqueue](../src/qq-agent.ts) | 正式入口依次注册群白名单、SDK内存去重、mentionGate和有限前缀清理，再调用handle。宿主只接受群@事件，校验发送者、群、消息及replyTarget一致；文本中的身份不是授权。validQQMessage要求消息年龄在-30秒至严格小于270秒之间，在入队、出队和会话创建后复查。 |
+| QQAgent.enqueue：conversation.tail | 以JSON编码的群＋发送者为键串接Promise；同一会话最多3条在途（含正在执行），第4条只回忙碌提示、不进入模型/确认hook。不同键各有队列；第21个新会话被拒，已有会话仍可接待。出队过期的消息直接放弃，队列不是持久事件收件箱。 |
+| enqueue：创建会话 → beforePrompt → session.prompt | 创建会话后才执行宿主前置处理；返回固定回执时不调用模型，回执以triggerTurn=false写入原会话。普通消息进入Pi，60秒timer仅与prompt竞速；排队、会话创建、beforePrompt、发送及等待abort完成均不在该timer内，不能称作整条请求60秒保证。 |
+| enqueue：catch / finally → deliver | 模型超时/错误先发出abort，再尝试一次受控失败回复；finally等待取消并dispose旧会话，之后下一轮创建新会话，失败tail不会阻塞后续轮。发送或登记异常不盲目重发；正常模型路径发送前复查时效及关闭状态。close先标记关闭、取消已建立会话，再等待队列收尾，不能证明任意外部等待有界。 |
+| [agent.ts：createSession](../src/agent.ts) 与业务Store | Pi完整历史只在内存中；20个已处理轮后，下一轮dispose并重建，空闲且无在途的会话达到30分钟后在扫描/下次入队时清理。轮换不迁移对话摘要，下一轮必须重新定位/取证；业务任务与退款的持久化及幂等另由Store保证，不能把会话串行说成跨进程事务保护。 |
+
+取舍是用现有Promise与Pi生命周期承载小规模测试群，避免引入消息代理或自写Harness；代价是队列/历史在进程退出后丢失，超时不覆盖所有await，内存限额与轮换可能要求用户重述。SDK去重不等于处理成功或资金幂等，跨进程恢复与已执行退款仍须按[售后持久化边界](./after-sales.md#确认与持久化边界)说明。D3已实现续接，本页旧“尚未实现”描述已修正；不据此认领真实商家网络回调。
+
+**验收入口与范围：** 仓库根目录执行`node scripts/qq-agent-check.ts`，使用实际Pi/QQAgent、faux脚本模型及本地发送记录，session工厂为通信echo工具，不读取业务数据库。它检查A阻塞时另一个用户/群能完成、同会话第4条忙碌、前三条按序、100毫秒测试超时在失败回复前取消且不发送迟到文本、失败后新会话恢复、宿主回执串行及初始化期间过期/关闭不执行。身份归属、资金事务、真实网络耗时和QQ客户端显示不在该检查的证明范围；20会话上限、20轮轮换与30分钟清理本轮仅源码核验，不冒称动态验收。历史平台结果仍见[D2/D3联合闭环](#d2d3-联合闭环)，本轮不重验。
+
+**本轮结果：** 上述离线检查仅执行一次、退出0（外层命令耗时1.049秒）；文档差异与新增链接已核对。源码基线`51b71f3`，Node v26.10.0、Pi coding-agent 1.0.0、QQ SDK 1.0.4；0远程模型/真实QQ/数据库请求，无检查失败。仅补本文与计划，未发现需修改生产代码的有证据缺陷；默认配置与C1/O4/O5准入状态保持不变，不将本地echo/faux通过结果升级为售后业务或平台验收。
 
 ## 最小验收顺序
 
