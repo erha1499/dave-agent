@@ -51,6 +51,13 @@ const config = { version: 2, simulation: true, readOnly: true, profiles: [profil
 export async function checkWebChatUI() {
   const ids = ['profile-select', 'new-chat', 'app-status', 'init-retry', 'chat-messages', 'chat-empty', 'starter-list', 'chat-form', 'chat-input', 'char-count', 'send-button', 'order-hints',
     'eval-link', 'chat-settings', 'settings-form', 'model-select', 'thinking-select', 'tokens-select', 'apply-settings', 'settings-status', 'active-settings'];
+  const html = await readFile(new URL('../web/chat/index.html', import.meta.url), 'utf8');
+  for (const id of ids) assert.equal([...html.matchAll(new RegExp(`\\bid=["']${id}["']`, 'g'))].length, 1, `actual HTML must bind ${id} exactly once`);
+  for (const [tag, id] of [['form', 'chat-form'], ['form', 'settings-form'], ['textarea', 'chat-input'],
+    ['select', 'profile-select'], ['select', 'model-select'], ['select', 'thinking-select'], ['select', 'tokens-select']])
+    assert.match(html, new RegExp(`<${tag}\\b[^>]*\\bid=["']${id}["']`), `${id} must keep its native semantics`);
+  for (const id of ['chat-input', 'profile-select', 'model-select', 'thinking-select', 'tokens-select'])
+    assert.match(html, new RegExp(`<label\\b[^>]*\\bfor=["']${id}["']`), `${id} must retain an accessible label`);
   const nodes = new Map(ids.map(id => [id, Object.assign(new Element(id === 'chat-input' ? 'textarea' : id.endsWith('-select') ? 'select' : 'div'), { id })]));
   nodes.get('chat-messages').append(nodes.get('chat-empty'));
   nodes.get('chat-empty').append(nodes.get('starter-list'));
