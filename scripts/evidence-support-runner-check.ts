@@ -42,7 +42,7 @@ async function supportClient(model = "mock-support", malformed = false, profile:
       const decisions = payload.documents.map((doc: { id: string; body: string }) => {
         const supported = payload.query.includes("午餐") && doc.id === "hours";
         if (profile === "typed") return { id: doc.id, category: supported ? "direct_fact" : "limitation_only",
-          quote: badQuote && doc.id === "refund" ? "未提供的引文" : doc.body, reason: supported ? "原文直接说明时段" : "原文没有所问事实" };
+          quote: badQuote && doc.id === "refund" && payload.query.includes("午餐") ? "未提供的引文" : doc.body, reason: supported ? "原文直接说明时段" : "原文没有所问事实" };
         return { id: doc.id, supported, quote: supported ? doc.body : null, reason: supported ? "原文直接说明时段" : "原文没有所问事实" };
       });
       return { role: "assistant", api: "openai-completions", provider: "deepseek", model,
@@ -249,16 +249,28 @@ try {
   assert.equal("knownEstimatedCostUsd" in typedWarmUsage && typedWarmUsage.knownEstimatedCostUsd, null, "historical proof must not bill the current replay");
   assert.equal(evaluateRecordedAcceptance(typedWarm.report).meetsApplicableTargets, true);
 
-  const partialOptions = { ...typedOptions, dataset: oneQuestion(), supportClient: await supportClient("mock-typed-partial", false, "typed", true),
+  const partialOptions = { ...typedOptions, supportClient: await supportClient("mock-typed-partial", false, "typed", true),
     cacheDir: join(directory, "typed-partial-cache") };
   const partialCold = await runRetrievalV2({ ...partialOptions, acceptance });
   assert.equal(partialCold.report.results[0]!.supportVerification?.validation?.status, "partial");
+  assert.deepEqual(partialCold.report.results[0]!.acceptance.accepted.map(doc => doc.id), ["hours"], "valid evidence survives an invalid sibling");
+  assert.equal(partialCold.report.results[1]!.supportVerification?.validation?.status, "complete");
+  const partialScore = evaluateRecordedAcceptance(partialCold.report);
+  console.log(JSON.stringify({ localPartialControl: { planned: partialScore.totals.planned, measured: partialScore.totals.measured,
+    incomplete: partialScore.totals.incomplete, meetsApplicableTargets: partialScore.meetsApplicableTargets } }));
+  assert.equal(partialScore.meetsApplicableTargets, false, "partial judgment must not pass the complete acceptance gate");
+  assert.equal(partialScore.totals.incomplete, 1);
+  assert.equal(partialScore.totals.measured, 1);
+  assert.equal(partialScore.totals.answerable, 1, "incomplete positive remains in the planned denominator");
+  assert.equal(partialScore.totals.acceptedRecallAt5, 0);
+  assert.equal(partialScore.totals.falseRejects, 0, "invalid judgment is not a valid false rejection");
   const beforePartialWarm = [rerankRequests, supportRequests];
   const partialWarm = await runRetrievalV2({ ...partialOptions, acceptance });
   assert.deepEqual([rerankRequests, supportRequests], beforePartialWarm);
   assert.deepEqual(partialWarm.report.results[0]!.supportVerification, partialCold.report.results[0]!.supportVerification);
   assert.deepEqual(partialWarm.report.results[0]!.acceptance, partialCold.report.results[0]!.acceptance, "partial cannot become complete on replay");
   assert.equal(partialWarm.report.supportCalls[0]!.attempts.length, 0);
+  assert.deepEqual(evaluateRecordedAcceptance(partialWarm.report).totals, partialScore.totals, "warm replay cannot turn a partial case into a passing measurement");
 
   const typedFile = join(typedOptions.cacheDir, `support-${typedCold.report.supportCalls[0]!.inputHash}.json`);
   const typedSaved = JSON.parse(await readFile(typedFile, "utf8"));

@@ -55,6 +55,8 @@ export function evaluateRecordedAcceptance(report: Report) {
         : prepared;
       if (!expectedAcceptance || expectedAcceptance.status === "unavailable" || expectedAcceptance.status !== row.acceptance.status
         || contentHash(expectedAcceptance.accepted) !== contentHash(row.acceptance.accepted)) throw new Error("结果缺少绑定有效的实际判别记录，或接收原文不符。");
+      // Usable evidence does not make every candidate judgment valid.
+      if (expectedAcceptance.rejected.some(rejected => rejected.reason === "invalid_support_decision")) return { ...base, status: "failed" as const };
       const ids = row.acceptance.accepted.map(document => document.id);
       const visible = new Set(scopeDocuments(corpus.documents, question).map(document => document.id));
       if (ids.length > 5 || new Set(ids).size !== ids.length) throw new Error("接收结果不符合 Top5 合同。");

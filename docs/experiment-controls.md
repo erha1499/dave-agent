@@ -73,6 +73,8 @@ npm run validate
 
 `retrieval-v2`注入typed隔离判别客户端时，缓存v2保存完整原`verification`及哈希，保留partial/invalid状态和原请求证明；本轮cache-hit账本仍为0新attempt，不重复汇总原费用。binary及旧非隔离缓存v1保持兼容；缺完整证明的旧typed缓存拒绝使用，不自动迁移、覆盖或远程重试。需重新有预算运行时使用独立`cacheDir`并保留旧记录；`refresh`仍不写持久缓存。本地哈希与结构/输入绑定不是远端真实性或语义正确性的证明，修复工程证据见[缓存合同](./optimization-plan.md#第十片typed判别缓存保留完整证明)。
 
+`acceptance-report`区分可用原文和整题判别完整性：typed partial可在原报告保留有效候选，但重算证明中存在`invalid_support_decision`时，该题标failed/incomplete，不进入完整测量及有效误拒/无答案拒收分母，也不得通过准入门；完整计划与可答分母保留。冷/热回放同一口径，不撤销运行时有效原文、不重写历史报告，见[验收完整性修复](./optimization-plan.md#第十一片不完整判别的验收门核查)。
+
 模型固定为现有业务模型配置及百炼 text-embedding-v4 1024 维、qwen3-rerank。没有任意模型、API URL、系统提示词、命令、文件路径或环境变量表单。长期记忆和模型改写暂未实现。
 
 ### C1 业务知识服务开关
