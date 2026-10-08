@@ -89,17 +89,37 @@ Webhook 协议允许回调端口 `80/443/8080/8443`，要求 HTTPS。可以由�
 
 官方 2026-04-23 更新已将单聊、群聊自定义 Markdown 开放给所有机器人，无需单独申请模板；频道仍需内邀。当前安装包的旧权限说明与官网有差异，以 [官方 Markdown 文档](https://bot.q.qq.com/wiki/develop/api-v2/server-inter/message/type/markdown.html) 为准。这里的模板是应用内排版函数，无需平台 `custom_template_id`。
 
-宿主将本轮成功工具结果或任务回执映射为 `Reply`，再按 `answer`、`order`、`merchant_confirmation`、`merchant_status`、`refund_confirmation`、`refund_status`、`notice` 七种类型选择固定策略模板。订单、金额、确认文字和状态只使用实际业务结果；模型正文经过转义，不能自行插入标题、链接或改变模板。退款工具失败且无有效操作证据时固定提示无法确认结果，不转发模型猜测。首版使用标题、粗体和列表，不依赖表格或代码块；CLI 使用同一策略的纯文本输出。
+宿主将本轮成功工具结果或任务回执映射为 `Reply`，再按 `answer`、`order`、`merchant_confirmation`、`merchant_status`、`refund_confirmation`、`refund_status`、`notice` 七种类型选择固定策略模板。结构化订单字段、金额、确认文字和状态来自业务结果；`answer` 和订单卡附文仍保留模型正文。其 Markdown 版本转义所覆盖的排版语法，不能据此声称正文事实或整段回答已获验证；纯文本版本保留原正文。退款工具失败且无有效操作证据时固定提示无法确认结果，不转发模型猜测。首版使用标题、粗体和列表，不依赖表格或代码块；CLI 使用同一策略的纯文本输出。
 
-`QQ_REPLY_FORMAT=markdown` 为默认值，显式设为 `text` 可切回纯文本。发送错误只记录失败，不自动切换格式或重发；网络超时或响应读取失败时，原消息可能已经送达。模型正文最多 1000 个 Unicode 码点，渲染后应用输出上限为 4000 码点，不能把它写成 QQ 官方长度限制。
+`QQ_REPLY_FORMAT=markdown` 为默认值，显式设为 `text` 可切回纯文本。发送错误只记录失败，不自动切换格式或重发；网络超时或响应读取失败时，原消息可能已经送达。`answer` / `notice` 正文最多 1000 个 Unicode 码点，订单卡附文最多 500；最终 Markdown 超过 4000 码点则拒绝发送，不截断完整模板或确认指令。4000 检查作用于 Markdown，即使选择纯文本也先经过该检查；它是应用限制，不能写成 QQ 官方长度限制。
 
 2026-10-02 验收：`validate` 通过五种模板、内容注入、长度限制与真实 SDK HTTP 发送失败不重发检查。真实 QQ API 返回 200，客户端已验证 `answer`、`order`、`merchant_confirmation`、`merchant_status`、`notice` 五类显示；空原因确认触发固定服务提示，不调用模型、不创建任务。协商确认采用独立普通文本行，已验证复制后精确发送；隐形字符在模板、确认入口和存储边界均拒绝。
 
 ### 固定业务按钮
 
-`QQ_REPLY_BUTTONS` 默认 `false`，本机测试配置已设为 `true`。启用后，群聊 Markdown 的协商确认回复增加“确认模拟协商”，等待中的任务增加“查询进度”，有效退款方案增加“确认模拟退款”；终态不带按钮。按钮由固定策略生成，使用 `type=2` 指令按钮、`style=1` 蓝色线框，并限制为本次入站消息的实际发送者。点击只填入指令（`enter=false`、`reply=false`），用户核对后发送，继续经过原来的宿主确认、订单归属和幂等检查；普通文本、非群回复不带按钮，发送失败不自动重发。警告使用红色圆点与粗体，不依赖正文颜色。
+`QQ_REPLY_BUTTONS` 默认 `false`，2026-10-02 本机按钮验收配置设为 `true`。启用后，群聊 Markdown 的协商确认回复增加“确认模拟协商”，等待中的任务增加“查询进度”，有效退款方案增加“确认模拟退款”；终态不带按钮。按钮由固定策略生成，使用 `type=2` 指令按钮、`style=1` 蓝色线框，并限制为本次入站消息的实际发送者。点击只填入指令（`enter=false`、`reply=false`），用户核对后发送，继续经过原来的宿主确认、订单归属和幂等检查；普通文本、非群回复不带按钮，发送失败不自动重发。警告使用红色圆点与粗体，不依赖正文颜色。
 
 2026-10-02 按钮验收：`npm run validate` 通过，最终样式调整后 `check:reply` 再次通过；真实 QQ API 返回 200，Mac QQ 显示蓝色线框及蓝色按钮文字。已完成“点击确认按钮 → 填入完整指令 → 用户发送 → pending 回执 → 点击查询按钮并发送 → approved 79.80 元”的模拟协商闭环，重复确认仍返回原任务；数据库核验退款金额和记录数为零、券未核销，临时测试夹具已清理。当前 Mac QQ 将 `style=3/4` 显示为灰色，且未展示请求中的 `modal` 二次确认弹窗，因此最终采用 `style=1`，用户发送指令才构成确认，不能把弹窗作为授权保证。当时手机端、真实双用户按钮权限尚未验收；后续跨用户按钮检查见下文，完整手机样式仍待验收。该轮没有重跑历史 88/88 真实模型回归。
+
+### 业务卡渲染与平台接收边界审计（2026-10-08）
+
+**业务约束与追问：** 模型说“已退款”不能改变合成订单/资金事实，排版或按钮也不能替代用户确认。面试可追问“工具仍是 prepared 时为什么不能显示成功？平台返回消息 ID 后为什么仍可能无法确认方案已登记？”本轮固定源码 `1b4d4321c884c758fa67fda5a1712ecd50d9d19f`，只审计默认 atomic 的出站卡片链；25 分钟内以源码、既有断言、文档差异及链接核验收尾，无新增业务检查或远程批次。
+
+```text
+QQAgent.enqueue
+├ 普通 atomic 模型轮：本轮新增且当前启用的工具结果 → replyFromTools → Reply
+│  优先退款结果、退款失败提示、商家、订单、普通答复；格式异常为 notice
+└ 宿主确认回执 / 原任务通知：直接形成业务 Reply
+→ renderReply：两路汇合，七种固定策略、字段校验、Markdown 转义、长度检查、原始按钮指令
+→ qq.ts → sendQQReply：显式格式 / 按钮开关、可信发送者、原 replyTarget → QQ SDK
+→ 非空消息 ID → QQAgent.deliver.afterDeliver → markRefundReplyPresented（适用方案）
+```
+
+**个人实现与取舍：** [`QQAgent`](../src/qq-agent.ts)、[`replyFromTools`](../src/reply-from-tools.ts)、[`renderReply`](../src/reply.ts) 和 [`sendQQReply`](../src/qq-reply.ts) 实现本轮证据映射、固定模板及发送/登记顺序；Pi 复用循环、工具结果和生命周期，腾讯 SDK 复用网络传输。直接发送模型 Markdown 或采信模型声明的 Reply/按钮更短，但会把卡片结构交给模型；固定策略增加字段/状态校验，仍不能验证 `answer` 与订单附文的语义。有效退款或商家专用卡不附模型正文；Controller 候选先取 `supportReply`，不据本条扩展其准入。渲染不新增模型请求，未单独测量 CPU、延迟或费用。
+
+**可复现例子与证据：** 工具返回合法 prepared 方案，即使模型正文为“退款成功”，[`reply-check.ts`](../scripts/reply-check.ts) 仍断言 `refund_confirmation`，保留 79.80 元及原 `确认退款 UUID` 指令；渲染时按本机时间判过期的方案不带确认指令/按钮，合法 succeeded 卡不带重复动作；显示动作不替代存储边界的期限复核。该脚本另含伪标题/链接、emoji 码点、订单附文及完整协商指令断言，入口 `node scripts/reply-check.ts`。按钮指令保留未转义原文，Markdown 正文另行转义；[`qq-reply-check.ts`](../scripts/qq-reply-check.ts) 用实际安装 SDK 连 localhost，核对 `msg_type`、原 `msg_id`、指定用户权限参数，以及无 ID/API/网络失败各仅一次发送，入口 `node scripts/qq-reply-check.ts`。这只证明请求构造，真实权限拒绝与客户端显示使用下文的[历史双用户记录](#双用户隔离与异额退款)。
+
+**接收、登记与边界：** 默认按钮关闭；开启也仅群聊 Markdown 且有可信发送者时附按钮，点击只填字，手动复制仍须通过宿主授权。请求中的 modal 不是授权保证，历史 Mac QQ 未展示它。SDK 非空 ID 支持“平台接收”的判断，不证明客户端可见；[`QQAgent.deliver`](../src/qq-agent.ts) 随后调用 [`markRefundReplyPresented`](../src/refund-entry.ts)，发送或登记异常均不自动重发，也不声称尚无副作用。两步非原子，登记可在平台接收后失败，确认与持久恢复仍依赖[退款边界](./after-sales.md#退款确认调用链审计2026-10-08)。[`refund-agent-check.ts`](../scripts/refund-agent-check.ts) 已有替代 Store/发送的顺序和失败断言；本轮只审阅，不执行或增加样本。文档差异、链接和独立源码审阅通过；0 新模型/数据库/真实 QQ/资金请求，当前平台权限、客户端、实库登记失败未补验，完整手机样式及 C1/O4/O5 仍未完成。下一步先按上述两问讲清证据层级，无相关变化不重复审计。
 
 ## 腾讯 SDK 与宿主的职责
 
