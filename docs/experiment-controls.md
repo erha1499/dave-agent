@@ -268,9 +268,19 @@ node scripts/acceptance-report.ts --report .runtime/retrieval-v2/RUN_ID.json
 
 该入口核验记录与输入/配置的绑定、原文和实际接收结果。`acceptance-calibrate.ts` 可以重放原始分数来校准 score 阈值，**不能从原始分数生成或重放 support 判断**；不能用纯分数校准结果冒充“事实支持模式已验证”。修改候选范围或判别配置后，应取得相匹配的实际判别记录，再用固定验证报告评价。
 
-HTTP 不接受命令或密钥；仅本机 Host/Origin，严格 JSON、请求体上限 32 KiB。任务执行状态和完整配置保存在忽略的 `.runtime/experiments/`。终止后不自动重跑；中断及未执行重复不能算通过。实验目录锁限制同一工作区同时一个实验；关闭工作台会等待当前实验完成，以便清理隔离订单。
+HTTP 不接受命令或密钥；仅本机 Host/Origin，严格 JSON、请求体上限 32 KiB。任务执行状态和完整配置保存在忽略的 `.runtime/experiments/`。[HTTP 的 POST/GET](https://github.com/erha1499/dave-agent/blob/63f376ed17c313edefc3aa693195ebec2eeed7b6/src/eval-server.ts#L57-L88)分别调用 `start/list/get`；[CLI 实际运行](https://github.com/erha1499/dave-agent/blob/63f376ed17c313edefc3aa693195ebec2eeed7b6/scripts/experiment.ts#L47-L56)为 `start → await close → get`，`--list` 仅列预设。互斥只覆盖使用同一实验目录的 `ExperimentJobs` 入口，不约束直接调用 runner 的脚本或其它数据库 worker。
 
-正常进程退出自动释放锁，死进程的完整锁元数据可恢复；半写或损坏锁会保守拒绝启动。仅在确认没有实验进程运行后，手动检查并清理 `.runtime/experiments/active.json` 和 `active.lock/`；不要删除历史任务 JSON。没有提供运行中强制取消，以免中断模拟订单清理。
+**本机实验锁审计（2026-10-08）：** 售后评测可写合成订单，不能在前一任务尚未收尾时撞入现场；面试追问是“为何只准一个实验、关闭为何等待、PID 能证明什么”。个人实现为配置快照、目录互斥、落盘和中断记录；复用 Node 标准库及现有 runner/Pi，不扩建调度器。固定源码 `63f376ed`，验收为调用链、既有断言及文档差异/链接静态核验；预算30分钟，材料补齐即停，0运行样本，不启动实验/数据库/模型/QQ或清理实际锁。
+
+| 调用与源码定位（固定上述版本） | 行为与既有检查定位 |
+| --- | --- |
+| [`serialized/start`](https://github.com/erha1499/dave-agent/blob/63f376ed17c313edefc3aa693195ebec2eeed7b6/src/experiment-jobs.ts#L36-L45)，`start` 第192–223行 | 同进程按目录串行处理元数据，跨进程以 `mkdir active.lock` 和 `wx` 创建元数据拒绝竞争；在串行区内登记 `active`，避免关闭漏等已进入的启动。[检查第79–103、185–191行](https://github.com/erha1499/dave-agent/blob/63f376ed17c313edefc3aa693195ebec2eeed7b6/scripts/experiment-jobs-check.ts#L79-L103)包含第二实例拒绝、串行重复及两个并发启动只成功一个。 |
+| [`readLock/recoverLock/interrupt/get/list`](https://github.com/erha1499/dave-agent/blob/63f376ed17c313edefc3aa693195ebec2eeed7b6/src/experiment-jobs.ts#L117-L191) | `get/list/start` 也会触发恢复写入；完整锁元数据的 PID 判死后才尝试回收该代次，恢复 owner 仍活则拒绝抢占。任务另按 `ownerPid` 判断，死进程的 `running` 记录转 `interrupted`、清空 `current`，保留计划和已保存结果，不自动补跑。[检查第193–222、232–240行](https://github.com/erha1499/dave-agent/blob/63f376ed17c313edefc3aa693195ebec2eeed7b6/scripts/experiment-jobs-check.ts#L193-L240)包含死PID、缺失主元数据、活恢复owner、半写及活PID保护。 |
+| [`run/close`](https://github.com/erha1499/dave-agent/blob/63f376ed17c313edefc3aa693195ebec2eeed7b6/src/experiment-jobs.ts#L225-L251) → [工作台信号关闭](https://github.com/erha1499/dave-agent/blob/63f376ed17c313edefc3aa693195ebec2eeed7b6/src/eval-server.ts#L160-L170) | `run` 最终保存并释放自己的锁；执行异常停止后续运行，保留分母与已存结果。`close` 封闭本实例启动、经过元数据串行区后等待本实例 `active`，无取消/超时，不等待其它实例实验。工作台 `SIGINT/SIGTERM` 先关HTTP连接，再等待实验、关闭历史Store；CLI未注册该信号处理。[检查第89–101、172–183行](https://github.com/erha1499/dave-agent/blob/63f376ed17c313edefc3aa693195ebec2eeed7b6/scripts/experiment-jobs-check.ts#L89-L101)分别检查等待与失败后 `plannedRuns=4/results=1`，不代表真实数据库清理成功。 |
+
+[`alive(pid)`](https://github.com/erha1499/dave-agent/blob/63f376ed17c313edefc3aa693195ebec2eeed7b6/src/experiment-jobs.ts#L32-L35)仅以 `process.kill(pid, 0)` 探测，只有 `ESRCH` 视为死亡，其它错误保守视为存活；PID复用可能阻止恢复，不提供强进程身份或跨机器保障。正常释放指执行器的 `finally`，强杀/掉电不能保证订单清理；恢复锁也不清理遗留数据库fixture。`active` 吸收运行拒绝，`close` 返回本身不证明落盘或清理成功，仍须回读状态/结果；`completed` 不等于业务准入，也不授权重跑已关闭预算。仅在确认没有实验进程运行后，手动检查并清理 `active.json` 和 `active.lock/`；不要删除历史任务JSON，本轮不执行清理。
+
+独立复现入口为 `node scripts/experiment-jobs-check.ts`（无env-file，临时目录、注入runner及人工构造dead-PID元数据，本轮未运行）。上述断言不是实际子进程终止、HTTP信号关闭、PID复用或真实fixture清理验收；本片仅静态补材料，不增加历史工程/模型/QQ样本。中断和未执行重复不能算通过，分母与准入另见[评测口径](./evaluation.md#评测分母与费用调用链审计2026-10-08)。
 
 ## 对比口径
 
