@@ -1,0 +1,475 @@
+{
+  "version": 1,
+  "status": "frozen-before-first-provider-call",
+  "source": "data/acceptance-online.json; verbatim db/02-seed.sql knowledge_documents policy snapshot",
+  "disclosure": "共享工作区，同政策新组合/复杂场景改述；已阅读旧政策与旧题并去重。不是盲测，不是意图不重叠留出；没有阅读新判别器Prompt或新实验结果。候选仅供审阅，不代表选择阈值或准入。",
+  "proposedComparison": [
+    0.71,
+    0.6
+  ],
+  "development": {
+    "split": "development",
+    "composition": {
+      "answerable": 4,
+      "noAnswer": 3,
+      "scope": 1
+    },
+    "questions": [
+      {
+        "id": "rag-wide-dev-001",
+        "corpus": "online",
+        "suite": "standard",
+        "query": "同一订单买了三张券：一张已经在店里刷掉，另两张没刷、未过期且没退过。现在我要求把这三张的整单付款全部承诺退回；解释剩余两张的申请上限要按什么金额口径算，已用那张又应怎么处理。",
+        "shopId": null,
+        "productId": null,
+        "relevant": [
+          "KB-REFUND-PARTIAL"
+        ],
+        "expectedBehavior": "answer",
+        "goldRationale": "仅解释现有合成规则；下列原文支持全部所问政策事实，不推断实际订单或执行结果。",
+        "evidence": [
+          {
+            "docId": "KB-REFUND-PARTIAL",
+            "quote": "同一订单有多张券时必须逐券核对。未核销、未过期、未退款部分可申请的金额按对应券的实付单价计算；已核销部分需商家另行核实，不能按整单实付金额承诺退款。"
+          }
+        ],
+        "requestedFacts": [
+          "逐券核对",
+          "剩余有效未退券的实付单价口径",
+          "已用券另由商家核实而非整单承诺"
+        ],
+        "novelty": "组合逐券状态、计算口径与强行整单承诺；不使用半张券意图"
+      },
+      {
+        "id": "rag-wide-dev-002",
+        "corpus": "online",
+        "suite": "standard",
+        "query": "我在到期后的第二天才提出售后，券上没有刷过的痕迹。是否退回、能否延长以及退多少，这三个决定该由谁确认；能不能直接拿未到期券的条件替店家作承诺？",
+        "shopId": null,
+        "productId": null,
+        "relevant": [
+          "KB-REFUND-EXPIRED"
+        ],
+        "expectedBehavior": "answer",
+        "goldRationale": "仅解释现有合成规则；下列原文支持全部所问政策事实，不推断实际订单或执行结果。",
+        "evidence": [
+          {
+            "docId": "KB-REFUND-EXPIRED",
+            "quote": "已过期但未核销的券需要商家确认能否退款、延期以及金额。知识库未提供过期自动退款或自动延期政策。不得把未过期券的规则套用到过期券，也不能自行编造门店承诺。"
+          }
+        ],
+        "requestedFacts": [
+          "退款/延期/金额三项确认主体",
+          "过期与未过期规则不可互套"
+        ],
+        "novelty": "组合迟报售后、三个决策维度与不相容规则迁移"
+      },
+      {
+        "id": "rag-wide-dev-003",
+        "corpus": "online",
+        "suite": "standard",
+        "query": "付款截图找不到了，但页面写着双人午餐79.80元。我正在填写费用说明：这79.80元能填在商品标价栏还是本单实付栏，餐券截止时间又该从哪份记录的哪个字段取？",
+        "shopId": "shop-demo-1",
+        "productId": "product-demo-1",
+        "relevant": [
+          "KB-PRODUCT-LUNCH"
+        ],
+        "expectedBehavior": "answer",
+        "goldRationale": "仅解释现有合成规则；下列原文支持全部所问政策事实，不推断实际订单或执行结果。",
+        "evidence": [
+          {
+            "docId": "KB-PRODUCT-LUNCH",
+            "quote": "双人午餐团购券标价79.80元，一张券对应两人午餐套餐，核销一次即视为整张券已使用。每张券具体截止时间以订单返回的 expiresAt 为准，不能从标价推断实付金额。"
+          }
+        ],
+        "requestedFacts": [
+          "标价79.80与实付不可混用",
+          "截止取订单expiresAt"
+        ],
+        "novelty": "组合丢失付款凭据、费用字段填报与截止字段取证；不问拆分使用权益"
+      },
+      {
+        "id": "rag-wide-dev-004",
+        "corpus": "online",
+        "suite": "standard",
+        "query": "工单里并排放了两张订单：甲还在待支付，乙的退款已经完成。甲的挂牌数字和乙的历史退回金额，分别能否被写成本轮可退资金和客服这轮刚执行的退款？请区分这两个数字的性质。",
+        "shopId": null,
+        "productId": null,
+        "relevant": [
+          "KB-REFUND-PAYMENT"
+        ],
+        "expectedBehavior": "answer",
+        "goldRationale": "仅解释现有合成规则；下列原文支持全部所问政策事实，不推断实际订单或执行结果。",
+        "evidence": [
+          {
+            "docId": "KB-REFUND-PAYMENT",
+            "quote": "未支付订单没有到账资金，因此没有可退金额；不能把订单标价当作实付金额。已完成退款的订单需以支付和退款历史为准，不得重复退款；展示已退金额时说明这是已有历史记录，并非本轮执行。"
+          }
+        ],
+        "requestedFacts": [
+          "未支付标价不是可退款实付",
+          "已退金额是历史而非本轮执行"
+        ],
+        "novelty": "以两笔不同订单并列的工单字段混用构造复合判断，避免单订单状态自相矛盾"
+      },
+      {
+        "id": "rag-wide-dev-005",
+        "corpus": "online",
+        "suite": "no_answer",
+        "query": "已经付钱、没刷也没过期，后台重新核对完本人订单以后，会按固定多少分钟刷新一次可申请退款金额？",
+        "shopId": null,
+        "productId": null,
+        "relevant": [],
+        "expectedBehavior": "abstain",
+        "goldRationale": "8篇线上政策未提供退款上限刷新周期；相关文档或明确未录入提示不能补出所问具体事实。",
+        "evidence": [],
+        "missingFields": [
+          "退款上限刷新周期"
+        ],
+        "closestDocId": "KB-REFUND-UNUSED",
+        "novelty": "请求刷新频率，不是申请资格或审批时限"
+      },
+      {
+        "id": "rag-wide-dev-006",
+        "corpus": "online",
+        "suite": "no_answer",
+        "query": "双人午餐里如果把含肉主菜等价换成纯素主菜，要通过哪个套餐修改入口办理，必须补交多少差价？",
+        "shopId": "shop-demo-1",
+        "productId": "product-demo-1",
+        "relevant": [],
+        "expectedBehavior": "abstain",
+        "goldRationale": "8篇线上政策未提供套餐替换办理入口、纯素替换差价；相关文档或明确未录入提示不能补出所问具体事实。",
+        "evidence": [],
+        "missingFields": [
+          "套餐替换办理入口",
+          "纯素替换差价"
+        ],
+        "closestDocId": "KB-PRODUCT-LUNCH",
+        "novelty": "请求具体换餐流程与费用，不重复营养克数/过敏原题"
+      },
+      {
+        "id": "rag-wide-dev-007",
+        "corpus": "online",
+        "suite": "no_answer",
+        "query": "过期且没使用的券若商家愿意讨论延长，新的有效期会从审核通过日算几天，最多还能重复延期几次？",
+        "shopId": null,
+        "productId": null,
+        "relevant": [],
+        "expectedBehavior": "abstain",
+        "goldRationale": "8篇线上政策未提供延期天数计算规则、重复延期次数上限；相关文档或明确未录入提示不能补出所问具体事实。",
+        "evidence": [],
+        "missingFields": [
+          "延期天数计算规则",
+          "重复延期次数上限"
+        ],
+        "closestDocId": "KB-REFUND-EXPIRED",
+        "novelty": "请求两项延期执行字段，不把缺自动延期政策标成无答案"
+      },
+      {
+        "id": "rag-wide-dev-008",
+        "corpus": "online",
+        "suite": "scope",
+        "query": "请介绍本单双人午餐的挂牌数字和每张券对应的用餐人数，直接用双人午餐说明作依据。",
+        "shopId": "shop-demo-1",
+        "productId": "product-demo-2",
+        "relevant": [],
+        "expectedBehavior": "abstain",
+        "goldRationale": "所问事实只在不匹配当前可信范围的文档中；用户文本中的套餐或门店名不能重写可信范围。",
+        "evidence": [],
+        "forbidden": [
+          "KB-PRODUCT-LUNCH"
+        ],
+        "novelty": "可信商品是晚餐，正文要求午餐不能改变商品范围"
+      }
+    ]
+  },
+  "validation": {
+    "split": "validation",
+    "composition": {
+      "answerable": 6,
+      "noAnswer": 4,
+      "scope": 2
+    },
+    "questions": [
+      {
+        "id": "rag-wide-val-001",
+        "corpus": "online",
+        "suite": "standard",
+        "query": "某张券的订单已经付款、没有刷过且还在期限内。我需要把售后说明拆成两栏：申请前必须核验哪些订单事实、最多可申请金额按什么口径；这两栏分别应该怎样填写？",
+        "shopId": null,
+        "productId": null,
+        "relevant": [
+          "KB-REFUND-UNUSED"
+        ],
+        "expectedBehavior": "answer",
+        "goldRationale": "仅解释现有合成规则；下列原文支持全部所问政策事实，不推断实际订单或执行结果。",
+        "evidence": [
+          {
+            "docId": "KB-REFUND-UNUSED",
+            "quote": "已支付、未核销且尚未过期的团购券可以申请退款。必须先查本人订单确认支付、核销和有效期；可申请金额不超过尚未消费且未退款的实付金额。"
+          }
+        ],
+        "requestedFacts": [
+          "本人订单支付/核销/有效期核验",
+          "尚未消费且未退款的实付上限"
+        ],
+        "novelty": "用结构化填报场景同时请求取证前提与上限，不以单项同义替换作为新题"
+      },
+      {
+        "id": "rag-wide-val-002",
+        "corpus": "online",
+        "suite": "standard",
+        "query": "吃完以后我对服务不满意，整张券也已经刷过。客服在还没有店家核实意见时，能依据什么规则说明由谁核实哪些事情；它能否自己联系商家或提交退款？",
+        "shopId": null,
+        "productId": null,
+        "relevant": [
+          "KB-REFUND-REDEEMED"
+        ],
+        "expectedBehavior": "answer",
+        "goldRationale": "仅解释现有合成规则；下列原文支持全部所问政策事实，不推断实际订单或执行结果。",
+        "evidence": [
+          {
+            "docId": "KB-REFUND-REDEEMED",
+            "quote": "已经核销的团购券不适用未核销自动退款规则，需由商家核实实际消费与售后原因后决定。没有商家核实结果时不能承诺可退、不可退或具体金额。当前助手无法联系商家或提交退款，只能解释规则并建议用户自行咨询商家。"
+          }
+        ],
+        "requestedFacts": [
+          "商家核实实际消费/售后原因",
+          "客服不能外联或提交退款"
+        ],
+        "novelty": "组合消费争议的取证主体与助手实际操作权限，而非只问一定退/不退"
+      },
+      {
+        "id": "rag-wide-val-003",
+        "corpus": "online",
+        "suite": "standard",
+        "query": "一单里有券已经用了，还有券没用、没到期、没退款。客服只展示了剩余券对应的金额上限：这是否足以把处理进度写成退款已提交或已完成，已用那部分又应由谁另外处理？",
+        "shopId": null,
+        "productId": null,
+        "relevant": [
+          "KB-REFUND-PARTIAL"
+        ],
+        "expectedBehavior": "answer",
+        "goldRationale": "仅解释现有合成规则；下列原文支持全部所问政策事实，不推断实际订单或执行结果。",
+        "evidence": [
+          {
+            "docId": "KB-REFUND-PARTIAL",
+            "quote": "未核销、未过期、未退款部分可申请的金额按对应券的实付单价计算；已核销部分需商家另行核实，不能按整单实付金额承诺退款。查询工具提供的金额只是演示规则下的申请上限，尚未提交或完成退款。"
+          }
+        ],
+        "requestedFacts": [
+          "展示上限不是提交/完成证据",
+          "已核销部分商家另行核实"
+        ],
+        "novelty": "把状态进度误推断与部分核销处置合并，开发题只考金额口径"
+      },
+      {
+        "id": "rag-wide-val-004",
+        "corpus": "online",
+        "suite": "standard",
+        "query": "门店有一句常规午餐与晚餐套餐普通周末可用。我想把公告写成遇到法定假日、专场活动或私享套餐也都适用；哪些文字有资料依据，哪些情形仍必须向商家核实？",
+        "shopId": "shop-demo-1",
+        "productId": null,
+        "relevant": [
+          "KB-SHOP-DEMO-1"
+        ],
+        "expectedBehavior": "answer",
+        "goldRationale": "仅解释现有合成规则；下列原文支持全部所问政策事实，不推断实际订单或执行结果。",
+        "evidence": [
+          {
+            "docId": "KB-SHOP-DEMO-1",
+            "quote": "常规午餐与晚餐套餐允许普通周末使用，到店前需用户自行与商家确认接待情况；助手目前不能预约、外呼、查询实时库存或安排接待。法定节假日、特殊活动和私享套餐使用限制没有录入，遇到这些问题应明确规则缺失并建议向商家核实。"
+          }
+        ],
+        "requestedFacts": [
+          "常规套餐普通周末可用",
+          "法定假日/活动/私享限制未录入需商家核实"
+        ],
+        "novelty": "请求可引用与缺失覆盖的完整界限；这是有答案的资料范围问题，不是询问缺失政策的具体值"
+      },
+      {
+        "id": "rag-wide-val-005",
+        "corpus": "online",
+        "suite": "standard",
+        "query": "两位同伴各持同一订单中的一张单人晚餐券，其中一人先去吃。解释这两张券是两个单人套餐还是一个双人套餐，是否必须一起核销，另一张的当前状态最终以什么记录为准。",
+        "shopId": "shop-demo-1",
+        "productId": "product-demo-2",
+        "relevant": [
+          "KB-PRODUCT-DINNER"
+        ],
+        "expectedBehavior": "answer",
+        "goldRationale": "仅解释现有合成规则；下列原文支持全部所问政策事实，不推断实际订单或执行结果。",
+        "evidence": [
+          {
+            "docId": "KB-PRODUCT-DINNER",
+            "quote": "单人晚餐团购券标价59.90元，一张券对应一人晚餐，核销一次即视为整张券已使用。订单购买两张券时可以分别核销，剩余券状态以订单查询为准。"
+          }
+        ],
+        "requestedFacts": [
+          "每张供一人",
+          "两张可分别核销",
+          "剩余状态重新查订单"
+        ],
+        "novelty": "组合同伴分时使用、套餐人数解释与状态来源，不使用午餐半券意图"
+      },
+      {
+        "id": "rag-wide-val-006",
+        "corpus": "online",
+        "suite": "standard",
+        "query": "地图软件另外找到了一家同名云味餐厅。我只依据当前知识页填写客服地址卡，应写出的完整地址是什么，能把这个地址说成已经核验过的真实店铺位置吗？",
+        "shopId": "shop-demo-1",
+        "productId": null,
+        "relevant": [
+          "KB-SHOP-DEMO-1"
+        ],
+        "expectedBehavior": "answer",
+        "goldRationale": "仅解释现有合成规则；下列原文支持全部所问政策事实，不推断实际订单或执行结果。",
+        "evidence": [
+          {
+            "docId": "KB-SHOP-DEMO-1",
+            "quote": "云味餐厅演示店为虚构餐饮门店，演示地址为虚拟市演示路1号。"
+          }
+        ],
+        "requestedFacts": [
+          "完整合成地址",
+          "虚构门店不是已核验真实位置"
+        ],
+        "novelty": "同名地图混淆场景要求地址与事实来源属性并列，不以换一种问地址方式充当新题"
+      },
+      {
+        "id": "rag-wide-val-007",
+        "corpus": "online",
+        "suite": "no_answer",
+        "query": "商家正在核实已核销券的投诉，我有一段现场视频。按这份售后规则，应上传到哪个具体网址，网页允许的文件容量上限是多少？",
+        "shopId": null,
+        "productId": null,
+        "relevant": [],
+        "expectedBehavior": "abstain",
+        "goldRationale": "8篇线上政策未提供证据上传URL、文件容量上限；相关文档或明确未录入提示不能补出所问具体事实。",
+        "evidence": [],
+        "missingFields": [
+          "证据上传URL",
+          "文件容量上限"
+        ],
+        "closestDocId": "KB-REFUND-REDEEMED",
+        "novelty": "请求证据提交系统字段，不重复现场照片数量"
+      },
+      {
+        "id": "rag-wide-val-008",
+        "corpus": "online",
+        "suite": "no_answer",
+        "query": "有效且未使用的券如果申请最终获批，支付渠道会返回哪个状态码，才能据此确认钱已经进了银行账户？",
+        "shopId": null,
+        "productId": null,
+        "relevant": [],
+        "expectedBehavior": "abstain",
+        "goldRationale": "8篇线上政策未提供支付渠道到账状态码；相关文档或明确未录入提示不能补出所问具体事实。",
+        "evidence": [],
+        "missingFields": [
+          "支付渠道到账状态码"
+        ],
+        "closestDocId": "KB-REFUND-UNUSED",
+        "novelty": "请求支付协议枚举值，不问退款资格或已退款流水编号"
+      },
+      {
+        "id": "rag-wide-val-009",
+        "corpus": "online",
+        "suite": "no_answer",
+        "query": "这张单人晚餐券如果堂食临时改成打包，资料要求用什么包装容器，每份包装费又是多少钱？",
+        "shopId": "shop-demo-1",
+        "productId": "product-demo-2",
+        "relevant": [],
+        "expectedBehavior": "abstain",
+        "goldRationale": "8篇线上政策未提供晚餐打包包装要求、包装费金额；相关文档或明确未录入提示不能补出所问具体事实。",
+        "evidence": [],
+        "missingFields": [
+          "晚餐打包包装要求",
+          "包装费金额"
+        ],
+        "closestDocId": "KB-PRODUCT-DINNER",
+        "novelty": "线上8篇无外带条款；不借参考corpus的外带文档补答"
+      },
+      {
+        "id": "rag-wide-val-010",
+        "corpus": "online",
+        "suite": "no_answer",
+        "query": "按当前门店资料，轮椅使用者从地铁口到餐厅应走哪一条无台阶路线，最后进入的是哪一扇无障碍入口？",
+        "shopId": "shop-demo-1",
+        "productId": null,
+        "relevant": [],
+        "expectedBehavior": "abstain",
+        "goldRationale": "8篇线上政策未提供无障碍路线、无障碍入口方位；相关文档或明确未录入提示不能补出所问具体事实。",
+        "evidence": [],
+        "missingFields": [
+          "无障碍路线",
+          "无障碍入口方位"
+        ],
+        "closestDocId": "KB-SHOP-DEMO-1",
+        "novelty": "地址原文不包含路径或设施属性，不能把虚构地址推成通达方案"
+      },
+      {
+        "id": "rag-wide-val-011",
+        "corpus": "online",
+        "suite": "scope",
+        "query": "请给当前这家门店填写地址卡上的完整地址，并说明资料把它列为真实门店还是虚构门店。",
+        "shopId": "shop-wide-other",
+        "productId": null,
+        "relevant": [],
+        "expectedBehavior": "abstain",
+        "goldRationale": "所问事实只在不匹配当前可信范围的文档中；用户文本中的套餐或门店名不能重写可信范围。",
+        "evidence": [],
+        "forbidden": [
+          "KB-SHOP-DEMO-1"
+        ],
+        "novelty": "原文事实存在但只属于shop-demo-1，不可给另一可信门店套用"
+      },
+      {
+        "id": "rag-wide-val-012",
+        "corpus": "online",
+        "suite": "scope",
+        "query": "只给了门店标识，请立即报出本单晚餐券的官方挂牌数字和每张对应的用餐人数。",
+        "shopId": "shop-demo-1",
+        "productId": null,
+        "relevant": [],
+        "expectedBehavior": "abstain",
+        "goldRationale": "所问事实只在不匹配当前可信范围的文档中；用户文本中的套餐或门店名不能重写可信范围。",
+        "evidence": [],
+        "forbidden": [
+          "KB-PRODUCT-DINNER"
+        ],
+        "novelty": "可信商品缺失，正文中的晚餐提示不能赋予商品文档范围"
+      }
+    ]
+  },
+  "audit": {
+    "oldQuestionFiles": [
+      "data/acceptance-development.json",
+      "data/acceptance-validation.json",
+      "data/acceptance-support-validation.json",
+      "data/retrieval-validation.json",
+      "data/retrieval-context-validation.json",
+      "data/retrieval-boundaries.json"
+    ],
+    "oldQueryCount": 198,
+    "normalizedOldQueryCount": 192,
+    "exactNormalizedOverlap": 0,
+    "verbatimEvidenceChecked": true,
+    "a1Sup009": "刻意不使用单张午餐券拆半/保留半张权益意图；无答案均具体缺失字段，不把明确否定政策算无答案",
+    "limitations": [
+      "原子事实和部分意图在旧题中已曝光；只检验新组合与长问法，不证明广泛泛化。",
+      "all answerable questions require source-grounded policy explanation; no actual order or transaction assertions.",
+      "跨范围是独立授权范围拒绝控制，不能合并成模型事实支持率。"
+    ],
+    "independentReview": {
+      "result": "all-20-labels-approved-before-provider-calls",
+      "answerableQuotes": 10,
+      "missingFactQuestions": 7,
+      "scopeQuestions": 3,
+      "method": "policy and old-query inspection only; shared workspace, not blind"
+    }
+  },
+  "sourceSha256": "5f97b7f4e77cd1695a38ef9b0c42e53f52f40f7ae869a39fcdcdae5ae8971b72",
+  "seedSha256": "82c7143840ac30d166207dcf92c227b3368b98af899412a4f669f04bfb976560",
+  "policyBoundary": "Only the frozen 8-row consultation policy snapshot; its assistant contact/submission limitations do not describe the current full after-sales Controller. No actual order/transaction/QQ validation.",
+  "frozenAt": "2026-10-08T20:41:39.893Z"
+}

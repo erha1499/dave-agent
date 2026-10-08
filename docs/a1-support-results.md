@@ -64,3 +64,30 @@ npm run validate
 验证后补强了检查器的模型/语料绑定与延期记录完整性检查，未改变任何策略、Prompt、数据标签、指标算法或门槛。原冻结文件保持不变；[最终完整性审计](../data/acceptance-support-audit.json) 记录检查器前后哈希，并重算全部五份报告，确认结果一致。其余被冻结文件哈希全部未变。
 
 证据文件：[候选冻结](../data/acceptance-support-freeze.json)、[汇总、逐题决定与费用](../data/acceptance-support-results.json)、[新数据说明](./acceptance-data.md#新一轮事实支持固定验证)。新验证任务 `b3ed4874-baf9-4a4d-be8a-387ae065b869`；A run `67222a3f-780a-4f78-83e0-1ffc2c36a2aa`，B run `7c0b436e-6ff9-4830-9091-e98bfa3b1f28`。旧失败原始记录保留；完整本机报告在 `.runtime/retrieval-v2/`，不提交运行日志或凭据。
+
+## 2026-10-09：较宽预筛的新题对照未改善
+
+沿上述后续建议，只比较`support 0.71 / 0.60`，保持qwen3-rerank、DeepSeek flash与binary fact-support-v1不变。[新题](../data/rag-prefilter-probe-20261009.json)与[方法/参数冻结](../data/rag-prefilter-freeze-20261009.json)在首次请求前完成；独立标注/审阅原8篇咨询政策，开发8题及另一验证12题一起冻结。门槛是开发新增至少1个完整gold接收、不丢原正确case且无答案/范围错误均0；未达到便停止，不靠剩余预算续跑。
+
+| 新开发8题 | 0.71 | 0.60 |
+| --- | --- | --- |
+| 完整观测 | 8/8 | 8/8；共享排名，4次判别缓存 |
+| 原始gold命中 / 接收Recall@5 | 4/4 / 3/4（75%） | 4/4 / 3/4（75%） |
+| 误拒 / 无答案误收 / 范围错误 | 1/4 / 0/3 / 0/1 | 1/4 / 0/3 / 0/1 |
+
+四个gold的重排分数都高于0.71；`rag-wide-dev-003`的正确午餐原文分数0.832756，已经进入两臂判别器。问句要求区分79.80的标价/实付性质并说明截止字段来源，原文足以回答；判别器却要求具体实付额、具体expiresAt值和表单规则，导致误拒。原标签、第一次拒绝及理由保留，不因结果改标。0.60只让无答案题`dev-005`多送两篇相关但不含刷新周期的原文，两篇仍被拒收；没有召回收益。
+
+本轮于北京04:44一次结束，**40个计划结果=16开发观测+24验证未执行**，对应8个开发query与12个未执行验证query。验证未执行不算通过；候选未准入，默认和历史A1成绩不改。实际8次rerank、5次判别，共13次尝试，0失败/用量缺失；估算费用分别为¥0.0038335、$0.00126048。额外判别1次，估算$0.000258336。实际判别5请求P50 1.060s、P95 1.584s，nearest-rank、小样本及未隔离本机环境，不是客服SLA；缓存后的两臂耗时不作独立生产对照。模型别名/参数固定不证明provider权重固定或账单结算。
+
+本片只检验同政策的新组合长问法，不是盲测或意图独立留出；政策快照中咨询助手的权限描述不外推当前完整售后Controller。没有DB、QQ或最终客服回答验收。结论是保留0.71、不追加阈值或重跑；如将来另立实验，应针对判别器把“来源/性质”误当“实际值”的意图要求漂移，而非继续降低相关性阈值。完整结果见[脱敏汇总](../data/rag-prefilter-results-20261009.json)，方法见[固定一次运行器](../scripts/rag-prefilter-probe.ts)及[第六片合同](./optimization-plan.md#第六片新题比较较宽预筛的召回与代价)。
+
+```sh
+node scripts/rag-prefilter-probe.ts --self-check
+node scripts/rag-prefilter-probe.ts --dry-run
+node --env-file-if-exists=.env scripts/rag-prefilter-probe.ts --freeze-input
+# 以下为本次首次执行命令；05:27截止及独占目录拒绝再次执行，另轮须新合同/冻结。
+node --env-file-if-exists=.env scripts/rag-prefilter-probe.ts --run
+npm run validate
+```
+
+最终方法typecheck、自检、dry-run、本地伪时钟过期零请求负控、已执行目录拒绝重复且原结果字节未变的零请求控制及完整validate通过，本次运行前后14份冻结文件hash未变；独审重算两份真实报告、40计划、缓存及双币种用量通过。冻结/自检没有请求provider，未用缓存复算冒充新模型验证。

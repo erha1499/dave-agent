@@ -1,0 +1,406 @@
+{
+  "version": 1,
+  "frozenAt": "2026-10-08T20:42:30.337Z",
+  "baselineCommit": "fe3d7e99b10699931deea48f7f3a30937919aae9",
+  "methodAndFixture": "new files frozen by SHA256 before any provider calls; not present in baseline commit",
+  "runtime": {
+    "node": "v26.10.0",
+    "piAi": "1.0.0",
+    "piCodingAgent": "1.0.0"
+  },
+  "identity": {
+    "version": 1,
+    "files": {
+      "scripts/rag-prefilter-probe.ts": "9d950d36f9bb9ef2e269ffe6e4114cb29b08ddb9e2174d4416e9b64b7fe59bec",
+      "data/rag-prefilter-probe-20261009.json": "699ef0c2606d556985bf13fe056985287fa52c4ecef19aa1a475282c48c629f0",
+      "data/acceptance-online.json": "5f97b7f4e77cd1695a38ef9b0c42e53f52f40f7ae869a39fcdcdae5ae8971b72",
+      "src/bailian.ts": "ed7fc42f703bd3e49ee38581c4bfa5d35f886872f5039c2b467e74682c1d95b1",
+      "src/evidence-support.ts": "e92c6374f8c13d4289e94d6e40cb9fd53ed5b9a2ff4a81fba52f38396e672a31",
+      "src/evidence-acceptance.ts": "6e8040cf1ea30135dd7c18a44ed72d255ce94131226223325df3ab209b61d368",
+      "src/retrieval-ranking.ts": "6391fcf74f4bfb79f01c018d8c3cc0fb3f969a2256f9269e3127b5f907f6dc89",
+      "src/agent.ts": "8fd83aa81d921b03e4ce7227453c97d2148449dae06b87df6e6954f4223740ea",
+      "src/model-selection.ts": "e9b1eedd0d6a22d1a67164a07bed9bc425e7c85c0e575d2c1dca3bd7e0a21631",
+      "src/knowledge-retrieval.ts": "89a9c606cabc1579b2cbe45ec25675260731e0a0fbe2fe99133515d7df8ebf00",
+      "scripts/retrieval-data.ts": "828c191e375ed7d5e7b509c036e172bec49d163f7c83f4128ea05e900baa29e9",
+      "scripts/retrieval-v2.ts": "0bc839b2a27b5760c54c7dd5aadce654d085186d125e876cee007e51a2c754c3",
+      "scripts/acceptance-report.ts": "f33e7ac48bafbf2d5cba2d66834b41b9f20e952bb546b25d06ad9e4ac598abef",
+      "package-lock.json": "b1bf19c78dde262cc85470fd4033f51756b2a46a20f9cd261928ee65b496edeb"
+    },
+    "datasetHashes": {
+      "development": "29f10ba0779f83fe27aa657a95c3dbbf54a957f514b609b9569156d15a3f0231",
+      "validation": "af4e227814653a1f57851ade89b2ebde64b6715aa0faa55a6ab115da4a90bea0"
+    },
+    "arms": [
+      {
+        "id": "development-A",
+        "split": "development",
+        "threshold": 0.71,
+        "maxRequests": 16
+      },
+      {
+        "id": "development-B",
+        "split": "development",
+        "threshold": 0.6,
+        "maxRequests": 8
+      },
+      {
+        "id": "validation-A",
+        "split": "validation",
+        "threshold": 0.71,
+        "maxRequests": 24
+      },
+      {
+        "id": "validation-B",
+        "split": "validation",
+        "threshold": 0.6,
+        "maxRequests": 12
+      }
+    ],
+    "plan": [
+      {
+        "arm": "development-A",
+        "split": "development",
+        "id": "rag-wide-dev-001",
+        "suite": "standard",
+        "answerable": true
+      },
+      {
+        "arm": "development-A",
+        "split": "development",
+        "id": "rag-wide-dev-002",
+        "suite": "standard",
+        "answerable": true
+      },
+      {
+        "arm": "development-A",
+        "split": "development",
+        "id": "rag-wide-dev-003",
+        "suite": "standard",
+        "answerable": true
+      },
+      {
+        "arm": "development-A",
+        "split": "development",
+        "id": "rag-wide-dev-004",
+        "suite": "standard",
+        "answerable": true
+      },
+      {
+        "arm": "development-A",
+        "split": "development",
+        "id": "rag-wide-dev-005",
+        "suite": "no_answer",
+        "answerable": false
+      },
+      {
+        "arm": "development-A",
+        "split": "development",
+        "id": "rag-wide-dev-006",
+        "suite": "no_answer",
+        "answerable": false
+      },
+      {
+        "arm": "development-A",
+        "split": "development",
+        "id": "rag-wide-dev-007",
+        "suite": "no_answer",
+        "answerable": false
+      },
+      {
+        "arm": "development-A",
+        "split": "development",
+        "id": "rag-wide-dev-008",
+        "suite": "scope",
+        "answerable": false
+      },
+      {
+        "arm": "development-B",
+        "split": "development",
+        "id": "rag-wide-dev-001",
+        "suite": "standard",
+        "answerable": true
+      },
+      {
+        "arm": "development-B",
+        "split": "development",
+        "id": "rag-wide-dev-002",
+        "suite": "standard",
+        "answerable": true
+      },
+      {
+        "arm": "development-B",
+        "split": "development",
+        "id": "rag-wide-dev-003",
+        "suite": "standard",
+        "answerable": true
+      },
+      {
+        "arm": "development-B",
+        "split": "development",
+        "id": "rag-wide-dev-004",
+        "suite": "standard",
+        "answerable": true
+      },
+      {
+        "arm": "development-B",
+        "split": "development",
+        "id": "rag-wide-dev-005",
+        "suite": "no_answer",
+        "answerable": false
+      },
+      {
+        "arm": "development-B",
+        "split": "development",
+        "id": "rag-wide-dev-006",
+        "suite": "no_answer",
+        "answerable": false
+      },
+      {
+        "arm": "development-B",
+        "split": "development",
+        "id": "rag-wide-dev-007",
+        "suite": "no_answer",
+        "answerable": false
+      },
+      {
+        "arm": "development-B",
+        "split": "development",
+        "id": "rag-wide-dev-008",
+        "suite": "scope",
+        "answerable": false
+      },
+      {
+        "arm": "validation-A",
+        "split": "validation",
+        "id": "rag-wide-val-001",
+        "suite": "standard",
+        "answerable": true
+      },
+      {
+        "arm": "validation-A",
+        "split": "validation",
+        "id": "rag-wide-val-002",
+        "suite": "standard",
+        "answerable": true
+      },
+      {
+        "arm": "validation-A",
+        "split": "validation",
+        "id": "rag-wide-val-003",
+        "suite": "standard",
+        "answerable": true
+      },
+      {
+        "arm": "validation-A",
+        "split": "validation",
+        "id": "rag-wide-val-004",
+        "suite": "standard",
+        "answerable": true
+      },
+      {
+        "arm": "validation-A",
+        "split": "validation",
+        "id": "rag-wide-val-005",
+        "suite": "standard",
+        "answerable": true
+      },
+      {
+        "arm": "validation-A",
+        "split": "validation",
+        "id": "rag-wide-val-006",
+        "suite": "standard",
+        "answerable": true
+      },
+      {
+        "arm": "validation-A",
+        "split": "validation",
+        "id": "rag-wide-val-007",
+        "suite": "no_answer",
+        "answerable": false
+      },
+      {
+        "arm": "validation-A",
+        "split": "validation",
+        "id": "rag-wide-val-008",
+        "suite": "no_answer",
+        "answerable": false
+      },
+      {
+        "arm": "validation-A",
+        "split": "validation",
+        "id": "rag-wide-val-009",
+        "suite": "no_answer",
+        "answerable": false
+      },
+      {
+        "arm": "validation-A",
+        "split": "validation",
+        "id": "rag-wide-val-010",
+        "suite": "no_answer",
+        "answerable": false
+      },
+      {
+        "arm": "validation-A",
+        "split": "validation",
+        "id": "rag-wide-val-011",
+        "suite": "scope",
+        "answerable": false
+      },
+      {
+        "arm": "validation-A",
+        "split": "validation",
+        "id": "rag-wide-val-012",
+        "suite": "scope",
+        "answerable": false
+      },
+      {
+        "arm": "validation-B",
+        "split": "validation",
+        "id": "rag-wide-val-001",
+        "suite": "standard",
+        "answerable": true
+      },
+      {
+        "arm": "validation-B",
+        "split": "validation",
+        "id": "rag-wide-val-002",
+        "suite": "standard",
+        "answerable": true
+      },
+      {
+        "arm": "validation-B",
+        "split": "validation",
+        "id": "rag-wide-val-003",
+        "suite": "standard",
+        "answerable": true
+      },
+      {
+        "arm": "validation-B",
+        "split": "validation",
+        "id": "rag-wide-val-004",
+        "suite": "standard",
+        "answerable": true
+      },
+      {
+        "arm": "validation-B",
+        "split": "validation",
+        "id": "rag-wide-val-005",
+        "suite": "standard",
+        "answerable": true
+      },
+      {
+        "arm": "validation-B",
+        "split": "validation",
+        "id": "rag-wide-val-006",
+        "suite": "standard",
+        "answerable": true
+      },
+      {
+        "arm": "validation-B",
+        "split": "validation",
+        "id": "rag-wide-val-007",
+        "suite": "no_answer",
+        "answerable": false
+      },
+      {
+        "arm": "validation-B",
+        "split": "validation",
+        "id": "rag-wide-val-008",
+        "suite": "no_answer",
+        "answerable": false
+      },
+      {
+        "arm": "validation-B",
+        "split": "validation",
+        "id": "rag-wide-val-009",
+        "suite": "no_answer",
+        "answerable": false
+      },
+      {
+        "arm": "validation-B",
+        "split": "validation",
+        "id": "rag-wide-val-010",
+        "suite": "no_answer",
+        "answerable": false
+      },
+      {
+        "arm": "validation-B",
+        "split": "validation",
+        "id": "rag-wide-val-011",
+        "suite": "scope",
+        "answerable": false
+      },
+      {
+        "arm": "validation-B",
+        "split": "validation",
+        "id": "rag-wide-val-012",
+        "suite": "scope",
+        "answerable": false
+      }
+    ],
+    "parameters": {
+      "timeoutMs": 15000,
+      "retries": 0,
+      "cache": "reuse",
+      "consecutiveFailureLimit": 1
+    },
+    "settings": {
+      "rerank": {
+        "endpoints": {
+          "origin": "https://ws-tiy939iiusj2254o.cn-beijing.maas.aliyuncs.com",
+          "embedding": "https://ws-tiy939iiusj2254o.cn-beijing.maas.aliyuncs.com/compatible-mode/v1/embeddings",
+          "rerank": "https://ws-tiy939iiusj2254o.cn-beijing.maas.aliyuncs.com/compatible-api/v1/reranks"
+        },
+        "timeoutMs": 15000,
+        "retries": 0,
+        "embeddingModel": "text-embedding-v4",
+        "dimensions": 1024,
+        "rerankModel": "qwen3-rerank",
+        "rerankInstruction": "Given a web search query, retrieve relevant passages that answer the query."
+      },
+      "support": {
+        "provider": "deepseek",
+        "model": "deepseek-flash",
+        "api": "openai-completions",
+        "endpoint": "https://api.deepseek.com",
+        "timeoutMs": 15000,
+        "temperature": 0,
+        "maxTokens": 2048,
+        "maxRetries": 0,
+        "promptVersion": "fact-support-v1",
+        "promptHash": "3d254e0bca8e14fae05804a0f027c653f5f099e1b91e5fb519088b5aaa04f15a",
+        "serialization": "json-query-id-title-tags-body-v1",
+        "serializationHash": "1d16c5e3ef4647c120fe6ddce72417c9ec618ee41dc77faa447ec214e5749c4a",
+        "pricing": {
+          "currency": "USD",
+          "estimated": true,
+          "source": "Pi model catalog",
+          "rates": {
+            "input": 0.3,
+            "output": 1.2,
+            "cacheRead": 0.006,
+            "cacheWrite": 0
+          }
+        }
+      }
+    },
+    "deadline": "2026-10-08T21:27:00.000Z",
+    "maxRequests": 60
+  },
+  "review": {
+    "independentPolicyLabels": "20/20 reviewed before requests; 10 answerable quotes, 7 genuinely missing facts, 3 scope cases",
+    "method": "independent code review passed; no remote calls in self-check/dry-run/freeze-input"
+  },
+  "decision": {
+    "development": "Both arms fully measured and safe, >=1 additional fully correct answerable case, no loss; otherwise skip all 24 validation rows",
+    "validation": "Same gain/no-loss/safety gate; passing is candidate evidence only, no runtime/default admission",
+    "retries": 0,
+    "rerankRequestsMax": 20,
+    "allRequestAttemptsMax": 60,
+    "databaseCalls": 0,
+    "qqCalls": 0
+  },
+  "disclosure": "共享工作区，同政策新组合/复杂场景改述；已阅读旧政策与旧题并去重。不是盲测，不是意图不重叠留出；没有阅读新判别器Prompt或新实验结果。候选仅供审阅，不代表选择阈值或准入。",
+  "policyBoundary": "Only the frozen 8-row consultation policy snapshot; its assistant contact/submission limitations do not describe the current full after-sales Controller. No actual order/transaction/QQ validation.",
+  "timingBoundary": "B reuses ranking and possibly support caches; arm duration percentiles are not independent production latency comparisons. Host work is not isolated. Provider cancellation and bill coverage are not proven by local timeout."
+}

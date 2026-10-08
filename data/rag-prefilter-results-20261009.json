@@ -1,0 +1,527 @@
+{
+  "version": 1,
+  "status": "development_not_improved",
+  "decision": "Keep threshold 0.71; wider 0.60 produced no correct gain. Do not run validation or switch defaults.",
+  "startedAt": "2026-10-08T20:44:25.883Z",
+  "finishedAt": "2026-10-08T20:44:33.910Z",
+  "freezeFile": "data/rag-prefilter-freeze-20261009.json",
+  "freezeFileSha256": "022fe6d353329a811f3ab8f54e0d4f9ba5e483bae20cde96364292d60d28ef01",
+  "freezeObjectHash": "91b898bcbe775fd76199a2b39dce7033a8662714d2f0c816cf34aae1fbafaaa7",
+  "plannedArmResults": 40,
+  "measuredArmResults": 16,
+  "validationArmResultsNotExecuted": 24,
+  "independentDevelopmentQueries": 8,
+  "validationQueriesNotExecuted": 12,
+  "providerFailures": 0,
+  "missingExecutedArmResults": 0,
+  "developmentGate": {
+    "pass": false,
+    "gained": [],
+    "lost": [],
+    "aSafe": true,
+    "bSafe": true,
+    "aRecall": 0.75,
+    "bRecall": 0.75
+  },
+  "arms": [
+    {
+      "arm": "development-A",
+      "runId": "2fb01530-9b43-4b49-8e91-0aebdc5287d5",
+      "reportSha256": "668c0ae02ea75612e329e4a8874ed1592b4827229db2f0ef9b0827fa57714287",
+      "datasetHash": "29f10ba0779f83fe27aa657a95c3dbbf54a957f514b609b9569156d15a3f0231",
+      "threshold": 0.71,
+      "status": "completed",
+      "totals": {
+        "planned": 8,
+        "measured": 8,
+        "deferred": 0,
+        "incomplete": 0,
+        "answerable": 4,
+        "acceptedRecallAt5": 0.75,
+        "falseRejects": 1,
+        "falseRejectDenominator": 4,
+        "falseRejectRate": 0.25,
+        "falseAccepts": 0,
+        "noAnswer": 3,
+        "noAnswerPlanned": 3,
+        "scopeCases": 1,
+        "scopeAbstentionFailures": 0,
+        "scopeViolations": 0,
+        "boundaryFailures": 0,
+        "covered": 3
+      },
+      "usage": [
+        {
+          "operation": "embedding",
+          "requests": 0,
+          "successfulRequests": 0,
+          "cacheHits": 0,
+          "reportedRequests": 0,
+          "usageCoverage": null,
+          "knownTokens": null,
+          "completeTokens": null,
+          "knownEstimatedCostCny": null,
+          "completeEstimatedCostCny": null
+        },
+        {
+          "operation": "rerank",
+          "requests": 8,
+          "successfulRequests": 8,
+          "cacheHits": 0,
+          "reportedRequests": 8,
+          "usageCoverage": 1,
+          "knownTokens": 7667,
+          "completeTokens": 7667,
+          "knownEstimatedCostCny": 0.0038335,
+          "completeEstimatedCostCny": 0.0038335
+        },
+        {
+          "operation": "support",
+          "requests": 4,
+          "successfulRequests": 4,
+          "cacheHits": 0,
+          "reportedRequests": 4,
+          "usageCoverage": 1,
+          "knownTokens": 2868,
+          "completeTokens": 2868,
+          "knownEstimatedCostCny": null,
+          "completeEstimatedCostCny": null,
+          "knownEstimatedCostUsd": 0.001002144,
+          "completeEstimatedCostUsd": 0.001002144,
+          "costCoverage": 1
+        }
+      ],
+      "cases": [
+        {
+          "id": "rag-wide-dev-001",
+          "suite": "standard",
+          "status": "ok",
+          "acceptanceStatus": "accepted",
+          "gold": [
+            "KB-REFUND-PARTIAL"
+          ],
+          "goldScores": [
+            {
+              "id": "KB-REFUND-PARTIAL",
+              "score": 0.9585161389774546
+            }
+          ],
+          "acceptedIds": [
+            "KB-REFUND-PARTIAL"
+          ],
+          "supportCandidateIds": [
+            "KB-REFUND-PARTIAL"
+          ],
+          "falseRejected": false
+        },
+        {
+          "id": "rag-wide-dev-002",
+          "suite": "standard",
+          "status": "ok",
+          "acceptanceStatus": "accepted",
+          "gold": [
+            "KB-REFUND-EXPIRED"
+          ],
+          "goldScores": [
+            {
+              "id": "KB-REFUND-EXPIRED",
+              "score": 0.8994392438099652
+            }
+          ],
+          "acceptedIds": [
+            "KB-REFUND-EXPIRED"
+          ],
+          "supportCandidateIds": [
+            "KB-REFUND-EXPIRED",
+            "KB-REFUND-REDEEMED"
+          ],
+          "falseRejected": false
+        },
+        {
+          "id": "rag-wide-dev-003",
+          "suite": "standard",
+          "status": "ok",
+          "acceptanceStatus": "rejected",
+          "gold": [
+            "KB-PRODUCT-LUNCH"
+          ],
+          "goldScores": [
+            {
+              "id": "KB-PRODUCT-LUNCH",
+              "score": 0.8327561573620736
+            }
+          ],
+          "acceptedIds": [],
+          "supportCandidateIds": [
+            "KB-PRODUCT-LUNCH"
+          ],
+          "falseRejected": true
+        },
+        {
+          "id": "rag-wide-dev-004",
+          "suite": "standard",
+          "status": "ok",
+          "acceptanceStatus": "accepted",
+          "gold": [
+            "KB-REFUND-PAYMENT"
+          ],
+          "goldScores": [
+            {
+              "id": "KB-REFUND-PAYMENT",
+              "score": 0.7516536691040903
+            }
+          ],
+          "acceptedIds": [
+            "KB-REFUND-PAYMENT"
+          ],
+          "supportCandidateIds": [
+            "KB-REFUND-PAYMENT"
+          ],
+          "falseRejected": false
+        },
+        {
+          "id": "rag-wide-dev-005",
+          "suite": "no_answer",
+          "status": "ok",
+          "acceptanceStatus": "rejected",
+          "gold": [],
+          "goldScores": [],
+          "acceptedIds": [],
+          "supportCandidateIds": [],
+          "falseRejected": null
+        },
+        {
+          "id": "rag-wide-dev-006",
+          "suite": "no_answer",
+          "status": "ok",
+          "acceptanceStatus": "rejected",
+          "gold": [],
+          "goldScores": [],
+          "acceptedIds": [],
+          "supportCandidateIds": [],
+          "falseRejected": null
+        },
+        {
+          "id": "rag-wide-dev-007",
+          "suite": "no_answer",
+          "status": "ok",
+          "acceptanceStatus": "rejected",
+          "gold": [],
+          "goldScores": [],
+          "acceptedIds": [],
+          "supportCandidateIds": [],
+          "falseRejected": null
+        },
+        {
+          "id": "rag-wide-dev-008",
+          "suite": "scope",
+          "status": "ok",
+          "acceptanceStatus": "rejected",
+          "gold": [],
+          "goldScores": [],
+          "acceptedIds": [],
+          "supportCandidateIds": [],
+          "falseRejected": null
+        }
+      ]
+    },
+    {
+      "arm": "development-B",
+      "runId": "72ce3fd9-a04f-4c6f-861d-4e090773a295",
+      "reportSha256": "65a70229c9a0db7330632acf0fcc86dae681f51985e6be1bf5a2bb58c3f0e835",
+      "datasetHash": "29f10ba0779f83fe27aa657a95c3dbbf54a957f514b609b9569156d15a3f0231",
+      "threshold": 0.6,
+      "status": "completed",
+      "totals": {
+        "planned": 8,
+        "measured": 8,
+        "deferred": 0,
+        "incomplete": 0,
+        "answerable": 4,
+        "acceptedRecallAt5": 0.75,
+        "falseRejects": 1,
+        "falseRejectDenominator": 4,
+        "falseRejectRate": 0.25,
+        "falseAccepts": 0,
+        "noAnswer": 3,
+        "noAnswerPlanned": 3,
+        "scopeCases": 1,
+        "scopeAbstentionFailures": 0,
+        "scopeViolations": 0,
+        "boundaryFailures": 0,
+        "covered": 3
+      },
+      "usage": [
+        {
+          "operation": "embedding",
+          "requests": 0,
+          "successfulRequests": 0,
+          "cacheHits": 0,
+          "reportedRequests": 0,
+          "usageCoverage": null,
+          "knownTokens": null,
+          "completeTokens": null,
+          "knownEstimatedCostCny": null,
+          "completeEstimatedCostCny": null
+        },
+        {
+          "operation": "rerank",
+          "requests": 0,
+          "successfulRequests": 0,
+          "cacheHits": 8,
+          "reportedRequests": 0,
+          "usageCoverage": null,
+          "knownTokens": null,
+          "completeTokens": null,
+          "knownEstimatedCostCny": null,
+          "completeEstimatedCostCny": null
+        },
+        {
+          "operation": "support",
+          "requests": 1,
+          "successfulRequests": 1,
+          "cacheHits": 4,
+          "reportedRequests": 1,
+          "usageCoverage": 1,
+          "knownTokens": 788,
+          "completeTokens": 788,
+          "knownEstimatedCostCny": null,
+          "completeEstimatedCostCny": null,
+          "knownEstimatedCostUsd": 0.000258336,
+          "completeEstimatedCostUsd": 0.000258336,
+          "costCoverage": 1
+        }
+      ],
+      "cases": [
+        {
+          "id": "rag-wide-dev-001",
+          "suite": "standard",
+          "status": "ok",
+          "acceptanceStatus": "accepted",
+          "gold": [
+            "KB-REFUND-PARTIAL"
+          ],
+          "goldScores": [
+            {
+              "id": "KB-REFUND-PARTIAL",
+              "score": 0.9585161389774546
+            }
+          ],
+          "acceptedIds": [
+            "KB-REFUND-PARTIAL"
+          ],
+          "supportCandidateIds": [
+            "KB-REFUND-PARTIAL"
+          ],
+          "falseRejected": false
+        },
+        {
+          "id": "rag-wide-dev-002",
+          "suite": "standard",
+          "status": "ok",
+          "acceptanceStatus": "accepted",
+          "gold": [
+            "KB-REFUND-EXPIRED"
+          ],
+          "goldScores": [
+            {
+              "id": "KB-REFUND-EXPIRED",
+              "score": 0.8994392438099652
+            }
+          ],
+          "acceptedIds": [
+            "KB-REFUND-EXPIRED"
+          ],
+          "supportCandidateIds": [
+            "KB-REFUND-EXPIRED",
+            "KB-REFUND-REDEEMED"
+          ],
+          "falseRejected": false
+        },
+        {
+          "id": "rag-wide-dev-003",
+          "suite": "standard",
+          "status": "ok",
+          "acceptanceStatus": "rejected",
+          "gold": [
+            "KB-PRODUCT-LUNCH"
+          ],
+          "goldScores": [
+            {
+              "id": "KB-PRODUCT-LUNCH",
+              "score": 0.8327561573620736
+            }
+          ],
+          "acceptedIds": [],
+          "supportCandidateIds": [
+            "KB-PRODUCT-LUNCH"
+          ],
+          "falseRejected": true
+        },
+        {
+          "id": "rag-wide-dev-004",
+          "suite": "standard",
+          "status": "ok",
+          "acceptanceStatus": "accepted",
+          "gold": [
+            "KB-REFUND-PAYMENT"
+          ],
+          "goldScores": [
+            {
+              "id": "KB-REFUND-PAYMENT",
+              "score": 0.7516536691040903
+            }
+          ],
+          "acceptedIds": [
+            "KB-REFUND-PAYMENT"
+          ],
+          "supportCandidateIds": [
+            "KB-REFUND-PAYMENT"
+          ],
+          "falseRejected": false
+        },
+        {
+          "id": "rag-wide-dev-005",
+          "suite": "no_answer",
+          "status": "ok",
+          "acceptanceStatus": "rejected",
+          "gold": [],
+          "goldScores": [],
+          "acceptedIds": [],
+          "supportCandidateIds": [
+            "KB-REFUND-PARTIAL",
+            "KB-REFUND-UNUSED"
+          ],
+          "falseRejected": null
+        },
+        {
+          "id": "rag-wide-dev-006",
+          "suite": "no_answer",
+          "status": "ok",
+          "acceptanceStatus": "rejected",
+          "gold": [],
+          "goldScores": [],
+          "acceptedIds": [],
+          "supportCandidateIds": [],
+          "falseRejected": null
+        },
+        {
+          "id": "rag-wide-dev-007",
+          "suite": "no_answer",
+          "status": "ok",
+          "acceptanceStatus": "rejected",
+          "gold": [],
+          "goldScores": [],
+          "acceptedIds": [],
+          "supportCandidateIds": [],
+          "falseRejected": null
+        },
+        {
+          "id": "rag-wide-dev-008",
+          "suite": "scope",
+          "status": "ok",
+          "acceptanceStatus": "rejected",
+          "gold": [],
+          "goldScores": [],
+          "acceptedIds": [],
+          "supportCandidateIds": [],
+          "falseRejected": null
+        }
+      ]
+    }
+  ],
+  "actualCostLedger": {
+    "requestAttempts": 13,
+    "rerankRequests": 8,
+    "rerankTokens": 7667,
+    "estimatedRerankCny": 0.0038335,
+    "supportRequests": 5,
+    "supportTokens": 3656,
+    "estimatedSupportUsd": 0.00126048,
+    "usageCoverage": 1,
+    "costCoverage": 1,
+    "rankingCacheHits": 8,
+    "supportCacheHits": 4,
+    "additionalSupportRequestsByWideThreshold": 1,
+    "additionalSupportEstimatedUsd": 0.000258336,
+    "pricing": "frozen snapshot estimates; CNY and USD separate, not invoice or provider billing proof"
+  },
+  "actualRequestTiming": {
+    "rerank": {
+      "n": 8,
+      "p50Ms": 226,
+      "p95Ms": 522,
+      "maxMs": 522,
+      "method": "nearest-rank; actual requests only, host not isolated; small n, not production SLA"
+    },
+    "support": {
+      "n": 5,
+      "p50Ms": 1059.8042500000001,
+      "p95Ms": 1584.1462089999998,
+      "maxMs": 1584.1462089999998,
+      "method": "nearest-rank; actual requests only, host not isolated; small n, not production SLA"
+    }
+  },
+  "failure": {
+    "id": "rag-wide-dev-003",
+    "gold": "KB-PRODUCT-LUNCH",
+    "goldRerankScore": 0.8327561573620736,
+    "stage": "fact-support-v1 false rejection, after both score thresholds passed",
+    "recordedReason": "原文仅说明标价79.80元及截止时间以订单expiresAt为准，未给出实付金额或费用说明栏位填写规则，也未提供具体订单的expiresAt值。",
+    "analysis": "The question asks whether 79.80 is list or paid price and where to read the expiry field; the policy states list price, cannot infer actual paid amount, and order expiresAt. It does not request actual paid amount or an actual expiry timestamp. Original gold and first result retained."
+  },
+  "limitations": [
+    "Same frozen 8 consultation policy rows; not current full after-sales capability, not blind or intent-disjoint.",
+    "Two arms share all ranking and four support decisions; 16 measured decisions are not 16 independent questions/model repetitions.",
+    "No gain means fresh validation 24 arm-results deliberately not executed, not counted as passed.",
+    "No final customer answer, real QQ, DB transaction, or commercial validation; no runtime default changed.",
+    "No additional threshold, Prompt adjustment, repeat, or old a1-sup-009 run. Provider model weights and cancellation/bill settlement are not proven."
+  ],
+  "planSource": "data/rag-prefilter-freeze-20261009.json identity.plan; all 40 original arm/question IDs retained there",
+  "planStatusByArm": [
+    {
+      "arm": "development-A",
+      "planned": 8,
+      "statusCounts": {
+        "measured": 8,
+        "not_executed": 0,
+        "missing": 0,
+        "failed": 0
+      },
+      "notExecutedReason": null
+    },
+    {
+      "arm": "development-B",
+      "planned": 8,
+      "statusCounts": {
+        "measured": 8,
+        "not_executed": 0,
+        "missing": 0,
+        "failed": 0
+      },
+      "notExecutedReason": null
+    },
+    {
+      "arm": "validation-A",
+      "planned": 12,
+      "statusCounts": {
+        "measured": 0,
+        "not_executed": 12,
+        "missing": 0,
+        "failed": 0
+      },
+      "notExecutedReason": "development_gain_gate_failed"
+    },
+    {
+      "arm": "validation-B",
+      "planned": 12,
+      "statusCounts": {
+        "measured": 0,
+        "not_executed": 12,
+        "missing": 0,
+        "failed": 0
+      },
+      "notExecutedReason": "development_gain_gate_failed"
+    }
+  ]
+}
