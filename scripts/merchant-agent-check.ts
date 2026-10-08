@@ -19,7 +19,7 @@ const orderId = fixture.orders[0]!;
 const sourceKey = merchantSourceKey(identity, "merchant-agent-check");
 const otherSource = merchantSourceKey(identity, "another-group");
 const sessions: Awaited<ReturnType<typeof createCouponSession>>[] = [];
-const expectedTools = ["get_merchant_request", "get_order", "prepare_merchant_request", "search_faq"];
+const expectedTools = ["get_merchant_request", "get_order", "list_orders", "prepare_merchant_request", "search_faq"];
 
 async function create(senderId = identity.senderId, key = sourceKey) {
   const session = await createCouponSession({ ...identity, senderId }, store, runtime, faux.getModel(), { store: merchant, sourceKey: key });

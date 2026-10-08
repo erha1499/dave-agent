@@ -19,6 +19,7 @@ import {
 import type { CouponStore, QQIdentity } from "./coupon-store.ts";
 import type { AfterSalesStore } from "./after-sales.ts";
 import type { RefundStore } from "./refunds.ts";
+import { registerOrderDiscovery } from "./order-discovery.ts";
 import { normalizeBailianGenerationBaseUrl, resolveModelSelection, type ModelSelection } from "./model-selection.ts";
 
 const projectDir = fileURLToPath(new URL("../", import.meta.url));
@@ -86,8 +87,14 @@ export async function createCouponSession(
 
   const tools: ToolDefinition[] = [
     defineTool({
+      name: "list_orders", label: "查看本人最近订单",
+      description: "查询当前可信身份最近三笔订单（按下单时间倒序），返回套餐、门店、支付与券状态摘要及hasMore。不接受身份或客户参数；没有明确订单时可用它让用户选单。列表只供定位，不是退款资格、金额或批准；选定后必须重新get_order和适用search_faq。",
+      parameters: Type.Object({}, { additionalProperties: false }),
+      execute: async () => ({ content: [{ type: "text", text: JSON.stringify(await store.listOrders(identity)) }], details: {} }),
+    }),
+    defineTool({
       name: "search_faq",
-      label: "查询模拟团购券规则",
+      label: "查询团购券规则",
       description: "检索公开团购券规则并返回证据ID及适用门店/套餐。参数仅为query、shopId、productId；不接受orderId。有明确订单的套餐政策问题先get_order确定范围，再使用该结果中的shopId/productId查询；具体退款资格问题每轮重新取证。不传范围只查询通用规则，其空结果不能证明具体套餐无文档。",
       parameters: Type.Object({
         query: Type.String({ minLength: 1, maxLength: 500 }),
@@ -98,8 +105,8 @@ export async function createCouponSession(
     }),
     defineTool({
       name: "get_order",
-      label: "查询本人模拟券单",
-      description: "按COUPON-1001格式订单号查询当前QQ身份的模拟团购券订单、门店/套餐范围、核销、付款和历史退款事实。查询具体订单的套餐政策前先用本工具确定FAQ范围。每次用户询问退款资格或金额都重新调用本工具，历史结果只帮助定位订单，不能代替最新用户消息之后的调用；随后查询适用FAQ。指代不清先询问，不猜单。身份由宿主绑定并在每次执行时校验；不能查询他人或修改数据。金额单位为分。",
+      label: "查询本人订单",
+      description: "按COUPON-1001格式订单号查询当前QQ身份的模拟团购券订单、门店/套餐范围、核销、付款和历史退款事实。查询具体订单的套餐政策前先用本工具确定FAQ范围。每次回答具体订单或券的当前状态、核销、付款、已退金额或有效期，都在最新用户消息之后重新调用本工具；“这张”“这笔”等省略表达也一样。历史结果、最近列表和旧卡只帮助定位，不能代替本轮读取或被称为本轮查询证据。判断退款资格或金额还须随后查询适用FAQ。无get_refund时只能说明本轮读取的付款/退款历史，不能推断方案状态或真实到账。指代不清先询问，不猜单。身份由宿主绑定并在每次执行时校验；不能查询他人或修改数据。金额单位为分。",
       parameters: Type.Object({ orderId: Type.String({ pattern: "^COUPON-\\d{4}$" }) }, { additionalProperties: false }),
       execute: async (_id, { orderId }) => ({ content: [{ type: "text", text: JSON.stringify(await store.getOrder(identity, orderId)) }], details: {} }),
     }),
@@ -146,7 +153,9 @@ export async function createCouponSession(
       }),
     );
   }
-  return createSession(modelRuntime, { ...model, maxTokens: Math.min(model.maxTokens, 2048) }, systemPrompt, tools, skills);
+  const session = await createSession(modelRuntime, { ...model, maxTokens: Math.min(model.maxTokens, 2048) }, systemPrompt, tools, skills);
+  registerOrderDiscovery(session, store, identity);
+  return session;
 }
 
 export function createQQSession(modelRuntime: ModelRuntime, model: Model<Api>) {

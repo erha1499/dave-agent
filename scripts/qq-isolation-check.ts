@@ -19,7 +19,7 @@ type Fixture = Awaited<ReturnType<typeof createMerchantFixture>>;
 type Session = Awaited<ReturnType<typeof createCouponSession>>;
 type Call = { name: string; args: Record<string, string>; denied?: boolean };
 const fixtures: Fixture[] = [], modelErrors: unknown[] = [];
-const group = `isolation-${randomUUID()}`, allTools = ["get_merchant_request", "get_order", "get_refund", "prepare_merchant_request", "prepare_refund", "search_faq"];
+const group = `isolation-${randomUUID()}`, allTools = ["get_merchant_request", "get_order", "get_refund", "list_orders", "prepare_merchant_request", "prepare_refund", "search_faq"];
 const orderPool = createPool(readDatabaseConfig()), store = new CouponStore(orderPool);
 const merchant = new AfterSalesStore(createPool(readAfterSalesDatabaseConfig()));
 const refunds = new RefundStore(createPool(readRefundDatabaseConfig()));

@@ -34,6 +34,7 @@
           </div>
           <section class="chat-scroll" id="chat-messages" aria-label="聊天记录" role="log" aria-live="polite" aria-relevant="additions">
             <div id="chat-empty" class="empty-state">
+              <div class="message-avatar empty-avatar" aria-hidden="true">d.</div>
               <h2>有什么可以帮你？</h2>
               <p>咨询团购券使用、本人订单和到账规则。</p>
               <ul id="starter-list" class="starter-list"></ul>
@@ -41,7 +42,7 @@
           </section>
           <form id="chat-form" class="composer">
             <label class="field-label" for="chat-input">你的问题</label>
-            <textarea id="chat-input" maxlength="2000" rows="3" disabled placeholder="例如：团购券到期未使用，可以申请退款吗？"></textarea>
+            <textarea id="chat-input" maxlength="2000" rows="2" disabled placeholder="例如：我有哪些订单，或者我要退款"></textarea>
             <div class="composer-footer">
               <small class="key-note">Enter 发送 · Shift+Enter 换行</small>
               <span id="char-count" class="char-count">0/2000</span>

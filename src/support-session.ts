@@ -12,6 +12,7 @@ import type { RefundStore } from "./refunds.ts";
 import type { SupportQuestionResolver, SupportQuestionObservation } from "./support-question-resolution.ts";
 import type { SupportContextPort, SupportContextSnapshot, SupportContextValue } from "./conversation-state.ts";
 import type { Reply } from "./reply.ts";
+import { registerOrderDiscovery } from "./order-discovery.ts";
 import { normalizeModelSupportAction, getModelSupportActionParameters, type TaskReferenceMode } from "./support-context-action.ts";
 import { SupportController, SupportPolicyScopeRepairError, type SupportCall, type SupportResult, type TrustedPolicyTopic,
   type SupportPolicyScopeRepair } from "./support-controller.ts";
@@ -780,5 +781,6 @@ export async function createSupportSession(
     } catch { receipt.historyFailed = true; }
     await publishContext(abort, current.requestId, selectedAt);
   };
+  registerOrderDiscovery(session, store, identity);
   return session;
 }

@@ -3,11 +3,12 @@
 const ids=['profile-select','new-chat','app-status','chat-messages','chat-empty','chat-form','chat-input','send-button','char-count','starter-list','order-hints','init-retry','eval-link','chat-settings','settings-form','model-select','thinking-select','tokens-select','apply-settings','settings-status','active-settings'];
 const els={};
 ids.forEach(id=>{els[id.replace(/-([a-z])/g,(_,c)=>c.toUpperCase())]=document.getElementById(id);});
-const state={config:null,session:null,messages:[],profileId:null,busy:true,initialized:false,expired:false,generation:0,failedAttempt:null,composing:false,settingsError:'',settingsApplying:false};
+const state={config:null,session:null,messages:[],profileId:null,busy:true,initialized:false,expired:false,generation:0,failedAttempt:null,composing:false,settingsError:'',settingsApplying:false,pendingTurn:null};
 function element(tag,text,className){const n=document.createElement(tag);if(text!=null)n.textContent=text;if(className)n.className=className;return n;}
 function setStatus(text,isError=false){els.appStatus.textContent=text;els.appStatus.classList.toggle('error',isError);}
 function setBusy(value){
   state.busy=Boolean(value);
+  els.chatMessages.setAttribute('aria-busy',state.busy?'true':'false');
   const locked=state.busy||!state.initialized;
   els.evalLink.setAttribute("aria-disabled",locked?"true":"false");
   els.chatInput.disabled=locked;
@@ -16,6 +17,7 @@ function setBusy(value){
   els.newChat.disabled=state.busy||(!state.initialized&&!state.expired);
   const draft=els.chatInput.value;
   els.sendButton.disabled=locked||state.expired||!draft.trim()||draft.length>2000;
+  for(const button of els.chatMessages.querySelectorAll('.order-select-button'))button.disabled=locked||state.expired;
   if(state.config)updateSettingsControls();
 }
 function updateCount(){const len=els.chatInput.value.length;els.charCount.textContent=`${len}/2000`;els.charCount.classList.toggle('over',len>2000);setBusy(state.busy);}
@@ -32,15 +34,71 @@ async function api(path,body){
   return data;
 }
 
+const STEP_LABELS=['受理咨询','查询订单详情','查询最近订单','查阅服务规则','整理答复'];
+function validateStep(s){
+  return s&&typeof s.id==='string'&&s.id.length>0&&s.id.length<=128&&STEP_LABELS.includes(s.label)&&['running','done','error'].includes(s.status);
+}
+function validateSteps(steps){return Array.isArray(steps)&&steps.length<=64&&steps.every(validateStep);}
+async function streamMessage(body,onEvent){
+  let response;
+  try{response=await fetch('/api/chat/messages/stream',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json','X-Chat-Request':'1'},body:JSON.stringify(body)});}
+  catch{throw new Error('网络异常，请保留原文重试');}
+  if(!response.ok){const error=new Error(HTTP_ERRORS[response.status]||'请求失败，请稍后重试');error.status=response.status;throw error;}
+  if(!response.body||!response.headers.get('Content-Type')?.startsWith('text/event-stream'))throw new Error('服务响应异常，请保留原文重试');
+  const reader=response.body.getReader(),decoder=new TextDecoder();
+  let buffer='',started=false;
+  function receive(block){
+    let event='message';const data=[];
+    for(const line of block.split(/\r\n|\r|\n/)){
+      if(line.startsWith('event:'))event=line.slice(6).trim();
+      else if(line.startsWith('data:'))data.push(line.slice(5).replace(/^ /,''));
+    }
+    if(!data.length)return;
+    let payload;
+    try{payload=JSON.parse(data.join('\n'));}catch{throw new Error('服务响应异常，请保留原文重试');}
+    if(!payload||payload.sessionId!==body.sessionId||payload.requestId!==body.requestId)throw new Error('响应会话不匹配，请重新连接');
+    if(event==='start'){
+      if(started||typeof payload.replayed!=='boolean')throw new Error('服务响应异常');
+      started=true;
+    }else{
+      if(!started)throw new Error('服务响应异常');
+      if(event==='step'&&!validateStep(payload))throw new Error('处理步骤格式异常');
+      if(event==='delta'&&(typeof payload.messageId!=='string'||!payload.messageId||typeof payload.text!=='string'))throw new Error('答复片段格式异常');
+      if(event==='result'){
+        if(!validateReply(payload.reply)||(payload.steps!==undefined&&!validateSteps(payload.steps))||!['host','agent'].includes(payload.origin)||!Number.isFinite(payload.durationMs)||payload.durationMs<0)throw new Error('响应校验失败');
+        return payload;
+      }
+      if(event==='error'){
+        if(!Number.isInteger(payload.status)||payload.status<400||payload.status>599||typeof payload.error!=='string')throw new Error('服务响应异常');
+        const error=new Error(HTTP_ERRORS[payload.status]||'本轮未完成，请重试');error.status=payload.status;throw error;
+      }
+      if(!['step','delta'].includes(event))throw new Error('服务响应异常');
+    }
+    onEvent(event,payload);
+  }
+  try{
+    while(true){
+      const chunk=await reader.read();
+      buffer+=chunk.done?decoder.decode():decoder.decode(chunk.value,{stream:true});
+      let boundary;
+      while((boundary=/\r\n\r\n|\n\n|\r\r/.exec(buffer))){
+        const block=buffer.slice(0,boundary.index);buffer=buffer.slice(boundary.index+boundary[0].length);
+        const result=receive(block);if(result)return result;
+      }
+      if(chunk.done)throw new Error('连接已中断，本轮未完成；请保留原文重试');
+    }
+  }finally{await reader.cancel().catch(()=>{});}
+}
 
 function validateReply(r){
   if(!r||typeof r!=='object')return false;
   if(!['answer','notice','order'].includes(r.kind))return false;
   if(typeof r.text!=='string')return false;
   if(r.evidenceIds!==undefined&&(!Array.isArray(r.evidenceIds)||!r.evidenceIds.every(x=>typeof x==='string')))return false;
+  if(r.hasMore!==undefined&&typeof r.hasMore!=='boolean')return false;
   if(r.kind==='order'){
     if(!Array.isArray(r.orders))return false;
-    if(!r.orders.every(o=>o&&typeof o.id==='string'&&typeof o.status==='string'&&Array.isArray(o.couponStatuses)&&o.couponStatuses.every(x=>typeof x==='string')))return false;
+    if(!r.orders.every(o=>o&&typeof o.id==='string'&&typeof o.status==='string'&&Array.isArray(o.couponStatuses)&&o.couponStatuses.every(x=>typeof x==='string')&&['productName','shopName','selectionText'].every(k=>o[k]===undefined||typeof o[k]==='string')&&(o.createdAt===undefined||o.createdAt===null||typeof o.createdAt==='string')))return false;
   }
   return true;
 }
@@ -92,7 +150,7 @@ function validateSession(d, config = state.config) {
   if (!pids.includes(s.profileId)) return false;
   if (!validateSettings(s.settings, config)) return false;
   if (!s.model || typeof s.model.provider !== "string" || !s.model.provider || typeof s.model.id !== "string" || !s.model.id) return false;
-  return d.messages.every(m => m && typeof m.id === "string" && (m.role === "user" || m.role === "assistant") && typeof m.text === "string" && (!("reply" in m) || validateReply(m.reply)));
+  return d.messages.every(m => m && typeof m.id === "string" && (m.role === "user" || m.role === "assistant") && typeof m.text === "string" && (!("reply" in m) || validateReply(m.reply)) && (m.steps===undefined||validateSteps(m.steps)));
 }
 
 function money(cents){
@@ -103,46 +161,77 @@ function money(cents){
 }
 
 
+function renderSteps(steps,container,pending=false){
+  if(!steps||!steps.length)return;
+  const details=element('details',null,'processing-steps');details.open=pending;
+  details.append(element('summary',pending?'处理步骤':'处理步骤 · '+steps.length));
+  const list=element('ul');
+  const statuses={running:'处理中',done:'已完成',error:'未完成'};
+  for(const step of steps){
+    const item=element('li',null,'processing-step '+step.status);
+    item.append(element('span',step.label,'step-label'),element('span',statuses[step.status],'step-status'));
+    list.append(item);
+  }
+  details.append(list);container.append(details);
+}
+function renderMessage(m){
+  const row=element('div',null,'message '+m.role);
+  const reply=m.role==='assistant'?m.reply:undefined;
+  if(reply?.kind==='notice')row.classList.add('notice');
+  const avatar=element('div',m.role==='user'?'你':'d.','message-avatar');avatar.setAttribute('aria-hidden','true');
+  const body=element('div',null,'message-body');
+  body.append(element('div',m.role==='user'?'你':'Dave客服','message-label'));
+  if(m.pending)body.append(element('div',m.error?'本轮未完成 · 可保留原文重试':'正在处理 · 答复尚未完成','turn-status'+(m.error?' error':'')));
+  if(m.role==='assistant')renderSteps(m.steps,body,Boolean(m.pending));
+  if(m.text||!m.pending)body.append(element('p',reply?reply.text:m.text,'message-text'));
+  if(reply?.kind==='order')renderOrderCards(reply,body);
+  if(reply?.evidenceIds?.length){
+    const details=element('details',null,'evidence');details.append(element('summary','依据'));
+    const list=element('ul');for(const id of reply.evidenceIds)list.append(element('li',id));details.append(list);body.append(details);
+  }
+  row.append(avatar,body);els.chatMessages.append(row);
+}
 function renderMessages(){
-  const list=state.messages;
   els.chatMessages.replaceChildren();
-  if(!list.length){els.chatMessages.append(els.chatEmpty);return;}
-  for(const m of list){
-    const div=element('div',null,`message ${m.role}`);
-    if(m.role==='assistant'&&m.reply&&m.reply.kind==='notice')div.classList.add('notice');
-    div.append(element('div',m.role==='user'?'你':'Dave客服','message-label'));
-    const isReply=m.role==='assistant'&&m.reply;
-    div.append(element('p',isReply?m.reply.text:m.text,'message-text'));
-    if(isReply&&m.reply.kind==='order')renderOrderCards(m.reply,div);
-    const ids=m.reply&&m.reply.evidenceIds;
-    if(m.role==='assistant'&&Array.isArray(ids)&&ids.length){
-      const d=element('details',null,'evidence');
-      d.append(element('summary','依据'));
-      const ul=document.createElement('ul');
-      ids.forEach(id=>ul.append(element('li',id)));
-      d.append(ul);
-      div.append(d);
-    }
-    els.chatMessages.append(div);
+  const pending=state.pendingTurn;
+  const current=pending&&state.session&&pending.sessionId===state.session.id&&pending.generation===state.generation;
+  if(!state.messages.length&&!current){els.chatMessages.append(els.chatEmpty);return;}
+  for(const message of state.messages)renderMessage(message);
+  if(current){
+    renderMessage({role:'user',text:pending.text});
+    renderMessage({role:'assistant',text:pending.draft,steps:pending.steps,pending:true,error:pending.error});
   }
   els.chatMessages.scrollTop=els.chatMessages.scrollHeight;
 }
-
-function renderOrderCards(reply, container) {
-  if (!reply || reply.kind !== 'order' || !Array.isArray(reply.orders) || !container) return;
-  const S = { paid: '已支付', refunded: '已退款', redeemed: '已核销', partially_redeemed: '部分核销', pending_payment: '待付款', closed: '已关闭' };
-  const C = { unused: '未核销', redeemed: '已核销', expired: '已过期', refunded: '已退款' };
-  for (const o of reply.orders) {
-    if (!o || typeof o !== 'object') continue;
-    const card = element('div', '', 'order-card');
-    card.appendChild(element('div', '订单号：' + (o.id == null || o.id === '' ? '未知' : String(o.id)), 'order-id'));
-    card.appendChild(element('div', '状态：' + (Object.hasOwn(S, o.status) ? S[o.status] : '未知状态'), 'order-status'));
-    card.appendChild(element('div', '实付：' + money(o.paidCents), 'order-paid'));
-    card.appendChild(element('div', '已退：' + money(o.refundedCents), 'order-refunded'));
-    const cs = Array.isArray(o.couponStatuses) ? o.couponStatuses : [];
-    card.appendChild(element('div', '券状态：' + (cs.length ? cs.map(c => Object.hasOwn(C, c) ? C[c] : '未知').join('、') : '无'), 'order-coupons'));
-    container.appendChild(card);
+function renderOrderCards(reply,container){
+  const statuses={paid:'已支付',refunded:'已退款',redeemed:'已核销',partially_redeemed:'部分核销',pending_payment:'待付款',closed:'已关闭'};
+  const coupons={unused:'未核销',redeemed:'已核销',expired:'已过期',refunded:'已退款'};
+  const cards=element('div',null,'order-cards');
+  for(const order of reply.orders){
+    const card=element('div',null,'order-card');
+    const heading=element('div',null,'order-card-heading');
+    heading.append(element('div',order.productName||'团购券订单','order-product'),element('span',Object.hasOwn(statuses,order.status)?statuses[order.status]:'未知状态','order-status'));
+    card.append(heading);
+    if(order.shopName)card.append(element('div',order.shopName,'order-shop'));
+    card.append(element('div','订单号：'+(order.id||'未知'),'order-id'));
+    if(order.createdAt){
+      const date=new Date(order.createdAt);
+      card.append(element('div','下单时间：'+(Number.isNaN(date.getTime())?'未知':date.toLocaleString('zh-CN',{hour12:false})),'order-date'));
+    }
+    const amount=element('div',null,'order-amounts');
+    amount.append(element('span','实付 '+money(order.paidCents),'order-paid'),element('span','已退 '+money(order.refundedCents),'order-refunded'));card.append(amount);
+    card.append(element('div','券状态：'+(order.couponStatuses.length?order.couponStatuses.map(status=>Object.hasOwn(coupons,status)?coupons[status]:'未知').join('、'):'无'),'order-coupons'));
+    if(order.selectionText==='选择订单 '+order.id&&/^选择订单 COUPON-[A-Za-z0-9_-]+$/.test(order.selectionText)){
+      const select=element('button','选择这笔订单','order-select-button');select.type='button';select.disabled=state.busy||!state.initialized||state.expired;
+      select.addEventListener('click',()=>{
+        if(state.busy||!state.initialized||state.expired)return;
+        els.chatInput.value=order.selectionText;updateCount();submitMessage();
+      });card.append(select);
+    }
+    cards.append(card);
   }
+  container.append(cards);
+  if(reply.hasMore)container.append(element('p','当前展示最近3笔，可按订单号继续查询','order-more'));
 }
 
 function renderProfileHints() {
@@ -294,6 +383,7 @@ async function initialize(preferredProfileId) {
     if (!data || !data.session || !validateSession(data, config) || !config.profiles.some((p) => p.id === data.session.profileId)) throw new Error('session');
     if (state.profileId && state.profileId !== data.session.profileId) els.chatInput.value = '';
     state.config = config; state.session = data.session; state.messages = data.messages; state.profileId = data.session.profileId;
+    state.pendingTurn = null;
     state.initialized = true; state.expired = false; state.failedAttempt = null;
     state.settingsError = ''; state.settingsApplying = false;
     renderProfileHints(); renderMessages(); renderChatSettings(true); updateCount(); setStatus('可咨询');
@@ -315,24 +405,42 @@ async function submitMessage(event) {
   const sid = state.session.id, gen = state.generation;
   const f = state.failedAttempt;
   const requestId = (f && f.sessionId === sid && f.text === text) ? f.requestId : crypto.randomUUID();
+  const pending={sessionId:sid,generation:gen,requestId,text,draft:'',messageId:null,steps:[],error:false};
+  state.pendingTurn=pending;
+  const current=()=>gen===state.generation&&state.session?.id===sid&&state.pendingTurn===pending;
   setBusy(true);
-  setStatus('正在查询');
+  setStatus('正在处理');renderMessages();
   try {
-    const res = await api('/api/chat/messages', { requestId, sessionId: sid, text });
-    if (gen !== state.generation || !state.session || state.session.id !== sid) return;
-    if (!res || res.sessionId !== sid || res.requestId !== requestId || !validateReply(res.reply)) throw new Error('响应校验失败');
+    const res = await streamMessage({requestId,sessionId:sid,text},(event,data)=>{
+      if(!current())return;
+      if(event==='step'){
+        const index=pending.steps.findIndex(step=>step.id===data.id);
+        const step={id:data.id,label:data.label,status:data.status};
+        if(index<0){if(pending.steps.length>=64)throw new Error('处理步骤超出上限');pending.steps.push(step);}
+        else pending.steps[index]=step;
+      }else if(event==='delta'){
+        if(pending.messageId!==data.messageId){pending.messageId=data.messageId;pending.draft='';}
+        pending.draft+=data.text;
+      }
+      renderMessages();
+    });
+    if (!current()) return;
     state.messages.push({ id: requestId + ':user', role: 'user', text });
-    state.messages.push({ id: requestId + ':assistant', role: 'assistant', text: res.reply.text, reply: res.reply });
+    state.messages.push({ id: requestId + ':assistant', role: 'assistant', text: res.reply.text, reply: res.reply,steps:res.steps??pending.steps });
+    state.pendingTurn=null;
     input.value = '';
     state.failedAttempt = null;
     renderMessages();
     updateCount();
     setStatus(res.reply.kind === "notice" ? "请核对信息" : "已回复");
   } catch (error) {
-    if (gen !== state.generation) return;
+    if (!current()) return;
+    pending.error=true;
+    for(const step of pending.steps)if(step.status==='running')step.status='error';
     state.failedAttempt = { sessionId: sid, requestId, text };
     input.value = text;
     setStatus(error.message, true);
+    renderMessages();
     if (error.status === 401 || error.status === 503) { state.expired = true; els.initRetry.hidden = false; els.initRetry.textContent = '重新开始'; }
   } finally {
     if (gen === state.generation) { setBusy(false); input.focus(); }
@@ -376,6 +484,7 @@ async function resetConversation(profileId, preserveDraft = false, newSettings =
       throw new Error('新会话响应格式错误');
     if (reqSettings && !settingsEqual(s.settings, reqSettings)) throw new Error('新会话设置与预期不一致');
     state.session = s; state.profileId = profileId; state.messages = []; state.failedAttempt = null; state.expired = false;
+    state.pendingTurn=null;
     if (!(preserveDraft && oldProfileId === profileId)) els.chatInput.value = '';
     state.settingsError = '';
     renderProfileHints(); renderMessages(); renderChatSettings(applying); updateCount();

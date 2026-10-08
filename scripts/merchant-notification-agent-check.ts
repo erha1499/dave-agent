@@ -21,7 +21,7 @@ const task: MerchantTask = {
   reason: "行程变化", amountCents: 7980, approvedAmountCents: 7980, simulation: true,
   createdAt: "2026-01-01T00:00:00.000Z", dueAt: "2026-01-01T00:00:01.000Z", completedAt: "2026-01-01T00:00:01.000Z",
 };
-const allTools = ["get_merchant_request", "get_order", "get_refund", "prepare_merchant_request", "prepare_refund", "search_faq"];
+const allTools = ["get_merchant_request", "get_order", "get_refund", "list_orders", "prepare_merchant_request", "prepare_refund", "search_faq"];
 const [prompt, skill] = await Promise.all([
   readFile(new URL("../prompts/customer-service.md", import.meta.url), "utf8"),
   readFile(new URL("../skills/shop-support/SKILL.md", import.meta.url), "utf8"),

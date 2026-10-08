@@ -45,7 +45,7 @@ async function child(mode: Mode, input: Input): Promise<Output> {
   const replies: RenderedReply[] = [], tools: Output["tools"] = [];
   const agent = new QQAgent(async () => {
     session = await createCouponSession(input.identity, business, runtime, faux.getModel(), { store: merchant, sourceKey, refunds });
-    assert.deepEqual(session.getActiveToolNames().sort(), ["get_merchant_request", "get_order", "get_refund", "prepare_merchant_request", "prepare_refund", "search_faq"]);
+    assert.deepEqual(session.getActiveToolNames().sort(), ["get_merchant_request", "get_order", "get_refund", "list_orders", "prepare_merchant_request", "prepare_refund", "search_faq"]);
     return session;
   }, async (target, _text, reply, requester) => {
     assert.equal(target.targetId, input.group); assert.equal(requester, input.identity.senderId); replies.push(structuredClone(reply));

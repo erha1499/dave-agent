@@ -7,8 +7,10 @@ type Replies = {
   notice: TextReply<"notice">;
   order: {
     kind: "order"; text: string;
-    orders: Array<{ id: string; status: string; paidCents: number; refundedCents: number; couponStatuses: string[] }>;
+    orders: Array<{ id: string; status: string; paidCents: number; refundedCents: number; couponStatuses: string[];
+      productName?: string; shopName?: string; createdAt?: string | null; selectionText?: string }>;
     evidenceIds: string[];
+    hasMore?: boolean;
   };
   merchant_confirmation: { kind: "merchant_confirmation"; orderId: string; amountCents: number; confirmationText: string };
   merchant_status: { kind: "merchant_status"; task: MerchantTask };
@@ -87,12 +89,15 @@ const strategies: { [K in keyof Replies]: (reply: Replies[K]) => Content } = {
       const coupons = order.couponStatuses.slice(0, 3).map(value => couponStatuses.get(value) ?? "未知状态").join("、") || "暂无记录";
       const moreCoupons = order.couponStatuses.length > 3 ? "（仅展示前三张）" : "";
       const paid = money(order.paidCents), refunded = money(order.refundedCents);
+      const summary = [order.productName ? `套餐：${field(order.productName)}` : "", order.shopName ? `门店：${field(order.shopName)}` : ""].filter(Boolean).join("\n");
+      const selection = order.selectionText === `选择订单 ${id}` ? `\n${order.selectionText}` : "";
       return {
-        text: `订单：${id}\n状态：${status}\n实付：${paid} 元\n已退：${refunded} 元\n券状态：${coupons}${moreCoupons}`,
-        markdown: `**订单：${escape(id)}**\n\n- 状态：${escape(status)}\n- 实付：${paid} 元\n- 已退：${refunded} 元\n- 券状态：${escape(coupons)}${moreCoupons}`,
+        text: `订单：${id}${summary ? `\n${summary}` : ""}\n状态：${status}\n实付：${paid} 元\n已退：${refunded} 元\n券状态：${coupons}${moreCoupons}${selection}`,
+        markdown: `**订单：${escape(id)}**\n\n${summary ? `${prose(summary)}\n\n` : ""}- 状态：${escape(status)}\n- 实付：${paid} 元\n- 已退：${refunded} 元\n- 券状态：${escape(coupons)}${moreCoupons}${selection ? `\n\n${prose(selection)}` : ""}`,
       };
     });
-    const omitted = reply.orders.length > 3 ? "\n\n本次仅展示前三笔订单，请指定订单号继续查询。" : "";
+    const omitted = reply.orders.length > 3 ? "\n\n本次仅展示前三笔订单，请指定订单号继续查询。"
+      : reply.hasMore ? "\n\n当前展示最近三笔订单，可按订单号继续查询其他订单。" : "";
     return {
       text: ["订单查询", ...orders.map(order => order.text), text].filter(Boolean).join("\n\n") + omitted + sources.text,
       markdown: ["## 订单查询", ...orders.map(order => order.markdown), text ? prose(text) : ""].filter(Boolean).join("\n\n") + omitted + sources.markdown,

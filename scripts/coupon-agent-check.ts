@@ -28,7 +28,7 @@ type Knowledge = Awaited<ReturnType<CouponStore["searchKnowledge"]>>;
 function inputs(context: TranscriptContext) {
   assert.equal(getCurrentSystemPrompt(context.messages), expectedPrompt);
   const declarations = getCurrentTools(context.messages);
-  assert.deepEqual(declarations.map(tool => tool.name).sort(), ["get_order", "search_faq"]);
+  assert.deepEqual(declarations.map(tool => tool.name).sort(), ["get_order", "list_orders", "search_faq"]);
   for (const tool of declarations) {
     assert.equal(Reflect.get(tool.parameters, "additionalProperties"), false);
     assert.ok(!JSON.stringify(tool.parameters).match(/customerId|senderId|appId|identity/));
@@ -43,7 +43,7 @@ function userInputs(messages: CouponSession["messages"]) {
 async function create(identity: QQIdentity) {
   const session = await createCouponSession(identity, store, runtime, faux.getModel());
   sessions.push(session);
-  assert.deepEqual(session.getActiveToolNames().sort(), ["get_order", "search_faq"]);
+  assert.deepEqual(session.getActiveToolNames().sort(), ["get_order", "list_orders", "search_faq"]);
   assert.deepEqual(session.resourceLoader.getSkills().skills.map(skill => skill.name), ["shop-support"]);
   return session;
 }

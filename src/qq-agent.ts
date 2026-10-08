@@ -5,6 +5,7 @@ import { renderReply, type Reply, type RenderedReply } from "./reply.ts";
 import { replyFromTools } from "./reply-from-tools.ts";
 import type { MerchantTask } from "./after-sales.ts";
 import { cancelSupportTurn, getSupportHostReceipt, isSupportSession, prepareSupportPrompt, supportReply } from "./support-session.ts";
+import { prepareOrderDiscoveryPrompt, presentOrderDiscoveryReply } from "./order-discovery.ts";
 
 export type ContinuationOutcome = "busy" | "sent" | "deferred" | "unknown";
 
@@ -143,9 +144,13 @@ export class QQAgent {
           return;
         }
         // Only trusted ingress text reaches this host action. Tools cannot invent consent.
-        const hostReply = resolve ? undefined : await this.beforePrompt?.(msg);
+        const consultation = resolve ? undefined : await this.beforePrompt?.(msg);
+        const discovery: { prompt: string; reply?: Reply } = !resolve && consultation === undefined ? await prepareOrderDiscoveryPrompt(session, msg.content) : { prompt: msg.content };
+        const hostReply = consultation ?? discovery.reply;
         if (hostReply !== undefined) {
           const delivered = await this.deliver(msg, hostReply);
+          if (delivered) presentOrderDiscoveryReply(session,
+            typeof hostReply === "string" ? { kind: "notice", text: hostReply } : hostReply, msg.content);
           outcome = delivered ? "sent" : "unknown";
           conversation.turns++;
           try {
@@ -165,7 +170,7 @@ export class QQAgent {
         }
         const prompt = merchant
           ? `宿主业务事件：模拟商家任务 ${merchant.taskId}（订单 ${merchant.orderId}）已结束。这不是用户消息，也不是用户授权。请调用 get_merchant_request 查询该订单的当前结果，只通知这一任务的结果，说明下一步需用户提出请求并确认。不得确认、创建协商或准备/执行退款，不得用对话中的其他订单替代。`
-          : msg.content;
+          : discovery.prompt;
         supportRun = isSupportSession(session);
         if (supportRun) prepareSupportPrompt(session, {
           requestId: msg.messageId, groupOpenid: msg.groupOpenid!, messageId: msg.messageId,
@@ -190,6 +195,7 @@ export class QQAgent {
         outcome = merchant ? await deliverMerchant() : await this.deliver(msg, reply) ? "sent" : "unknown";
         if (outcome === "deferred") return;
         const delivered = outcome === "sent";
+        if (delivered && !merchant) presentOrderDiscoveryReply(session, reply, msg.content);
         if (merchant) {
           await session.sendCustomMessage({ customType: "merchant-result", content: renderReply({ kind: "merchant_status", task: merchant }).text, display: true }, { triggerTurn: false });
         }

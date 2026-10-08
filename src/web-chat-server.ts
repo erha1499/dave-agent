@@ -72,7 +72,7 @@ export function createWebChatServer(chat: WebChatSessions) {
       if (req.method === "GET" && url.pathname === "/api/chat/session") {
         req.resume(); json(200, chat.get(token)); return;
       }
-      if (req.method === "POST" && ["/api/chat/session", "/api/chat/messages"].includes(url.pathname)) {
+      if (req.method === "POST" && ["/api/chat/session", "/api/chat/messages", "/api/chat/messages/stream"].includes(url.pathname)) {
         const body = await readBody(req);
         if (url.pathname === "/api/chat/session") {
           if (typeof body.profileId !== "string" || !Object.hasOwn(body, "sessionId")
@@ -85,6 +85,27 @@ export function createWebChatServer(chat: WebChatSessions) {
         if (Object.keys(body).length !== 3 || !["text", "requestId", "sessionId"].every(key => Object.hasOwn(body, key))
           || typeof body.text !== "string" || typeof body.requestId !== "string" || typeof body.sessionId !== "string")
           throw new WebChatError(400, "发送消息只接受 sessionId、requestId 和 text。");
+        if (url.pathname === "/api/chat/messages/stream") {
+          const stream = (event: string, data: unknown) => {
+            if (res.destroyed || res.writableEnded) return;
+            if (!res.headersSent) {
+              res.writeHead(200, { "Content-Type": "text/event-stream; charset=utf-8", "X-Accel-Buffering": "no" });
+              res.flushHeaders();
+            }
+            res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+          };
+          try {
+            const result = await chat.send(token, body.requestId, body.text, body.sessionId, ({ type, ...data }) => stream(type, data));
+            stream("result", result);
+          } catch (error) {
+            if (!res.headersSent) throw error;
+            stream("error", { sessionId: body.sessionId, requestId: body.requestId,
+              status: error instanceof WebChatError ? error.status : 503,
+              error: error instanceof WebChatError ? error.message : "客服服务暂时不可用，请稍后重试。" });
+          }
+          if (!res.destroyed && !res.writableEnded) res.end();
+          return;
+        }
         const result = await chat.send(token, body.requestId, body.text, body.sessionId);
         // Only creation sets the cookie: a late message response must not replace or clear a newer conversation.
         json(200, result); return;

@@ -15,6 +15,7 @@ export async function checkWebChat() {
   let factories = 0, requests = 0, block: Promise<void> | undefined, onRead: (() => void) | undefined;
   const reads: Array<{ identity: QQIdentity; orderId: string }> = [];
   const store = {
+    async listOrders() { return { source: "demo-database", asOf: new Date().toISOString(), orders: [], hasMore: false }; },
     async getOrder(identity: QQIdentity, orderId: string) {
       reads.push({ identity: { ...identity }, orderId }); onRead?.(); await block;
       if (identity.appId !== "TEST_APP" || (identity.senderId === "TEST_USER1" ? "COUPON-1001" : "COUPON-1002") !== orderId)
@@ -146,7 +147,7 @@ export async function checkWebChat() {
     ]);
     const order = await send(a.cookie, "查询 COUPON-1001"); assert.equal(order.status, 200); assert.equal(order.data.origin, "agent");
     assert.equal(order.data.reply.kind, "order"); assert.equal(order.data.reply.orders[0].paidCents, 7980);
-    assert.equal(reads.at(-1)!.identity.senderId, "TEST_USER1"); assert.deepEqual(declarations, ["get_order", "search_faq"]);
+    assert.equal(reads.at(-1)!.identity.senderId, "TEST_USER1"); assert.deepEqual(declarations, ["get_order", "list_orders", "search_faq"]);
     assert.match(hostHistory, /假设/); assert.doesNotMatch(userTexts.join(" "), /COUPON-1002/);
     const xss = "<img src=x onerror=alert(1)> & <script>alert(2)</script>";
     faux.setResponses([() => { requests++; return fauxAssistantMessage(xss); }]);
@@ -425,7 +426,7 @@ async function checkWebChatSettings() {
       else { assert.deepEqual(wire.thinking, { type: settings.thinkingLevel === "high" ? "enabled" : "disabled" });
         assert.equal(wire.reasoning_effort, settings.thinkingLevel === "high" ? "high" : undefined); }
       const native = actualSessions.at(-1)!;
-      assert.deepEqual(native.getActiveToolNames().sort(), ["get_order", "search_faq"]);
+      assert.deepEqual(native.getActiveToolNames().sort(), ["get_order", "list_orders", "search_faq"]);
       assert.equal(native.thinkingLevel, settings.thinkingLevel); assert.equal(native.model?.maxTokens, settings.maxTokens);
     }
     const preserved = await chat.create(cookie, "demo-b", cases.at(-1), chat.get(cookie).session?.id ?? null); cookie = preserved.token;

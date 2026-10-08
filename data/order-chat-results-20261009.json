@@ -1,0 +1,431 @@
+{
+  "date": "2026-10-09",
+  "data": "Local synthetic customer/order/rule fixtures; real Pi/DeepSeek requests; no business writes or QQ sends",
+  "batches": [
+    {
+      "version": "entry-v1",
+      "runId": "09628d29-17ea-4187-a830-08c78034077a",
+      "startedAt": "2026-10-08T18:23:52.337Z",
+      "status": "failed",
+      "planned": 8,
+      "executed": 4,
+      "passed": 3,
+      "notExecuted": 4,
+      "providerRequests": 4,
+      "reportedMessages": 4,
+      "reportedTokens": 20704,
+      "estimatedCost": {
+        "USD": 0.00223542,
+        "basis": "Pi 1.0.0 catalog and provider reported usage; not a bill",
+        "CNY": null
+      },
+      "limits": {
+        "turns": 8,
+        "providerRequests": 24,
+        "elapsedMinutes": 15,
+        "providerSdkRetries": 0
+      },
+      "configuration": {
+        "settings": {
+          "modelSelection": "configured",
+          "thinkingLevel": "off",
+          "maxTokens": 2048
+        },
+        "model": {
+          "provider": "deepseek",
+          "id": "deepseek-flash"
+        }
+      },
+      "piRetrySettings": [
+        {
+          "enabled": true,
+          "maxRetries": 2,
+          "baseDelayMs": 2000,
+          "maxAgentDelayMs": 60000
+        }
+      ],
+      "sourceHashes": {
+        "src/agent.ts": "e7975bedfe41bfe5bcd9a6135e20f444966350b155f82914b581991b3ddd7c56",
+        "src/order-discovery.ts": "39e02009d4738726a9a0806a96b016b874a8e6ca121ea11df46dd60c27588e12",
+        "src/coupon-store.ts": "bf90a5a764274639ae4474b6f8d455c8991a24bccaa39ee249d2fd38a4cd3bca",
+        "src/reply.ts": "56da64a5d692852d39d99abc44a9bca37c0e888d262d38fdff625d7eb96be400",
+        "src/reply-from-tools.ts": "7b0569afbf0a3900e30eb95276e447448d14cd1463c9e6df47d0ea22548d6bb1",
+        "src/web-chat.ts": "48de4be48138f12a814f1aada3dbdc289aa7d9143ffe106d26655a13f8c042e9",
+        "src/web-chat-server.ts": "72d7bed2869c249304f685a498ab2b496dbf1c146258b77bd4b9bb6295375827",
+        "src/web-chat-settings.ts": "c0046d77a68b073cc24ea24f5af7e8a368bde89aa8b03f38be375a2f1b6441b6",
+        "src/cli.ts": "51fb5bc8aa33b99648359cad72a1ad69386fafd0b89e2cd51bc1c94fd3fbee4a",
+        "prompts/customer-service.md": "b741497c27cae61225800cd2845b9f40e731dd37dd52fe4f6dec2c95601f9bc8",
+        "skills/shop-support/SKILL.md": "b33afadde0eb9c4574c043d6fba43c8571e980c202fd8e9bba18b3341b39f51f",
+        "scripts/order-chat-live-check.ts": "255c8c075801ece688e663b25fbfceb098a06ee373bf7add6c68b9c6ce674a39",
+        "package-lock.json": "807ea254ad990d1e064e9d1be8791400d168ad74cec81a27d4a813619575bf4c"
+      },
+      "finalSourceHashesVerified": false,
+      "artifactSHA256": "7e3211b6c9a92483180be2a26255f5ea56e7aecc81686ce9ebec5a4b89b32b72",
+      "rows": [
+        {
+          "label": "A 本人最近订单",
+          "status": "passed",
+          "executedText": "我有哪些订单",
+          "reply": {
+            "kind": "order",
+            "text": "这是你的最近订单，请选择一笔继续查询。\n选择订单只用于定位，不会提交退款。",
+            "evidenceIds": [],
+            "hasMore": true,
+            "orders": [
+              {
+                "id": "COUPON-2003",
+                "status": "paid",
+                "paidCents": 7980,
+                "refundedCents": 0,
+                "createdAt": "2026-10-02T12:01:24.308Z",
+                "shopName": "云味餐厅演示店（虚构）",
+                "productName": "双人午餐团购券",
+                "couponStatuses": [
+                  "unused"
+                ],
+                "selectionText": "选择订单 COUPON-2003"
+              },
+              {
+                "id": "COUPON-2002",
+                "status": "paid",
+                "paidCents": 7980,
+                "refundedCents": 0,
+                "createdAt": "2026-10-02T12:01:24.308Z",
+                "shopName": "云味餐厅演示店（虚构）",
+                "productName": "双人午餐团购券",
+                "couponStatuses": [
+                  "unused"
+                ],
+                "selectionText": "选择订单 COUPON-2002"
+              },
+              {
+                "id": "COUPON-2001",
+                "status": "paid",
+                "paidCents": 7980,
+                "refundedCents": 0,
+                "createdAt": "2026-10-02T12:01:24.308Z",
+                "shopName": "云味餐厅演示店（虚构）",
+                "productName": "双人午餐团购券",
+                "couponStatuses": [
+                  "unused"
+                ],
+                "selectionText": "选择订单 COUPON-2001"
+              }
+            ]
+          },
+          "providerRequests": 0,
+          "firstDeltaMs": null
+        },
+        {
+          "label": "A 缺单退款",
+          "status": "passed",
+          "executedText": "我要退款",
+          "reply": {
+            "kind": "order",
+            "text": "请先选择要退款的订单，我会继续核对订单及适用规则。\n选择订单只用于定位，不会提交退款。",
+            "evidenceIds": [],
+            "hasMore": true,
+            "orders": [
+              {
+                "id": "COUPON-2003",
+                "status": "paid",
+                "paidCents": 7980,
+                "refundedCents": 0,
+                "createdAt": "2026-10-02T12:01:24.308Z",
+                "shopName": "云味餐厅演示店（虚构）",
+                "productName": "双人午餐团购券",
+                "couponStatuses": [
+                  "unused"
+                ],
+                "selectionText": "选择订单 COUPON-2003"
+              },
+              {
+                "id": "COUPON-2002",
+                "status": "paid",
+                "paidCents": 7980,
+                "refundedCents": 0,
+                "createdAt": "2026-10-02T12:01:24.308Z",
+                "shopName": "云味餐厅演示店（虚构）",
+                "productName": "双人午餐团购券",
+                "couponStatuses": [
+                  "unused"
+                ],
+                "selectionText": "选择订单 COUPON-2002"
+              },
+              {
+                "id": "COUPON-2001",
+                "status": "paid",
+                "paidCents": 7980,
+                "refundedCents": 0,
+                "createdAt": "2026-10-02T12:01:24.308Z",
+                "shopName": "云味餐厅演示店（虚构）",
+                "productName": "双人午餐团购券",
+                "couponStatuses": [
+                  "unused"
+                ],
+                "selectionText": "选择订单 COUPON-2001"
+              }
+            ]
+          },
+          "providerRequests": 0,
+          "firstDeltaMs": null
+        },
+        {
+          "label": "A 选择后退款咨询",
+          "status": "passed",
+          "executedText": "选择订单 COUPON-2003",
+          "reply": {
+            "kind": "order",
+            "text": "订单 COUPON-2003 退款资格核对\n\n订单：COUPON-2003\n门店：云味餐厅演示店（虚构）\n套餐：双人午餐团购券\n状态：已支付，实付 79.80 元，已退 0.00 元\n券：1 张，未核销，有效期至 2026-11-01\n\n规则依据：KB-REFUND-UNUSED（未核销且未过期团购券退款规则）——已支付、未核销且未过期的券可申请退款，可申请金额不超过未消费未退款的实付金额，即上限 79.80 元；该规则同时说明资格不等于商家已批准，也不等于资金已退回。\n\n当前助手只能查询和说明，没有可用的退款申请或联系商家工具，无法代你提交退款。\n\n如需继续，请自行联系商家或测试管理员核实办理。",
+            "orders": [
+              {
+                "id": "COUPON-2003",
+                "status": "paid",
+                "paidCents": 7980,
+                "refundedCents": 0,
+                "couponStatuses": [
+                  "unused"
+                ]
+              }
+            ],
+            "evidenceIds": [
+              "KB-REFUND-UNUSED",
+              "KB-REFUND-EXPIRED",
+              "KB-REFUND-PARTIAL",
+              "KB-REFUND-REDEEMED",
+              "KB-REFUND-PAYMENT"
+            ]
+          },
+          "providerRequests": 3,
+          "firstDeltaMs": 6042.3185
+        },
+        {
+          "label": "A 省略订单续问",
+          "status": "failed",
+          "executedText": "这张券现在有没有核销？",
+          "reply": {
+            "kind": "answer",
+            "text": "COUPON-2003 的券状态（依据本轮订单查询）：\n\n券号 CP-2003-1：未核销（unused），核销时间与核销门店均为空。\n有效期至 2026-11-01。\n\n该订单 1 张券目前均未核销，也未退款。",
+            "evidenceIds": []
+          },
+          "providerRequests": 1,
+          "firstDeltaMs": 2596.479458
+        },
+        {
+          "label": "B 本人最近订单",
+          "status": "not-executed",
+          "executedText": null,
+          "reply": null,
+          "providerRequests": 0,
+          "firstDeltaMs": null
+        },
+        {
+          "label": "B 选择后查询",
+          "status": "not-executed",
+          "executedText": null,
+          "reply": null,
+          "providerRequests": 0,
+          "firstDeltaMs": null
+        },
+        {
+          "label": "B 越权拒绝",
+          "status": "not-executed",
+          "executedText": null,
+          "reply": null,
+          "providerRequests": 0,
+          "firstDeltaMs": null
+        },
+        {
+          "label": "Pi 原生订单列表",
+          "status": "not-executed",
+          "executedText": null,
+          "reply": null,
+          "providerRequests": 0,
+          "firstDeltaMs": null
+        }
+      ]
+    },
+    {
+      "version": "fresh-v2",
+      "runId": "9a8b7107-7f3a-4746-8d84-bcd5dbbaa98f",
+      "startedAt": "2026-10-08T18:32:52.332Z",
+      "status": "passed",
+      "planned": 4,
+      "executed": 4,
+      "passed": 4,
+      "notExecuted": 0,
+      "providerRequests": 7,
+      "reportedMessages": 7,
+      "reportedTokens": 30469,
+      "estimatedCost": {
+        "USD": 0.002622084,
+        "basis": "Pi 1.0.0 catalog and provider reported usage; not a bill",
+        "CNY": null
+      },
+      "limits": {
+        "turns": 4,
+        "providerRequests": 12,
+        "elapsedMinutes": 10,
+        "providerSdkRetries": 0
+      },
+      "configuration": {
+        "settings": {
+          "modelSelection": "configured",
+          "thinkingLevel": "off",
+          "maxTokens": 2048
+        },
+        "model": {
+          "provider": "deepseek",
+          "id": "deepseek-flash"
+        }
+      },
+      "piRetrySettings": [
+        {
+          "enabled": true,
+          "maxRetries": 2,
+          "baseDelayMs": 2000,
+          "maxAgentDelayMs": 60000
+        },
+        {
+          "enabled": true,
+          "maxRetries": 2,
+          "baseDelayMs": 2000,
+          "maxAgentDelayMs": 60000
+        }
+      ],
+      "sourceHashes": {
+        "src/agent.ts": "8fd83aa81d921b03e4ce7227453c97d2148449dae06b87df6e6954f4223740ea",
+        "src/order-discovery.ts": "39e02009d4738726a9a0806a96b016b874a8e6ca121ea11df46dd60c27588e12",
+        "src/coupon-store.ts": "bf90a5a764274639ae4474b6f8d455c8991a24bccaa39ee249d2fd38a4cd3bca",
+        "src/reply.ts": "56da64a5d692852d39d99abc44a9bca37c0e888d262d38fdff625d7eb96be400",
+        "src/reply-from-tools.ts": "7b0569afbf0a3900e30eb95276e447448d14cd1463c9e6df47d0ea22548d6bb1",
+        "src/web-chat.ts": "48de4be48138f12a814f1aada3dbdc289aa7d9143ffe106d26655a13f8c042e9",
+        "src/web-chat-server.ts": "72d7bed2869c249304f685a498ab2b496dbf1c146258b77bd4b9bb6295375827",
+        "src/web-chat-settings.ts": "c0046d77a68b073cc24ea24f5af7e8a368bde89aa8b03f38be375a2f1b6441b6",
+        "src/cli.ts": "51fb5bc8aa33b99648359cad72a1ad69386fafd0b89e2cd51bc1c94fd3fbee4a",
+        "prompts/customer-service.md": "a393a85e0e6bd34bc141d70a014a09a1d0f0aece0e5e80ed639d93e029d7daae",
+        "skills/shop-support/SKILL.md": "abc0c9e36fb0920811b74164771edffb13c30b3077490d499babff16c7a10938",
+        "scripts/order-chat-live-check.ts": "0e844a617fb2d6838cdce18f1767e2d058cdf54d0419bb5c4c8302ae5bf82360",
+        "package-lock.json": "807ea254ad990d1e064e9d1be8791400d168ad74cec81a27d4a813619575bf4c"
+      },
+      "finalSourceHashesVerified": true,
+      "artifactSHA256": "5eccb617cb126fe92ba4cb7fccd299158fabeb533d10c88780c0f2ae6abbfa9e",
+      "rows": [
+        {
+          "label": "B 新缺单退款",
+          "status": "passed",
+          "executedText": "我想要退款",
+          "reply": {
+            "kind": "order",
+            "text": "请先选择要退款的订单，我会继续核对订单及适用规则。\n选择订单只用于定位，不会提交退款。",
+            "evidenceIds": [],
+            "hasMore": false,
+            "orders": [
+              {
+                "id": "COUPON-1002",
+                "status": "paid",
+                "paidCents": 7980,
+                "refundedCents": 0,
+                "createdAt": "2026-10-01T09:01:49.891Z",
+                "shopName": "云味餐厅演示店（虚构）",
+                "productName": "双人午餐团购券",
+                "couponStatuses": [
+                  "unused"
+                ],
+                "selectionText": "选择订单 COUPON-1002"
+              }
+            ]
+          },
+          "providerRequests": 0,
+          "firstDeltaMs": null
+        },
+        {
+          "label": "B 裸订单号退款咨询",
+          "status": "passed",
+          "executedText": "COUPON-1002",
+          "reply": {
+            "kind": "order",
+            "text": "订单：COUPON-1002\n门店：云味餐厅演示店（虚构）\n套餐：双人午餐团购券\n状态：已支付，实付 79.80 元，已退 0.00 元\n券：1 张，未核销，有效期至 2026-10-31\n\n规则依据：KB-REFUND-UNUSED（未核销且未过期可申请退款，可申请金额不超过未消费未退款的实付金额，即上限 79.80 元）。\n\n说明：符合该模拟规则下的申请条件，但申请资格不等于商家已批准或资金已退回。当前会话未提供商家协商与退款办理工具，我无法为你提交申请或执行退款，只能做规则与订单查询。如需继续，建议你自行联系商家或测试管理员核实。",
+            "orders": [
+              {
+                "id": "COUPON-1002",
+                "status": "paid",
+                "paidCents": 7980,
+                "refundedCents": 0,
+                "couponStatuses": [
+                  "unused"
+                ]
+              }
+            ],
+            "evidenceIds": [
+              "KB-REFUND-UNUSED",
+              "KB-REFUND-PARTIAL",
+              "KB-REFUND-EXPIRED",
+              "KB-REFUND-REDEEMED",
+              "KB-REFUND-PAYMENT"
+            ]
+          },
+          "providerRequests": 3,
+          "firstDeltaMs": 4067.5136250000005
+        },
+        {
+          "label": "B 当前核销数量",
+          "status": "passed",
+          "executedText": "刚刚选择的订单现在有几张券已经核销？",
+          "reply": {
+            "kind": "order",
+            "text": "订单：COUPON-1002（云味餐厅演示店（虚构）·双人午餐团购券）\n\n本轮查询结果：0 张已核销。\n\n订单内共 1 张券 CP-1002-1，状态为未核销（unused），核销时间与核销门店均为空。订单状态已支付，实付 79.80 元，已退 0.00 元，有效期至 2026-10-31。",
+            "orders": [
+              {
+                "id": "COUPON-1002",
+                "status": "paid",
+                "paidCents": 7980,
+                "refundedCents": 0,
+                "couponStatuses": [
+                  "unused"
+                ]
+              }
+            ],
+            "evidenceIds": []
+          },
+          "providerRequests": 2,
+          "firstDeltaMs": 1791.701709
+        },
+        {
+          "label": "Pi 新订单列表问法",
+          "status": "passed",
+          "executedText": "能帮我看看本人近期购买的券单，列出最近三笔吗？",
+          "reply": {
+            "kind": "order",
+            "text": "您本人近期（按下单时间倒序）的订单如下，目前只有 1 笔，没有更早的了：\n\n1. COUPON-1002\n   门店：云味餐厅演示店（虚构）\n   套餐：双人午餐团购券\n   实付：79.80 元\n   券状态：1 张 unused（未核销）\n   订单状态：paid（已支付）\n   退款历史：0.00 元\n\n如需查询某笔订单的当前状态、核销、付款、退款资格或有效期，请回复订单号，我会重新读取该订单并按适用规则为您说明。",
+            "orders": [
+              {
+                "id": "COUPON-1002",
+                "status": "paid",
+                "paidCents": 7980,
+                "refundedCents": 0,
+                "couponStatuses": [
+                  "unused"
+                ],
+                "productName": "双人午餐团购券",
+                "shopName": "云味餐厅演示店（虚构）",
+                "createdAt": "2026-10-01T09:01:49.891Z",
+                "selectionText": "选择订单 COUPON-1002"
+              }
+            ],
+            "evidenceIds": []
+          },
+          "providerRequests": 2,
+          "firstDeltaMs": null
+        }
+      ]
+    }
+  ],
+  "limits": [
+    "Entry-v1 failure retained; 4 planned turns not executed. No rescore or rerun.",
+    "Fresh-v2 has new inputs after the current-fact prompt fix, not a production accuracy estimate.",
+    "USD estimates exclude Kimi generation; CNY not used in these batches.",
+    "Source lock hashes include preexisting local dependency edits, preserved outside this commit.",
+    "v1 final run hash verification did not finish; archived source bytes were verified separately before repair."
+  ]
+}

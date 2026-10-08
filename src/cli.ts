@@ -19,6 +19,7 @@ import { readKnowledgeParameters, resolveSupportRunParameters } from "./support-
 import { modelSelections, type ModelSelection } from "./model-selection.ts";
 import { createSupportQuestionClient } from "./support-question-client.ts";
 import { createArrivalConsultation } from "./arrival-consultation.ts";
+import { prepareOrderDiscoveryPrompt, presentOrderDiscoveryReply } from "./order-discovery.ts";
 
 export function readCliQuestionOptions(architecture: "atomic" | "controller", env: NodeJS.ProcessEnv = process.env):
   { questionContract: "v2" } | { questionContract: "v3"; modelSelection: ModelSelection; timeoutMs: number } {
@@ -50,11 +51,16 @@ export async function runCliPrompt(
   session: AgentSession, text: string, write: (text: string) => Promise<void>,
   afterDeliver?: (reply: Reply) => Promise<void>,
   beforePrompt?: (text: string) => Promise<Reply | undefined>,
+  preparedDiscovery?: { prompt: string; reply?: Reply },
 ) {
-  const hostReply = await beforePrompt?.(text);
+  const consultation = preparedDiscovery ? undefined : await beforePrompt?.(text);
+  const discovery: { prompt: string; reply?: Reply } = preparedDiscovery
+    ?? (consultation === undefined ? await prepareOrderDiscoveryPrompt(session, text) : { prompt: text });
+  const hostReply = consultation ?? discovery.reply;
   if (hostReply !== undefined) {
     await write(`客服：${renderReply(hostReply).text}\n`);
     await afterDeliver?.(hostReply);
+    if (!preparedDiscovery) presentOrderDiscoveryReply(session, hostReply, text);
     // A read-only rule receipt is history, never consent or an Agent turn.
     try { await session.sendCustomMessage({ customType: "arrival-consultation", content: renderReply(hostReply).text, display: true }, { triggerTurn: false }); }
     catch { /* Delivery already succeeded; do not retry the consultation or send. */ }
@@ -65,7 +71,7 @@ export async function runCliPrompt(
   prepareSupportPrompt(session, { requestId, groupOpenid: "cli", messageId: requestId });
   let modelFailed = false;
   try {
-    await session.prompt(text, { expandPromptTemplates: false });
+    await session.prompt(discovery.prompt, { expandPromptTemplates: false });
     if (!getSupportHostReceipt(session) && session.agent.state.errorMessage) throw new Error("模型请求失败。");
   } catch {
     modelFailed = true;
@@ -79,6 +85,7 @@ export async function runCliPrompt(
   // Delivery failures do not re-enter the model fallback or retry any business action.
   await write(`客服：${renderReply(reply).text}\n`);
   await afterDeliver?.(reply);
+  if (!preparedDiscovery) presentOrderDiscoveryReply(session, reply, text);
   return reply;
 }
 
@@ -131,6 +138,7 @@ async function main() {
             ?? (afterSales ? await confirmMerchantReply(afterSales, identity, sourceKey, text) : undefined);
           if (confirmation !== undefined) {
             const receipt = renderReply(confirmation).text;
+            presentOrderDiscoveryReply(session, confirmation, text);
             await session.sendCustomMessage({ customType: "business-receipt", content: receipt, display: true }, { triggerTurn: false });
             console.log(`客服：${receipt}`);
             continue;

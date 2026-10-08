@@ -67,7 +67,7 @@ const refunds = {
 const runtime = await createModelRuntime();
 const faux = fauxProvider();
 runtime.registerNativeProvider(faux.provider);
-const tools = ["get_merchant_request", "get_order", "get_refund", "prepare_merchant_request", "prepare_refund", "search_faq"];
+const tools = ["get_merchant_request", "get_order", "get_refund", "list_orders", "prepare_merchant_request", "prepare_refund", "search_faq"];
 async function create(msg: QQBotInboundMessage) {
   assert.equal(msg.senderId, identity.senderId); assert.equal(msg.groupOpenid, group);
   const session = await createCouponSession(identity, {} as CouponStore, runtime, faux.getModel(), {

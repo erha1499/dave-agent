@@ -64,6 +64,38 @@ export class CouponStore {
     return rows[0]?.customer_id as string | undefined;
   }
 
+  async listOrders(identity: QQIdentity) {
+    if (!validIdentity(identity)) throw new OrderAccessError(unavailableOrder);
+    // One statement keeps identity and all list facts in the same read snapshot.
+    const rows = await this.select(`SELECT /*+ MAX_EXECUTION_TIME(3000) */
+      o.id, o.status, o.paid_cents, o.refunded_cents, o.created_at, s.name AS shop_name,
+      (SELECT p.name FROM order_items i JOIN products p ON p.id = i.product_id
+        WHERE i.order_id = o.id ORDER BY i.id LIMIT 1) AS product_name,
+      (SELECT COUNT(*) FROM order_items i WHERE i.order_id = o.id) AS item_count,
+      (SELECT JSON_ARRAYAGG(c.status) FROM coupons c JOIN order_items i ON i.id = c.order_item_id
+        WHERE i.order_id = o.id) AS coupon_statuses
+      FROM orders o JOIN qq_identities q ON q.customer_id = o.customer_id
+      JOIN shops s ON s.id = o.shop_id
+      WHERE q.app_id = ? AND q.sender_id = ?
+      ORDER BY o.created_at DESC, o.id DESC LIMIT 4`, [identity.appId, identity.senderId]);
+    // An unbound identity must not look like a successfully queried empty customer.
+    if (!rows.length && !await this.resolveCustomer(identity)) throw new OrderAccessError(unavailableOrder);
+    const orders = rows.slice(0, 3).map(row => {
+      let couponStatuses: unknown;
+      try { couponStatuses = typeof row.coupon_statuses === "string" ? JSON.parse(row.coupon_statuses) : row.coupon_statuses ?? []; }
+      catch { throw new Error(databaseFailure); }
+      if (!Array.isArray(couponStatuses) || couponStatuses.length > 100
+        || couponStatuses.some(status => typeof status !== "string") || Number(row.item_count) > 100) throw new Error(databaseFailure);
+      return { id: row.id as string, status: row.status as string, paidCents: row.paid_cents as number,
+        refundedCents: row.refunded_cents as number, createdAt: date(row.created_at),
+        shopName: row.shop_name as string,
+        productName: `${row.product_name ?? "订单商品"}${Number(row.item_count) > 1 ? "等" : ""}`,
+        couponStatuses: couponStatuses as string[] };
+    });
+    // ponytail: latest three orders only; add pagination when browsing beyond an explicit order ID is needed.
+    return { source: "demo-database" as const, asOf: new Date().toISOString(), orders, hasMore: rows.length > 3 };
+  }
+
   async getOrder(identity: QQIdentity, orderId: string) {
     if (!/^COUPON-\d{4}$/.test(orderId)) throw new Error("演示订单号格式为 COUPON-1001。");
     if (!validIdentity(identity)) throw new OrderAccessError(unavailableOrder);

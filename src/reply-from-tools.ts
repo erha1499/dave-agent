@@ -24,15 +24,33 @@ function merchantTask(value: unknown): value is MerchantTask {
 export function replyFromTools(text: string, results: Evidence[]): Reply {
   const orders: Extract<Reply, { kind: "order" }>["orders"] = [];
   const evidenceIds = new Set<string>();
+  let hasMore = false;
+  let listed = false;
+  let listFailed = false;
   let merchant: Reply | undefined;
   let refund: Reply | undefined;
   let refundFailed = false;
   try {
     for (const result of results) {
+      if (result.toolName === "list_orders" && result.isError) listFailed = true;
       if (result.isError && ["prepare_refund", "get_refund"].includes(result.toolName)) refundFailed = true;
-      if (result.isError || !["get_order", "search_faq", "prepare_merchant_request", "get_merchant_request", "prepare_refund", "get_refund"].includes(result.toolName)) continue;
+      if (result.isError || !["list_orders", "get_order", "search_faq", "prepare_merchant_request", "get_merchant_request", "prepare_refund", "get_refund"].includes(result.toolName)) continue;
       const value: unknown = JSON.parse(result.content.map(part => part.type === "text" ? part.text : "").join(""));
-      if (result.toolName === "get_order") {
+      if (result.toolName === "list_orders") {
+        if (!record(value) || value.source !== "demo-database" || typeof value.hasMore !== "boolean"
+          || !Array.isArray(value.orders) || value.orders.length > 3) throw new Error();
+        hasMore = value.hasMore;
+        listed = true;
+        for (const row of value.orders) {
+          if (!record(row) || !orderId(row.id) || typeof row.status !== "string" || !cents(row.paidCents) || !cents(row.refundedCents)
+            || !Array.isArray(row.couponStatuses) || !row.couponStatuses.every(status => typeof status === "string")
+            || typeof row.productName !== "string" || typeof row.shopName !== "string"
+            || !(row.createdAt === null || typeof row.createdAt === "string")) throw new Error();
+          orders.push({ id: row.id, status: row.status, paidCents: row.paidCents, refundedCents: row.refundedCents,
+            couponStatuses: row.couponStatuses as string[], productName: row.productName, shopName: row.shopName,
+            createdAt: row.createdAt, selectionText: `选择订单 ${row.id}` });
+        }
+      } else if (result.toolName === "get_order") {
         if (!record(value) || value.source !== "demo-database" || !orderId(value.id) || typeof value.status !== "string"
           || !record(value.amounts) || !cents(value.amounts.paidCents) || !cents(value.amounts.refundedCents)
           || !Array.isArray(value.coupons) || !value.coupons.every(item => record(item) && typeof item.status === "string")) throw new Error();
@@ -64,6 +82,7 @@ export function replyFromTools(text: string, results: Evidence[]): Reply {
   if (refund) return refund;
   if (refundFailed) return { kind: "notice", text: "无法确认当前模拟退款状态，请在原会话按订单号重新查询，或联系测试管理员核实。" };
   if (merchant) return merchant;
-  if (orders.length) return { kind: "order", text, orders: [...new Map(orders.map(order => [order.id, order])).values()], evidenceIds: [...evidenceIds] };
+  if (orders.length || listed) return { kind: "order", text: orders.length ? text : "当前客户没有订单记录。", orders: [...new Map(orders.map(order => [order.id, order])).values()], evidenceIds: [...evidenceIds], ...(hasMore ? { hasMore } : {}) };
+  if (listFailed) return { kind: "notice", text: "最近订单暂时无法查询，请稍后重试或核对本人身份绑定。" };
   return { kind: "answer", text, evidenceIds: [...evidenceIds] };
 }
