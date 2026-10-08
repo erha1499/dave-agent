@@ -214,7 +214,7 @@ try {
   assert.equal(confirms, beforeMalformed + 8, "only exact commands with outer ASCII space/tab padding are accepted");
   assert.ok(!logs.join("\n").includes("synthetic private"));
   assert.equal(faux.getPendingResponseCount(), 0);
-  console.log("模拟退款 Agent 离线检查通过：真实 Pi 六工具、固定方案、发送后登记、排队确认、失败不重发、过期卡只读、用户原文边界、宿主幂等确认、丢失回执后查询。业务事务另由 MySQL 检查覆盖。");
+  console.log(`模拟退款 Agent 离线检查通过：真实 Pi ${tools.length}项工具、固定方案、发送后登记、排队确认、失败不重发、过期卡只读、用户原文边界、宿主幂等确认、丢失回执后查询。业务事务另由 MySQL 检查覆盖。`);
 } finally {
   sendRelease.resolve(); markRelease.resolve(); await qq.close();
 }
