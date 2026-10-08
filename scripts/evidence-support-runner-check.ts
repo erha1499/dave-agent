@@ -28,8 +28,8 @@ const client = createBailianClient({ env: { DASHSCOPE_API_KEY: "mock-secret", DA
     return new Response(JSON.stringify({ results, usage: { total_tokens: 10 } }));
   } });
 let supportRequests = 0;
-async function supportClient(model = "mock-support", malformed = false): Promise<EvidenceSupportClient> {
-  const base = await createEvidenceSupportClient({ timeoutMs: 1000, runtime: {
+async function supportClient(model = "mock-support", malformed = false, profile: "binary" | "typed" = "binary", badQuote = false): Promise<EvidenceSupportClient> {
+  const base = await createEvidenceSupportClient({ timeoutMs: 1000, profile, ...(profile === "typed" ? { typedPromptVersion: "fact-support-typed-v6" as const } : {}), runtime: {
     model: { provider: "deepseek", id: model, api: "openai-completions", baseUrl: "https://api.deepseek.com", maxTokens: 2048,
       cost: { input: .1, output: .2, cacheRead: .01, cacheWrite: 0 } },
     complete: async (context, options) => {
@@ -41,6 +41,8 @@ async function supportClient(model = "mock-support", malformed = false): Promise
       for (const doc of payload.documents) assert.deepEqual(Object.keys(doc), ["id", "title", "tags", "body"]);
       const decisions = payload.documents.map((doc: { id: string; body: string }) => {
         const supported = payload.query.includes("午餐") && doc.id === "hours";
+        if (profile === "typed") return { id: doc.id, category: supported ? "direct_fact" : "limitation_only",
+          quote: badQuote && doc.id === "refund" ? "未提供的引文" : doc.body, reason: supported ? "原文直接说明时段" : "原文没有所问事实" };
         return { id: doc.id, supported, quote: supported ? doc.body : null, reason: supported ? "原文直接说明时段" : "原文没有所问事实" };
       });
       return { role: "assistant", api: "openai-completions", provider: "deepseek", model,
@@ -228,5 +230,49 @@ try {
   const beforeCorrupt = supportRequests;
   await assert.rejects(runRetrievalV2({ ...options, dataset: oneQuestion(), acceptance }), /执行中断/);
   assert.equal(supportRequests, beforeCorrupt, "invalid cached provenance fails closed without unbudgeted automatic retry");
-  console.log("PASS support runner: preserved raw results, actual support decisions, label isolation, scoped empty path, failed/partial denominators, combined budgets, query/body/settings cache isolation, frozen snapshot bindings and explicit deferrals; mock transport only.");
+
+  const typedOptions = { ...options, supportClient: await supportClient("mock-typed", false, "typed"), cacheDir: join(directory, "typed-cache") };
+  const typedCold = await runRetrievalV2({ ...typedOptions, acceptance });
+  assert.equal(typedCold.report.status, "completed");
+  assert.ok(typedCold.report.results.every(row => row.supportVerification?.validation?.status === "complete"));
+  const beforeTypedWarm = [rerankRequests, supportRequests], typedCache = await contents(typedOptions.cacheDir);
+  const typedWarm = await runRetrievalV2({ ...typedOptions, acceptance });
+  assert.equal(typedWarm.report.status, "completed");
+  assert.deepEqual([rerankRequests, supportRequests], beforeTypedWarm, "typed warm replay must not request either provider");
+  assert.deepEqual(await contents(typedOptions.cacheDir), typedCache, "replay must preserve the saved proof");
+  assert.deepEqual(typedWarm.report.results.map(row => row.supportVerification), typedCold.report.results.map(row => row.supportVerification));
+  assert.ok(typedWarm.report.supportCalls.every(call => call.cache === "hit" && call.attempts.length === 0));
+  assert.deepEqual(typedWarm.report.supportCalls.map(call => call.requestHash), typedCold.report.supportCalls.map(call => call.requestHash));
+  assert.equal(supportUsage(typedWarm.report)!.requests, 0);
+  assert.equal(supportUsage(typedWarm.report)!.knownTokens, null);
+  const typedWarmUsage = supportUsage(typedWarm.report)!;
+  assert.equal("knownEstimatedCostUsd" in typedWarmUsage && typedWarmUsage.knownEstimatedCostUsd, null, "historical proof must not bill the current replay");
+  assert.equal(evaluateRecordedAcceptance(typedWarm.report).meetsApplicableTargets, true);
+
+  const partialOptions = { ...typedOptions, dataset: oneQuestion(), supportClient: await supportClient("mock-typed-partial", false, "typed", true),
+    cacheDir: join(directory, "typed-partial-cache") };
+  const partialCold = await runRetrievalV2({ ...partialOptions, acceptance });
+  assert.equal(partialCold.report.results[0]!.supportVerification?.validation?.status, "partial");
+  const beforePartialWarm = [rerankRequests, supportRequests];
+  const partialWarm = await runRetrievalV2({ ...partialOptions, acceptance });
+  assert.deepEqual([rerankRequests, supportRequests], beforePartialWarm);
+  assert.deepEqual(partialWarm.report.results[0]!.supportVerification, partialCold.report.results[0]!.supportVerification);
+  assert.deepEqual(partialWarm.report.results[0]!.acceptance, partialCold.report.results[0]!.acceptance, "partial cannot become complete on replay");
+  assert.equal(partialWarm.report.supportCalls[0]!.attempts.length, 0);
+
+  const typedFile = join(typedOptions.cacheDir, `support-${typedCold.report.supportCalls[0]!.inputHash}.json`);
+  const typedSaved = JSON.parse(await readFile(typedFile, "utf8"));
+  assert.equal(typedSaved.version, 2);
+  assert.equal(typedSaved.verificationHash, contentHash(typedSaved.verification));
+  const legacy = { version: 1, inputHash: typedSaved.inputHash, requestHash: typedSaved.verification.requestHash,
+    value: typedSaved.verification.value, valueHash: contentHash(typedSaved.verification.value) };
+  const tampered = structuredClone(typedSaved); tampered.verification.validation.outputHash = "a".repeat(64);
+  for (const invalid of [legacy, tampered]) {
+    const bytes = JSON.stringify(invalid); await writeFile(typedFile, bytes);
+    const beforeInvalid: [number, number] = [rerankRequests, supportRequests];
+    await assert.rejects(runRetrievalV2({ ...typedOptions, dataset: oneQuestion(), acceptance }), /执行中断/);
+    assert.deepEqual([rerankRequests, supportRequests], beforeInvalid, "invalid cached proof must not trigger paid fallback");
+    assert.equal(await readFile(typedFile, "utf8"), bytes, "invalid cache is not silently migrated or overwritten");
+  }
+  console.log("PASS support runner: preserved raw results, actual support decisions, label isolation, scoped empty path, failed/partial denominators, combined budgets, binary/typed complete/partial cache proofs and current usage separation, query/body/settings isolation, frozen snapshot bindings and explicit deferrals; mock transport only.");
 } finally { await rm(directory, { recursive: true, force: true }); }

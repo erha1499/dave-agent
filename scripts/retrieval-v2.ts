@@ -6,7 +6,7 @@ import { BailianBudgetStop, BailianError, contentHash, createBailianClient, vali
 import { scopeDocuments, rankLexical, rankBm25, rankDense, reciprocalRankFusion, serializeRetrievalDocument, resolveRetrievalParameters,
   type RetrievalExperimentParameters, type RetrievalDocument, type RetrievalScope, type RankedDocument } from "../src/retrieval-ranking.ts";
 import { acceptEvidence, evidenceAcceptanceBinding, evidenceAcceptanceVersion, resolveEvidenceAcceptance, type EvidenceAcceptanceConfig, type EvidenceAcceptanceResult } from "../src/evidence-acceptance.ts";
-import { createEvidenceSupportClient, verifyEvidenceSupport, validateEvidenceSupportVerification, evidenceSupportInputHash, applyEvidenceSupport, EvidenceSupportError,
+import { createEvidenceSupportClient, verifyEvidenceSupport, validateEvidenceSupportVerification, evidenceSupportInputHash, evidenceSupportValidationVersion, applyEvidenceSupport, EvidenceSupportError,
   type EvidenceSupportClient, type EvidenceSupportAttempt, type EvidenceSupportCandidate, type EvidenceSupportVerification } from "../src/evidence-support.ts";
 import { loadRetrievalData } from "./retrieval-data.ts";
 
@@ -280,12 +280,16 @@ export async function runRetrievalV2(options: { label: string; modes?: Retrieval
     const input = { query, scope, candidates, settings: supportClient!.settings };
     const inputHash = evidenceSupportInputHash(input);
     const cachePath = join(cacheDir, `support-${inputHash}.json`), id = randomUUID();
+    const isolated = input.settings.validationVersion === evidenceSupportValidationVersion;
     if (parameters.cache === "reuse") try {
       const saved = JSON.parse(await readFile(cachePath, "utf8"));
-      const verification = { value: saved.value, requestHash: saved.requestHash, attempts: [] as EvidenceSupportAttempt[], inputHash };
-      if (saved.version !== 1 || saved.inputHash !== inputHash || saved.valueHash !== contentHash(saved.value)
+      const verification = isolated ? saved.verification
+        : { value: saved.value, requestHash: saved.requestHash, attempts: [] as EvidenceSupportAttempt[], inputHash };
+      if (saved.version !== (isolated ? 2 : 1) || saved.inputHash !== inputHash
+        || (isolated ? saved.verificationHash !== contentHash(verification) : saved.valueHash !== contentHash(saved.value))
         || !validateEvidenceSupportVerification(verification, input)) throw new Error("支持性缓存校验失败；未自动覆盖。");
-      supportCalls.push({ id, operation: "support", cache: "hit", inputHash, requestHash: saved.requestHash, attempts: [], status: "ok" });
+      // The proof retains original usage; only the current call ledger records replay cost.
+      supportCalls.push({ id, operation: "support", cache: "hit", inputHash, requestHash: verification.requestHash, attempts: [], status: "ok" });
       return { verification, callId: id };
     } catch (error) { if (!(error && typeof error === "object" && "code" in error && error.code === "ENOENT")) throw error; }
     if (!controls.beforeAttempt()) throw new BailianBudgetStop([]);
@@ -294,8 +298,11 @@ export async function runRetrievalV2(options: { label: string; modes?: Retrieval
       if (!validateEvidenceSupportVerification(response, input)) throw new Error("支持性响应校验失败。");
       supportCalls.push({ id, operation: "support", cache: "miss", inputHash, requestHash: response.requestHash, attempts: response.attempts, status: "ok" });
       supportConsecutiveFailures = 0;
-      if (parameters.cache === "reuse") await atomicJson(cachePath, { version: 1, inputHash, requestHash: response.requestHash,
-        createdAt: new Date().toISOString(), value: response.value, valueHash: contentHash(response.value) });
+      if (parameters.cache === "reuse") await atomicJson(cachePath, isolated
+        ? { version: 2, inputHash, createdAt: new Date().toISOString(),
+          verification: response, verificationHash: contentHash(response) }
+        : { version: 1, inputHash, requestHash: response.requestHash, createdAt: new Date().toISOString(),
+          value: response.value, valueHash: contentHash(response.value) });
       return { verification: response, callId: id };
     } catch (error) {
       if (!supportCalls.some(call => call.id === id)) supportCalls.push({ id, operation: "support", cache: "miss", inputHash,

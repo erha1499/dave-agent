@@ -71,6 +71,8 @@ npm run validate
 
 检索方案改为 `kind: "retrieval"`，每个 variant 使用 `modes: ["M0", "M4"]` 替代 architecture。参数含 candidateTopK、bm25K1/bm25B、rrfK/rrfWindow、cache、timeoutMs、retries、maxRequests、consecutiveFailureLimit。默认及边界由共享校验器提供。M4 始终使用可见范围内全部候选；Recall@5 / MRR@5 固定。cache=refresh 不读取或写入持久结果缓存，复用缓存的运行不能声称为独立模型重复或生产延迟。
 
+`retrieval-v2`注入typed隔离判别客户端时，缓存v2保存完整原`verification`及哈希，保留partial/invalid状态和原请求证明；本轮cache-hit账本仍为0新attempt，不重复汇总原费用。binary及旧非隔离缓存v1保持兼容；缺完整证明的旧typed缓存拒绝使用，不自动迁移、覆盖或远程重试。需重新有预算运行时使用独立`cacheDir`并保留旧记录；`refresh`仍不写持久缓存。本地哈希与结构/输入绑定不是远端真实性或语义正确性的证明，修复工程证据见[缓存合同](./optimization-plan.md#第十片typed判别缓存保留完整证明)。
+
 模型固定为现有业务模型配置及百炼 text-embedding-v4 1024 维、qwen3-rerank。没有任意模型、API URL、系统提示词、命令、文件路径或环境变量表单。长期记忆和模型改写暂未实现。
 
 ### C1 业务知识服务开关
