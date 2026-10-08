@@ -3,7 +3,7 @@ import { mkdtemp, readFile, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { BailianError, createBailianClient, resolveBailianEndpoints, embeddingDimensions, validVector } from "../src/bailian.ts";
-import { checkV2Boundaries, runRetrievalV2, retrievalModes, summarizeV2, validateV2Dataset, type V2Dataset } from "./retrieval-v2.ts";
+import { checkV2Boundaries, runRetrievalV2, retrievalModes, summarizeV2, validateV2Dataset, type SupportCall, type V2Dataset } from "./retrieval-v2.ts";
 
 const env = { DASHSCOPE_API_KEY: "mock-secret-do-not-record", DASHSCOPE_BASE_URL: "https://dashscope.aliyuncs.com/compatible-mode/v1" };
 const vector = (index = 0): number[] => Array.from({ length: embeddingDimensions }, (_value, i) => i === index ? 1 : 0);
@@ -94,6 +94,43 @@ try {
   const partial = summarizeV2([], [], first.report.plan);
   assert.ok(partial.groups.every(group => group.planned === group.missing));
   assert.ok(partial.groups.filter(group => group.suite === "standard").every(group => group.plannedRecallAt5 === 0));
+  const usd: SupportCall = { id: "usd", operation: "support", cache: "miss", inputHash: "synthetic-usd", requestHash: "synthetic-request", status: "ok",
+    attempts: [{ operation: "support", provider: "deepseek", model: "synthetic", attempt: 1, durationMs: 1, outcome: "ok",
+      totalTokens: 15, inputTokens: 10, outputTokens: 5, cacheReadTokens: 0, cacheWriteTokens: 0, costUsd: .000002 }] };
+  const cny: SupportCall = { ...usd, id: "cny", inputHash: "synthetic-cny", attempts: [{ ...usd.attempts[0]!,
+    provider: "bailian", model: "qwen3.7-plus-2026-05-26", costUsd: null, costCny: .0005 }] };
+  const unknown: SupportCall = { ...cny, id: "unknown", status: "failed", attempts: [{ ...cny.attempts[0]!, outcome: "timeout",
+    totalTokens: null, inputTokens: null, outputTokens: null, cacheReadTokens: null, cacheWriteTokens: null, costCny: null }] };
+  // Actual attempt costs stay in their original currency; unknown and no-attempt ledgers never become zero.
+  const costCases = [
+    { name: "single CNY", calls: [cny], expected: [.0005, .0005, null, null, 1] },
+    { name: "charged invalid response", calls: [{ ...cny, status: "failed" as const,
+      attempts: [{ ...cny.attempts[0]!, outcome: "invalid_response" as const }] }], expected: [.0005, .0005, null, null, 1] },
+    { name: "CNY known plus unknown", calls: [cny, unknown], expected: [.0005, null, null, null, .5] },
+    { name: "legacy USD", calls: [usd], expected: [null, null, .000002, .000002, 1] },
+    { name: "reported CNY zero", calls: [{ ...cny, attempts: [{ ...cny.attempts[0]!, costCny: 0 }] }], expected: [0, 0, null, null, 1] },
+    { name: "reported USD zero", calls: [{ ...usd, attempts: [{ ...usd.attempts[0]!, costUsd: 0 }] }], expected: [null, null, 0, 0, 1] },
+    { name: "cache only", calls: [{ ...cny, cache: "hit" as const, attempts: [] }], expected: [null, null, null, null, null] },
+    { name: "mixed currencies", calls: [cny, usd], expected: [.0005, null, .000002, null, 1] },
+  ];
+  for (const row of costCases) {
+    const usage = summarizeV2([], [], [], null, row.calls).usage.find(item => item.operation === "support");
+    assert.ok(usage && "knownEstimatedCostUsd" in usage);
+    assert.deepEqual([usage.knownEstimatedCostCny, usage.completeEstimatedCostCny, usage.knownEstimatedCostUsd,
+      usage.completeEstimatedCostUsd, usage.costCoverage], row.expected, row.name);
+    if (row.name === "charged invalid response") {
+      assert.equal(usage.requests, 1); assert.equal(usage.successfulRequests, 0);
+    }
+    if (row.name === "cache only") {
+      assert.equal(usage.requests, 0); assert.equal(usage.cacheHits, 1);
+      assert.equal(usage.knownTokens, null); assert.equal(usage.completeTokens, null); assert.equal(usage.usageCoverage, null);
+    }
+    if (row.name === "legacy USD") assert.deepEqual(usage, {
+      operation: "support", requests: 1, successfulRequests: 1, cacheHits: 0, reportedRequests: 1, usageCoverage: 1,
+      knownTokens: 15, completeTokens: 15, knownEstimatedCostCny: null, completeEstimatedCostCny: null,
+      knownEstimatedCostUsd: .000002, completeEstimatedCostUsd: .000002, costCoverage: 1,
+    }, "old USD-only ledger preserves its exact summary shape and values");
+  }
   const second = await runRetrievalV2({ ...options, modes: [...retrievalModes] });
   assert.ok(second.report.summary.usage.every(row => row.requests === 0 && row.completeTokens === null && row.cacheHits > 0));
   assert.deepEqual(second.report.results.map(row => row.ranking), first.report.results.map(row => row.ranking));

@@ -258,7 +258,7 @@ support 的 runId 是现有 MySQL 评测记录，summary 为 `RunAnalysis`（cou
 
 support 报告另保存逐行 `supportVerification` 和独立 `supportCalls` 账本。若 rerank 成功但支持判别超时、返回无效或请求预算不足，原始 ranking/metrics 仍保留成功结果，接收阶段为 `acceptance.status: "unavailable"`、`acceptedMetrics: null`，`summary.groups[].acceptance.failed` 增加；不能将其当成功拒答或从计划分母删除。可回答题的计划 Recall 仍承担该失败，成功观测的误拒/误接收分母不混入未完成判别。
 
-`summary.usage` 按 operation 分行：embedding/rerank 的费用在适用区域使用 `knownEstimatedCostCny` / `completeEstimatedCostCny`；support 使用 `knownEstimatedCostUsd` / `completeEstimatedCostUsd`，来源为 Pi 模型目录估算，另有 `costCoverage`。USD 与 CNY 独立展示，未知费用是 null；已报告部分与完整用量分开。格式无效的模型输出也可能已经产生用量，不能把未接收证据当作免费调用。
+`summary.usage` 按 operation 分行：embedding/rerank 的费用在适用区域使用 `knownEstimatedCostCny` / `completeEstimatedCostCny`；support 按实际 attempt 分别汇总已有 USD/CNY 字段，价格来源与固定版本在 `snapshot.settings.acceptance.support.pricing`，是估算而非账单。`costCoverage` 是有任一币种已知费用的请求数/实际请求数；每个 `completeEstimatedCost*` 只有全部实际请求均报告该币种费用时才有值，混合币种不能成为单币种完整费用。USD 与 CNY 独立展示，已知零费用保留为0，未知费用是 null；缓存命中无新请求/用量，零实际请求的完整费用与覆盖率仍为null。格式无效的模型输出也可能已经产生用量，不能把未接收证据当作免费调用。2026-10-09补齐support的CNY汇总；历史保存报告不自动重写或补算。
 
 事实支持效果必须基于实际 verifier 记录评分：
 

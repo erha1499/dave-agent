@@ -155,15 +155,17 @@ export function summarizeV2(results: V2Result[], calls: Call[], plan: PlannedCas
       completeEstimatedCostCny: attempts.length && attempts.length === known.length && pricePerMillionCny !== null ? knownTokens! * pricePerMillionCny / 1_000_000 : null };
   });
   const attempts = supportCalls.flatMap(call => call.attempts), known = attempts.filter(attempt => attempt.totalTokens !== null);
-  const costs = attempts.filter(attempt => attempt.costUsd !== null);
+  const costs = attempts.filter(attempt => attempt.costUsd !== null), costsCny = attempts.filter(attempt => attempt.costCny != null);
   const knownTokens = known.length ? known.reduce((sum, attempt) => sum + attempt.totalTokens!, 0) : null;
   const knownCost = costs.length ? costs.reduce((sum, attempt) => sum + attempt.costUsd!, 0) : null;
+  const knownCostCny = costsCny.length ? costsCny.reduce((sum, attempt) => sum + attempt.costCny!, 0) : null;
   const supportUsage = { operation: "support", requests: attempts.length, successfulRequests: attempts.filter(attempt => attempt.outcome === "ok").length,
     cacheHits: supportCalls.filter(call => call.cache === "hit").length, reportedRequests: known.length, usageCoverage: attempts.length ? known.length / attempts.length : null,
     knownTokens, completeTokens: attempts.length && known.length === attempts.length ? knownTokens : null,
-    knownEstimatedCostCny: null, completeEstimatedCostCny: null, knownEstimatedCostUsd: knownCost,
+    knownEstimatedCostCny: knownCostCny,
+    completeEstimatedCostCny: attempts.length && costsCny.length === attempts.length ? knownCostCny : null, knownEstimatedCostUsd: knownCost,
     completeEstimatedCostUsd: attempts.length && costs.length === attempts.length ? knownCost : null,
-    costCoverage: attempts.length ? costs.length / attempts.length : null };
+    costCoverage: attempts.length ? attempts.filter(attempt => attempt.costUsd !== null || attempt.costCny != null).length / attempts.length : null };
   return { plannedRows: plan.length, completedRows: results.length, missingRows: plan.length - results.length, groups,
     usage: [...usage, ...(supportCalls.length ? [supportUsage] : [])] };
 }
