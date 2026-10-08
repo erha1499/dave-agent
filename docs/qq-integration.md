@@ -77,7 +77,7 @@ Webhook 协议允许回调端口 `80/443/8080/8443`，要求 HTTPS。可以由�
 
 每个进程只服务一个 AppID，因此会话键采用 `group_openid + member_openid`，机器人身份由进程隔离。不同用户隔离，同一用户消息串行；D3 商家结果已通过同一队列续接，窗口与恢复边界见[商家结果续接](#d3-商家结果续接)。订单身份则由可信 AppID＋发送者标识查询 `qq_identities`，每次工具执行都检查绑定及归属，不使用用户正文、昵称或 CLI 默认客户身份。官方文档说明群 @ 的 `content` 已去掉机器人 mention 前缀；过滤依据可信事件类型，不能把文本中的昵称当作身份。[群 @ 事件](https://bot.q.qq.com/wiki/develop/api-v2/autogen/event/group_at_message_create.html)
 
-未绑定用户可以问通用规则，不能查订单。宿主将可信事件身份记录在被 Git 忽略的 `.runtime/qq-identities/`，绑定日志只输出匿名代号，不公开真实发送者标识。本机管理员先核对发信人，再选择其对应的演示客户并运行 `qq:bind`；脚本通过容器管理员权限写入映射，不能覆盖已有绑定。不能将所有成员自动绑定为客户一，也不能让用户通过对话自行指定客户 ID。绑定完成后原会话下一次查询即生效。
+未绑定用户可以问通用规则，不能查订单。宿主将可信事件身份记录在被 Git 忽略的 `.runtime/qq-identities/`，绑定日志只输出匿名代号，不公开真实发送者标识。本机管理员先核对发信人，再选择其对应的演示客户并运行 `qq:bind`；脚本通过容器管理员权限写入映射，不能覆盖已有绑定。不能将所有成员自动绑定为客户一，也不能让用户通过对话自行指定客户 ID。绑定成功提交后，后续新开始的订单工具查询按新映射授权，无需重启会话；这不保证在途查询撤销或旧模型历史清除，见[绑定与失效审计](#身份绑定与失效调用链审计2026-10-08)。
 
 群 OpenID 与 AppID 相关：更换机器人后，即使目标 QQ 群不变，也需通过新机器人的入站事件重新取得 OpenID。[唯一身份机制](https://bot.q.qq.com/wiki/develop/api-v2/dev-prepare/api-call-guide.html)
 
@@ -114,6 +114,24 @@ ACK 只说明收到事件，不证明模型成功、退款成功或事件已持�
 API 当前通过 `AppID + AppSecret` 获取 AccessToken：`POST https://api.bot.qq.com/app/getAppAccessToken`，请求字段为 `appId/clientSecret`；调用 API 使用 `Authorization: QQBot <AccessToken>`。有效期按返回的 `expires_in` 处理，通常不超过 7200 秒，接近到期 60 秒内可获取新 token。优先复用 SDK 的缓存和刷新；不要沿用已弃用的静态 Token 方案。[接口调用与鉴权](https://bot.q.qq.com/wiki/develop/api-v2/dev-prepare/interface-framework/api-use.html)
 
 SDK `1.0.4` 的默认 API / Token 域名仍是 `api.sgroup.qq.com` / `bots.qq.com`，与当前文档有差异。实例的 `baseUrl` 和 `tokenBaseUrl` 均已设为 `https://api.bot.qq.com`，真实获取 token、网关连接和群消息发送已成功。旧地址是否继续兼容，本轮没有实际调用证据；无需为这个差异 fork SDK。[配置透传对照](https://github.com/tencent-connect/qqbot-nodejs/blob/ca55d9c395b582b7fcfad0ec27209c35dd04e0b3/src/QQBot.ts)，该段已同时核对 npm 发布源码和编译产物。
+
+### 身份绑定与失效调用链审计（2026-10-08）
+
+**本轮 P0 合同：** 业务约束是由管理员把可信 QQ 发送者关联到合成客户，用户话术、昵称、匿名代号和模型参数都不能授予订单权限。面试追问是“绑定后为何无需重启，以及解绑后拒绝新查询是否就清除了旧模型事实”。个人实现是管理员绑定流程、工具边界的重新授权和可选上下文失效；复用腾讯 SDK 入站身份、Pi 循环与既有 MySQL 约束。固定源码基线 `f9bff1b533ba9565422797864336e6b645fbc0e9`，沿用[稳定 atomic 配置](./after-sales.md#启动)。预算30分钟，只读源码/既有记录、独审及文档差异/链接核验后收尾；0新增模型、数据库或真实QQ请求，不重跑既有检查。
+
+| 调用位置 | 真实行为与边界 |
+| --- | --- |
+| [qq.ts：main 的 Session 工厂](../src/qq.ts) → [QQAgent.enqueue](../src/qq-agent.ts) | identity 取进程 AppID 与可信事件 senderId；群白名单在工厂前执行。会话按群＋发送者隔离，但 `resolveCustomer` 只在创建 Session 时用于未绑定提示/记录，不是每轮权限门禁。已有 Session 继续复用，不能依赖日志提示阻止访问。 |
+| [recordQQIdentity](../src/qq-identity.ts) | 对 AppID＋senderId 做 SHA-256，显示12位前缀；完整记录位于忽略目录，目录/新文件创建权限为0700/0600，`wx` 不覆盖已有文件。因此 groupOpenid/seenAt 是首次记录，不是最新活动或当前授权证明；匿名代号只是管理员定位索引，仍须核对发信人。 |
+| [bind-qq.ts：main](../scripts/bind-qq.ts) → [qq_identities](../db/01-schema.sql) | 严格校验参数、唯一前缀匹配、当前 AppID 与记录中的白名单群；通过本机容器管理员事务仅插入现有客户且尚无绑定的映射。已有相同绑定可确认，已有其他客户则报错不覆盖；数据库的发送者唯一键与客户外键独立兜底。该脚本没有解绑/重绑功能，也不是模型工具。 |
+| [createCouponSession 的 get_order](../src/agent.ts) → [CouponStore.getOrder](../src/coupon-store.ts) | 模型只提交 orderId，宿主闭包带 identity；每次查询联查当前映射及订单归属，并在同一个只读 REPEATABLE READ 快照中读取订单/券/支付/退款。成功绑定提交后的新快照会读取新映射；已经建立的快照不构成实时撤销屏障。不存在和不归属使用相同拒绝消息，结果不暴露客户或发送者标识。 |
+| atomic 历史与 [Controller/mysql 恢复](./conversation-recovery.md#本片恢复与降级边界) | 默认 atomic Session 未传轮前绑定检查，普通消息复用 Pi 历史；管理员删除/重绑后，工具重新授权不能证明历史事实已从后续模型输入清除。只有显式 Controller/mysql 的 `options.context` 路径才读取 customerId/绑定行ID/修订号，并在变化时同时 `resetLeaf()` 与 `agent.reset()`。这不是默认 atomic 或 Controller/memory 的保证，当前分支重置也不是历史物理删除。 |
+
+**取舍与可复现路线：** 同一发送者在获准群中的订单身份共享 AppID＋senderId 映射，群级会话/确认来源另行隔离；不把群成员资格当订单授权。管理员首次绑定复用一张映射表及约束，工具自行查库，避免把客户ID交给模型或另建登录系统。代价是本机人工核对与管理员权限；每次 `get_order` 都在数据库查询中复核授权，没有独立延迟/费用对照。沿[最小验收顺序](#最小验收顺序)的第4步复现“未绑定拒绝 → 管理员绑定 → 原会话新查询本人单 → 他人单拒绝”，工程入口为 `npm run check:business`（真实MySQL＋Pi/faux，须先准备本机数据库）；本轮未执行这些写入/检查，也未读取本机真实身份记录。
+
+**证据与未准入项：** [2026-10-03双用户实测](#双用户隔离与异额退款)支持首次绑定无需重启及本人/他人订单边界；[O4恢复记录](./conversation-recovery.md#启用与复现)支持候选配置的绑定变化清理，均为历史证据。源码证明默认路径缺少相应失效门禁，不能据静态阅读声称已动态复现模型泄漏，也不能宣称默认已支持运行中的解绑/重绑清历史。该能力保持未实现/未准入；若要支持它，下一步先冻结一个“旧订单已入Pi历史 → 删除或更换绑定 → 下一轮实际 provider 输入不含旧事实”的独立工程合同。既有首次绑定闭环继续展示，C1/O4/O5、通知/退款事务及历史分数不变。
+
+**本轮结果：** 固定基线源码与工作区对应文件无差异，独审及文档/链接核验通过；仅补材料与计划，不改生产代码或配置。无新增业务运行、效果分数或费用估算，不把源码审阅替代当前MySQL、真实模型、QQ或商业交易验收。
 
 ### 会话排队与超时恢复调用链审计（2026-10-08）
 
