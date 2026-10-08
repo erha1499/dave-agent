@@ -31,6 +31,25 @@ const deferred = () => {
   const promise = new Promise<void>((done) => { resolve = done; });
   return { promise, resolve };
 };
+async function within(pending: Promise<unknown>, label: string) {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    await Promise.race([pending, new Promise<never>((_, reject) => {
+      timer = setTimeout(() => reject(new Error(`${label}：等待超过 5 秒。`)), 5000);
+    })]);
+  } finally { clearTimeout(timer); }
+}
+async function waitBlocked(started: Promise<void>, pending: Promise<void>, label: string) {
+  await within(Promise.race([started, pending.then(() => { throw new Error(`${label}：本轮提前结束，未进入阻塞点。`); })]), label);
+}
+async function observePending(pending: Promise<void>, label: string) {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    await Promise.race([pending.then(() => { throw new Error(`${label}：释放前已提前结束。`); }), new Promise<void>(resolve => {
+      timer = setTimeout(resolve, 100);
+    })]);
+  } finally { clearTimeout(timer); }
+}
 function message(id: string, content: string, senderId = "user_one", groupOpenid = "group_one"): QQBotInboundMessage {
   const timestamp = new Date().toISOString();
   return {
@@ -192,6 +211,165 @@ try {
 } finally {
   await timed.close();
 }
+
+// Actual Pi must settle a noncooperative provider before replacing its session.
+const providerStarted = deferred(), providerRelease = deferred(), providerFallback = deferred();
+const providerSessions = sessions.length, providerCalls = faux.state.callCount;
+let providerSignal: AbortSignal | undefined, providerSettled = false, lateToolStarts = 0;
+let providerRecoveryInputs: string[] | undefined;
+const noncooperative = new QQAgent(async () => {
+  const session = await create();
+  session.subscribe(event => { if (event.type === "tool_execution_start") lateToolStarts++; });
+  return session;
+}, async (target, text) => {
+  await send(target, text);
+  if (target.msgId === "held-provider") providerFallback.resolve();
+}, (text) => logs.push(text), 50);
+faux.setResponses([
+  async (_context, options) => {
+    providerSignal = options?.signal;
+    providerStarted.resolve();
+    await providerRelease.promise; // Deliberately ignores abort.
+    return fauxAssistantMessage(fauxToolCall("echo", { text: "旧供应商迟到工具" }), { stopReason: "toolUse" });
+  },
+  context => { providerRecoveryInputs = inputs(context); return fauxAssistantMessage("供应商释放后恢复"); },
+]);
+const heldProvider = noncooperative.handle(message("held-provider", "供应商阻塞测试")).finally(() => { providerSettled = true; });
+let providerRetry: Promise<void> | undefined;
+try {
+  await waitBlocked(providerStarted.promise, heldProvider, "供应商启动");
+  await waitBlocked(providerFallback.promise, heldProvider, "供应商超时回执");
+  assert.equal(providerSignal?.aborted, true);
+  providerRetry = noncooperative.handle(message("held-provider-retry", "供应商恢复测试"));
+  await observePending(heldProvider, "忽略取消的供应商");
+  assert.equal(providerSettled, false);
+  assert.equal(sessions.length, providerSessions + 1);
+  assert.equal(faux.state.callCount, providerCalls + 1, "queued retry must not start while the old provider is held");
+  assert.deepEqual(sent.filter(item => item.target.msgId === "held-provider").map(item => item.text), ["客服暂时无法处理这条消息，请稍后重试。"]);
+  providerRelease.resolve();
+  await within(Promise.all([heldProvider, providerRetry]), "供应商释放与恢复");
+  assert.equal(sessions.length, providerSessions + 2);
+  assert.equal(faux.state.callCount, providerCalls + 2);
+  assert.deepEqual(providerRecoveryInputs, ["供应商恢复测试"]);
+  assert.equal(lateToolStarts, 0, "aborted provider's late echo tool call must never execute");
+  assert.equal(sent.at(-1)?.text, "供应商释放后恢复");
+  assert.equal(sent.filter(item => item.target.msgId === "held-provider").length, 1);
+  assert.equal(faux.getPendingResponseCount(), 0);
+} finally {
+  providerRelease.resolve();
+  await within(Promise.allSettled([heldProvider, ...(providerRetry ? [providerRetry] : [])]), "供应商清理");
+  await within(noncooperative.close(), "供应商会话关闭");
+}
+
+// The actual Pi tool executor is held after start. Its fake completion is not a DB rollback check.
+const toolStarted = deferred(), toolRelease = deferred(), toolFallback = deferred();
+const toolSessions = sessions.length, toolCalls = faux.state.callCount;
+let toolSignal: AbortSignal | undefined, toolSettled = false, fakeCompletions = 0;
+let toolRecoveryInputs: string[] | undefined;
+const executingTool = new QQAgent(async () => {
+  const session = await create();
+  if (sessions.length === toolSessions + 1) {
+    const echo = session.agent.state.tools.find(tool => tool.name === "echo");
+    assert.ok(echo);
+    echo.execute = async (_id, _params, signal) => {
+      toolSignal = signal;
+      toolStarted.resolve();
+      await toolRelease.promise; // Work that already started can still complete after abort.
+      fakeCompletions++;
+      return { content: [{ type: "text", text: "已开始工具的迟到结果" }], details: {} };
+    };
+  }
+  return session;
+}, async (target, text) => {
+  await send(target, text);
+  if (target.msgId === "held-tool") toolFallback.resolve();
+}, (text) => logs.push(text), 50);
+faux.setResponses([
+  fauxAssistantMessage(fauxToolCall("echo", { text: "工具阻塞测试" }), { stopReason: "toolUse" }),
+  context => { toolRecoveryInputs = inputs(context); return fauxAssistantMessage("工具释放后恢复"); },
+]);
+const heldTool = executingTool.handle(message("held-tool", "已开始工具测试")).finally(() => { toolSettled = true; });
+let toolRetry: Promise<void> | undefined;
+try {
+  await waitBlocked(toolStarted.promise, heldTool, "工具启动");
+  await waitBlocked(toolFallback.promise, heldTool, "工具超时回执");
+  assert.equal(toolSignal?.aborted, true);
+  toolRetry = executingTool.handle(message("held-tool-retry", "工具恢复测试"));
+  await observePending(heldTool, "已经开始的工具");
+  assert.equal(toolSettled, false);
+  assert.equal(fakeCompletions, 0);
+  assert.equal(sessions.length, toolSessions + 1);
+  assert.equal(faux.state.callCount, toolCalls + 1);
+  assert.deepEqual(sent.filter(item => item.target.msgId === "held-tool").map(item => item.text), ["客服暂时无法处理这条消息，请稍后重试。"]);
+  toolRelease.resolve();
+  await within(Promise.all([heldTool, toolRetry]), "工具释放与恢复");
+  assert.equal(fakeCompletions, 1, "abort does not undo an already started fake tool execution");
+  assert.equal(sessions.length, toolSessions + 2);
+  assert.equal(faux.state.callCount, toolCalls + 2, "aborted tool result must not trigger another old-session provider call");
+  assert.deepEqual(toolRecoveryInputs, ["工具恢复测试"]);
+  assert.equal(sent.at(-1)?.text, "工具释放后恢复");
+  assert.equal(sent.filter(item => item.target.msgId === "held-tool").length, 1, "late tool result must not be sent");
+  assert.equal(faux.getPendingResponseCount(), 0);
+} finally {
+  toolRelease.resolve();
+  await within(Promise.allSettled([heldTool, ...(toolRetry ? [toolRetry] : [])]), "工具清理");
+  await within(executingTool.close(), "工具会话关闭");
+}
+
+// Pi can be idle while a Controller's prompt wrapper is still publishing host context.
+const publishStarted = deferred(), publishRelease = deferred(), publishFallback = deferred();
+const publishSessions = sessions.length, publishCalls = faux.state.callCount;
+let publishSettled = false, hostCompletions = 0, nativeIdle = false;
+let publishRecoveryInputs: string[] | undefined;
+const publishingHost = new QQAgent(async () => {
+  const session = await create();
+  if (sessions.length === publishSessions + 1) {
+    const nativePrompt = session.prompt.bind(session);
+    session.prompt = async (...args) => {
+      await nativePrompt(...args);
+      nativeIdle = session.isIdle;
+      publishStarted.resolve();
+      await publishRelease.promise;
+      hostCompletions++;
+    };
+  }
+  return session;
+}, async (target, text) => {
+  await send(target, text);
+  if (target.msgId === "held-publish") publishFallback.resolve();
+}, (text) => logs.push(text), 50);
+faux.setResponses([
+  fauxAssistantMessage("旧宿主发布的迟到文本"),
+  context => { publishRecoveryInputs = inputs(context); return fauxAssistantMessage("宿主发布释放后恢复"); },
+]);
+const heldPublish = publishingHost.handle(message("held-publish", "宿主发布阻塞测试")).finally(() => { publishSettled = true; });
+let publishRetry: Promise<void> | undefined;
+try {
+  await waitBlocked(publishStarted.promise, heldPublish, "宿主发布启动");
+  assert.equal(nativeIdle, true, "native Pi must be idle before the host publish barrier");
+  await waitBlocked(publishFallback.promise, heldPublish, "宿主发布超时回执");
+  publishRetry = publishingHost.handle(message("held-publish-retry", "宿主发布恢复测试"));
+  await observePending(heldPublish, "Pi idle 后的宿主发布");
+  assert.equal(publishSettled, false);
+  assert.equal(hostCompletions, 0);
+  assert.equal(sessions.length, publishSessions + 1);
+  assert.equal(faux.state.callCount, publishCalls + 1, "retry must wait for the complete prompt wrapper, not only Pi abort");
+  assert.deepEqual(sent.filter(item => item.target.msgId === "held-publish").map(item => item.text), ["客服暂时无法处理这条消息，请稍后重试。"]);
+  publishRelease.resolve();
+  await within(Promise.all([heldPublish, publishRetry]), "宿主发布释放与恢复");
+  assert.equal(hostCompletions, 1);
+  assert.equal(sessions.length, publishSessions + 2);
+  assert.equal(faux.state.callCount, publishCalls + 2);
+  assert.deepEqual(publishRecoveryInputs, ["宿主发布恢复测试"]);
+  assert.equal(sent.at(-1)?.text, "宿主发布释放后恢复");
+  assert.equal(sent.filter(item => item.target.msgId === "held-publish").length, 1, "old native text must not be sent after host publication settles");
+  assert.equal(faux.getPendingResponseCount(), 0);
+} finally {
+  publishRelease.resolve();
+  await within(Promise.allSettled([heldPublish, ...(publishRetry ? [publishRetry] : [])]), "宿主发布清理");
+  await within(publishingHost.close(), "宿主发布会话关闭");
+}
+console.log("QQ→Pi 取消边界回归通过：3/3 工程控制，超时各一次回执、100ms 内等待旧供应商/工具/宿主发布结束、释放后新会话恢复；假工具完成不代表数据库回滚。");
 
 const creating = deferred();
 const releaseCreate = deferred();

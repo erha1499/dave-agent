@@ -108,6 +108,7 @@ export class QQAgent {
       const tag = createHash("sha256").update(key).digest("hex").slice(0, 12);
       let timer: ReturnType<typeof setTimeout> | undefined;
       let aborting: Promise<void> | undefined;
+      let prompting: Promise<void> | undefined;
       let failed = false;
       let merchant: MerchantTask | undefined;
       let activeTools: string[] | undefined;
@@ -221,8 +222,9 @@ export class QQAgent {
         if (supportRun) prepareSupportPrompt(session, {
           requestId: msg.messageId, groupOpenid: msg.groupOpenid!, messageId: msg.messageId,
         });
+        prompting = session.prompt(prompt, { expandPromptTemplates: false });
         await Promise.race([
-          session.prompt(prompt, { expandPromptTemplates: false }),
+          prompting,
           new Promise<never>((_resolve, reject) => {
             timer = setTimeout(() => reject(new Error("模型处理超时")), this.timeoutMs);
           }),
@@ -274,6 +276,8 @@ export class QQAgent {
             }
             await aborting;
           } finally {
+            // Controller publication can outlive Pi idle; finish the full prompt before replacing it.
+            await prompting?.catch(() => {});
             conversation.session.dispose();
             conversation.session = undefined;
             conversation.turns = 0;

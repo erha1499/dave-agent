@@ -125,7 +125,7 @@ QQAgent.enqueue
 
 腾讯 SDK 已实现地址验证 `op:13`、普通事件 Ed25519 验签、事件分发和 HTTP ACK。当前 Webhook 实现将事件处理放到后台，立即返回 HTTP 200 与 `{"op":12,"d":0}`；普通事件缺失或错误签名会返回 401。地址验证走独立路径，不能把它当成用户消息交给 Pi。[Webhook 源码](https://github.com/tencent-connect/qqbot-nodejs/blob/ca55d9c395b582b7fcfad0ec27209c35dd04e0b3/src/protocol/transport/webhook.ts)
 
-ACK 只说明收到事件，不证明模型成功、退款成功或事件已持久保存。当前宿主负责测试群白名单、Pi 会话队列、模型超时与发送失败记录，Webhook 请求体限制为 64 KiB。最多 20 个内存会话，每会话最多 3 条在途消息（含正在处理）；Pi prompt 限时 60 秒，空闲 30 分钟清理，20 轮后换新上下文。自动压缩关闭，模型输出最多 2048 token；输出长度按上述模板限制，并在发送前重新检查原消息仍处于 4 分 30 秒回复余量内。SDK 去重中间件使用进程内状态，重启后丢失，不能替代业务幂等或持久事件队列。
+ACK 只说明收到事件，不证明模型成功、退款成功或事件已持久保存。当前宿主负责测试群白名单、Pi 会话队列、模型超时与发送失败记录，Webhook 请求体限制为 64 KiB。最多 20 个内存会话，每会话最多 3 条在途消息（含正在处理）；Pi prompt 的60秒timer触发取消/失败处理，旧请求完成取消收尾没有硬时限（见[取消边界](#非协作取消与在途工具的恢复边界2026-10-09)）；空闲 30 分钟清理，20 轮后换新上下文。自动压缩关闭，模型输出最多 2048 token；输出长度按上述模板限制，并在发送前重新检查原消息仍处于 4 分 30 秒回复余量内。SDK 去重中间件使用进程内状态，重启后丢失，不能替代业务幂等或持久事件队列。
 
 发布包的 `msg_seq` 由时间和随机数生成，并非每个原消息的持久递增计数；重新调用发送会生成新序号，不能把 SDK 发送当成业务幂等保障。SDK 的群级并发中间件也不能替代我们的“群＋发送者”会话队列；初期不用 SDK 自带历史缓冲，由 Pi 统一管理对话。[发送实现](https://github.com/tencent-connect/qqbot-nodejs/blob/ca55d9c395b582b7fcfad0ec27209c35dd04e0b3/src/protocol/api/routes.ts)、[并发中间件](https://github.com/tencent-connect/qqbot-nodejs/blob/ca55d9c395b582b7fcfad0ec27209c35dd04e0b3/src/middleware/concurrency-guard.ts)
 
@@ -183,7 +183,25 @@ SDK `1.0.4` 的默认 API / Token 域名仍是 `api.sgroup.qq.com` / `bots.qq.co
 
 这些证据支持默认QQ门禁的工程与实库行为，0新增远程模型/真实QQ/商业交易调用。未绑定公开咨询适用于默认atomic和Controller/memory；Controller/mysql仍沿用其候选恢复合同。本片不改O4/C1准入，也不回填历史QQ成绩。快照之间直接UPDATE A→B→A、强行复用原ID、轮前快照之后的provider输入窗口、末次快照到QQ发送间的撤销、撤回已提交provider的旧内容均未证明；数据库授权与QQ发送仍不原子。
 
+### 非协作取消与在途工具的恢复边界（2026-10-09）
+
+五项P0合同见[第四片](./optimization-plan.md#第四片非协作取消时的队列恢复合同)。实际Pi/faux基线复现：50ms测试timer触发失败通知及AbortSignal，100ms观察窗内原handle仍未完成，同用户retry没有进入新provider或Session；释放旧callback后才重建并恢复，迟到echo调用未执行。该结果修正此前“失败tail不会阻塞后续轮”的笼统表述，是工程负控，不是远程请求或QQ验收。
+
+```text
+prompt超时 → cancelSupportTurn＋Pi abort → 一次受控恢复回复
+  → 等Pi idle及完整prompt（含宿主尾段，无硬等待上限）→ dispose → 同用户下一轮新Session
+其他用户的独立队列可继续处理；close同样等待旧Session与队列收尾
+```
+
+固定SDK1.0.0的`AgentSession.abort()`发出信号后等待idle；`dispose()`清监听器、扩展上下文及资源，没有终止外部Promise或强制idle。Pi默认parallel工具路径在prepare与execute前检查signal，未启动的迟到工具被拒；已启动execute仍等待完成。当前atomic工具不消耗signal，已经开始的`prepare_refund`可保存待确认方案，取消不能撤销已开始的事务，也不构成退款执行授权。
+
+本片另修复QQ只等Pi idle的遗漏：Controller的完整prompt在native模型结束后仍会await上下文发布，现[QQAgent](../src/qq-agent.ts)保留该Promise并在失败dispose前等其settle，避免宿主尾段未结束就释放同用户队列。Controller的`cancelSupportTurn`和`support_action`在继续操作与本地发布前校验当前turn/signal；已发出的focus/context写仍需完成。context引用写若在取消后完成，会尝试CAS补blocked；focus接口没有此补写，CAS补写失败也不能视为原子撤销。正式QQ当前注入context，不注入focus。跳过finally等待后直接重建，会让旧任务/写入与新会话并存，Map的会话与排队上限也不再覆盖退役任务；本片补齐完整prompt尾段等待，保留生命周期串行，没有为更短表面耗时删除等待或改Pi核心；它只涵盖包装prompt所等待的宿主工作，不保证任意脱离该Promise的后台任务收尾。
+
+新增专项区分原实现可通过的非协作provider/已开始工具2个边界控制，以及捕获Pi idle后宿主尾段提前释放的1个修复控制；对应实库与最终完整检查结果见[第四片收尾](./optimization-plan.md#第四片非协作取消时的队列恢复合同)。它不证明DB回滚、供应商停计费或QQ客户端显示；要支持有界退役，须另立合同区分provider等待与工具/持久写阶段，并跟踪退役任务、资源上限和收尾。取消后的底层请求尝试、已经发送的HTTP及外部副作用仍不能被本片强行撤回。
+
 ### 会话排队与超时恢复调用链审计（2026-10-08）
+
+本节原专项使用响应取消信号的provider；非协作及已启动工具的补充合同见[2026-10-09取消边界](#非协作取消与在途工具的恢复边界2026-10-09)。
 
 **本轮 P0 合同：** 业务约束是同一用户的确认/查询按到达顺序执行，不串入其他会话，也不把超时或未知发送当作成功。面试追问是“一个用户卡住时，其他人能否继续；超时后旧请求会不会发出迟到回复；60秒到底覆盖哪些等待”。个人实现为入口校验、按群＋用户的Promise队列、取消/替换会话与发送门槛；复用腾讯SDK通信/中间件、Pi工具循环/取消接口及已有业务重新授权。本轮只审计这一链、修正文档状态与时间范围，沿用[稳定atomic演示配置](./after-sales.md#启动)。预算30分钟，既有离线检查仅一次（命令超时90秒），0远程模型/真实QQ/数据库请求；核对源码、检查及证据范围后收尾，不扩建队列或重新跑候选实验。
 
@@ -192,7 +210,7 @@ SDK `1.0.4` 的默认 API / Token 域名仍是 `api.sgroup.qq.com` / `bots.qq.co
 | [qq.ts：main / sanitizeQQContent](../src/qq.ts) → [QQAgent.handle / enqueue](../src/qq-agent.ts) | 正式入口依次注册群白名单、SDK内存去重、mentionGate和有限前缀清理，再调用handle。宿主只接受群@事件，校验发送者、群、消息及replyTarget一致；文本中的身份不是授权。validQQMessage要求消息年龄在-30秒至严格小于270秒之间，在入队、出队和会话创建后复查。 |
 | QQAgent.enqueue：conversation.tail | 以JSON编码的群＋发送者为键串接Promise；同一会话最多3条在途（含正在执行），第4条只回忙碌提示、不进入模型/确认hook。不同键各有队列；第21个新会话被拒，已有会话仍可接待。出队过期的消息直接放弃，队列不是持久事件收件箱。 |
 | enqueue：创建会话 → beforePrompt → session.prompt | 创建会话后才执行宿主前置处理；返回固定回执时不调用模型，回执以triggerTurn=false写入原会话。普通消息进入Pi，60秒timer仅与prompt竞速；排队、会话创建、beforePrompt、发送及等待abort完成均不在该timer内，不能称作整条请求60秒保证。 |
-| enqueue：catch / finally → deliver | 模型超时/错误先发出abort，再尝试一次受控失败回复；finally等待取消并dispose旧会话，之后下一轮创建新会话，失败tail不会阻塞后续轮。发送或登记异常不盲目重发；正常模型路径发送前复查时效及关闭状态。close先标记关闭、取消已建立会话，再等待队列收尾，不能证明任意外部等待有界。 |
+| enqueue：catch / finally → deliver | 模型超时/错误先发出abort，再尝试一次受控失败回复；原基线finally仅等Pi idle；2026-10-09还补等完整prompt宿主尾段再dispose，新轮才创建会话。catch消化异常不能使未settle的tail立即完成，非协作取消仍会阻塞同一用户后续轮。发送或登记异常不盲目重发；正常模型路径发送前复查时效及关闭状态。close先标记关闭、取消已建立会话，再等待队列收尾，不能证明任意外部等待有界。 |
 | [agent.ts：createSession](../src/agent.ts) 与业务Store | Pi完整历史只在内存中；20个已处理轮后，下一轮dispose并重建，空闲且无在途的会话达到30分钟后在扫描/下次入队时清理。轮换不迁移对话摘要，下一轮必须重新定位/取证；业务任务与退款的持久化及幂等另由Store保证，不能把会话串行说成跨进程事务保护。 |
 
 取舍是用现有Promise与Pi生命周期承载小规模测试群，避免引入消息代理或自写Harness；代价是队列/历史在进程退出后丢失，超时不覆盖所有await，内存限额与轮换可能要求用户重述。SDK去重不等于处理成功或资金幂等，跨进程恢复与已执行退款仍须按[售后持久化边界](./after-sales.md#确认与持久化边界)说明。D3已实现续接，本页旧“尚未实现”描述已修正；不据此认领真实商家网络回调。

@@ -642,6 +642,90 @@ COMMIT;`);
     faux.setResponses(responses(action("order"))); await qq.handle(message(qqGroup, "继续查看这笔订单"));
     assert.equal(getSupportResult(sessions.at(-1)!)?.evidence.order?.id, orderB);
     console.log("[conversation-state] real QQAgent local transport, 20-turn replacement and A-notification/B-focus isolation PASS");
+
+    await qq.close(); qq = undefined;
+    {
+      const channel = group("publish-timeout"), port = bind(channel);
+      const deferred = () => { let resolve!: () => void; const promise = new Promise<void>(done => { resolve = done; }); return { promise, resolve }; };
+      const entered = deferred(), release = deferred(), deliveredFallback = deferred();
+      async function bounded<T>(pending: Promise<T>, label: string): Promise<T> {
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        try {
+          return await Promise.race([pending, new Promise<never>((_resolve, reject) => {
+            timer = setTimeout(() => reject(new Error(`Context publication check timed out: ${label}`)), 5000);
+          })]);
+        } finally { clearTimeout(timer); }
+      }
+      let initialSession: Session | undefined, firstPublication = true, created = 0;
+      let firstSettled = false, retrySettled = false;
+      let firstHandle: Promise<void> | undefined, retryHandle: Promise<void> | undefined;
+      const writes: string[] = [], delivered: Array<{ messageId?: string; text: string }> = [];
+      const held: Port = { ...port, async write(expected, proposed) {
+        const publication = firstPublication && Boolean(proposed.focus);
+        if (publication) {
+          firstPublication = false;
+          assert.equal(initialSession?.isIdle, true, "The native Pi run has settled before the host focus publication waits");
+          entered.resolve(); await release.promise;
+        }
+        const saved = await port.write(expected, proposed);
+        if (publication) {
+          assert.equal(saved.value?.focus?.orderId, orderA); writes.push("focus-committed");
+        } else if (writes.includes("focus-committed") && proposed.requiresRestatement && !proposed.focus) {
+          assert.equal(saved.value?.requiresRestatement, true); assert.equal(saved.value.focus, undefined);
+          writes.push("cancelled-publication-invalidated");
+        }
+        return saved;
+      } };
+      const firstMessage = message(channel, `查看 ${orderA}`), retryMessage = message(channel, `查看 ${orderB}`);
+      qq = new QQAgent(async () => {
+        created++;
+        if (created > 1) {
+          assert.deepEqual(writes, ["focus-committed", "cancelled-publication-invalidated"]);
+          const saved = await port.read();
+          assert.equal(saved.value?.requiresRestatement, true); assert.equal(saved.value.focus, undefined);
+          writes.push("new-session-read-blocked");
+        }
+        const session = await create(channel, created === 1 ? held : port);
+        if (created === 1) initialSession = session;
+        return session;
+      }, async (target, text) => {
+        delivered.push({ messageId: target.msgId, text });
+        if (target.msgId === firstMessage.messageId) deliveredFallback.resolve();
+      }, () => {}, 500, undefined, undefined, { resolveBinding: () => business.resolveBinding(identity) });
+      try {
+        faux.setResponses(responses(action("order", explicit(orderA))));
+        firstHandle = qq.handle(firstMessage).finally(() => { firstSettled = true; });
+        await bounded(entered.promise, "publication startup");
+        await bounded(deliveredFallback.promise, "timeout reply");
+        assert.equal(initialSession?.isIdle, true);
+        assert.equal(faux.getPendingResponseCount(), 0);
+        assert.equal(delivered.length, 1);
+        const callsWhileHeld = faux.state.callCount;
+        faux.setResponses(responses(action("order", explicit(orderB))));
+        retryHandle = qq.handle(retryMessage).finally(() => { retrySettled = true; });
+        await new Promise<void>(resolve => setTimeout(resolve, 80));
+        assert.equal(firstSettled, false, "Pi idle must not release a host prompt whose context publication is still pending");
+        assert.equal(retrySettled, false); assert.equal(created, 1); assert.equal(faux.state.callCount, callsWhileHeld);
+        assert.deepEqual(writes, []); assert.equal(delivered.length, 1);
+        release.resolve();
+        await bounded(Promise.all([firstHandle, retryHandle]), "full host settlement and retry");
+        assert.equal(created, 2); assert.equal(firstSettled, true); assert.equal(retrySettled, true);
+        assert.deepEqual(writes, ["focus-committed", "cancelled-publication-invalidated", "new-session-read-blocked"]);
+        assert.deepEqual(delivered.map(reply => reply.messageId), [firstMessage.messageId, retryMessage.messageId], "The canceled first prompt cannot send a late second reply");
+        assert.match(delivered[1]!.text, new RegExp(orderB));
+        const recovered = await port.read();
+        assert.equal(recovered.value?.focus?.orderId, orderB); assert.equal(recovered.value.requiresRestatement, false);
+        assert.equal(faux.getPendingResponseCount(), 0);
+        console.log("[conversation-state] Pi idle with pending host publication: QQ timeout waits for real focus commit/CAS invalidation before replacement and explicit-order recovery PASS");
+      } finally {
+        release.resolve();
+        try { await bounded(Promise.allSettled([firstHandle, retryHandle].filter((pending): pending is Promise<void> => Boolean(pending))), "released handles cleanup"); }
+        finally {
+          const closing = qq; qq = undefined;
+          await bounded(closing.close(), "QQ publication cleanup");
+        }
+      }
+    }
     console.log("PASS conversation state: real MySQL + Pi/faux, including independent synthetic CLI processes; no paid model or QQ platform requests. Full O4 model/history recovery remains unverified.");
   } finally {
     await qq?.close();
