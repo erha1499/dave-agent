@@ -14,7 +14,7 @@
 
 A1 增量已接入 version 2 数据集/接收策略/阈值，保持 version 1 配置语义。接收指标与 raw 分表，误接收分别显示无答案与全部预期拒答口径；空分母不适用、旧字段未记录、context 待 C1。模型门槛未通过时，任务 completed 只代表执行结束。11 组实验 UI 检查、15 组既有 UI 检查、完整 validate 及 1440px/390px 实际配置下载/回填/提交/结果验收通过。见 [A1 记录](./a1-implementation-results.md)。
 
-请阅读 `docs/evaluation-api.md` 的完整合同及 `plan.md` 第 8.1 节。继续维护现有明亮柔和、简洁的工作台。旧 GET 运行列表与详情兼容；新 GET 提供单运行 analysis、两次 compare 与 batches 稳定性。
+请阅读[评测 API 完整合同](./evaluation-api.md)及[当前评测状态](../plan.md#已交付的稳定主线)。继续维护现有明亮柔和、简洁的工作台。旧 GET 运行列表与详情兼容；新 GET 提供单运行 analysis、两次 compare 与 batches 稳定性。
 
 前端交付：
 
