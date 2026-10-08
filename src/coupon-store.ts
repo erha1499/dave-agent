@@ -3,6 +3,7 @@ import { rankKnowledge } from "./knowledge-retrieval.ts";
 import type { RetrievalDocument } from "./retrieval-ranking.ts";
 
 export type QQIdentity = { appId: string; senderId: string };
+export type QQIdentityBinding = { bindingId: string; customerId: string };
 const unavailableOrder = "未找到当前客户可查询的订单，请核对订单号或联系人工客服。";
 const databaseFailure = "演示业务数据暂时无法查询，请稍后重试。";
 export class OrderAccessError extends Error {}
@@ -58,10 +59,15 @@ export class CouponStore {
     try { await this.pool.end(); } catch { throw new Error(databaseFailure); }
   }
 
-  async resolveCustomer(identity: QQIdentity): Promise<string | undefined> {
+  async resolveBinding(identity: QQIdentity): Promise<QQIdentityBinding | undefined> {
     if (!validIdentity(identity)) return undefined;
-    const rows = await this.select("SELECT /*+ MAX_EXECUTION_TIME(3000) */ customer_id FROM qq_identities WHERE app_id = ? AND sender_id = ? LIMIT 1", [identity.appId, identity.senderId]);
-    return rows[0]?.customer_id as string | undefined;
+    const rows = await this.select("SELECT /*+ MAX_EXECUTION_TIME(3000) */ CAST(id AS CHAR) AS binding_id, customer_id FROM qq_identities WHERE app_id = ? AND sender_id = ? LIMIT 1", [identity.appId, identity.senderId]);
+    const row = rows[0];
+    return row ? { bindingId: row.binding_id as string, customerId: row.customer_id as string } : undefined;
+  }
+
+  async resolveCustomer(identity: QQIdentity): Promise<string | undefined> {
+    return (await this.resolveBinding(identity))?.customerId;
   }
 
   async listOrders(identity: QQIdentity) {

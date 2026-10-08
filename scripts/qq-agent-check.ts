@@ -316,3 +316,4 @@ try {
   await expiresDuringCreate.close();
 }
 console.log("QQ→Pi 离线检查通过：工具循环、专用上下文、隔离/队列、宿主确认串行与回执上下文、真实 SDK 清洗后确认边界、初始化期间过期拒绝、可控失败、发送不重试、超时恢复和安全关闭。");
+await (await import("./qq-binding-check.ts")).checkQQBinding();

@@ -6,6 +6,7 @@ import { replyFromTools } from "./reply-from-tools.ts";
 import type { MerchantTask } from "./after-sales.ts";
 import { cancelSupportTurn, getSupportHostReceipt, isSupportSession, prepareSupportPrompt, supportReply } from "./support-session.ts";
 import { prepareOrderDiscoveryPrompt, presentOrderDiscoveryReply } from "./order-discovery.ts";
+import type { QQIdentityBinding } from "./coupon-store.ts";
 
 export type ContinuationOutcome = "busy" | "sent" | "deferred" | "unknown";
 
@@ -22,7 +23,11 @@ export function validQQMessage(msg: QQBotInboundMessage, now = Date.now()) {
   return Number.isFinite(age) && age >= -30_000 && age < 5 * 60_000 - 30_000;
 }
 
-type Conversation = { session?: AgentSession; tail: Promise<void>; pending: number; turns: number; touched: number };
+function sameBinding(left: QQIdentityBinding | undefined, right: QQIdentityBinding | undefined) {
+  return left?.bindingId === right?.bindingId && left?.customerId === right?.customerId;
+}
+
+type Conversation = { session?: AgentSession; binding?: QQIdentityBinding; tail: Promise<void>; pending: number; turns: number; touched: number };
 
 export class QQAgent {
   private conversations = new Map<string, Conversation>();
@@ -35,6 +40,7 @@ export class QQAgent {
   private beforePrompt?: (msg: QQBotInboundMessage) => Promise<string | Reply | undefined>;
   private afterDeliver?: (msg: QQBotInboundMessage, reply: Reply) => Promise<void>;
   private merchantEvents: "model" | "host";
+  private resolveBinding?: (msg: QQBotInboundMessage) => Promise<QQIdentityBinding | undefined>;
 
   constructor(
     createSession: (msg: QQBotInboundMessage) => Promise<AgentSession>,
@@ -43,7 +49,7 @@ export class QQAgent {
     timeoutMs = 60_000,
     beforePrompt?: (msg: QQBotInboundMessage) => Promise<string | Reply | undefined>,
     afterDeliver?: (msg: QQBotInboundMessage, reply: Reply) => Promise<void>,
-    options: { merchantEvents?: "model" | "host" } = {},
+    options: { merchantEvents?: "model" | "host"; resolveBinding?: (msg: QQBotInboundMessage) => Promise<QQIdentityBinding | undefined> } = {},
   ) {
     this.createSession = createSession;
     this.send = send;
@@ -52,6 +58,7 @@ export class QQAgent {
     this.beforePrompt = beforePrompt;
     this.afterDeliver = afterDeliver;
     this.merchantEvents = options.merchantEvents ?? "model";
+    this.resolveBinding = options.resolveBinding;
   }
 
   private prune() {
@@ -105,6 +112,26 @@ export class QQAgent {
       let merchant: MerchantTask | undefined;
       let activeTools: string[] | undefined;
       let supportRun = false;
+      let binding: QQIdentityBinding | undefined;
+      let bindingReady = false;
+      const deliverBound = async (reply: string | Reply): Promise<ContinuationOutcome> => {
+        if (this.resolveBinding) {
+          try {
+            const current = await this.resolveBinding(msg);
+            if (!bindingReady || !sameBinding(binding, current)) {
+              failed = true;
+              this.log("[agent] 身份绑定已变化；未发送旧会话回复。");
+              return "deferred";
+            }
+          } catch {
+            failed = true;
+            this.log("[agent] 回复发送前身份读取失败；未发送。");
+            return "deferred";
+          }
+        }
+        if (this.closed || !validQQMessage(msg)) return "deferred";
+        return await this.deliver(msg, reply) ? "sent" : "unknown";
+      };
       const deliverMerchant = async (): Promise<ContinuationOutcome> => {
         let current: MerchantTask | undefined;
         try { current = await resolve!(); } catch {
@@ -116,9 +143,27 @@ export class QQAgent {
           return "deferred";
         }
         merchant = current;
-        return await this.deliver(msg, { kind: "merchant_status", task: current }) ? "sent" : "unknown";
+        return deliverBound({ kind: "merchant_status", task: current });
       };
       try {
+        if (this.resolveBinding) {
+          try {
+            const current = await this.resolveBinding(msg);
+            binding = current && { ...current };
+            bindingReady = true;
+          } catch {
+            failed = true;
+            this.log("[agent] 会话身份读取失败；本轮尚未处理业务。");
+            return;
+          }
+          if (this.closed || !validQQMessage(msg)) return;
+          if (conversation.session && !sameBinding(conversation.binding, binding)) {
+            conversation.session.dispose();
+            conversation.session = undefined;
+            conversation.turns = 0;
+          }
+          conversation.binding = binding;
+        }
         if (resolve) {
           merchant = await resolve();
           if (!merchant || merchant.status === "pending") return;
@@ -148,10 +193,11 @@ export class QQAgent {
         const discovery: { prompt: string; reply?: Reply } = !resolve && consultation === undefined ? await prepareOrderDiscoveryPrompt(session, msg.content) : { prompt: msg.content };
         const hostReply = consultation ?? discovery.reply;
         if (hostReply !== undefined) {
-          const delivered = await this.deliver(msg, hostReply);
+          outcome = await deliverBound(hostReply);
+          if (outcome === "deferred") return;
+          const delivered = outcome === "sent";
           if (delivered) presentOrderDiscoveryReply(session,
             typeof hostReply === "string" ? { kind: "notice", text: hostReply } : hostReply, msg.content);
-          outcome = delivered ? "sent" : "unknown";
           conversation.turns++;
           try {
             // Remember the receipt without triggering another model turn; the next normal prompt uses the business system prompt.
@@ -192,7 +238,7 @@ export class QQAgent {
         // Reauthorize after the model wait; the model cannot redirect the fixed task or restore consent.
         const reply: Reply = merchant ? { kind: "merchant_status", task: merchant }
           : supportReply(session, text) ?? replyFromTools(text!, results);
-        outcome = merchant ? await deliverMerchant() : await this.deliver(msg, reply) ? "sent" : "unknown";
+        outcome = merchant ? await deliverMerchant() : await deliverBound(reply);
         if (outcome === "deferred") return;
         const delivered = outcome === "sent";
         if (delivered && !merchant) presentOrderDiscoveryReply(session, reply, msg.content);
@@ -212,16 +258,22 @@ export class QQAgent {
         if (!resolve || merchant) {
           // Known durable business facts remain usable when the model fails. Never retry an attempted send.
           if (outcome === "deferred" && validQQMessage(msg) && !this.closed) {
-            outcome = merchant ? await deliverMerchant() : await this.deliver(msg,
+            outcome = merchant ? await deliverMerchant() : await deliverBound(
               supportRun && conversation.session ? supportReply(conversation.session)!
-              : "客服暂时无法处理这条消息，请稍后重试。") ? "sent" : "unknown";
+              : "客服暂时无法处理这条消息，请稍后重试。");
           }
         }
       } finally {
         clearTimeout(timer);
         if (activeTools && conversation.session && !failed) conversation.session.setActiveToolsByName(activeTools);
         if (failed && conversation.session) {
-          try { await aborting; } finally {
+          try {
+            if (!aborting) {
+              cancelSupportTurn(conversation.session);
+              aborting = conversation.session.abort();
+            }
+            await aborting;
+          } finally {
             conversation.session.dispose();
             conversation.session = undefined;
             conversation.turns = 0;

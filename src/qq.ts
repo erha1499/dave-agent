@@ -151,7 +151,8 @@ async function main() {
         const identity = { appId: options.appId, senderId: msg.senderId };
         await markRefundReplyPresented(refunds, identity, merchantSourceKey(identity, msg.groupOpenid!), reply);
       },
-      { merchantEvents: architecture === "controller" ? "host" : "model" },
+      { merchantEvents: architecture === "controller" ? "host" : "model",
+        resolveBinding: msg => store.resolveBinding({ appId: options.appId, senderId: msg.senderId }) },
     );
     bot.on("message", async (_ctx, msg) => {
       await agent.handle(msg);
