@@ -217,11 +217,30 @@ Recall@5 按 standard / hard：选集从 P0 的 **59.09% / 3.85%**，经 P1 第�
 
 ## 检查与后续
 
-```sh
-npm run validate       # 不需数据库/API key：类型、工程/检索检查、评测口径、HTTP 边界与前端异步回归
-npm run check:eval-db  # 真实 MySQL：持久化、失败/跳过、受限权限、历史与类型隔离
-npm run check:business # 既有真实 MySQL + Pi/faux 工程回放
-```
+**validate 与实库门槛映射（2026-10-08）：** 以下按固定源码 `8d247e939351c72e71a1e4a92c914a2d08eeb2a0` 的 [npm 入口](../package.json)与 [聚合检查](../scripts/check.ts)追踪实际调用。运行改动须在最终版本执行受影响专项和完整 `validate`；涉及存储、事务、锁或进程恢复时，再执行对应实库入口，不能由聚合检查替代。提交规则见 [AGENTS.md](../AGENTS.md)。
+
+| 受影响边界与入口 | 实际调用路径 | 条件、覆盖与未证明项 |
+| --- | --- | --- |
+| 工程回归：`npm run validate` | `typecheck` → `check.ts` 汇总配置/检索/Controller/Session 等确定性检查 → `check:qq` / `check:qq-agent` / `check:reply` → `check:eval`（[`eval-check.ts`](../scripts/eval-check.ts)与 UI 检查）→ [`refund-agent-check.ts`](../scripts/refund-agent-check.ts) → [`merchant-notification-agent-check.ts`](../scripts/merchant-notification-agent-check.ts)。 | 不需数据库或真实模型密钥；使用合成 Store、Pi/faux、替代提供商传输及本机 HTTP。检查类型、宿主/工具边界、评测口径和前端回归；不验证真实 SQL、事务、跨进程恢复、模型质量或 QQ 平台。 |
+| 订单/身份存储：`npm run check:business` | [`coupon-db-check.ts`](../scripts/coupon-db-check.ts) → `CouponStore.resolveCustomer/getOrder/searchKnowledge`；成功后 [`coupon-agent-check.ts`](../scripts/coupon-agent-check.ts) → 实际 Store / Pi 工具回填。 | 基础 11 表、固定合成种子及只读账号 `DB_PASSWORD`。两段均查 MySQL，第二段用 faux；断言本人/App 隔离、订单关联/整数金额、规则作用域、只读权限与工具回填。没有退款事务或真实模型/QQ 验收。 |
+| 协商存储/状态：`npm run check:merchant` | [`merchant-db-check.ts`](../scripts/merchant-db-check.ts) → `AfterSalesStore.prepare/request/applyResult/processDue/getTask`；成功后 [`merchant-agent-check.ts`](../scripts/merchant-agent-check.ts) → 实际 Store / Pi/faux / 宿主确认。 | 售后初始化、基础/协商受限账号及管理员 fixture。两段均连 MySQL；检查归属/来源、并发同任务、批准/拒绝/超时、事实不变及同进程 Store/连接重建。未专门验证锁等待跨截止，也不是进程退出或真实商家回调验收。 |
+| 退款金额/事务/确认/幂等：`npm run check:refund` | [`refund-db-check.ts`](../scripts/refund-db-check.ts) → `RefundStore.prepare/markPresented/confirm/get`，末尾导入 [`coupon-snapshot-check.ts`](../scripts/coupon-snapshot-check.ts)；DB 成功后运行 `refund-agent-check.ts`。 | 基础/协商/退款独立受限账号及管理员 fixture。实库检查一致订单快照、展示/授权/金额/批准/期限复核、并发单笔退款及状态一致；后段是替代 Store 的 Pi/QQAgent 发送故障检查。重建连接不证明真实进程恢复，本地发送不证明 QQ 可见或真实支付。 |
+| 通知持久化/领取恢复：`npm run check:merchant-notifications` | [`merchant-notification-db-check.ts`](../scripts/merchant-notification-db-check.ts) → `confirmMerchantReply` / `AfterSalesStore.request/listNotifications/claimNotification/finishNotification` / worker；成功后运行 `merchant-notification-agent-check.ts`。 | 基础/协商/退款账号及管理员 fixture。第一段 MySQL 检查原路由、并发唯一领取、重建后 pending 恢复/claimed 不重发、worker 收尾；第二段用替代 Store、Pi/faux 和本地发送记录。未证明真实进程恢复、平台接收/客户端展示或发送前重绑的实库竞争。 |
+| 评测存储：`npm run check:eval-db` | [`eval-db-check.ts`](../scripts/eval-db-check.ts) → `EvalStore.startRun/saveCase/finishRun/getRun/getBatch` → 分析器及本机 HTTP 回读。 | `eval:init` 后的独立 `EVAL_DB_PASSWORD` 账号；写入并保留 `kind=engineering` 合成历史。检查失败保存回滚、失败/跳过/未知用量、客观计划/批次、类型隔离和受限权限；不验证业务退款或模型回答质量。 |
+| 任务行锁跨截止：`node --env-file-if-exists=.env scripts/merchant-deadline-lock-db-check.ts` | [`专用库检查`](../scripts/merchant-deadline-lock-db-check.ts)锁行并观测 `data_lock_waits` → 正式 `AfterSalesStore.applyResult` 的事务/`FOR UPDATE`/锁后条件 UPDATE。 | 强制本机 `127.0.0.1:13306/dave_agent`，需 Compose 管理员及锁等待观测权限；复制任务表到随机库/账号，结束删除。检查截止后放锁仍拒绝及正常/边界调用；无 `--db` 开关，不跑全库 worker。专用表无外键，不证明身份/订单/退款链、精确提交时刻或批准/拒绝竞争。 |
+| 真实进程退款结果恢复：`node --env-file-if-exists=.env scripts/atomic-refund-recovery-db-check.ts --db` | [`恢复脚本`](../scripts/atomic-refund-recovery-db-check.ts)的 `--db` → `checkAtomicRefundRecoveryDatabase` → 两个不同 PID：实际展示/宿主确认/重复幂等 → 新连接及 atomic Session 的 `get_order/get_refund` 查询。 | 三组账号配置强制本机 `127.0.0.1/localhost:13306/dave_agent`，使用管理员 fixture、Pi/faux 和本地发送，禁止远程 HTTP。父进程核对同一退款及九表查询前后相同、清理全零；证明明确订单号的持久结果查询，不证明聊天历史/省略指代、通知 dispatcher、真实模型/QQ或商业退款。 |
+
+尤其不能按脚本名推断覆盖：`check.ts` 约第 57 行导入恢复脚本后仅调用 `checkAtomicRefundRecovery()`（约第 160 行），检查 JS 合成快照及输入/金额/批准/退款 ID 反例，不建连接或启动子进程；只有直接运行脚本的 `--db` 分支（约第 185 行）才执行上表实库合同。
+
+实库执行前须按[售后启动合同](./after-sales.md#启动)核对专用合成环境、非本轮 pending 协商、`TEST_APP` 终态待发通知及常驻 CLI/QQ/商家 worker，串行运行并按各脚本处理自身 fixture；`processDue` 和通知扫描范围并不因随机 fixture 自动隔离。不要把两个专用脚本的本机强制校验推广为全部 DB 入口的保护。历史结果复用[稳定主线工程复核](./after-sales.md#本轮稳定主线工程复核2026-10-06)、[取锁后截止复核](./after-sales.md#取锁后截止复核2026-10-08)及[售后验证记录](./after-sales.md#验证记录)，不计为本次执行。
+
+本题 P0 与收尾边界：
+
+- **真实业务约束：** 身份、授权、金额、确认、事务幂等与持久恢复须由实际代码和存储执行，替代 Store 的通过不能代替这些合同。
+- **面试追问：** “validate 全绿为何还不能证明退款事务、取锁后截止与跨进程恢复？改哪个边界应运行哪个实库入口？”按表定位调用及未证明项即可回答。
+- **个人实现/复用：** 项目实现业务检查、fixture 隔离和持久化合同；复用 Pi 生命周期、Node 断言与 MySQL，不认领模型语义、QQ 平台或商业支付能力。
+- **本轮验收/演示证据：** 固定源码和既有断言只读核对、两路独审通过；20 个链接/锚点、8 个入口、命令顺序及纯合同/`--db` 分支静态断言和文档差异检查均退出 0，节外正文保持不变。只补此映射，0 数据库/模型/QQ 请求，未执行 `validate` 或专项、不增加历史样本，也不改变稳定配置与 C1/O4/O5 状态。
+- **预算/停止条件：** 30 分钟，预留至少 10 分钟核验、精确提交/推送与释放；映射和事实核验完成即收尾，不扩为全库审计或新实验。
 
 工作台精简版本 `5d29347` 已完成桌面/窄屏、运行切换、失败筛选、A/B 对比及未知指标展示验收；此前浏览器访问受阻记录已由这次实际验收补齐。本轮浏览器已核对最终 D1/D2 运行的 3/3 场景、21/21 usage、80,971 Tokens，并保留可见的失败历史。
 
