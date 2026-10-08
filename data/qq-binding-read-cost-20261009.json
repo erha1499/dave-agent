@@ -1,0 +1,43 @@
+{
+  "status": "pass",
+  "sourceCommit": "a23ec66",
+  "plannedPairs": 100,
+  "completedPairs": 100,
+  "firstReadMs": 12.527,
+  "warmupPlanned": 20,
+  "warmupCompleted": 20,
+  "sqlStatements": 222,
+  "plan": {
+    "type": "const",
+    "key": "uq_qq_sender",
+    "rows": 1
+  },
+  "startedAt": "2026-10-08T19:41:26.351Z",
+  "singleReadSummary": {
+    "n": 200,
+    "p50Ms": 0.276,
+    "p95Ms": 0.453,
+    "maxMs": 0.757
+  },
+  "pairSummary": {
+    "n": 100,
+    "p50Ms": 0.56,
+    "p95Ms": 0.711,
+    "maxMs": 1.511
+  },
+  "finishedAt": "2026-10-08T19:41:26.437Z",
+  "evidenceLayer": "local real MySQL read-only microbenchmark; not model or QQ latency",
+  "concurrency": 1,
+  "platform": "macOS arm64",
+  "node": "v26.10.0",
+  "mysql": "8.4.11",
+  "fixture": "synthetic seed binding; no writes",
+  "metricDefinition": "nearest-rank; client-side store calls including pool, driver, transport, server and JS",
+  "measuredScriptSha256": "9e96b527f2e9d858a6d8813e8a2ad30667f4bad6d6b831577165305a4b4c81f7",
+  "remoteModelCalls": 0,
+  "qqCalls": 0,
+  "hostWorkload": "other local tasks not isolated; sampler concurrency only",
+  "selectCalls": 221,
+  "explainCalls": 1,
+  "statementCounting": "executions; connection and prepare protocol operations excluded"
+}

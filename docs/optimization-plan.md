@@ -365,4 +365,82 @@ v = 同类案例每次成功的可量化价值；0/2 分别表示基线/候选
 | 配置与版本 | Node v26.10.0、Pi 1.0.0、QQ SDK 1.0.4；本机MySQL实际8.4.11、127.0.0.1:13306/dave_agent。沿用默认atomic与现有工具权限，无新增依赖/schema/模型开关 |
 | 校准失败与范围 | 首次DB检查把system/tool说明中的示例订单ID误计旧事实，退出1且清理完成；改为真实toolResult并保留同绑定正控后通过。复跑用于检查修正后最终版本，不累计为更多业务样本 |
 
-每个实际处理轮次新增轮前、送前两次绑定SQL读取，变化时丢弃旧历史与选单；延迟增量未单独测量。0新增远程模型、真实QQ或商业交易调用，不补C1/O4准入、不回填历史成绩、不声称DB到QQ原子授权。快照窗口、瞬时ABA与无法撤回已送provider内容的局限保留。两片均已形成可复现缺陷、根因修复与验收链；下一片回到P0核对稳定主线演示和证据缺项，不因剩余时间自动启动新检索实验。
+成功出站的普通轮次新增轮前、送前两次绑定读取，变化时丢弃旧历史与选单；本片当时未测延迟，后续本机微基准见[第三片](#第三片绑定门禁的本机读取成本)。0新增远程模型、真实QQ或商业交易调用，不补C1/O4准入、不回填历史成绩、不声称DB到QQ原子授权。快照窗口、瞬时ABA与无法撤回已送provider内容的局限保留。两片均已形成可复现缺陷、根因修复与验收链；下一片回到P0核对稳定主线演示和证据缺项，不因剩余时间自动启动新检索实验。
+
+### 第三片：绑定门禁的本机读取成本
+
+| P0 项目 | 本片合同 |
+| --- | --- |
+| 真实业务约束 | 身份保护必须读取当前绑定；为省延迟缓存旧授权会破坏撤销门禁。成功出站的普通轮次新增轮前、送前两次读取，先量化本机成本再决定是否需要优化 |
+| 具体面试追问 | 为什么不用绑定缓存，两次SQL读增加多少成本；本机客户端调用耗时与端到端QQ/模型延迟分别怎样解释 |
+| 个人实现与复用 | 只复用实际CouponStore.resolveBinding及mysql2受限读账号；EXPLAIN核对现有唯一索引。没有新缓存/依赖/schema/运行开关，测量代码在文档保留复现入口 |
+| 验收及演示证据 | 固定TEST_APP/TEST_USER1合成绑定只读，绑定值应全程相同；独立进程首次读取单列，20次热身后100组串行双读，保存完整分母、nearest-rank P50/P95/最大值及EXPLAIN。失败不补零、不追加采样 |
+| 预算与停止条件 | 北京03:40启动，10分钟至03:50；最多222个只读语句执行（首次SELECT1＋热身20＋采样200＋EXPLAIN1，连接/prepare另属协议开销），0写入/模型/QQ。本机双读P95超过10ms或未用唯一索引才考虑另立有界优化合同；这是定位阈值，不是生产SLO。完成一次即收尾 |
+
+本片补此前未测量的SQL延迟，不把本机微基准升级为客服耗时、生产容量或并发性能；先冻结合同，再运行唯一一次。
+
+**第三片收尾（北京03:41，单次运行）：** 222/222计划只读语句执行完成，SELECT共221（首次1、热身20、100/100双读组共200），EXPLAIN1；0失败/未执行，0写入/远程模型/QQ。[脱敏汇总](../data/qq-binding-read-cost-20261009.json)记录运行时间、源码版本、分母、环境和测量脚本hash；实际Node v26.10.0、macOS arm64、本机MySQL8.4.11。
+
+| 指标 | 结果 |
+| --- | --- |
+| 独立进程首次resolveBinding | 12.527ms；包含首次连接/prepare，单独报告 |
+| 热态单次调用（200次） | P50 0.276ms、P95 0.453ms、最大0.757ms |
+| 热态串行双调用（100组） | P50 0.560ms、P95 0.711ms、最大1.511ms；含pool/driver/回环传输/MySQL及少量JS开销 |
+| 参数化EXPLAIN | type=const、key=uq_qq_sender、估计rows=1；不是EXPLAIN ANALYZE或扫描实测 |
+
+nearest-rank分位数；双读P95直接取排序第95组，未将两个单读P95相加。同一行、采样并发1和热连接条件下，双读P95低于预先定位阈值，不增加缓存或其他运行改动。同机并行任务未隔离，实际QQ两次读取之间有宿主/模型等待，连接池竞争和部署网络均未测量；这些结果不证明QQ端到端新增P95、并发容量或授权原子性，也不能证明采样间没有ABA。冷启动值只有1个样本，不能外推分布。独立只读方法审阅及原始数组分位数复算通过；本片仅结果/文档，不重复全量validate或安全场景采样。
+
+可复现命令（运行实现固定在`a23ec66`的隔离checkout，仓库根目录，真实只读账号、固定合成绑定；换版本须同步记录实际sourceCommit，不得沿用本记录标签；不要把多次执行累加为本次样本）：
+
+```sh
+node --env-file-if-exists=.env --input-type=module <<'JS'
+import assert from 'node:assert/strict';
+import { performance } from 'node:perf_hooks';
+import { createPool } from 'mysql2/promise';
+import { CouponStore, readDatabaseConfig } from './src/coupon-store.ts';
+const config = readDatabaseConfig();
+assert.equal(config.host, '127.0.0.1'); assert.equal(config.port, 13306);
+assert.equal(config.database, 'dave_agent'); assert.equal(config.user, 'dave_agent_read');
+const pool = createPool(config), store = new CouponStore(pool);
+const identity = { appId: 'TEST_APP', senderId: 'TEST_USER1' };
+const deadline = performance.now() + 10 * 60_000;
+const result = { status: 'incomplete', sourceCommit: 'a23ec66', plannedPairs: 100, completedPairs: 0,
+  firstReadMs: null, warmupPlanned: 20, warmupCompleted: 0, sqlStatements: 0,
+  pairMs: [], singleReadMs: [], plan: null, startedAt: new Date().toISOString() };
+const round = x => Math.round(x * 1000) / 1000;
+const summary = values => {
+  const sorted = [...values].sort((a,b) => a-b);
+  return sorted.length ? { n: sorted.length, p50Ms: round(sorted[Math.ceil(sorted.length * .5)-1]),
+    p95Ms: round(sorted[Math.ceil(sorted.length * .95)-1]), maxMs: round(sorted.at(-1)) } : null;
+};
+let binding;
+async function read() {
+  assert.ok(performance.now() < deadline, 'measurement time budget exhausted');
+  const start = performance.now(); result.sqlStatements++;
+  const current = await store.resolveBinding(identity);
+  const elapsed = performance.now()-start;
+  assert.ok(current, 'synthetic binding unavailable');
+  if (binding) assert.deepEqual(current,binding); else binding=current;
+  return elapsed;
+}
+try {
+  result.firstReadMs = round(await read());
+  for (let i=0;i<20;i++) { await read(); result.warmupCompleted++; }
+  for (let i=0;i<100;i++) {
+    const start=performance.now();
+    result.singleReadMs.push(await read(),await read());
+    result.pairMs.push(performance.now()-start); result.completedPairs++;
+  }
+  result.sqlStatements++;
+  const [rows] = await pool.execute({sql:'EXPLAIN SELECT /*+ MAX_EXECUTION_TIME(3000) */ CAST(id AS CHAR) AS binding_id, customer_id FROM qq_identities WHERE app_id = ? AND sender_id = ? LIMIT 1',timeout:5000},[identity.appId,identity.senderId]);
+  const plan=rows[0]; result.plan={type:plan.type,key:plan.key,rows:plan.rows};
+  assert.equal(plan.key,'uq_qq_sender'); assert.equal(plan.type,'const'); assert.equal(Number(plan.rows),1);
+  assert.equal(result.sqlStatements,222); result.status='pass';
+} catch { result.status='failed'; process.exitCode=1; }
+finally {
+  result.singleReadSummary=summary(result.singleReadMs); result.pairSummary=summary(result.pairMs);
+  result.finishedAt=new Date().toISOString();
+  console.log(JSON.stringify(result)); await store.close();
+}
+JS
+```
