@@ -1,0 +1,747 @@
+{
+  "version": 1,
+  "status": "development_not_improved",
+  "decision": "Keep stable defaults and binary v1; typed v6 produced no correct gain. Validation not executed; no additional threshold, Prompt or model run.",
+  "startedAt": "2026-10-08T21:39:02.390Z",
+  "finishedAt": "2026-10-08T21:39:18.360Z",
+  "baselineCommit": "a46043f4f55ae8c8dfaa2a3b1087faf3d9f35135",
+  "freezeFile": "data/rag-intent-profile-freeze-20261009.json",
+  "freezeFileSha256": "9e39501e11a201dc01e618aefbb2db74752db1dbd715e153be5e49979013deed",
+  "freezeObjectHash": "cb3f198c7ccc68ceb8346b974c516e4a524e97e811976cf80dd605006f021375",
+  "frozenInputsUnchanged": true,
+  "plannedArmResults": 40,
+  "measuredArmResults": 16,
+  "validationArmResultsNotExecuted": 24,
+  "independentDevelopmentQueries": 8,
+  "validationQueriesNotExecuted": 12,
+  "providerFailures": 0,
+  "missingExecutedArmResults": 0,
+  "invalidOrPartialSupportResults": 0,
+  "developmentGate": {
+    "pass": false,
+    "gained": [],
+    "lost": [],
+    "aSafe": true,
+    "bSafe": true,
+    "aRecall": 0.75,
+    "bRecall": 0.75
+  },
+  "validationGate": null,
+  "arms": [
+    {
+      "arm": "development-A",
+      "runId": "46c2d13e-2442-4658-90bd-1ff696fcf37d",
+      "reportSha256": "8cf0570f6b83c9c2f058994fe51ec876a5728b4d5777fb31d17fec994eacf6d7",
+      "datasetHash": "c7750859dfe51dcfe5fe0d4b9c8da1c2eaebd3d9cbc4f4771929b94f51a2bd7d",
+      "threshold": 0.71,
+      "supportSettings": {
+        "provider": "deepseek",
+        "model": "deepseek-flash",
+        "api": "openai-completions",
+        "endpoint": "https://api.deepseek.com",
+        "timeoutMs": 15000,
+        "temperature": 0,
+        "maxTokens": 2048,
+        "maxRetries": 0,
+        "promptVersion": "fact-support-v1",
+        "promptHash": "3d254e0bca8e14fae05804a0f027c653f5f099e1b91e5fb519088b5aaa04f15a",
+        "serialization": "json-query-id-title-tags-body-v1",
+        "serializationHash": "1d16c5e3ef4647c120fe6ddce72417c9ec618ee41dc77faa447ec214e5749c4a",
+        "pricing": {
+          "currency": "USD",
+          "estimated": true,
+          "source": "Pi model catalog",
+          "rates": {
+            "input": 0.3,
+            "output": 1.2,
+            "cacheRead": 0.006,
+            "cacheWrite": 0
+          }
+        }
+      },
+      "status": "completed",
+      "totals": {
+        "planned": 8,
+        "measured": 8,
+        "deferred": 0,
+        "incomplete": 0,
+        "answerable": 4,
+        "acceptedRecallAt5": 0.75,
+        "falseRejects": 1,
+        "falseRejectDenominator": 4,
+        "falseRejectRate": 0.25,
+        "falseAccepts": 0,
+        "noAnswer": 3,
+        "noAnswerPlanned": 3,
+        "scopeCases": 1,
+        "scopeAbstentionFailures": 0,
+        "scopeViolations": 0,
+        "boundaryFailures": 0,
+        "covered": 3
+      },
+      "usage": [
+        {
+          "operation": "embedding",
+          "requests": 0,
+          "successfulRequests": 0,
+          "cacheHits": 0,
+          "reportedRequests": 0,
+          "usageCoverage": null,
+          "knownTokens": null,
+          "completeTokens": null,
+          "knownEstimatedCostCny": null,
+          "completeEstimatedCostCny": null
+        },
+        {
+          "operation": "rerank",
+          "requests": 8,
+          "successfulRequests": 8,
+          "cacheHits": 0,
+          "reportedRequests": 8,
+          "usageCoverage": 1,
+          "knownTokens": 7287,
+          "completeTokens": 7287,
+          "knownEstimatedCostCny": 0.0036435,
+          "completeEstimatedCostCny": 0.0036435
+        },
+        {
+          "operation": "support",
+          "requests": 6,
+          "successfulRequests": 6,
+          "cacheHits": 0,
+          "reportedRequests": 6,
+          "usageCoverage": 1,
+          "knownTokens": 4028,
+          "completeTokens": 4028,
+          "knownEstimatedCostCny": null,
+          "completeEstimatedCostCny": null,
+          "knownEstimatedCostUsd": 0.001265316,
+          "completeEstimatedCostUsd": 0.001265316,
+          "costCoverage": 1
+        }
+      ],
+      "cases": [
+        {
+          "id": "rag-intent-dev-001",
+          "suite": "standard",
+          "status": "ok",
+          "acceptanceStatus": "rejected",
+          "gold": [
+            "KB-REFUND-PAYMENT"
+          ],
+          "goldScores": [
+            {
+              "id": "KB-REFUND-PAYMENT",
+              "score": 0.6142022405941222
+            }
+          ],
+          "acceptedIds": [],
+          "supportCandidateIds": [],
+          "falseRejected": true,
+          "supportDecisions": [],
+          "validation": null
+        },
+        {
+          "id": "rag-intent-dev-002",
+          "suite": "standard",
+          "status": "ok",
+          "acceptanceStatus": "accepted",
+          "gold": [
+            "KB-SHOP-DEMO-1"
+          ],
+          "goldScores": [
+            {
+              "id": "KB-SHOP-DEMO-1",
+              "score": 0.907817692594499
+            }
+          ],
+          "acceptedIds": [
+            "KB-SHOP-DEMO-1"
+          ],
+          "supportCandidateIds": [
+            "KB-SHOP-DEMO-1"
+          ],
+          "falseRejected": false,
+          "supportDecisions": [
+            {
+              "id": "KB-SHOP-DEMO-1",
+              "supported": true,
+              "quote": "常规午餐与晚餐套餐允许普通周末使用，到店前需用户自行与商家确认接待情况；助手目前不能预约、外呼、查询实时库存或安排接待。",
+              "reason": "原文明确常规套餐普通周末可用，但到店前需用户自行与商家确认接待，且助手不能安排接待，直接支持责任归属与助手能力判断。"
+            }
+          ],
+          "validation": null
+        },
+        {
+          "id": "rag-intent-dev-003",
+          "suite": "standard",
+          "status": "ok",
+          "acceptanceStatus": "accepted",
+          "gold": [
+            "KB-REFUND-UNUSED"
+          ],
+          "goldScores": [
+            {
+              "id": "KB-REFUND-UNUSED",
+              "score": 0.8941655877628558
+            }
+          ],
+          "acceptedIds": [
+            "KB-REFUND-UNUSED"
+          ],
+          "supportCandidateIds": [
+            "KB-REFUND-UNUSED"
+          ],
+          "falseRejected": false,
+          "supportDecisions": [
+            {
+              "id": "KB-REFUND-UNUSED",
+              "supported": true,
+              "quote": "【演示规则】已支付、未核销且尚未过期的团购券可以申请退款。必须先查本人订单确认支付、核销和有效期；可申请金额不超过尚未消费且未退款的实付金额。退款申请资格不等于商家已经批准或资金已经退回。当前助手只能查询与说明，不能申请、联系商家或执行退款。",
+              "reason": "原文明确申请资格不等于商家批准或资金退回，且助手不能申请或执行退款，足以判断该标注不成立及阶段关系。"
+            }
+          ],
+          "validation": null
+        },
+        {
+          "id": "rag-intent-dev-004",
+          "suite": "standard",
+          "status": "ok",
+          "acceptanceStatus": "accepted",
+          "gold": [
+            "KB-PRODUCT-DINNER"
+          ],
+          "goldScores": [
+            {
+              "id": "KB-PRODUCT-DINNER",
+              "score": 0.8486421239831972
+            }
+          ],
+          "acceptedIds": [
+            "KB-PRODUCT-DINNER"
+          ],
+          "supportCandidateIds": [
+            "KB-PRODUCT-DINNER"
+          ],
+          "falseRejected": false,
+          "supportDecisions": [
+            {
+              "id": "KB-PRODUCT-DINNER",
+              "supported": true,
+              "quote": "【演示规则】单人晚餐团购券标价59.90元，一张券对应一人晚餐，核销一次即视为整张券已使用。",
+              "reason": "原文以“一张券对应一人晚餐”作为团购券的规则性说明，并规定核销一次即整张券已使用，属于商品说明/规则定义，而非报告某笔订单已有谁吃过。"
+            }
+          ],
+          "validation": null
+        },
+        {
+          "id": "rag-intent-dev-005",
+          "suite": "no_answer",
+          "status": "ok",
+          "acceptanceStatus": "rejected",
+          "gold": [],
+          "goldScores": [],
+          "acceptedIds": [],
+          "supportCandidateIds": [
+            "KB-REFUND-PARTIAL",
+            "KB-REFUND-UNUSED"
+          ],
+          "falseRejected": null,
+          "supportDecisions": [
+            {
+              "id": "KB-REFUND-PARTIAL",
+              "supported": false,
+              "quote": null,
+              "reason": "原文仅说明未核销部分按对应券实付单价计算，未给出该订单具体券的实付单价或剩余券数量，无法得出精确人民币数额。"
+            },
+            {
+              "id": "KB-REFUND-UNUSED",
+              "supported": false,
+              "quote": null,
+              "reason": "原文仅规定可申请金额不超过未消费未退款的实付金额，未提供该订单具体实付金额或剩余券信息，无法计算精确数额。"
+            }
+          ],
+          "validation": null
+        },
+        {
+          "id": "rag-intent-dev-006",
+          "suite": "no_answer",
+          "status": "ok",
+          "acceptanceStatus": "rejected",
+          "gold": [],
+          "goldScores": [],
+          "acceptedIds": [],
+          "supportCandidateIds": [
+            "KB-REFUND-REDEEMED"
+          ],
+          "falseRejected": null,
+          "supportDecisions": [
+            {
+              "id": "KB-REFUND-REDEEMED",
+              "supported": false,
+              "quote": null,
+              "reason": "原文仅说明需商家核实后决定，且无核实结果时不能承诺金额，未给出店家最终核实意见原文或具体退款金额。"
+            }
+          ],
+          "validation": null
+        },
+        {
+          "id": "rag-intent-dev-007",
+          "suite": "no_answer",
+          "status": "ok",
+          "acceptanceStatus": "rejected",
+          "gold": [],
+          "goldScores": [],
+          "acceptedIds": [],
+          "supportCandidateIds": [
+            "KB-PRODUCT-LUNCH"
+          ],
+          "falseRejected": null,
+          "supportDecisions": [
+            {
+              "id": "KB-PRODUCT-LUNCH",
+              "supported": false,
+              "quote": null,
+              "reason": "原文仅说明截止时间以订单返回的expiresAt为准，未给出具体到期年月日与精确时分。"
+            }
+          ],
+          "validation": null
+        },
+        {
+          "id": "rag-intent-dev-008",
+          "suite": "scope",
+          "status": "ok",
+          "acceptanceStatus": "rejected",
+          "gold": [],
+          "goldScores": [],
+          "acceptedIds": [],
+          "supportCandidateIds": [],
+          "falseRejected": null,
+          "supportDecisions": [],
+          "validation": null
+        }
+      ]
+    },
+    {
+      "arm": "development-B",
+      "runId": "9cc3e5bf-1cba-4043-a1c7-2a0da478131f",
+      "reportSha256": "9c61321c4c4dd021c75b54038ba28c9456257a35a24e496bac7062dd1c754469",
+      "datasetHash": "c7750859dfe51dcfe5fe0d4b9c8da1c2eaebd3d9cbc4f4771929b94f51a2bd7d",
+      "threshold": 0.71,
+      "supportSettings": {
+        "provider": "deepseek",
+        "model": "deepseek-flash",
+        "api": "openai-completions",
+        "endpoint": "https://api.deepseek.com",
+        "timeoutMs": 15000,
+        "temperature": 0,
+        "maxTokens": 2048,
+        "maxRetries": 0,
+        "promptVersion": "fact-support-typed-v6",
+        "promptHash": "889596997b27deccf91339f46b7a3825aa239a50fbcde92ce5109b67a77f19fa",
+        "serialization": "json-query-id-title-tags-body-v1",
+        "serializationHash": "1d16c5e3ef4647c120fe6ddce72417c9ec618ee41dc77faa447ec214e5749c4a",
+        "pricing": {
+          "currency": "USD",
+          "estimated": true,
+          "source": "Pi model catalog",
+          "rates": {
+            "input": 0.3,
+            "output": 1.2,
+            "cacheRead": 0.006,
+            "cacheWrite": 0
+          }
+        },
+        "profile": "typed",
+        "validationVersion": "typed-candidate-isolation-v1"
+      },
+      "status": "completed",
+      "totals": {
+        "planned": 8,
+        "measured": 8,
+        "deferred": 0,
+        "incomplete": 0,
+        "answerable": 4,
+        "acceptedRecallAt5": 0.75,
+        "falseRejects": 1,
+        "falseRejectDenominator": 4,
+        "falseRejectRate": 0.25,
+        "falseAccepts": 0,
+        "noAnswer": 3,
+        "noAnswerPlanned": 3,
+        "scopeCases": 1,
+        "scopeAbstentionFailures": 0,
+        "scopeViolations": 0,
+        "boundaryFailures": 0,
+        "covered": 3
+      },
+      "usage": [
+        {
+          "operation": "embedding",
+          "requests": 0,
+          "successfulRequests": 0,
+          "cacheHits": 0,
+          "reportedRequests": 0,
+          "usageCoverage": null,
+          "knownTokens": null,
+          "completeTokens": null,
+          "knownEstimatedCostCny": null,
+          "completeEstimatedCostCny": null
+        },
+        {
+          "operation": "rerank",
+          "requests": 0,
+          "successfulRequests": 0,
+          "cacheHits": 8,
+          "reportedRequests": 0,
+          "usageCoverage": null,
+          "knownTokens": null,
+          "completeTokens": null,
+          "knownEstimatedCostCny": null,
+          "completeEstimatedCostCny": null
+        },
+        {
+          "operation": "support",
+          "requests": 6,
+          "successfulRequests": 6,
+          "cacheHits": 0,
+          "reportedRequests": 6,
+          "usageCoverage": 1,
+          "knownTokens": 11446,
+          "completeTokens": 11446,
+          "knownEstimatedCostCny": null,
+          "completeEstimatedCostCny": null,
+          "knownEstimatedCostUsd": 0.0019445399999999996,
+          "completeEstimatedCostUsd": 0.0019445399999999996,
+          "costCoverage": 1
+        }
+      ],
+      "cases": [
+        {
+          "id": "rag-intent-dev-001",
+          "suite": "standard",
+          "status": "ok",
+          "acceptanceStatus": "rejected",
+          "gold": [
+            "KB-REFUND-PAYMENT"
+          ],
+          "goldScores": [
+            {
+              "id": "KB-REFUND-PAYMENT",
+              "score": 0.6142022405941222
+            }
+          ],
+          "acceptedIds": [],
+          "supportCandidateIds": [],
+          "falseRejected": true,
+          "supportDecisions": [],
+          "validation": null
+        },
+        {
+          "id": "rag-intent-dev-002",
+          "suite": "standard",
+          "status": "ok",
+          "acceptanceStatus": "accepted",
+          "gold": [
+            "KB-SHOP-DEMO-1"
+          ],
+          "goldScores": [
+            {
+              "id": "KB-SHOP-DEMO-1",
+              "score": 0.907817692594499
+            }
+          ],
+          "acceptedIds": [
+            "KB-SHOP-DEMO-1"
+          ],
+          "supportCandidateIds": [
+            "KB-SHOP-DEMO-1"
+          ],
+          "falseRejected": false,
+          "supportDecisions": [
+            {
+              "id": "KB-SHOP-DEMO-1",
+              "category": "direct_fact",
+              "quote": "常规午餐与晚餐套餐允许普通周末使用，到店前需用户自行与商家确认接待情况；助手目前不能预约、外呼、查询实时库存或安排接待。",
+              "reason": "原文直接说明普通周末套餐使用规则、到店前确认接待由用户自行负责，以及助手不能安排接待，回答了责任归属和助手能力。",
+              "supported": true
+            }
+          ],
+          "validation": {
+            "status": "complete",
+            "outputHash": "b9c7d7d70406a72779d8cac0e09de508444465241fd9a4820e97edb2567caf41",
+            "invalidDecisions": []
+          }
+        },
+        {
+          "id": "rag-intent-dev-003",
+          "suite": "standard",
+          "status": "ok",
+          "acceptanceStatus": "accepted",
+          "gold": [
+            "KB-REFUND-UNUSED"
+          ],
+          "goldScores": [
+            {
+              "id": "KB-REFUND-UNUSED",
+              "score": 0.8941655877628558
+            }
+          ],
+          "acceptedIds": [
+            "KB-REFUND-UNUSED"
+          ],
+          "supportCandidateIds": [
+            "KB-REFUND-UNUSED"
+          ],
+          "falseRejected": false,
+          "supportDecisions": [
+            {
+              "id": "KB-REFUND-UNUSED",
+              "category": "direct_fact",
+              "quote": "【演示规则】已支付、未核销且尚未过期的团购券可以申请退款。必须先查本人订单确认支付、核销和有效期；可申请金额不超过尚未消费且未退款的实付金额。退款申请资格不等于商家已经批准或资金已经退回。当前助手只能查询与说明，不能申请、联系商家或执行退款。",
+              "reason": "原文明确申请退款条件，并直接说明申请资格不等于商家批准或资金退回，回答了阶段标注不成立及两者关系。",
+              "supported": true
+            }
+          ],
+          "validation": {
+            "status": "complete",
+            "outputHash": "60c8206a59beab357606e34f21aaaad724d2c897f18abbb0568fecf14761a5b3",
+            "invalidDecisions": []
+          }
+        },
+        {
+          "id": "rag-intent-dev-004",
+          "suite": "standard",
+          "status": "ok",
+          "acceptanceStatus": "accepted",
+          "gold": [
+            "KB-PRODUCT-DINNER"
+          ],
+          "goldScores": [
+            {
+              "id": "KB-PRODUCT-DINNER",
+              "score": 0.8486421239831972
+            }
+          ],
+          "acceptedIds": [
+            "KB-PRODUCT-DINNER"
+          ],
+          "supportCandidateIds": [
+            "KB-PRODUCT-DINNER"
+          ],
+          "falseRejected": false,
+          "supportDecisions": [
+            {
+              "id": "KB-PRODUCT-DINNER",
+              "category": "direct_fact",
+              "quote": "【演示规则】单人晚餐团购券标价59.90元，一张券对应一人晚餐，核销一次即视为整张券已使用。",
+              "reason": "原文明确将“一张券对应一人晚餐”作为商品规则说明，定义每张券对应一人晚餐，而非报告某笔订单已有谁吃过。",
+              "supported": true
+            }
+          ],
+          "validation": {
+            "status": "complete",
+            "outputHash": "7fc588e90ba28080c72fc8b5a4a2f09d28fb8b4e448b1c4e71f2f0d08e213622",
+            "invalidDecisions": []
+          }
+        },
+        {
+          "id": "rag-intent-dev-005",
+          "suite": "no_answer",
+          "status": "ok",
+          "acceptanceStatus": "rejected",
+          "gold": [],
+          "goldScores": [],
+          "acceptedIds": [],
+          "supportCandidateIds": [
+            "KB-REFUND-PARTIAL",
+            "KB-REFUND-UNUSED"
+          ],
+          "falseRejected": null,
+          "supportDecisions": [
+            {
+              "id": "KB-REFUND-PARTIAL",
+              "category": "limitation_only",
+              "quote": "未核销、未过期、未退款部分可申请的金额按对应券的实付单价计算；已核销部分需商家另行核实，不能按整单实付金额承诺退款。",
+              "reason": "原文给出剩余券退款上限的计算规则，但未提供该订单对应券的实付单价或具体金额，无法直接报出精确人民币数额。",
+              "supported": false
+            },
+            {
+              "id": "KB-REFUND-UNUSED",
+              "category": "limitation_only",
+              "quote": "可申请金额不超过尚未消费且未退款的实付金额。",
+              "reason": "原文仅说明未核销未过期券可申请退款且金额不超过实付金额，未给出该订单剩余券的实付金额，无法计算精确上限。",
+              "supported": false
+            }
+          ],
+          "validation": {
+            "status": "complete",
+            "outputHash": "e6ec513ce8107628c61addbd68e1360c85df530787cd7f38170b569cdb842d6f",
+            "invalidDecisions": []
+          }
+        },
+        {
+          "id": "rag-intent-dev-006",
+          "suite": "no_answer",
+          "status": "ok",
+          "acceptanceStatus": "rejected",
+          "gold": [],
+          "goldScores": [],
+          "acceptedIds": [],
+          "supportCandidateIds": [
+            "KB-REFUND-REDEEMED"
+          ],
+          "falseRejected": null,
+          "supportDecisions": [
+            {
+              "id": "KB-REFUND-REDEEMED",
+              "category": "limitation_only",
+              "quote": "没有商家核实结果时不能承诺可退、不可退或具体金额。",
+              "reason": "原文仅说明需商家核实后决定，且无核实结果时不能承诺金额；未提供店家最终核实意见原文或具体退款金额。",
+              "supported": false
+            }
+          ],
+          "validation": {
+            "status": "complete",
+            "outputHash": "e3a0af54974791af14a8f0e45d3de219676989917bbc336016ffad97cb26818f",
+            "invalidDecisions": []
+          }
+        },
+        {
+          "id": "rag-intent-dev-007",
+          "suite": "no_answer",
+          "status": "ok",
+          "acceptanceStatus": "rejected",
+          "gold": [],
+          "goldScores": [],
+          "acceptedIds": [],
+          "supportCandidateIds": [
+            "KB-PRODUCT-LUNCH"
+          ],
+          "falseRejected": null,
+          "supportDecisions": [
+            {
+              "id": "KB-PRODUCT-LUNCH",
+              "category": "limitation_only",
+              "quote": "每张券具体截止时间以订单返回的 expiresAt 为准",
+              "reason": "原文仅说明截止时间以订单返回的expiresAt为准，未给出该券具体到期年月日与精确时分，无法回答实例事实。",
+              "supported": false
+            }
+          ],
+          "validation": {
+            "status": "complete",
+            "outputHash": "bf40363442dfbe8f4f9e03b9c079bdf514d60b03fe6ead6e4031d22c7f795e75",
+            "invalidDecisions": []
+          }
+        },
+        {
+          "id": "rag-intent-dev-008",
+          "suite": "scope",
+          "status": "ok",
+          "acceptanceStatus": "rejected",
+          "gold": [],
+          "goldScores": [],
+          "acceptedIds": [],
+          "supportCandidateIds": [],
+          "falseRejected": null,
+          "supportDecisions": [],
+          "validation": null
+        }
+      ]
+    }
+  ],
+  "actualCostLedger": {
+    "requestAttempts": 20,
+    "rerankRequests": 8,
+    "rerankTokens": 7287,
+    "estimatedRerankCny": 0.0036435,
+    "supportRequests": 12,
+    "supportTokens": 15474,
+    "estimatedSupportUsd": 0.0032098559999999996,
+    "usageCoverage": 1,
+    "costCoverage": 1,
+    "rankingCacheHits": 8,
+    "supportCacheHits": 0,
+    "pricing": "frozen estimates; separate CNY/ USD, not provider invoice or settled billing"
+  },
+  "actualRequestTiming": {
+    "rerank": {
+      "n": 8,
+      "p50Ms": 218,
+      "p95Ms": 375,
+      "maxMs": 375,
+      "method": "nearest-rank; actual requests only, host not isolated; small n, not production SLA"
+    },
+    "support": {
+      "n": 12,
+      "p50Ms": 1143.6880419999998,
+      "p95Ms": 1589.01325,
+      "maxMs": 1589.01325,
+      "method": "nearest-rank; actual requests only, host not isolated; small n, not production SLA"
+    }
+  },
+  "failure": {
+    "id": "rag-intent-dev-001",
+    "gold": "KB-REFUND-PAYMENT",
+    "goldRerankScore": 0.6142022405941222,
+    "stage": "same pre-support score threshold 0.71; no support request in either arm",
+    "recordedRejection": "below_threshold",
+    "analysis": "The query asks what an already-refunded amount represents and which history to consult. The frozen payment policy supports this; gold remains rank 1 but its score falls below 0.71. Thus this case does not measure binary versus typed intent judgment. All three positive cases that reached either judge were accepted by both."
+  },
+  "limitations": [
+    "20 new frozen questions, independently labeled and reviewed against the same 8 synthetic consultation policies; no exact normalized query overlap across 485 distinct previous queries, but not blind or intent-disjoint.",
+    "Two arms share ranking for all 8 queries; 16 arm decisions are not 16 independent questions or model repetitions. Both make 6 actual support requests with separate profile/Prompt cache identities.",
+    "Typed v6 bundles Prompt, schema and candidate isolation; not a pure Prompt causal comparison. No quality gain observed in these development cases; larger general effect unknown.",
+    "Three positive cases reach each judge and both accept 3/3. The remaining false rejection is pre-support; this run cannot show typed fixes the earlier intent-drift failure.",
+    "40 full planned arm results include 24 validation not executed, never counted as passed. No third arm, additional score threshold, new Prompt or rerun.",
+    "Provider-side prompt cache usage differs between arms; observed tokens, cost and latency describe one sequential run, not stable performance or provider weight pinning.",
+    "No final customer answer, DB, QQ, actual commercial transaction or billing/ cancellation guarantee; no production default or overall C1 admission changed."
+  ],
+  "planSource": "data/rag-intent-profile-freeze-20261009.json identity.plan; all 40 original arm/question IDs retained there",
+  "planStatusByArm": [
+    {
+      "arm": "development-A",
+      "planned": 8,
+      "statusCounts": {
+        "measured": 8,
+        "not_executed": 0,
+        "missing": 0,
+        "failed": 0
+      },
+      "notExecutedReason": null
+    },
+    {
+      "arm": "development-B",
+      "planned": 8,
+      "statusCounts": {
+        "measured": 8,
+        "not_executed": 0,
+        "missing": 0,
+        "failed": 0
+      },
+      "notExecutedReason": null
+    },
+    {
+      "arm": "validation-A",
+      "planned": 12,
+      "statusCounts": {
+        "measured": 0,
+        "not_executed": 12,
+        "missing": 0,
+        "failed": 0
+      },
+      "notExecutedReason": "development_gain_gate_failed"
+    },
+    {
+      "arm": "validation-B",
+      "planned": 12,
+      "statusCounts": {
+        "measured": 0,
+        "not_executed": 12,
+        "missing": 0,
+        "failed": 0
+      },
+      "notExecutedReason": "development_gain_gate_failed"
+    }
+  ]
+}

@@ -91,3 +91,33 @@ npm run validate
 ```
 
 最终方法typecheck、自检、dry-run、本地伪时钟过期零请求负控、已执行目录拒绝重复且原结果字节未变的零请求控制及完整validate通过，本次运行前后14份冻结文件hash未变；独审重算两份真实报告、40计划、缓存及双币种用量通过。冻结/自检没有请求provider，未用缓存复算冒充新模型验证。
+
+## 2026-10-09：既有typed v6新题对照未改善
+
+针对上一片的命题漂移假设，比较已有binary `fact-support-v1`与`fact-support-typed-v6`，保持同DeepSeek Flash、qwen3-rerank及0.71预筛门槛。复用现有候选，不新改Prompt；typed的Prompt、schema及逐候选校验一起变化，不能声称纯Prompt因果。[20个新题](../data/rag-intent-profile-probe-20261009.json)和[方法/实际参数冻结](../data/rag-intent-profile-freeze-20261009.json)在首次请求前完成，独立作者与审阅者核对原8篇咨询政策、引文、缺实例字段及范围。对485个不同规范化旧query精确去重0重叠；政策/意图已曝光，仍非盲测或意图独立留出。
+
+| 新开发8题 | binary v1 | typed v6 |
+| --- | --- | --- |
+| 完整观测 / 原始gold命中 | 8/8 / 4/4 | 8/8 / 4/4；排名共享 |
+| 接收Recall@5 / 误拒 | 3/4（75%） / 1/4 | 3/4（75%） / 1/4 |
+| 无答案误收 / 范围错误 | 0/3 / 0/1 | 0/3 / 0/1 |
+| 实际判别请求 / tokens / 估算USD | 6 / 4,028 / $0.001265316 | 6 / 11,446 / $0.00194454 |
+
+唯一误拒`rag-intent-dev-001`询问已退金额的记录性质与核对来源。支付政策原文足以说明已有历史、支付/退款记录及非本轮执行；gold仍排第一，但分数0.614202低于0.71，两臂均未调用判别器。其余3个可答case进入判别器后均被两臂接收。**本轮没有证明typed能修复第六片的命题漂移；这次误拒位于判别之前。** 原标签、初次结果及低分保留，不因曝光失败追加较宽阈值或重跑。
+
+北京05:39:02–05:39:18唯一执行结束，gain/loss均0，开发未达门槛，**40个计划结果=16开发观测+24验证未执行**；验证不算通过，默认和整体C1准入不变。两臂共用8份排名缓存，判别缓存0命中，16结果仅对应8个query。实际20次尝试：rerank8次、7,287 tokens、估算¥0.0036435；判别12次、15,474 tokens、估算$0.003209856；0provider失败、partial/invalid及用量缺失。USD按冻结Pi目录/实际usage、CNY按北京端点估算，分列且非账单。provider端prompt缓存用量不同，一次顺序运行不能外推稳定成本倍率。
+
+实际判别12请求nearest-rank P50 1.144s/P95 1.589s；本机其他工作未隔离、小样本及排名缓存不能证明客服SLA。模型别名/参数固定不证明provider权重固定、账单或取消结算。本片只有检索与原文接收，没有最终客服回答、DB、QQ或商业验收；咨询政策中的助手权限不代表完整售后Controller。结论是保留默认与失败记录，暂不采用typed或追加实验。
+
+证据见[脱敏逐题/费用汇总](../data/rag-intent-profile-results-20261009.json)、[固定一次方法](../scripts/rag-intent-profile-probe.ts)及[第九片合同](./optimization-plan.md#第九片新题比较既有诉求判别候选)。基线`a46043f`，Node v26.10.0、Pi AI/Coding/agent-core 1.0.0；实际运行ID：A `46c2d13e-2442-4658-90bd-1ff696fcf37d`，B `9cc3e5bf-1cba-4043-a1c7-2a0da478131f`。运行日志和完整本机报告留在忽略目录，不入库。
+
+```sh
+node scripts/rag-intent-profile-probe.ts --self-check
+node scripts/rag-intent-profile-probe.ts --dry-run
+node --env-file-if-exists=.env scripts/rag-intent-profile-probe.ts --freeze-input
+# 本次首次执行命令；06:20截止及独占目录拒绝重复，另轮须新合同/冻结。
+node --env-file-if-exists=.env scripts/rag-intent-profile-probe.ts --run
+npm run validate
+```
+
+方法typecheck、自检、dry-run、冻结后的最终完整validate通过，14份冻结输入运行前后未变；本地伪时钟过期控制0请求/不建目录，重复目录控制0请求/原结果字节不变。独审重算两份报告、40计划、20份缓存与实际尝试、双币种和10条非空逐字引文通过；typed缓存v2在本轮仅写入，热回放由第十片工程检查验证。本manifest未再次真实调用或修后重跑。

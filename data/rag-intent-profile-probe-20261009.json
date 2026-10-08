@@ -1,0 +1,401 @@
+{
+  "version": 1,
+  "status": "frozen-initial-labels-independent-review-before-provider",
+  "source": "data/acceptance-online.json; unchanged verbatim eight-policy snapshot",
+  "sourceSha256": "5f97b7f4e77cd1695a38ef9b0c42e53f52f40f7ae869a39fcdcdae5ae8971b72",
+  "disclosure": "独立作者已读原8篇政策及旧固定题；第六片dev003失败的事实/意图主题已曝光。本题集不是盲测，不是意图独立留出；未阅读新判别器Prompt或第九片实验结果，0模型/DB/QQ。与第六片开发/验证20题均非同query，未复用dev003的价格性质+截止字段来源组合。",
+  "providerInputRule": "仅V2Question.query作为用户query发送；authorEvidenceQuote/sourceNotes、gold/标签及id不作为query或业务分支依据。",
+  "proposedComparison": {
+    "profiles": [
+      "binary-v1",
+      "typed-v6"
+    ],
+    "model": "deepseek-flash",
+    "acceptanceThreshold": 0.71
+  },
+  "deduplication": {
+    "algorithm": "NFKC → lowercase → remove all Unicode punctuation-category codepoints and whitespace → exact equality",
+    "dataFilesScanned": 93,
+    "queryFieldOccurrences": 545,
+    "distinctNormalizedOldQueries": 485,
+    "normalizedOldOverlap": 0,
+    "normalizedWithinProposalOverlap": 0,
+    "scanRule": "递归提取data下全部JSON/JSONL的query字段；不检查任何Prompt或非query结果字段。第六片data/rag-prefilter-probe-20261009.json包括在内。"
+  },
+  "development": {
+    "split": "development",
+    "composition": {
+      "answerable": 4,
+      "noAnswer": 3,
+      "scope": 1
+    },
+    "questions": [
+      {
+        "id": "rag-intent-dev-001",
+        "corpus": "online",
+        "query": "客服模板把查询到的“已退金额”列在“这轮新执行的操作结果”栏。这个字段在政策里代表哪一种记录性质，应依据什么记录核对它？",
+        "suite": "standard",
+        "shopId": null,
+        "productId": null,
+        "relevant": [
+          "KB-REFUND-PAYMENT"
+        ],
+        "expectedBehavior": "answer",
+        "authorEvidenceQuote": "已完成退款的订单需以支付和退款历史为准，不得重复退款；展示已退金额时说明这是已有历史记录，并非本轮执行。",
+        "sourceNotes": {
+          "docId": "KB-REFUND-PAYMENT",
+          "evidenceRole": "complete-single-contiguous-passage",
+          "boundary": "问历史字段的性质和来源，不索要实际退款金额或执行新退款。"
+        }
+      },
+      {
+        "id": "rag-intent-dev-002",
+        "corpus": "online",
+        "query": "常规套餐可以在普通周末使用，这条说明是否已经替客人完成了到店接待安排？请说明去店前确认接待的责任归属，以及助手在这个环节的能力。",
+        "suite": "standard",
+        "shopId": "shop-demo-1",
+        "productId": null,
+        "relevant": [
+          "KB-SHOP-DEMO-1"
+        ],
+        "expectedBehavior": "answer",
+        "authorEvidenceQuote": "常规午餐与晚餐套餐允许普通周末使用，到店前需用户自行与商家确认接待情况；助手目前不能预约、外呼、查询实时库存或安排接待。",
+        "sourceNotes": {
+          "docId": "KB-SHOP-DEMO-1",
+          "evidenceRole": "complete-single-contiguous-passage",
+          "boundary": "问使用政策与接待流程的性质，不索要某天实际库存或预约结果。"
+        }
+      },
+      {
+        "id": "rag-intent-dev-003",
+        "corpus": "online",
+        "query": "把“已支付、未核销且未过期，所以可以申请退款”写成“商家已经同意，钱也已退回”，这个阶段标注成立吗？规则中的申请资格与后两个阶段是什么关系？",
+        "suite": "standard",
+        "shopId": null,
+        "productId": null,
+        "relevant": [
+          "KB-REFUND-UNUSED"
+        ],
+        "expectedBehavior": "answer",
+        "authorEvidenceQuote": "已支付、未核销且尚未过期的团购券可以申请退款。必须先查本人订单确认支付、核销和有效期；可申请金额不超过尚未消费且未退款的实付金额。退款申请资格不等于商家已经批准或资金已经退回。",
+        "sourceNotes": {
+          "docId": "KB-REFUND-UNUSED",
+          "evidenceRole": "complete-single-contiguous-passage",
+          "boundary": "问政策资格与批准/资金回退的逻辑关系，不问某个订单现在是否已批准或到账。"
+        }
+      },
+      {
+        "id": "rag-intent-dev-004",
+        "corpus": "online",
+        "query": "单人晚餐商品按张卖券。资料中的“一张券对应一人晚餐”是在定义每张商品的套餐人数，还是在报告某笔订单已经有谁吃过？请解释这句商品说明的性质。",
+        "suite": "standard",
+        "shopId": "shop-demo-1",
+        "productId": "product-demo-2",
+        "relevant": [
+          "KB-PRODUCT-DINNER"
+        ],
+        "expectedBehavior": "answer",
+        "authorEvidenceQuote": "单人晚餐团购券标价59.90元，一张券对应一人晚餐，核销一次即视为整张券已使用。",
+        "sourceNotes": {
+          "docId": "KB-PRODUCT-DINNER",
+          "evidenceRole": "complete-single-contiguous-passage",
+          "boundary": "问商品套餐人数的定义性质，不索要实例已消费人员/状态，也不复用午餐半张券留到另一天问题。"
+        }
+      },
+      {
+        "id": "rag-intent-dev-005",
+        "corpus": "online",
+        "query": "我的订单有券已经用过，还有券没用。请给出这笔订单剩余券当前可申请退款上限的精确人民币数额，直接报计算结果。",
+        "suite": "no_answer",
+        "shopId": null,
+        "productId": null,
+        "relevant": [],
+        "expectedBehavior": "abstain",
+        "authorEvidenceQuote": "未核销、未过期、未退款部分可申请的金额按对应券的实付单价计算；已核销部分需商家另行核实，不能按整单实付金额承诺退款。",
+        "sourceNotes": {
+          "docId": "KB-REFUND-PARTIAL",
+          "evidenceRole": "nearest-policy-not-instance-fact",
+          "boundary": "真缺本实例每张券的核销/有效期/退款状态、实付单价及数量，政策公式不能产出实际金额。"
+        }
+      },
+      {
+        "id": "rag-intent-dev-006",
+        "corpus": "online",
+        "query": "店家已经核实完我那张已核销券的售后。请抄出店家最终核实意见的原文，并报出这次决定退给我的金额。",
+        "suite": "no_answer",
+        "shopId": null,
+        "productId": null,
+        "relevant": [],
+        "expectedBehavior": "abstain",
+        "authorEvidenceQuote": "已经核销的团购券不适用未核销自动退款规则，需由商家核实实际消费与售后原因后决定。没有商家核实结果时不能承诺可退、不可退或具体金额。",
+        "sourceNotes": {
+          "docId": "KB-REFUND-REDEEMED",
+          "evidenceRole": "nearest-policy-not-instance-fact",
+          "boundary": "真缺这次商家核实意见和决定金额；用户说已核实不提供意见正文或结果凭证。"
+        }
+      },
+      {
+        "id": "rag-intent-dev-007",
+        "corpus": "online",
+        "query": "请写出我手里这张双人午餐券的到期年月日与精确时分，我需要实际截止值，不是查找位置。",
+        "suite": "no_answer",
+        "shopId": "shop-demo-1",
+        "productId": "product-demo-1",
+        "relevant": [],
+        "expectedBehavior": "abstain",
+        "authorEvidenceQuote": "每张券具体截止时间以订单返回的 expiresAt 为准，不能从标价推断实付金额。",
+        "sourceNotes": {
+          "docId": "KB-PRODUCT-LUNCH",
+          "evidenceRole": "nearest-policy-not-instance-fact",
+          "boundary": "真缺该券实例的expiresAt字段值；已知字段来源不能替代具体时间值。"
+        }
+      },
+      {
+        "id": "rag-intent-dev-008",
+        "corpus": "online",
+        "query": "云味餐厅的常规套餐在普通周末到店之前，确认能否接待应由用户完成还是由助手代办？请按这家门店的说明解释流程。",
+        "suite": "scope",
+        "shopId": "shop-intent-other",
+        "productId": null,
+        "relevant": [],
+        "expectedBehavior": "abstain",
+        "authorEvidenceQuote": "常规午餐与晚餐套餐允许普通周末使用，到店前需用户自行与商家确认接待情况；助手目前不能预约、外呼、查询实时库存或安排接待。",
+        "sourceNotes": {
+          "docId": "KB-SHOP-DEMO-1",
+          "evidenceRole": "answer-only-in-forbidden-scope",
+          "boundary": "可信shopId是其他门店，文本点名云味不能扩大范围；门店流程依据只在禁止文档。"
+        },
+        "forbidden": [
+          "KB-SHOP-DEMO-1"
+        ]
+      }
+    ]
+  },
+  "validation": {
+    "split": "validation",
+    "composition": {
+      "answerable": 6,
+      "noAnswer": 4,
+      "scope": 2
+    },
+    "questions": [
+      {
+        "id": "rag-intent-val-001",
+        "corpus": "online",
+        "query": "多券订单的售后计算表有“按券实付单价”和“按整单实付”两个口径。规则对未用且有效、未退部分选哪一个口径，已核销部分为什么要分开处理？这里只问计算方法。",
+        "suite": "standard",
+        "shopId": null,
+        "productId": null,
+        "relevant": [
+          "KB-REFUND-PARTIAL"
+        ],
+        "expectedBehavior": "answer",
+        "authorEvidenceQuote": "同一订单有多张券时必须逐券核对。未核销、未过期、未退款部分可申请的金额按对应券的实付单价计算；已核销部分需商家另行核实，不能按整单实付金额承诺退款。",
+        "sourceNotes": {
+          "docId": "KB-REFUND-PARTIAL",
+          "evidenceRole": "complete-single-contiguous-passage",
+          "boundary": "问计算输入粒度及已核销部分的处理类别，不索要实例金额或执行状态。"
+        }
+      },
+      {
+        "id": "rag-intent-val-002",
+        "corpus": "online",
+        "query": "售后流程图给“券已核销”这条分支套上未核销自动退款。按现有政策，这个分支实际属于自动规则直接决定，还是商家核实后决定？请说明分支类型。",
+        "suite": "standard",
+        "shopId": null,
+        "productId": null,
+        "relevant": [
+          "KB-REFUND-REDEEMED"
+        ],
+        "expectedBehavior": "answer",
+        "authorEvidenceQuote": "已经核销的团购券不适用未核销自动退款规则，需由商家核实实际消费与售后原因后决定。",
+        "sourceNotes": {
+          "docId": "KB-REFUND-REDEEMED",
+          "evidenceRole": "complete-single-contiguous-passage",
+          "boundary": "问政策分支性质，不询问任何一次商家核实结果、不复用上一验证题的联系/提交能力组合。"
+        }
+      },
+      {
+        "id": "rag-intent-val-003",
+        "corpus": "online",
+        "query": "过期但没有使用的券，资料里“需要商家确认”属于自动延期或自动退款政策，还是尚待商家确认的处理流程？请解释这条规则目前承诺到哪一步。",
+        "suite": "standard",
+        "shopId": null,
+        "productId": null,
+        "relevant": [
+          "KB-REFUND-EXPIRED"
+        ],
+        "expectedBehavior": "answer",
+        "authorEvidenceQuote": "已过期但未核销的券需要商家确认能否退款、延期以及金额。知识库未提供过期自动退款或自动延期政策。",
+        "sourceNotes": {
+          "docId": "KB-REFUND-EXPIRED",
+          "evidenceRole": "complete-single-contiguous-passage",
+          "boundary": "问流程与自动政策的区别，明确否定自动规则在文档内可回答；不索要延期天数或新日期。"
+        }
+      },
+      {
+        "id": "rag-intent-val-004",
+        "corpus": "online",
+        "query": "我在整理双人午餐资料的登记状态。菜品明细、过敏原和特殊节假日可用性这三项，是已经录入的明细，还是被标为尚未录入？只回答资料状态。",
+        "suite": "standard",
+        "shopId": "shop-demo-1",
+        "productId": "product-demo-1",
+        "relevant": [
+          "KB-PRODUCT-LUNCH"
+        ],
+        "expectedBehavior": "answer",
+        "authorEvidenceQuote": "菜品明细、过敏原和特殊节假日可用性未录入。",
+        "sourceNotes": {
+          "docId": "KB-PRODUCT-LUNCH",
+          "evidenceRole": "complete-single-contiguous-passage",
+          "boundary": "问字段是否登记，完整答案就是明确未录入；不索要菜单/过敏原/假日实际值，也不复用第六片dev003价格与到期字段来源。"
+        }
+      },
+      {
+        "id": "rag-intent-val-005",
+        "corpus": "online",
+        "query": "未支付订单的页面也有一个商品标价。政策是否把这个数字视为已到账、可退的资金？请解释这里标价与实付的性质区别。",
+        "suite": "standard",
+        "shopId": null,
+        "productId": null,
+        "relevant": [
+          "KB-REFUND-PAYMENT"
+        ],
+        "expectedBehavior": "answer",
+        "authorEvidenceQuote": "未支付订单没有到账资金，因此没有可退金额；不能把订单标价当作实付金额。",
+        "sourceNotes": {
+          "docId": "KB-REFUND-PAYMENT",
+          "evidenceRole": "complete-single-contiguous-passage",
+          "boundary": "问未支付情况下数值性质的明确政策，不索要某笔实付款或退款历史数字。"
+        }
+      },
+      {
+        "id": "rag-intent-val-006",
+        "corpus": "online",
+        "query": "门店说明标题提到预约，是否意味着当前助手提供代预约、外呼、实时库存查询或安排接待这几项服务？按说明逐项说明现有能力。",
+        "suite": "standard",
+        "shopId": "shop-demo-1",
+        "productId": null,
+        "relevant": [
+          "KB-SHOP-DEMO-1"
+        ],
+        "expectedBehavior": "answer",
+        "authorEvidenceQuote": "助手目前不能预约、外呼、查询实时库存或安排接待。",
+        "sourceNotes": {
+          "docId": "KB-SHOP-DEMO-1",
+          "evidenceRole": "complete-single-contiguous-passage",
+          "boundary": "问宿主能力登记状态，政策明确不提供四项服务是可回答事实；不索要实际预约结果。"
+        }
+      },
+      {
+        "id": "rag-intent-val-007",
+        "corpus": "online",
+        "query": "这笔已经完成退款的订单，支付历史里记下的实付款和退款历史里记下的退回款各是多少元？请给两个实际历史金额。",
+        "suite": "no_answer",
+        "shopId": null,
+        "productId": null,
+        "relevant": [],
+        "expectedBehavior": "abstain",
+        "authorEvidenceQuote": "已完成退款的订单需以支付和退款历史为准，不得重复退款；展示已退金额时说明这是已有历史记录，并非本轮执行。",
+        "sourceNotes": {
+          "docId": "KB-REFUND-PAYMENT",
+          "evidenceRole": "nearest-policy-not-instance-fact",
+          "boundary": "真缺该订单支付历史实付款与退款历史退回款的数值；政策只说明历史来源和禁止重复退款。"
+        }
+      },
+      {
+        "id": "rag-intent-val-008",
+        "corpus": "online",
+        "query": "我已经自己和云味店员约好今晚用餐。请告诉我店家登记的预约确认编号、约定到店时刻以及安排的桌号。",
+        "suite": "no_answer",
+        "shopId": "shop-demo-1",
+        "productId": null,
+        "relevant": [],
+        "expectedBehavior": "abstain",
+        "authorEvidenceQuote": "到店前需用户自行与商家确认接待情况；助手目前不能预约、外呼、查询实时库存或安排接待。",
+        "sourceNotes": {
+          "docId": "KB-SHOP-DEMO-1",
+          "evidenceRole": "nearest-policy-not-instance-fact",
+          "boundary": "真缺用户自行安排后的预约记录、确认编号、时刻和桌号；不是问助手是否能预约，该明确否定政策并不能回答外部预约结果。"
+        }
+      },
+      {
+        "id": "rag-intent-val-009",
+        "corpus": "online",
+        "query": "我买的那笔单人晚餐订单还有一张券。请直接报这张剩余券当前究竟是未核销、已核销还是已退款，不要只介绍查询规则。",
+        "suite": "no_answer",
+        "shopId": "shop-demo-1",
+        "productId": "product-demo-2",
+        "relevant": [],
+        "expectedBehavior": "abstain",
+        "authorEvidenceQuote": "订单购买两张券时可以分别核销，剩余券状态以订单查询为准。",
+        "sourceNotes": {
+          "docId": "KB-PRODUCT-DINNER",
+          "evidenceRole": "nearest-policy-not-instance-fact",
+          "boundary": "真缺当前剩余券的订单状态值；购买和剩余描述不授权推断状态。"
+        }
+      },
+      {
+        "id": "rag-intent-val-010",
+        "corpus": "online",
+        "query": "那张过期未用的券，店家已经答应延长了。请写出店家最终登记的新截止日期和时分，我要实际生效时间。",
+        "suite": "no_answer",
+        "shopId": null,
+        "productId": null,
+        "relevant": [],
+        "expectedBehavior": "abstain",
+        "authorEvidenceQuote": "已过期但未核销的券需要商家确认能否退款、延期以及金额。知识库未提供过期自动退款或自动延期政策。",
+        "sourceNotes": {
+          "docId": "KB-REFUND-EXPIRED",
+          "evidenceRole": "nearest-policy-not-instance-fact",
+          "boundary": "真缺商家这次延期决定的新截止时间值；文档没有记录任何实例延期结果，用户声称答应也未给时间。"
+        }
+      },
+      {
+        "id": "rag-intent-val-011",
+        "corpus": "online",
+        "query": "单人晚餐资料里的59.90元表示商品挂牌价格，还是表示某个订单已经支付到账的金额？请仅解释这个数字在商品说明里的属性。",
+        "suite": "scope",
+        "shopId": "shop-demo-1",
+        "productId": "product-demo-1",
+        "relevant": [],
+        "expectedBehavior": "abstain",
+        "authorEvidenceQuote": "单人晚餐团购券标价59.90元，一张券对应一人晚餐，核销一次即视为整张券已使用。",
+        "sourceNotes": {
+          "docId": "KB-PRODUCT-DINNER",
+          "evidenceRole": "answer-only-in-forbidden-scope",
+          "boundary": "可信范围是午餐商品，晚餐价格属性依据在禁止的晚餐商品文档；不能因文本点名晚餐越权。"
+        },
+        "forbidden": [
+          "KB-PRODUCT-DINNER"
+        ]
+      },
+      {
+        "id": "rag-intent-val-012",
+        "corpus": "online",
+        "query": "双人午餐商品资料把菜品明细与过敏原列为已经录入，还是列为未录入？我只问商品资料的登记状态。",
+        "suite": "scope",
+        "shopId": "shop-demo-1",
+        "productId": null,
+        "relevant": [],
+        "expectedBehavior": "abstain",
+        "authorEvidenceQuote": "菜品明细、过敏原和特殊节假日可用性未录入。",
+        "sourceNotes": {
+          "docId": "KB-PRODUCT-LUNCH",
+          "evidenceRole": "answer-only-in-forbidden-scope",
+          "boundary": "只可信到门店、productId缺失，商品文档不能进范围；其他文档对相似字段的陈述不能证明午餐商品登记状态。"
+        },
+        "forbidden": [
+          "KB-PRODUCT-LUNCH"
+        ]
+      }
+    ]
+  },
+  "frozenAt": "2026-10-08T21:33:01.125128+00:00",
+  "review": {
+    "labels": "independent author and reviewer; 10 complete single-policy gold, 7 missing-instance-fact negatives, 3 scope refusals",
+    "callsBeforeFreeze": 0,
+    "baselineCommit": "a46043f4f55ae8c8dfaa2a3b1087faf3d9f35135",
+    "scopeBoundary": "original eight-policy consultation corpus; assistant capability descriptions do not describe full after-sales Controller"
+  }
+}

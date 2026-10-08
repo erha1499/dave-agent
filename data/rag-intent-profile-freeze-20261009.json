@@ -1,0 +1,428 @@
+{
+  "schemaVersion": 1,
+  "frozenAt": "2026-10-08T21:36:50.703139+00:00",
+  "baselineCommit": "a46043f4f55ae8c8dfaa2a3b1087faf3d9f35135",
+  "runtime": {
+    "node": "v26.10.0",
+    "packages": {
+      "@earendil-works/pi-ai": "1.0.0",
+      "@earendil-works/pi-coding-agent": "1.0.0",
+      "@earendil-works/pi-agent-core": "1.0.0"
+    }
+  },
+  "independentReview": "original fixture questions unchanged, single-policy gold/negative/scope and final method independently reviewed before provider",
+  "boundary": "new method/fixture not in baseline commit; actual bytes bound by identity.files; not blind or intent-disjoint",
+  "identity": {
+    "version": 1,
+    "files": {
+      "scripts/rag-intent-profile-probe.ts": "9e18ed6ab48f5cff84b41a2d2bb1b78fbb29cdeba7b25842205e98e41ff291c6",
+      "data/rag-intent-profile-probe-20261009.json": "0c28aee7bf15e632abfc7fcb856d2f31fc9ad67ca4a5eb526845808943e54e93",
+      "data/acceptance-online.json": "5f97b7f4e77cd1695a38ef9b0c42e53f52f40f7ae869a39fcdcdae5ae8971b72",
+      "src/bailian.ts": "ed7fc42f703bd3e49ee38581c4bfa5d35f886872f5039c2b467e74682c1d95b1",
+      "src/evidence-support.ts": "e92c6374f8c13d4289e94d6e40cb9fd53ed5b9a2ff4a81fba52f38396e672a31",
+      "src/evidence-acceptance.ts": "6e8040cf1ea30135dd7c18a44ed72d255ce94131226223325df3ab209b61d368",
+      "src/retrieval-ranking.ts": "6391fcf74f4bfb79f01c018d8c3cc0fb3f969a2256f9269e3127b5f907f6dc89",
+      "src/agent.ts": "8fd83aa81d921b03e4ce7227453c97d2148449dae06b87df6e6954f4223740ea",
+      "src/model-selection.ts": "e9b1eedd0d6a22d1a67164a07bed9bc425e7c85c0e575d2c1dca3bd7e0a21631",
+      "src/knowledge-retrieval.ts": "89a9c606cabc1579b2cbe45ec25675260731e0a0fbe2fe99133515d7df8ebf00",
+      "scripts/retrieval-data.ts": "828c191e375ed7d5e7b509c036e172bec49d163f7c83f4128ea05e900baa29e9",
+      "scripts/retrieval-v2.ts": "9e12fbdfbc01eea00c6659e4ce447efa2d86cfa7e2206d4a28e0bad92f9be4a4",
+      "scripts/acceptance-report.ts": "f33e7ac48bafbf2d5cba2d66834b41b9f20e952bb546b25d06ad9e4ac598abef",
+      "package-lock.json": "b1bf19c78dde262cc85470fd4033f51756b2a46a20f9cd261928ee65b496edeb"
+    },
+    "datasetHashes": {
+      "development": "c7750859dfe51dcfe5fe0d4b9c8da1c2eaebd3d9cbc4f4771929b94f51a2bd7d",
+      "validation": "96a975ec9214b56bc11d1a0966fec378547137ee1b36a91ee178dcafcb3b69f6"
+    },
+    "arms": [
+      {
+        "id": "development-A",
+        "split": "development",
+        "profile": "binary",
+        "threshold": 0.71,
+        "maxRequests": 16
+      },
+      {
+        "id": "development-B",
+        "split": "development",
+        "profile": "typed",
+        "threshold": 0.71,
+        "maxRequests": 8
+      },
+      {
+        "id": "validation-A",
+        "split": "validation",
+        "profile": "binary",
+        "threshold": 0.71,
+        "maxRequests": 24
+      },
+      {
+        "id": "validation-B",
+        "split": "validation",
+        "profile": "typed",
+        "threshold": 0.71,
+        "maxRequests": 12
+      }
+    ],
+    "plan": [
+      {
+        "arm": "development-A",
+        "split": "development",
+        "id": "rag-intent-dev-001",
+        "suite": "standard",
+        "answerable": true
+      },
+      {
+        "arm": "development-A",
+        "split": "development",
+        "id": "rag-intent-dev-002",
+        "suite": "standard",
+        "answerable": true
+      },
+      {
+        "arm": "development-A",
+        "split": "development",
+        "id": "rag-intent-dev-003",
+        "suite": "standard",
+        "answerable": true
+      },
+      {
+        "arm": "development-A",
+        "split": "development",
+        "id": "rag-intent-dev-004",
+        "suite": "standard",
+        "answerable": true
+      },
+      {
+        "arm": "development-A",
+        "split": "development",
+        "id": "rag-intent-dev-005",
+        "suite": "no_answer",
+        "answerable": false
+      },
+      {
+        "arm": "development-A",
+        "split": "development",
+        "id": "rag-intent-dev-006",
+        "suite": "no_answer",
+        "answerable": false
+      },
+      {
+        "arm": "development-A",
+        "split": "development",
+        "id": "rag-intent-dev-007",
+        "suite": "no_answer",
+        "answerable": false
+      },
+      {
+        "arm": "development-A",
+        "split": "development",
+        "id": "rag-intent-dev-008",
+        "suite": "scope",
+        "answerable": false
+      },
+      {
+        "arm": "development-B",
+        "split": "development",
+        "id": "rag-intent-dev-001",
+        "suite": "standard",
+        "answerable": true
+      },
+      {
+        "arm": "development-B",
+        "split": "development",
+        "id": "rag-intent-dev-002",
+        "suite": "standard",
+        "answerable": true
+      },
+      {
+        "arm": "development-B",
+        "split": "development",
+        "id": "rag-intent-dev-003",
+        "suite": "standard",
+        "answerable": true
+      },
+      {
+        "arm": "development-B",
+        "split": "development",
+        "id": "rag-intent-dev-004",
+        "suite": "standard",
+        "answerable": true
+      },
+      {
+        "arm": "development-B",
+        "split": "development",
+        "id": "rag-intent-dev-005",
+        "suite": "no_answer",
+        "answerable": false
+      },
+      {
+        "arm": "development-B",
+        "split": "development",
+        "id": "rag-intent-dev-006",
+        "suite": "no_answer",
+        "answerable": false
+      },
+      {
+        "arm": "development-B",
+        "split": "development",
+        "id": "rag-intent-dev-007",
+        "suite": "no_answer",
+        "answerable": false
+      },
+      {
+        "arm": "development-B",
+        "split": "development",
+        "id": "rag-intent-dev-008",
+        "suite": "scope",
+        "answerable": false
+      },
+      {
+        "arm": "validation-A",
+        "split": "validation",
+        "id": "rag-intent-val-001",
+        "suite": "standard",
+        "answerable": true
+      },
+      {
+        "arm": "validation-A",
+        "split": "validation",
+        "id": "rag-intent-val-002",
+        "suite": "standard",
+        "answerable": true
+      },
+      {
+        "arm": "validation-A",
+        "split": "validation",
+        "id": "rag-intent-val-003",
+        "suite": "standard",
+        "answerable": true
+      },
+      {
+        "arm": "validation-A",
+        "split": "validation",
+        "id": "rag-intent-val-004",
+        "suite": "standard",
+        "answerable": true
+      },
+      {
+        "arm": "validation-A",
+        "split": "validation",
+        "id": "rag-intent-val-005",
+        "suite": "standard",
+        "answerable": true
+      },
+      {
+        "arm": "validation-A",
+        "split": "validation",
+        "id": "rag-intent-val-006",
+        "suite": "standard",
+        "answerable": true
+      },
+      {
+        "arm": "validation-A",
+        "split": "validation",
+        "id": "rag-intent-val-007",
+        "suite": "no_answer",
+        "answerable": false
+      },
+      {
+        "arm": "validation-A",
+        "split": "validation",
+        "id": "rag-intent-val-008",
+        "suite": "no_answer",
+        "answerable": false
+      },
+      {
+        "arm": "validation-A",
+        "split": "validation",
+        "id": "rag-intent-val-009",
+        "suite": "no_answer",
+        "answerable": false
+      },
+      {
+        "arm": "validation-A",
+        "split": "validation",
+        "id": "rag-intent-val-010",
+        "suite": "no_answer",
+        "answerable": false
+      },
+      {
+        "arm": "validation-A",
+        "split": "validation",
+        "id": "rag-intent-val-011",
+        "suite": "scope",
+        "answerable": false
+      },
+      {
+        "arm": "validation-A",
+        "split": "validation",
+        "id": "rag-intent-val-012",
+        "suite": "scope",
+        "answerable": false
+      },
+      {
+        "arm": "validation-B",
+        "split": "validation",
+        "id": "rag-intent-val-001",
+        "suite": "standard",
+        "answerable": true
+      },
+      {
+        "arm": "validation-B",
+        "split": "validation",
+        "id": "rag-intent-val-002",
+        "suite": "standard",
+        "answerable": true
+      },
+      {
+        "arm": "validation-B",
+        "split": "validation",
+        "id": "rag-intent-val-003",
+        "suite": "standard",
+        "answerable": true
+      },
+      {
+        "arm": "validation-B",
+        "split": "validation",
+        "id": "rag-intent-val-004",
+        "suite": "standard",
+        "answerable": true
+      },
+      {
+        "arm": "validation-B",
+        "split": "validation",
+        "id": "rag-intent-val-005",
+        "suite": "standard",
+        "answerable": true
+      },
+      {
+        "arm": "validation-B",
+        "split": "validation",
+        "id": "rag-intent-val-006",
+        "suite": "standard",
+        "answerable": true
+      },
+      {
+        "arm": "validation-B",
+        "split": "validation",
+        "id": "rag-intent-val-007",
+        "suite": "no_answer",
+        "answerable": false
+      },
+      {
+        "arm": "validation-B",
+        "split": "validation",
+        "id": "rag-intent-val-008",
+        "suite": "no_answer",
+        "answerable": false
+      },
+      {
+        "arm": "validation-B",
+        "split": "validation",
+        "id": "rag-intent-val-009",
+        "suite": "no_answer",
+        "answerable": false
+      },
+      {
+        "arm": "validation-B",
+        "split": "validation",
+        "id": "rag-intent-val-010",
+        "suite": "no_answer",
+        "answerable": false
+      },
+      {
+        "arm": "validation-B",
+        "split": "validation",
+        "id": "rag-intent-val-011",
+        "suite": "scope",
+        "answerable": false
+      },
+      {
+        "arm": "validation-B",
+        "split": "validation",
+        "id": "rag-intent-val-012",
+        "suite": "scope",
+        "answerable": false
+      }
+    ],
+    "parameters": {
+      "timeoutMs": 15000,
+      "retries": 0,
+      "cache": "reuse",
+      "consecutiveFailureLimit": 1
+    },
+    "settings": {
+      "rerank": {
+        "endpoints": {
+          "origin": "https://ws-tiy939iiusj2254o.cn-beijing.maas.aliyuncs.com",
+          "embedding": "https://ws-tiy939iiusj2254o.cn-beijing.maas.aliyuncs.com/compatible-mode/v1/embeddings",
+          "rerank": "https://ws-tiy939iiusj2254o.cn-beijing.maas.aliyuncs.com/compatible-api/v1/reranks"
+        },
+        "timeoutMs": 15000,
+        "retries": 0,
+        "embeddingModel": "text-embedding-v4",
+        "dimensions": 1024,
+        "rerankModel": "qwen3-rerank",
+        "rerankInstruction": "Given a web search query, retrieve relevant passages that answer the query."
+      },
+      "support": {
+        "binary": {
+          "provider": "deepseek",
+          "model": "deepseek-flash",
+          "api": "openai-completions",
+          "endpoint": "https://api.deepseek.com",
+          "timeoutMs": 15000,
+          "temperature": 0,
+          "maxTokens": 2048,
+          "maxRetries": 0,
+          "promptVersion": "fact-support-v1",
+          "promptHash": "3d254e0bca8e14fae05804a0f027c653f5f099e1b91e5fb519088b5aaa04f15a",
+          "serialization": "json-query-id-title-tags-body-v1",
+          "serializationHash": "1d16c5e3ef4647c120fe6ddce72417c9ec618ee41dc77faa447ec214e5749c4a",
+          "pricing": {
+            "currency": "USD",
+            "estimated": true,
+            "source": "Pi model catalog",
+            "rates": {
+              "input": 0.3,
+              "output": 1.2,
+              "cacheRead": 0.006,
+              "cacheWrite": 0
+            }
+          }
+        },
+        "typed": {
+          "provider": "deepseek",
+          "model": "deepseek-flash",
+          "api": "openai-completions",
+          "endpoint": "https://api.deepseek.com",
+          "timeoutMs": 15000,
+          "temperature": 0,
+          "maxTokens": 2048,
+          "maxRetries": 0,
+          "promptVersion": "fact-support-typed-v6",
+          "promptHash": "889596997b27deccf91339f46b7a3825aa239a50fbcde92ce5109b67a77f19fa",
+          "serialization": "json-query-id-title-tags-body-v1",
+          "serializationHash": "1d16c5e3ef4647c120fe6ddce72417c9ec618ee41dc77faa447ec214e5749c4a",
+          "pricing": {
+            "currency": "USD",
+            "estimated": true,
+            "source": "Pi model catalog",
+            "rates": {
+              "input": 0.3,
+              "output": 1.2,
+              "cacheRead": 0.006,
+              "cacheWrite": 0
+            }
+          },
+          "profile": "typed",
+          "validationVersion": "typed-candidate-isolation-v1"
+        }
+      }
+    },
+    "comparison": "binary v1 versus typed v6 including Prompt, schema and candidate isolation; not pure Prompt causality",
+    "deadline": "2026-10-08T22:20:00.000Z",
+    "maxRequests": 60
+  }
+}
