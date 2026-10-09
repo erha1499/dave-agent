@@ -20,6 +20,7 @@ import { modelSelections, type ModelSelection } from "./model-selection.ts";
 import { createSupportQuestionClient } from "./support-question-client.ts";
 import { createArrivalConsultation } from "./arrival-consultation.ts";
 import { prepareOrderDiscoveryPrompt, presentOrderDiscoveryReply } from "./order-discovery.ts";
+import { withModelTask, readModelTaskLimits, ContextBudgetError } from "./model-request-budget.ts";
 
 export function readCliQuestionOptions(architecture: "atomic" | "controller", env: NodeJS.ProcessEnv = process.env):
   { questionContract: "v2" } | { questionContract: "v3"; modelSelection: ModelSelection; timeoutMs: number } {
@@ -53,43 +54,68 @@ export async function runCliPrompt(
   beforePrompt?: (text: string) => Promise<Reply | undefined>,
   preparedDiscovery?: { prompt: string; reply?: Reply },
 ) {
-  const consultation = preparedDiscovery ? undefined : await beforePrompt?.(text);
-  const discovery: { prompt: string; reply?: Reply } = preparedDiscovery
-    ?? (consultation === undefined ? await prepareOrderDiscoveryPrompt(session, text) : { prompt: text });
-  const hostReply = consultation ?? discovery.reply;
-  if (hostReply !== undefined) {
-    await write(`客服：${renderReply(hostReply).text}\n`);
-    await afterDeliver?.(hostReply);
-    if (!preparedDiscovery) presentOrderDiscoveryReply(session, hostReply, text);
-    // A read-only rule receipt is history, never consent or an Agent turn.
-    try { await session.sendCustomMessage({ customType: "arrival-consultation", content: renderReply(hostReply).text, display: true }, { triggerTurn: false }); }
-    catch { /* Delivery already succeeded; do not retry the consultation or send. */ }
-    return hostReply;
-  }
-  const previous = session.messages.length;
-  const requestId = randomUUID();
-  prepareSupportPrompt(session, { requestId, groupOpenid: "cli", messageId: requestId });
-  let modelFailed = false;
-  try {
-    await session.prompt(discovery.prompt, { expandPromptTemplates: false });
-    if (!getSupportHostReceipt(session) && session.agent.state.errorMessage) throw new Error("模型请求失败。");
-  } catch {
-    modelFailed = true;
-    cancelSupportTurn(session);
-    await session.abort();
-    if (!getSupportResult(session)) throw new Error("模型请求失败，请检查模型配置或稍后重试。");
-  }
-  const results = session.messages.slice(previous).flatMap(message => message.role === "toolResult" ? [message] : []);
-  const assistantText = modelFailed ? "" : session.getLastAssistantText() ?? "未生成回复，请重试。";
-  const reply = supportReply(session, assistantText) ?? replyFromTools(assistantText, results);
-  // Delivery failures do not re-enter the model fallback or retry any business action.
-  await write(`客服：${renderReply(reply).text}\n`);
-  await afterDeliver?.(reply);
-  if (!preparedDiscovery) presentOrderDiscoveryReply(session, reply, text);
-  return reply;
+  return withModelTask({ requestId: randomUUID(), entrypoint: "cli",
+    onComplete: summary => console.error(`[model-task] ${JSON.stringify(summary)}`) }, async task => {
+    task.setPhase("host");
+    const consultation = preparedDiscovery ? undefined : await beforePrompt?.(text);
+    const discovery: { prompt: string; reply?: Reply } = preparedDiscovery
+      ?? (consultation === undefined ? await prepareOrderDiscoveryPrompt(session, text) : { prompt: text });
+    const hostReply = consultation ?? discovery.reply;
+    if (hostReply !== undefined) {
+      task.setPhase("render");
+      const rendered = `客服：${renderReply(hostReply).text}\n`;
+      task.setPhase("send");
+      await write(rendered);
+      task.setPhase("receipt");
+      await afterDeliver?.(hostReply);
+      if (!preparedDiscovery) presentOrderDiscoveryReply(session, hostReply, text);
+      // A read-only rule receipt is history, never consent or an Agent turn.
+      try { await session.sendCustomMessage({ customType: "arrival-consultation", content: renderReply(hostReply).text, display: true }, { triggerTurn: false }); }
+      catch { /* Delivery already succeeded; do not retry the consultation or send. */ }
+      return hostReply;
+    }
+    const previous = session.messages.length;
+    const requestId = randomUUID();
+    prepareSupportPrompt(session, { requestId, groupOpenid: "cli", messageId: requestId });
+    let modelFailed = false;
+    task.setPhase("model");
+    try {
+      await session.prompt(discovery.prompt, { expandPromptTemplates: false });
+      if (task.snapshot().failureReason === "context_limit") throw new ContextBudgetError();
+      if (!getSupportHostReceipt(session) && session.agent.state.errorMessage) throw new Error("模型请求失败。");
+    } catch {
+      modelFailed = true;
+      task.fail("model_failed");
+      cancelSupportTurn(session);
+      await session.abort();
+      if (task.snapshot().failureReason === "context_limit") throw new ContextBudgetError();
+      if (!getSupportResult(session)) throw new Error("模型请求失败，请检查模型配置或稍后重试。");
+    }
+    task.setPhase("render");
+    const results = session.messages.slice(previous).flatMap(message => message.role === "toolResult" ? [message] : []);
+    const assistantText = modelFailed ? "" : session.getLastAssistantText() ?? "未生成回复，请重试。";
+    const reply = supportReply(session, assistantText) ?? replyFromTools(assistantText, results);
+    // Delivery failures do not re-enter the model fallback or retry any business action.
+    const rendered = `客服：${renderReply(reply).text}\n`;
+    task.setPhase("send");
+    await write(rendered);
+    task.setPhase("receipt");
+    await afterDeliver?.(reply);
+    if (!preparedDiscovery) presentOrderDiscoveryReply(session, reply, text);
+    return reply;
+  });
+}
+
+// Await the old turn before creating a new object: order discovery is keyed by Session.
+export async function replaceCliSession(previous: AgentSession, create: () => Promise<AgentSession>) {
+  cancelSupportTurn(previous);
+  await previous.abort();
+  previous.dispose();
+  return create();
 }
 
 async function main() {
+  const taskLimits = readModelTaskLimits();
   const architecture = readSupportArchitecture();
   const questionOptions = readCliQuestionOptions(architecture);
   const contextMode = readSupportContextMode(architecture);
@@ -120,10 +146,11 @@ async function main() {
     const business = afterSales ? { store: afterSales, sourceKey, refunds } : undefined;
     const questionResolver = questionOptions.questionContract === "v3" ? await createSupportQuestionClient({
       modelSelection: questionOptions.modelSelection, timeoutMs: questionOptions.timeoutMs }) : undefined;
-    const session = architecture === "controller"
-      ? await createSupportSession(identity, store, modelRuntime, model, business, { knowledge, context: contexts?.bind(identity, "cli"),
+    const createSession = () => architecture === "controller"
+      ? createSupportSession(identity, store, modelRuntime, model, business, { knowledge, context: contexts?.bind(identity, "cli"),
         questionContract: questionOptions.questionContract, questionResolver })
-      : await createCouponSession(identity, store, modelRuntime, model, business);
+      : createCouponSession(identity, store, modelRuntime, model, business);
+    let session = await createSession();
     const input = createInterface({ input: stdin, output: stdout });
     console.log(`团购券客服演示（${senderId}）：券单 COUPON-1001${afterSales ? "；模拟协商 COUPON-2001 / 2002 / 2003" : "，只读咨询"}；输入 /exit 退出。全部是模拟数据。`);
     if (questionResolver) console.log(`显式咨询候选 v3：${questionResolver.settings.provider}/${questionResolver.settings.model}，超时${questionResolver.settings.timeoutMs}ms；每次解析最多增加1个模型请求。v3方案已有有界真实开发对照，完整C1仍未准入；当前配置效果需另行验证。`);
@@ -134,21 +161,33 @@ async function main() {
         if (line.kind === "empty") continue;
         const { text } = line;
         try {
-          const confirmation = (refunds ? await confirmRefundReply(refunds, identity, sourceKey, text) : undefined)
-            ?? (afterSales ? await confirmMerchantReply(afterSales, identity, sourceKey, text) : undefined);
-          if (confirmation !== undefined) {
-            const receipt = renderReply(confirmation).text;
-            presentOrderDiscoveryReply(session, confirmation, text);
-            await session.sendCustomMessage({ customType: "business-receipt", content: receipt, display: true }, { triggerTurn: false });
-            console.log(`客服：${receipt}`);
-            continue;
-          }
-          await runCliPrompt(session, text,
-            output => new Promise<void>((resolve, reject) => stdout.write(output, error => error ? reject(error) : resolve())),
-            refunds ? reply => markRefundReplyPresented(refunds, identity, sourceKey, reply) : undefined,
-            text => arrival(identity, text));
+          await withModelTask({ requestId: randomUUID(), entrypoint: "cli", limits: taskLimits,
+            onComplete: summary => console.error(`[model-task] ${JSON.stringify(summary)}`) }, async task => {
+            task.setPhase("host");
+            const confirmation = (refunds ? await confirmRefundReply(refunds, identity, sourceKey, text) : undefined)
+              ?? (afterSales ? await confirmMerchantReply(afterSales, identity, sourceKey, text) : undefined);
+            if (confirmation !== undefined) {
+              task.setPhase("render");
+              const receipt = renderReply(confirmation).text;
+              presentOrderDiscoveryReply(session, confirmation, text);
+              task.setPhase("receipt");
+              await session.sendCustomMessage({ customType: "business-receipt", content: receipt, display: true }, { triggerTurn: false });
+              task.setPhase("send");
+              console.log(`客服：${receipt}`);
+              return;
+            }
+            await runCliPrompt(session, text,
+              output => new Promise<void>((resolve, reject) => stdout.write(output, error => error ? reject(error) : resolve())),
+              refunds ? reply => markRefundReplyPresented(refunds, identity, sourceKey, reply) : undefined,
+              text => arrival(identity, text));
+          });
         } catch (error) {
           console.error(error instanceof Error ? error.message : "本轮处理失败。");
+          if (error instanceof ContextBudgetError) {
+            // Persistent Controller references need a separate reset contract.
+            if (architecture !== "atomic") throw error;
+            session = await replaceCliSession(session, createSession);
+          }
         }
       }
     } finally {

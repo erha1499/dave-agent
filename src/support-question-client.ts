@@ -1,6 +1,7 @@
 import { isDeepStrictEqual } from "node:util";
 import { calculateCost, type Api, type Model, type Usage, type AssistantMessage, type Context, type ModelCost } from "@earendil-works/pi-ai";
 import { createConfiguredModelRuntime, createModelRuntime } from "./agent.ts";
+import { createModelRequestFetch, ModelRequestNotDispatchedError } from "./model-request-budget.ts";
 import { contentHash } from "./bailian.ts";
 import { estimateModelUsage, modelPricing, normalizeBailianGenerationBaseUrl, resolveModelSelection, type ModelSelection } from "./model-selection.ts";
 import { requireSupportQuestionResolution, supportQuestionResolutionInputHash, supportQuestionResolutionVersion,
@@ -40,7 +41,7 @@ export class SupportQuestionClientError extends Error {
 }
 type CompletionOptions = { signal: AbortSignal; timeoutMs: number; temperature: 0; maxTokens: number; maxRetries: 0;
   fetch: typeof globalThis.fetch; samplingParams: { response_format: { type: "json_object" } }; onPayload: (payload: unknown) => unknown };
-type Runtime = { model: { provider: string; id: string; api: string; baseUrl: string; maxTokens: number; cost: ModelCost };
+type Runtime = { model: { provider: string; id: string; api: string; baseUrl: string; maxTokens: number; contextWindow?: number; cost: ModelCost };
   complete: (context: Context, options: CompletionOptions) => Promise<AssistantMessage> };
 type WireUsage = { input: number; output: number; cacheRead: number; cacheWrite: number; totalTokens: number };
 function wireUsage(value: unknown): WireUsage | null {
@@ -79,7 +80,7 @@ export async function createSupportQuestionClient(options: { env?: NodeJS.Proces
   const settings: SupportQuestionSettings = freeze({ provider: model.provider, model: model.id, api: model.api, endpoint: model.baseUrl,
     timeoutMs, temperature: 0, maxTokens: Math.min(model.maxTokens, 1024), maxRetries: 0, promptVersion: supportQuestionPromptVersion,
     promptHash: contentHash(supportQuestionPrompt), serialization: "json-question-resolution-v1", pricing: modelPricing(model) });
-  const transport = options.fetch ?? globalThis.fetch;
+  const baseTransport = options.fetch ?? globalThis.fetch;
   const endpoint = `${settings.endpoint.replace(/\/$/u, "")}/chat/completions`;
   return { settings, async resolve(rawInput, resolveOptions = {}) {
     // Invalid source input never enters a model request or receives a fabricated hash.
@@ -99,6 +100,17 @@ export async function createSupportQuestionClient(options: { env?: NodeJS.Proces
       totalTokens: null, inputTokens: null, outputTokens: null, cacheReadTokens: null, cacheWriteTokens: null, costUsd: null,
       ...(settings.pricing.currency === "CNY" ? { costCny: null } : {}) };
     trace.attempts.push(attempt);
+    const transport = createModelRequestFetch({ phase: "question", provider: model.provider, model: model.id,
+      format: "openai-sse", pricing: settings.pricing, context: { contextWindow: model.contextWindow, maxOutputTokens: settings.maxTokens,
+        outputTokenField: model.provider === "bailian" ? "max_completion_tokens" : "max_tokens" } }, async (url, init) => {
+      // This trace counts dispatch, not a local context-budget refusal.
+      attempt.httpRequests = 1; attempt.wireHash = contentHash({ endpoint: String(url), method: "POST", body: init?.body });
+      try { return await baseTransport(url, init); }
+      catch (error) {
+        if (error instanceof ModelRequestNotDispatchedError) { attempt.httpRequests = 0; attempt.wireHash = null; }
+        throw error;
+      }
+    });
     let timer: NodeJS.Timeout | undefined, rejectStop: (error: Error) => void = () => {};
     const stopped = new Promise<never>((_resolve, reject) => { rejectStop = reject; });
     const stop = (kind: "aborted" | "timeout") => {
@@ -126,7 +138,6 @@ export async function createSupportQuestionClient(options: { env?: NodeJS.Proces
         || !isDeepStrictEqual(payload.messages, [{ role: "system", content: supportQuestionPrompt }, { role: "user", content: JSON.stringify(input) }])) {
         wireInvalid = true; throw new Error("question wire contract invalid");
       }
-      attempt.httpRequests = 1; attempt.wireHash = contentHash({ endpoint: actualEndpoint, method: "POST", body });
       const response = await transport(url, { ...init, redirect: "error", signal: controller.signal });
       if (sealed || controller.signal.aborted) { void response.body?.cancel().catch(() => {}); throw new Error("question request canceled"); }
       if (!response.ok || !response.body) return response;

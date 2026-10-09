@@ -1,0 +1,122 @@
+{
+  "version": 1,
+  "recordedAt": "2026-10-09T18:38:06.429993+00:00",
+  "command": "node --env-file-if-exists=.env scripts/refund-crash-window-check.ts --db",
+  "exitCode": 0,
+  "gitCommit": "03b75ea6ea9fe9e588b527f72370774055d1a09a",
+  "workingTreeDirty": true,
+  "sourceSha256": {
+    "scripts/refund-crash-window-check.ts": "27e48f38791801e82943fc1d8d2b6c50eb073eb3a64a9cfffe5d3b6b7b2cf5e0",
+    "scripts/merchant-test-fixture.ts": "8a3ca07fb1174a2930e45886b8065f089ba3f3cae4cc75abacebd4acf594ca9d",
+    "src/refunds.ts": "a00872bf5e20114752fd2fe001b3f9ab3bc3b94895b95fa22b44c64bb047df3d",
+    "src/refund-entry.ts": "ee0047a29cb45b13325ef98b886b6d5aa704b61369a97aa19128940f8d133e7f",
+    "src/coupon-store.ts": "833120439be1f457a17b4152d8a9e7c2e96a86232d2cb30d2863aff835b14b6a",
+    "src/after-sales.ts": "a26db542010fb3471215ff63295fc3d0dbbb7ce6d2be7ba8fe8550b008148cd1",
+    "src/reply.ts": "56da64a5d692852d39d99abc44a9bca37c0e888d262d38fdff625d7eb96be400"
+  },
+  "scope": "Actual local MySQL synthetic refund fixtures; owned SIGKILL child windows; no model, QQ, external merchant or payment calls",
+  "report": {
+    "suite": "refund-crash-windows",
+    "nonce": "effbbda9-64f5-4956-b205-a525bd99d8fd",
+    "planned": 2,
+    "remoteRequests": 0,
+    "modelCalls": 0,
+    "qqCalls": 0,
+    "windows": [
+      {
+        "window": "before-commit",
+        "status": "passed",
+        "stage": "complete",
+        "evidence": {
+          "orderId": "COUPON-2213",
+          "operationId": "a2a70b9d-efa2-4c59-9a7f-16d42282d008",
+          "fixturePaymentMarker": "mcheck-74e8fc79ac04870aea5b-payment-2213",
+          "baselineHash": "a9729436a38fae3c6b69c51e5320fc5b761e0270561966b5d7c82174258dc5e7",
+          "preparePid": 14404,
+          "barrierWritesHash": "d7bc7367f3a8039ab39085be6556683fc346d43070bef103bf7a6edd47174989",
+          "visibleWhilePausedHash": "a9729436a38fae3c6b69c51e5320fc5b761e0270561966b5d7c82174258dc5e7",
+          "crashPid": 14405,
+          "crashExit": {
+            "code": null,
+            "signal": "SIGKILL"
+          },
+          "recoveryPid": 14406,
+          "afterExitHash": "a9729436a38fae3c6b69c51e5320fc5b761e0270561966b5d7c82174258dc5e7",
+          "refundId": "7138721b-d8e8-47d7-bf5a-18897e1daa9d",
+          "beforeHash": "a9729436a38fae3c6b69c51e5320fc5b761e0270561966b5d7c82174258dc5e7",
+          "queriedHash": "a9729436a38fae3c6b69c51e5320fc5b761e0270561966b5d7c82174258dc5e7",
+          "deniedHash": "a9729436a38fae3c6b69c51e5320fc5b761e0270561966b5d7c82174258dc5e7",
+          "completedHash": "16fd9026238e5e1cf7f51d23ac77d87ce880cc44bde3787a67dc6bc69b6ab806",
+          "duplicateHash": "16fd9026238e5e1cf7f51d23ac77d87ce880cc44bde3787a67dc6bc69b6ab806",
+          "queryStatus": "awaiting_confirmation",
+          "wrongIdentityDenied": true,
+          "wrongSourceDenied": true,
+          "duplicateSameReceipt": true
+        }
+      },
+      {
+        "window": "after-commit",
+        "status": "passed",
+        "stage": "complete",
+        "evidence": {
+          "orderId": "COUPON-2328",
+          "operationId": "20f996e4-4947-4051-a4f9-f33b0c1f51f2",
+          "fixturePaymentMarker": "mcheck-74e8fc79ac04870aea5b-payment-2328",
+          "baselineHash": "91d0f0fe1b87554385822c1b177e87c6930e9e544b6e442ce4139fa13d5a7b0b",
+          "preparePid": 14407,
+          "barrierWritesHash": "09ac069ba4710375d7d1406329986c5a8704d01bc43ab4a3c1bd8f908f8fb28a",
+          "visibleWhilePausedHash": "c408759e172bc9f1e9f25731d91ff475bb33e88816434c558be5ea3a1088502b",
+          "crashPid": 14408,
+          "crashExit": {
+            "code": null,
+            "signal": "SIGKILL"
+          },
+          "recoveryPid": 14409,
+          "afterExitHash": "c408759e172bc9f1e9f25731d91ff475bb33e88816434c558be5ea3a1088502b",
+          "refundId": "254d242e-3a1a-4c6d-98e0-ba3e21b6d4f5",
+          "beforeHash": "c408759e172bc9f1e9f25731d91ff475bb33e88816434c558be5ea3a1088502b",
+          "queriedHash": "c408759e172bc9f1e9f25731d91ff475bb33e88816434c558be5ea3a1088502b",
+          "deniedHash": "c408759e172bc9f1e9f25731d91ff475bb33e88816434c558be5ea3a1088502b",
+          "completedHash": "c408759e172bc9f1e9f25731d91ff475bb33e88816434c558be5ea3a1088502b",
+          "duplicateHash": "c408759e172bc9f1e9f25731d91ff475bb33e88816434c558be5ea3a1088502b",
+          "queryStatus": "succeeded",
+          "wrongIdentityDenied": true,
+          "wrongSourceDenied": true,
+          "duplicateSameReceipt": true
+        }
+      }
+    ],
+    "cleanup": {
+      "status": "passed",
+      "remaining": {
+        "COUPON-2213": {
+          "orders": 0,
+          "items": 0,
+          "coupons": 0,
+          "payments": 0,
+          "tasks": 0,
+          "operations": 0,
+          "refunds": 0,
+          "notifications": 0,
+          "scenarios": 0
+        },
+        "COUPON-2328": {
+          "orders": 0,
+          "items": 0,
+          "coupons": 0,
+          "payments": 0,
+          "tasks": 0,
+          "operations": 0,
+          "refunds": 0,
+          "notifications": 0,
+          "scenarios": 0
+        }
+      }
+    },
+    "errors": [],
+    "passed": 2,
+    "failed": 0,
+    "notRun": 0,
+    "success": true
+  }
+}

@@ -13,7 +13,7 @@
 | 评测工作台 | 保存运行、逐轮检查、工具轨迹、配置与用量，支持对比和显式实验入口。 |
 | 实验候选 | Controller / 知识接收（C1）、有界会话恢复（O4）有实现和对照记录；C1、完整 O4 与最终选型 O5 仍未完成准入。 |
 
-默认为 `atomic + lexical + memory`，模型为 `deepseek/deepseek-flash`，未因候选实验切换。真实 QQ 验收记录来自 2026-10-02～03，稳定主线真实模型核心回归来自 2026-10-05；后续工程修复与历史验收分列，历史通过不代表当前环境已重验。最新进度见 [plan.md](./plan.md)。
+默认为 `atomic + lexical + memory`，模型为 `deepseek/deepseek-flash`，未因候选实验切换。真实 QQ 验收记录来自 2026-10-02～03，稳定主线真实模型核心回归来自 2026-10-05；后续工程修复与历史验收分列，历史通过不代表当前环境已重验。2026-10-10 的[联合验收](./docs/stable-joint-acceptance.md)为 20/26、未准入，保留答复证据缺陷与未执行项；该冻结批次也不追认后续上下文保护版本。最新进度见 [plan.md](./plan.md)。
 
 ## 稳定业务闭环
 
@@ -24,7 +24,7 @@
   → 发送结果未知或重启后，按订单号查询持久结果
 ```
 
-模型最多使用六项受限工具：订单/规则查询、协商准备/查询、退款方案/结果查询。执行退款只允许宿主处理实际用户的精确确认；商家批准、模型话术和通知均不构成资金授权。方案成功展示后才开放确认，事务内重新核对身份、原会话、金额、审批和期限。
+模型最多使用七项受限工具：本人最近订单、订单/规则查询、协商准备/查询、退款方案/结果查询。执行退款只允许宿主处理实际用户的精确确认；商家批准、模型话术和通知均不构成资金授权。方案成功展示后才开放确认，事务内重新核对身份、原会话、金额、审批和期限。
 
 D3 绑定原任务与原回复路由，至多一次主动发送尝试；`claimed` / `unknown` 不自动重发，可能漏通知，保留查询恢复。完整流程、准备条件和成功/澄清/越权/失败演示见 [售后说明](./docs/after-sales.md#面试演示路线)。
 
@@ -37,7 +37,7 @@ D3 绑定原任务与原回复路由，至多一次主动发送尝试；`claimed
 | 异步接待与恢复 | 项目实现持久任务、领取状态、群/用户串行队列和固定回执；[协商存储](./src/after-sales.ts)、[通知调度](./src/merchant-notifications.ts)、[QQAgent](./src/qq-agent.ts)。 |
 | 知识与评测 | 项目实现规则范围、检索/证据候选、固定分母与费用归因；[检索说明](./docs/retrieval.md)、[评测说明](./docs/evaluation.md)。 |
 
-前端由 Kimi CLI（K3 / Max）完成，宿主后端、契约、评测口径与最终联调由 Codex 负责。模型不开放 Pi 默认终端或文件工具。业务参考 [kefu-harness](https://github.com/wanglongze123/kefu-harness)，参考语料与本项目运行时规则分别保存。
+历史评测工作台由 Kimi CLI（K3 / Max）实现；2026-10-09 的订单发现与网页连续交互在 Kimi 生成预算关闭后，按用户授权由 Codex 完成，见[分工与验收](./plan.md#订单发现与网页连续交互2026-10-09已验收)。宿主后端、契约、评测口径与最终联调由 Codex 负责。模型不开放 Pi 默认终端或文件工具。业务参考 [kefu-harness](https://github.com/wanglongze123/kefu-harness)，参考语料与本项目运行时规则分别保存。
 
 ## 本地启动
 
@@ -66,7 +66,7 @@ npm run eval:init
 npm run eval:serve
 ```
 
-打开 [网页客服 :3002](http://127.0.0.1:3002/) 或 [评测工作台 :3001](http://127.0.0.1:3001/)，可同标签页往返。普通问答调用真实模型；完整 `查询到账 银行卡` 由宿主处理。模型设置在“应用并新建对话”后生效，历史仅在进程内；角色选择是本机合成身份入口，不代表真实登录鉴权。接口、设置与验收边界见 [网页说明](./docs/web-chat.md)。
+打开 [网页客服 :3002](http://127.0.0.1:3002/) 或 [评测工作台 :3001](http://127.0.0.1:3001/)，可同标签页往返。普通问答调用真实模型；完整 `查询到账 银行卡` 由宿主处理。模型设置在“应用并新建对话”后生效；活动 Pi Session 在进程内，公开聊天历史与请求回执保存在本机 SQLite，恢复时仍检查浏览器归属、角色及绑定；角色选择是本机合成身份入口，不代表真实登录鉴权。接口、设置与验收边界见 [网页说明](./docs/web-chat.md)。
 
 ### CLI 与售后演示
 
@@ -106,3 +106,5 @@ npm run qq:bind -- <12位identity代号> <对应演示客户ID>
 | [网页](./docs/web-chat.md) / [QQ](./docs/qq-integration.md) / [数据库](./docs/database.md) | 启动、契约与各入口验收。 |
 | [评测](./docs/evaluation.md) / [检索](./docs/retrieval.md) | 固定分母、数据、实际结果、失败与局限。 |
 | [优化取舍](./docs/optimization-plan.md) / [实验复现](./docs/experiment-controls.md) / [会话恢复](./docs/conversation-recovery.md) | 候选假设、配置、成本与准入边界。 |
+| [MiniMax 面试覆盖](./docs/minimax-interview-coverage.md) / [语雀本地稿](./docs/yuque-drafts/minimax/README.md) | 23篇原课程映射、8篇扩写与3篇新课；本地稿未发布语雀。 |
+| [联合验收](./docs/stable-joint-acceptance.md) / [请求预算](./docs/model-request-budget.md) / [上下文预算](./docs/context-budget-contract.md) / [退款故障窗口](./docs/refund-crash-window-validation.md) | 同轮答复、工具、状态与费用，超限恢复及实际DB崩溃证据；失败与未准入保留。 |

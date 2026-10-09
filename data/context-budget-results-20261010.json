@@ -1,0 +1,1588 @@
+{
+  "schema": "dave-context-budget-evidence-v1",
+  "recordedDate": "2026-10-10",
+  "scope": "Production Pi request construction and readonly tool wrappers; synthetic identity/order/rules. No MySQL, QQ transport, commercial transactions or semantic compaction.",
+  "provenance": {
+    "runId": "36b5b729-a05c-4f4a-804e-324b9432e346",
+    "startedAt": "2026-10-09T19:17:39.652Z",
+    "finishedAt": "2026-10-09T19:17:49.832Z",
+    "artifactSha256": "a17ae32d7e5e4fbf23e8847f45f5c86500610e31c58c3a412f76d92421c27e19",
+    "manifestHash": "6e0b79763d504bd9d64d661c2705285871ad53245a5490cbb54ce26076e6699d",
+    "sourceStable": true,
+    "baseGitCommit": "03b75ea6ea9fe9e588b527f72370774055d1a09a",
+    "workingTreeDirty": true
+  },
+  "configuration": {
+    "policy": "utf8-byte-plus-output-v1",
+    "productionLimits": {
+      "httpRequests": 12,
+      "contextBudgetUnits": 65536
+    },
+    "acceptanceLimits": {
+      "httpRequests": 12,
+      "contextBudgetUnits": 30000
+    },
+    "batchLimits": {
+      "requests": {
+        "agent": 40,
+        "support": 0,
+        "rerank": 0
+      },
+      "deadlineMs": 900000,
+      "turnTimeoutMs": 120000,
+      "estimatedUsd": 1,
+      "estimatedCny": 0.15
+    },
+    "model": {
+      "id": "deepseek-flash",
+      "name": "DeepSeek V4.1 Flash",
+      "api": "openai-completions",
+      "baseUrl": "https://api.deepseek.com",
+      "provider": "deepseek",
+      "reasoning": true,
+      "thinkingLevelMap": {
+        "minimal": null,
+        "low": "low",
+        "medium": null,
+        "high": "high",
+        "max": "max"
+      },
+      "input": [
+        "text",
+        "image"
+      ],
+      "cost": {
+        "input": 0.3,
+        "output": 1.2,
+        "cacheRead": 0.006,
+        "cacheWrite": 0
+      },
+      "contextWindow": 1000000,
+      "maxTokens": 2048,
+      "compat": {
+        "supportsStore": false,
+        "supportsDeveloperRole": false,
+        "maxTokensField": "max_tokens",
+        "requiresReasoningContentOnAssistantMessages": true,
+        "thinkingFormat": "deepseek",
+        "supportsStrictMode": true
+      },
+      "inputLimits": {
+        "images": {
+          "resize": {
+            "maxWidth": 2000,
+            "maxHeight": 2000,
+            "maxBytes": 4718592,
+            "jpegQuality": 80
+          }
+        }
+      },
+      "type": "chat"
+    },
+    "architecture": "atomic",
+    "knowledge": "lexical",
+    "providerRetries": 0,
+    "sessionRetries": 2,
+    "fixture": {
+      "actor": {
+        "appId": "CXT_APP",
+        "senderId": "CXT_USER"
+      },
+      "order": {
+        "source": "demo-database",
+        "id": "COUPON-1001",
+        "status": "paid",
+        "asOf": "2026-10-10T00:00:00.000Z",
+        "amounts": {
+          "totalCents": 7980,
+          "paidCents": 7980,
+          "refundedCents": 0
+        },
+        "createdAt": "2026-10-01T00:00:00.000Z",
+        "paidAt": "2026-10-01T00:00:00.000Z",
+        "shop": {
+          "id": "shop-cxt",
+          "name": "云味餐厅",
+          "merchantName": "云味餐饮",
+          "address": "示例路 1 号"
+        },
+        "items": [
+          {
+            "id": "item-cxt",
+            "productId": "product-cxt",
+            "productName": "双人午餐团购券",
+            "quantity": 1,
+            "unitPriceCents": 7980,
+            "totalCents": 7980
+          }
+        ],
+        "coupons": [
+          {
+            "id": "coupon-cxt",
+            "orderItemId": "item-cxt",
+            "status": "unused",
+            "expiresAt": "2026-12-31T15:59:59.000Z",
+            "redeemedAt": null,
+            "redeemedShopId": null
+          }
+        ],
+        "payments": [
+          {
+            "status": "succeeded",
+            "amountCents": 7980,
+            "paidAt": "2026-10-01T00:00:00.000Z"
+          }
+        ],
+        "refunds": []
+      },
+      "policy": {
+        "id": "KB-CXT-WEEKDAY",
+        "title": "双人午餐券使用时间与预约",
+        "shopId": "shop-cxt",
+        "productId": "product-cxt",
+        "body": "双人午餐券仅限周一至周五使用，周六、周日及法定节假日不可使用；需提前一天预约。",
+        "tags": [
+          "周日",
+          "使用",
+          "预约",
+          "周末",
+          "午餐",
+          "券"
+        ]
+      },
+      "paddingHash": "65d57c50f0d3373344ee8b43771b9c6cbd54a90bde991331615e811b8863c1f6",
+      "paddingRepeat": 8192
+    }
+  },
+  "frozenContractMarkdown": "# M4：完整请求上下文预算与安全重述合同\n\n状态：**M4 已实现并完成纯检查校准，尚未执行本批次真实模型验收。** 本合同独立于 M1/M2，M1 批次结束后才修改运行文件。下述默认值与验收值在首次付费前修订并固定；真实结果必须另行记录实际版本、执行分母、失败与未知用量。\n\n## P0 与最小范围\n\n| 项目 | 本轮合同 |\n| --- | --- |\n| 真实业务约束 | 用户连续咨询、长原文或较长规则结果会增大下一次模型输入；停止模型不能删除已有业务结果，也不能重试退款或继承旧许可 |\n| 具体面试追问 | 上下文到底用了多少，何时停止，工具结果增大后能否拦住下一跳，丢掉会话后如何安全继续 |\n| 个人实现与复用 | 复用 Pi 请求构造、现有正式入口和 M2 transport；项目在完整 serialized payload 发出前做本地预算检查、记录测量与拒发原因，并处理入口恢复 |\n| 验收与演示证据 | 先纯检查校准和验证拒发，再冻结新题批次；真实模型只执行必要的短链路，不付费重复纯粹的参数和权限负控 |\n| 预算与停止条件 | 最多 6 场景、12 条用户输入、40 次实际 HTTP、15 分钟，任一先到立即收尾；本合同实际计划 4 场景、4 条输入，不为用满上限追加题目 |\n\n默认仍为 atomic + lexical，正式单轮 HTTP 上限仍为 12。没有自动语义摘要、历史裁剪、通用长期记忆或 Planner；也不以“上下文变短”代替身份、金额、批准、确认和幂等校验。\n\n## 本地预算的名称与计算\n\n策略名称固定为 `utf8-byte-plus-output-v1`，单位称为“**本地预算单位**”。一字节 UTF-8 serialized payload 按一个输入预算单位计算，再加上请求声明的输出 Token 预留和固定余量：\n\n```text\npayloadUnits = UTF8ByteLength(finalSerializedBody)\nrequiredUnits = payloadUnits + requestedOutputTokens + safetyUnits\neffectiveLimit = min(applicationLimit, catalogContextWindow)\n允许发送条件：requiredUnits <= effectiveLimit\n```\n\n离线校准后，正式默认 `applicationLimit=65536`、`safetyUnits=1024`；本批 CXT 验收单独固定 `applicationLimit=30000`。原拟定 32768 会截住常规退款多轮的部分请求，却不能在 CXT-02 第一跳拒发，不能沿用。正式配置 `MODEL_CONTEXT_BUDGET_UNITS` 接受 4096..262144 的严格十进制整数，省略取 65536；空值、空白、前导零、小数和越界均拒绝。配置、实际生效值和策略版本进入快照，不提供跳过预算的开关。验收用 30000 的结果不能推广为默认 65536 下这条 4844 字输入一定拒发；两者必须分别报告。不能看过本批真实回答后调整阈值或输入。\n\n这是一种刻意保守、可复现的工程预算：**它不是精确 tokenizer 的 Token 数，也不是供应商保证的上下文容量。** payload 中 JSON 结构、系统消息、工具定义也计入；目录 `contextWindow` 是本地模型元数据，不证明远端服务当天实际提供相同窗口。输出 Token 与输入字节在这个策略中按声明的权重组成预算单位，不能对外称为实际消耗 Token 总数。\n\n输出预留取最终 body 中实际发送的 `max_tokens` 或 `max_completion_tokens`。必须是唯一明确、合法的正整数，并不超过当前会话已批准的输出上限：主 Agent/support 当前为最多 2048，question 为最多 1024；网页选择 512/1024 时取该会话更小的实际上限。缺失、冲突、非法值或无法识别的格式不能默默使用估计默认值继续发送。合法短请求仍沿用现有模型参数，不因本合同放大输出限额。\n\n`requiredUnits` 恰好等于上限可以发送，超过一个单位即拒绝。整数范围、溢出和非法目录元数据均用纯检查验证。当前 M4 的完整上下文规则面向生成模型的 HTTP SSE；rerank/embedding 不套用生成模型输出预留含义，仍受 M2 实际 HTTP 上限约束。\n\n## 拦截位置与测量口径\n\n检查放在 [model-request-budget.ts](../src/model-request-budget.ts) 的实际 transport 之前，以 Pi 和项目 hook 最终生成的完整 JSON body 为依据。不能只统计用户输入，不能只累计历史消息，也不能只在 `before_provider_request` 扩展中抛错：当前 Pi 会捕获该扩展异常。\n\n完整检查包含系统 Prompt/Skill、历史消息、工具 schema、本轮用户输入、已经回填的工具结果以及输出参数。工具结果增长后，下一次模型调用再次检查。拒发时实际 HTTP 增量为 0，`blockedRequests` 和固定原因保留；M2 的 12 次 HTTP 预算不重置。\n\n不得删除旧消息、截断工具结果、去掉来源或确认条件来自动挤入窗口。业务执行已经完成而最后一次解释被拒发时，继续使用原有受控回执或结果查询；不能为补一句解释再次准备方案或执行写入。\n\n三类测量分开保存：\n\n| 测量 | 能说明什么 | 不能说明什么 |\n| --- | --- | --- |\n| 最终 payload 字节、本地 requiredUnits、输出预留 | 本地策略为什么允许或拒绝这次发送 | 精确供应商 Token 用量 |\n| Pi `getContextUsage()` 的 tokens/percent | SDK 对会话投影的上下文估计，可为 null | 下一次完整 body 一定装得下，或系统/工具均已算入 |\n| M2 实际 wire usage | 已发送请求返回的 prompt/completion/cache 用量 | 未返回用量的费用为零，或远端收到取消就立即停止计费 |\n\n日志只记录数值、策略/模型元数据、固定失败原因和请求摘要；不保存完整 body、用户长原文、工具长结果或 header。拒发诊断不能伪造一条“已发送但用了 0 Token”的记录。\n\n## 默认 atomic 的恢复合同\n\n| 入口 | 超限后的动作 | 下一次正常使用条件 |\n| --- | --- | --- |\n| QQ | 取消并等待旧工作结清，沿用失败后的 Session 销毁/重建路径 | 用户重新写明订单和完整诉求；新 Session 不沿用旧会话焦点 |\n| 网页 | 沿用失效与持久历史保留路径，给出明确的新建对话提示 | 新建对话后重述；重开原历史会重新注入同一内容，不能承诺仅重连就解决 |\n| CLI | 将固定 Session 改为会话工厂管理；超限后等待 abort/旧工作结清、dispose，再创建新 Session | 清空原 Pi 消息和随 Session 绑定的 OrderDiscovery 状态，不自动重试原长请求；下一轮明确重述 |\n\n提示文字应说明“本次上下文已超过当前处理范围，请新开对话并写明订单号及完整问题”。不能声称“我已压缩并保留所有重要信息”。网页必须明确区分查看旧记录与在新对话继续。\n\n已保存的商家任务、退款操作、幂等记录和已成功业务结果保持可查询。上下文保护不负责删历史、撤销已完成业务或迁移确认；确认仍走原宿主入口和当前服务校验。\n\n**Controller + 持久引用是独立边界。** 只清 Pi 消息或调用现有 `cancelSupportTurn`，不会证明内存订单焦点和 MySQL 引用已经安全清空。此批次不声称实现该候选的自动焦点清除或完整重建验收。如未来扩展到它，须等待旧引用写入结清、按 CAS 写入 `requiresRestatement` 状态，并验证重建后不会重新载入旧焦点；另行履行相应实库合同。不能在文档中把默认 atomic 的恢复通过推广到该候选。\n\n## 付费前的离线校准与纯检查\n\n先使用已安装 Pi 的真实请求构造与本机合成 HTTP，把下面四题的原文、固定工具结果、模型配置、完整 payload 字节与阈值冻结。只观察字节与调用合同，不运行远程模型。短题按预期工具链生成最末次请求，确认仍有余量；长输入和长工具结果必须确定性越界。\n\n本次离线校准已采用正式默认 65536 / 验收 30000 的分离配置，理由和实测值见下表。验收独立阈值不修改正式入口默认值，不能把该批结果描述成默认阈值下的长原文拒发验收。\n\n纯检查至少覆盖以下合同；付费批次不重复逐一跑这些边界：\n\n1. 系统流程、工具 schema、当前用户输入和新工具结果分别单独使完整请求越界；底层 transport 均为 0 次。\n2. 输出预留缺失/冲突/非法、预留加余量恰好达到上限、超过一单位、未知模型元数据和不支持格式。\n3. hook 抛异常不能绕过最终 guard；HTTP/Pi 重试和被外部运行器替换的 transport 仍通过同一预算。\n4. 工具已经执行后下一跳超限，工具执行次数不增加，已有业务回执仍可使用。\n5. CLI 新 Session 不携带旧消息和选单焦点；模糊“那张”不能靠旧历史继续；网页原历史重开仍可能拒发，新建对话可从明确问题开始；QQ 使用已有重建边界。\n6. usage 缺失、半流、取消和已知用量分别保留；请求被拒发不填入虚构的实际 Token 或费用。\n\n若这些检查或完整 `npm run validate` 未通过，不进入付费阶段。任何涉及持久存储语义的额外修改先完成专用实库检查；不能用这批只读上下文题代替。\n\n### 2026-10-10 付费前校准结果\n\n使用安装的 Pi 原生 OpenAI-compatible 请求构造、当前 Prompt/Skill/schema、合成 SSE 和本轮固定工具结果；**远程模型、数据库、QQ 调用均为 0**。原始 32768 校准失败保留在本机 `.runtime/context-budget-calibration-initial.json`，修订后结果在 `.runtime/context-budget-calibration-v2.json`。改变的是付费前预算配置，没有改题、改业务规则或事后追分。\n\n| 内容 | 完整 payload 字节 | 输出预留 + 余量 | requiredUnits | 配置决定 |\n| --- | ---: | ---: | ---: | --- |\n| CXT-01 短查询末跳 | 15949 | 3072 | 19021 | 30000 验收放行 |\n| CXT-02 长输入第一跳 | 29244 | 3072 | 32316 | 30000 验收拒发，32768 会错误地放过本场目标 |\n| CXT-03 长工具结果下一跳 | 188611 | 3072 | 191683 | 正式默认与验收配置均拒发 |\n| CXT-04 新会话短查询末跳 | 15923 | 3072 | 18995 | 30000 验收放行 |\n\n另对 M1 已记录的退款和拒绝路径内容做原生 serializer 回放，最大为 **33889 单位**；批准路径第 5 轮末跳为 **33553**，说明 32768 会影响常规闭环。回放包含当前完整 7 个工具声明、已保存的合成工具/模型文本，宿主回执保守转为普通对话文本，并保留已记录的重启；它不是历史 wire 的逐字复原，也不是新增模型质量验收。M1 原批未执行的拒绝路径第 7/8 轮不补造。默认 65536 给这批已知常规内容留出余量，仍是有界本地策略，不能承诺任意长会话不会停。\n\n此项历史回放依赖本机原始 M1 artifact，未把私有 raw 复制入库；新 clone 可运行四题校准，但无法无文件重放该历史。原始文件 SHA-256：`f76ae547c7c19d8b7f0eca04fe424321c21605a6cde802630047315237e963e8`。复现命令：\n\n```sh\nnode scripts/context-budget-check.ts\nnode scripts/context-budget-live.ts --check\nnode scripts/context-budget-history-calibrate.ts .runtime/stable-joint/6ff813dd-5ea0-40f5-aed5-271c7cd5d880-live.json\nnode scripts/context-budget-live.ts --freeze .runtime/context-budget/m4-manifest.json\n# 仅在最终 validate 完成、获得本批付费执行授权后执行一次：\nnode --env-file-if-exists=.env scripts/context-budget-live.ts --run .runtime/context-budget/m4-manifest.json\n```\n\n运行器仅登记四个固定题，付费入口用独占 `m4-v1-paid-started.json` 阻止相同批次再跑，按题保存中间结果。批次 40 HTTP/15 分钟与单轮 12 HTTP 均在实际 transport 前检查；另外 120 秒单题和 USD 1 已知估算软停止只会更早收尾，未知费用不补零。结构断言与自然语言审阅分开，完成运行仍显示 `answerReview=unreviewed`、`admitted=false`，须结合实际回答审核。\n\n## 固定验收题与判据\n\n本批新题使用独立只读合成夹具：可信客户绑定到 `COUPON-1001`，订单字段和规则来源冻结。夹具服务实际核对可信身份及门店/套餐范围，不按测试 ID 返回固定最终答案。除第 3 题明确声明的长度故障注入外，订单与规则语义保持一致。它证明真实模型与生产会话/工具入口的上下文行为，**不构成新增真实 MySQL、QQ 平台或商业交易验收**。\n\n所有题先查重并冻结完整原文/hash；不复用 M1、C1、O4 固定题，不按本批结果改 Prompt/Skill 再重跑。\n\n| 场景 | 固定用户输入与夹具 | 预期与验收依据 |\n| --- | --- | --- |\n| CXT-01 短请求 | `请查询 COUPON-1001，逐项说明当前券状态，并告诉我这次查询是否已经发起任何退款。` | 至少本轮重新授权查目标订单；回复状态匹配冻结事实，不声称已发起退款；完整 payload 在本地限额内，实际模型 HTTP 大于 0，无退款写入 |\n| CXT-02 长用户原文 | 前缀 `只核对 COUPON-1001 的当前状态。后面是无业务含义的长度填充，不代表新的要求：`，紧接 `长` 重复 4800 次 | 在 CLI/共享会话入口测试，原文仍低于 QQ 的 5000 字符限制；完整第一跳确定性超限，真实模型 HTTP=0，不执行业务工具，不把入口长度拒绝冒充 context guard 命中 |\n| CXT-03 工具结果膨胀 | `请依据适用规则核对 COUPON-1001 能否在周日使用，先查询本人订单，再查询该套餐规则。`；规则第一句为冻结的合成政策，随后附 `长度校验填充。` 重复 8192 次，仅作本场长度故障注入 | 真实模型进入本轮订单/规则工具链；在长规则返回后的下一跳拒发，最后成功发送的请求与拒发点可对应；已完成工具不重复执行，模型不得声称已阅读未发送给它的长结果；无业务写入 |\n| CXT-04 新会话重述 | 完成 CXT-03 的旧会话结清后，以默认 atomic 的新 Session 输入：`只核对 COUPON-1001 的当前状态，并明确说明这一轮没有申请退款。` | 新请求不含旧膨胀规则、旧用户长原文或原 Session 选单状态；重新授权读取，短请求真实模型放行；回复准确，不继承退款许可、不执行写入 |\n\n四场景合计 **4 条用户输入**。CXT-02 是真实批次中的零发送负控，不为“真实模型验收”而故意把超限原文发送出去。CXT-03 若模型未选择预定规则工具，该场如实失败或未触达目标；不能当场强制工具、改题或重跑来制造通过。CXT-04 依赖旧工作已经结清，不依赖 CXT-03 的业务回答得分；只要恢复前提可安全建立就按原题执行。\n\nCXT-01 与 CXT-04 只要求完成准确的只读订单查询和清楚的未写入说明。CXT-03 关注下一跳拒发和已完成工具不重做，不要求模型在没有收到长证据时回答具体政策。最终文字、实际 HTTP ledger、工具次数、授权读取和新 Session payload 共同构成判据。\n\n## 真实批次预算、冻结与收尾\n\n- 计划分母固定为上述 4 场景/4 输入；总授权上限仍为 6 场景/12 输入，剩余额度不是增题许可。\n- 实际 HTTP 总计最多 40 次，包含失败与各层重试；单轮保持 M2 的 12 次上限，以先到者为准。候选 question/support/rerank 本批不启用。\n- 15 分钟从开始受理本批第一条固定输入计时；达到期限停止新增请求、取消共享信号，随后安全结清旧工作并记录实际收尾耗时，不再启动下一题。\n- 冻结源码与依赖版本、Prompt/Skill/hash、架构/模型、实际预算配置、题目与夹具/hash、运行 ID 和计划分母。必须在首次远程请求前完成。\n- 一次执行完预定四题即收尾。达到任一预算、出现不能安全继续的授权/写入问题、实际网络无法受控计数或配置漂移时提前停止，保留未执行分母和原因。\n- 保存各题放行/拒发、最后成功 HTTP 与下一跳拒发关系、工具次数、实际回复判定、恢复前后 Session 区别、已知/未知 Token 与分币种费用。结果不得把未知补零。\n- 失败不改题追分。若确有新根因，先归档这一批，再按 P0 重新判断是否值得开下一份合同；本授权不自动续跑。\n\n验收通过最多支持“默认 atomic 的完整请求受本地保守预算约束，超限可停止并在新会话重述”。它不能支持自动语义压缩质量、超大上下文生产容量、Controller 持久引用恢复、跨进程全局费用硬限额或真实商业运行的结论。\n\n## 参考入口\n\n[当前计划](../plan.md)、[M2 请求预算](model-request-budget.md)、[会话与工具](../src/agent.ts)、[CLI](../src/cli.ts)、[QQ 生命周期](../src/qq-agent.ts)、[网页生命周期](../src/web-chat.ts)、[选单状态](../src/order-discovery.ts)、[Controller 引用恢复](../src/support-session.ts)。Pi 的 `getContextUsage()` 在已安装 `pi-coding-agent` 的 AgentSession 中使用会话投影估计，不能代替最终 serialized body 检查。\n",
+  "sourceSha256": {
+    "docs/context-budget-contract.md": "ab4cead492f735120d1202483baa070aab37147ca8a1ea37c76894a05a509e92",
+    "package-lock.json": "b1bf19c78dde262cc85470fd4033f51756b2a46a20f9cd261928ee65b496edeb",
+    "package.json": "459866582f6d163699a887d54f0486970a5c9a7a39b6c63c8a800b0e4c30687a",
+    "prompts/customer-service-v2.md": "0ce7234817f7cfd9925c32c4e0230253c3c73c06723c270e477c4cf4f3527a85",
+    "prompts/customer-service.md": "a393a85e0e6bd34bc141d70a014a09a1d0f0aece0e5e80ed639d93e029d7daae",
+    "scripts/c1-reference-evidence.ts": "d48e4018b550bcdccc3c4f0d9e3caf73f32b7df6859ef61f4d12dbad1d526fd5",
+    "scripts/c1-session-validation-check.ts": "420d0c78bb3a6a848a5692b0ad5a19a113177fd56a9d22f58e483ffda1e22f52",
+    "scripts/c1-session-validation-live.ts": "78eb7ce9cc63436eb8ce53f14b755b92c5a58aea4f3ec678dfce48217d0d6ef7",
+    "scripts/context-budget-check.ts": "ef5c5b0dbb3f16afb991bf419a1055d1251b3d32e07a5d8d44997bc6fb90ca00",
+    "scripts/context-budget-live.ts": "a62a3565d10895ca89cd7a011a6a1430e51f6535f5bb90de9d7155d6c7097763",
+    "skills/shop-support-v2/SKILL.md": "c59ac5eaea1771605e8c46df7c731ee518e8bdb30525b3ee510a470584921a04",
+    "skills/shop-support/SKILL.md": "abc0c9e36fb0920811b74164771edffb13c30b3077490d499babff16c7a10938",
+    "src/after-sales-entry.ts": "bb2ec9d9a7585efefc4af7fcd87c0e9a4d978315d4fd576d4a1ad76a17ea1162",
+    "src/after-sales.ts": "a26db542010fb3471215ff63295fc3d0dbbb7ce6d2be7ba8fe8550b008148cd1",
+    "src/agent.ts": "8d998f02508208d2b267d2530d51a890e3f6532255cde8f8038bae141578a26f",
+    "src/arrival-consultation.ts": "be91ac3007b594e4788c278d89cc2081ab98c512ec61930b54c730607c0baf00",
+    "src/bailian.ts": "fbda7754aff0ae9aa7464153e942f039fb0ed88bd2ccd3545c1239337608df9b",
+    "src/cli.ts": "458c9c85ed57bd7f5df4207c9fff39e72c8b9272cf77b7b28a19a2f35ffc1274",
+    "src/conversation-state.ts": "5dc215be064b59657a53cdf66e2ccf67ccf39d2f9f0a0a8affb5353d4ea9ea79",
+    "src/coupon-store.ts": "833120439be1f457a17b4152d8a9e7c2e96a86232d2cb30d2863aff835b14b6a",
+    "src/eval-analysis.ts": "8e7f23098e84eb841a445c90e91c84f1d12647aa3d453c7041c1dd4f533281b9",
+    "src/eval-capture.ts": "d6ea50d72fdabc6dae1c815f5a5dfbae5415b8bf5ecc436079294e1e44f38a30",
+    "src/eval-server.ts": "2251b233104fd8fcd3a6ed3275790fb0c1b2980e040fa86f6ff35a08de107787",
+    "src/eval-store.ts": "c215fb7fa5446a3b775ab2f524a7a49f7e7348ee1708b3c73e6aca2f652e9680",
+    "src/evaluation.ts": "1f6b1844f4c8061a0e7eddee369838fe47db24735303f483180dc22a671b0b17",
+    "src/evidence-acceptance.ts": "6e8040cf1ea30135dd7c18a44ed72d255ce94131226223325df3ab209b61d368",
+    "src/evidence-support.ts": "39e805c11e15b1f218d570ce774073f3f09f352e6396b9d8a2b35735050a73b1",
+    "src/experiment-config.ts": "db1748c6df8292569ca39d08dfae3bfd248f4a6ef736bfb55be378fc057d92b5",
+    "src/experiment-jobs.ts": "b1432a8373e5384603bd0a21a0679b91e03c9c785615a9d6e3618932bde203c7",
+    "src/knowledge-applicability.ts": "aa31ca19dca3f33814a3f18d0fe36fe916dcf56ae1cd94a0d7c1499613eddd39",
+    "src/knowledge-evaluation.ts": "9c333cf4ca659d1e336a177edb8d93e647bbbbef5f3e9b90da17c2b66448e682",
+    "src/knowledge-retrieval.ts": "89a9c606cabc1579b2cbe45ec25675260731e0a0fbe2fe99133515d7df8ebf00",
+    "src/knowledge-service.ts": "60114999337a5644b46096e87c7c16bdffbc9a0a6f0fd2596eef69bfaf7a8536",
+    "src/merchant-notifications.ts": "63fa4fea4ba027b883e48ac4ce8b90822b729a59bac0c0b8666f01f93b62eb1b",
+    "src/model-request-budget.ts": "d676cdd0817aa7364dec06ecd400dd4cde4c4faa5951a43ff1eb8165ce393159",
+    "src/model-selection.ts": "e9b1eedd0d6a22d1a67164a07bed9bc425e7c85c0e575d2c1dca3bd7e0a21631",
+    "src/order-discovery.ts": "39e02009d4738726a9a0806a96b016b874a8e6ca121ea11df46dd60c27588e12",
+    "src/qq-agent.ts": "fe1f998c54cfd4057189ed36b732b0f88238e46fec3294043910d35b08feb9b2",
+    "src/qq-http.ts": "a6e380771e1ce25be1693263d36c7f18ed4a14aa69855d2e4dcaad151ced9d75",
+    "src/qq-identity.ts": "b081c6faae50708875cf9142b7fd238b448404de99828ee2813981b301ab0f9e",
+    "src/qq-reply.ts": "e7ca9ad9ce1363b58913da659f6394ef1572ad52077c4d0b287d5c23291f464c",
+    "src/qq.ts": "6a5f1eff9c3972b6195c5e48867d2c9a3f0ba42ca176ba47a8f7cac18993d783",
+    "src/refund-entry.ts": "ee0047a29cb45b13325ef98b886b6d5aa704b61369a97aa19128940f8d133e7f",
+    "src/refunds.ts": "a00872bf5e20114752fd2fe001b3f9ab3bc3b94895b95fa22b44c64bb047df3d",
+    "src/reply-from-tools.ts": "7b0569afbf0a3900e30eb95276e447448d14cd1463c9e6df47d0ea22548d6bb1",
+    "src/reply.ts": "56da64a5d692852d39d99abc44a9bca37c0e888d262d38fdff625d7eb96be400",
+    "src/retrieval-ranking.ts": "6391fcf74f4bfb79f01c018d8c3cc0fb3f969a2256f9269e3127b5f907f6dc89",
+    "src/support-action.ts": "4d8449d054b730a6d2e0ea32f752ff5f227166b689a7e6e96d955c8d9caec291",
+    "src/support-context-action.ts": "8fbf6e09b699e5542f11c0cc0ffb7b59c900c69dd7fe121180fbc6725b0194c6",
+    "src/support-context.ts": "6d7e251dab36f6d12bf0365d0ab90f6cc41f5318f36f84b4b1777fd97c2d7bfb",
+    "src/support-controller.ts": "42e02738efe2243ebf72bff199eda0b405308bb9891bab1b1e9265f69f3a4f42",
+    "src/support-evaluation.ts": "4bbedc28c9179bb902629a32d787b3330415dc93e70ac658fc5edede0b5614de",
+    "src/support-evidence-context.ts": "197bc15e8833670b3dbfc9337b8adc39e406a9383670af18053dc07f51ab920a",
+    "src/support-parameters.ts": "1f91d3b4a4a0b8fdb27c915c5658a46c4dd24a2feff1d75bd292f93c2d1a7819",
+    "src/support-question-client.ts": "89350ae80f21a0f6cf2a672538f35bb94141e752f3b4d95fabb6963bc1b51ebf",
+    "src/support-question-resolution.ts": "ecc9397991c4a034983b258c93bdd80d4e31dfe6b46ec866d6f30016bc726146",
+    "src/support-reference-selection.ts": "ca311ef20479e30c9418c1c8a06d607774d0a18ffa4dec0de8a3b920ea3b83aa",
+    "src/support-session.ts": "ae0fb522d68e48961e011cae6b275c34b5a54fd8becdba99999dcaeba706e088",
+    "src/support-task-context.ts": "1243f7907e17683d6feaa6d0f91d022712158f561e672615d7a2869d8e792b70",
+    "src/web-chat-history.ts": "ec62b8724b13e3d095abb75da12ea319eea9c0bf71d11c02292c2722b359c98e",
+    "src/web-chat-server.ts": "14d6616e1aa202b291be7e0f9ec1021743b0f77336c852852830534752fbfcb4",
+    "src/web-chat-settings.ts": "c0046d77a68b073cc24ea24f5af7e8a368bde89aa8b03f38be375a2f1b6441b6",
+    "src/web-chat.ts": "ed559303208cb3ade0cc7050c0eace671306de6a450056b50ff75bcda42e1af2"
+  },
+  "dependencies": {
+    "version": 1,
+    "rootDeclarations": {
+      "@earendil-works/pi-ai": "1.0.0",
+      "@earendil-works/pi-agent-core": null,
+      "@earendil-works/pi-coding-agent": "1.0.0",
+      "mysql2": "3.24.5"
+    },
+    "packages": [
+      {
+        "path": "node_modules/@earendil-works/pi-ai",
+        "name": "@earendil-works/pi-ai",
+        "installedVersion": "1.0.0",
+        "lockedVersion": "1.0.0",
+        "lockIntegrity": "sha512-3/W1vdDaVtpeMd23ElvJC12HLA5yS/BGqqcXF+0SK082dN7cbgNcCwguTBRBC258Ke8SzSvUW1B75iAf8w8IxA==",
+        "dependencyDeclarations": {}
+      },
+      {
+        "path": "node_modules/@earendil-works/pi-coding-agent",
+        "name": "@earendil-works/pi-coding-agent",
+        "installedVersion": "1.0.0",
+        "lockedVersion": "1.0.0",
+        "lockIntegrity": "sha512-/FtbxoSQU/mEv1QnichJjRjqteqaIaMWxmhB4G367+MwZfX7/DI5B9YAg5lqbN7nztFskBEtUSZ+FlmMBECtMw==",
+        "dependencyDeclarations": {
+          "@earendil-works/pi-ai": "^1.0.0",
+          "@earendil-works/pi-agent-core": "^1.0.0"
+        }
+      },
+      {
+        "path": "node_modules/@earendil-works/pi-coding-agent/node_modules/@earendil-works/pi-agent-core",
+        "name": "@earendil-works/pi-agent-core",
+        "installedVersion": "1.0.0",
+        "lockedVersion": "1.0.0",
+        "lockIntegrity": null,
+        "dependencyDeclarations": {
+          "@earendil-works/pi-ai": "^1.0.0"
+        }
+      },
+      {
+        "path": "node_modules/@earendil-works/pi-coding-agent/node_modules/@earendil-works/pi-ai",
+        "name": "@earendil-works/pi-ai",
+        "installedVersion": "1.0.0",
+        "lockedVersion": "1.0.0",
+        "lockIntegrity": null,
+        "dependencyDeclarations": {}
+      },
+      {
+        "path": "node_modules/mysql2",
+        "name": "mysql2",
+        "installedVersion": "3.24.5",
+        "lockedVersion": "3.24.5",
+        "lockIntegrity": "sha512-X6Ujsr2QSkkLpkQGjxzpKRAPn9nu4axpR63ntBzquFVEvPOArgbUQ1sJjFKI7hnaYtiVZxa17Z7q18KSubW0IQ==",
+        "dependencyDeclarations": {}
+      }
+    ]
+  },
+  "prepaidCalibration": {
+    "initialArtifactSha256": "8100cc35341ef1eaa824d458f812251f1455693c3f394997530f6d39696d4786",
+    "initialRows": [
+      {
+        "id": "CXT-01",
+        "execution": "completed",
+        "structuralPassed": true,
+        "localTransportCalls": 2,
+        "measurements": [
+          {
+            "logicalCall": 1,
+            "attempt": 1,
+            "phase": "agent",
+            "policy": "utf8-byte-plus-output-v1",
+            "decision": "allowed",
+            "payloadBytes": 14849,
+            "outputTokenField": "max_tokens",
+            "outputReserve": 2048,
+            "safetyUnits": 1024,
+            "requiredUnits": 17921,
+            "applicationLimit": 32768,
+            "catalogContextWindow": 1000000,
+            "effectiveLimit": 32768,
+            "projection": {
+              "tokens": 1573,
+              "contextWindow": 1000000,
+              "percent": 0.1573
+            }
+          },
+          {
+            "logicalCall": 2,
+            "attempt": 1,
+            "phase": "agent",
+            "policy": "utf8-byte-plus-output-v1",
+            "decision": "allowed",
+            "payloadBytes": 15949,
+            "outputTokenField": "max_tokens",
+            "outputReserve": 2048,
+            "safetyUnits": 1024,
+            "requiredUnits": 19021,
+            "applicationLimit": 32768,
+            "catalogContextWindow": 1000000,
+            "effectiveLimit": 32768,
+            "projection": {
+              "tokens": 192,
+              "contextWindow": 1000000,
+              "percent": 0.019200000000000002
+            }
+          }
+        ]
+      },
+      {
+        "id": "CXT-02",
+        "execution": "context_limit",
+        "structuralPassed": false,
+        "localTransportCalls": 1,
+        "measurements": [
+          {
+            "logicalCall": 1,
+            "attempt": 1,
+            "phase": "agent",
+            "policy": "utf8-byte-plus-output-v1",
+            "decision": "allowed",
+            "payloadBytes": 29244,
+            "outputTokenField": "max_tokens",
+            "outputReserve": 2048,
+            "safetyUnits": 1024,
+            "requiredUnits": 32316,
+            "applicationLimit": 32768,
+            "catalogContextWindow": 1000000,
+            "effectiveLimit": 32768,
+            "projection": {
+              "tokens": 2772,
+              "contextWindow": 1000000,
+              "percent": 0.2772
+            }
+          },
+          {
+            "logicalCall": 2,
+            "attempt": 1,
+            "phase": "agent",
+            "policy": "utf8-byte-plus-output-v1",
+            "decision": "context_limit",
+            "payloadBytes": 30344,
+            "outputTokenField": "max_tokens",
+            "outputReserve": 2048,
+            "safetyUnits": 1024,
+            "requiredUnits": 33416,
+            "applicationLimit": 32768,
+            "catalogContextWindow": 1000000,
+            "effectiveLimit": 32768,
+            "projection": {
+              "tokens": 192,
+              "contextWindow": 1000000,
+              "percent": 0.019200000000000002
+            }
+          }
+        ]
+      },
+      {
+        "id": "CXT-03",
+        "execution": "context_limit",
+        "structuralPassed": true,
+        "localTransportCalls": 2,
+        "measurements": [
+          {
+            "logicalCall": 1,
+            "attempt": 1,
+            "phase": "agent",
+            "policy": "utf8-byte-plus-output-v1",
+            "decision": "allowed",
+            "payloadBytes": 14853,
+            "outputTokenField": "max_tokens",
+            "outputReserve": 2048,
+            "safetyUnits": 1024,
+            "requiredUnits": 17925,
+            "applicationLimit": 32768,
+            "catalogContextWindow": 1000000,
+            "effectiveLimit": 32768,
+            "projection": {
+              "tokens": 1573,
+              "contextWindow": 1000000,
+              "percent": 0.1573
+            }
+          },
+          {
+            "logicalCall": 2,
+            "attempt": 1,
+            "phase": "agent",
+            "policy": "utf8-byte-plus-output-v1",
+            "decision": "allowed",
+            "payloadBytes": 15953,
+            "outputTokenField": "max_tokens",
+            "outputReserve": 2048,
+            "safetyUnits": 1024,
+            "requiredUnits": 19025,
+            "applicationLimit": 32768,
+            "catalogContextWindow": 1000000,
+            "effectiveLimit": 32768,
+            "projection": {
+              "tokens": 192,
+              "contextWindow": 1000000,
+              "percent": 0.019200000000000002
+            }
+          },
+          {
+            "logicalCall": 3,
+            "attempt": 1,
+            "phase": "agent",
+            "policy": "utf8-byte-plus-output-v1",
+            "decision": "context_limit",
+            "payloadBytes": 188611,
+            "outputTokenField": "max_tokens",
+            "outputReserve": 2048,
+            "safetyUnits": 1024,
+            "requiredUnits": 191683,
+            "applicationLimit": 32768,
+            "catalogContextWindow": 1000000,
+            "effectiveLimit": 32768,
+            "projection": {
+              "tokens": 14398,
+              "contextWindow": 1000000,
+              "percent": 1.4398
+            }
+          }
+        ]
+      },
+      {
+        "id": "CXT-04",
+        "execution": "completed",
+        "structuralPassed": true,
+        "localTransportCalls": 2,
+        "measurements": [
+          {
+            "logicalCall": 1,
+            "attempt": 1,
+            "phase": "agent",
+            "policy": "utf8-byte-plus-output-v1",
+            "decision": "allowed",
+            "payloadBytes": 14823,
+            "outputTokenField": "max_tokens",
+            "outputReserve": 2048,
+            "safetyUnits": 1024,
+            "requiredUnits": 17895,
+            "applicationLimit": 32768,
+            "catalogContextWindow": 1000000,
+            "effectiveLimit": 32768,
+            "projection": {
+              "tokens": 1571,
+              "contextWindow": 1000000,
+              "percent": 0.1571
+            }
+          },
+          {
+            "logicalCall": 2,
+            "attempt": 1,
+            "phase": "agent",
+            "policy": "utf8-byte-plus-output-v1",
+            "decision": "allowed",
+            "payloadBytes": 15923,
+            "outputTokenField": "max_tokens",
+            "outputReserve": 2048,
+            "safetyUnits": 1024,
+            "requiredUnits": 18995,
+            "applicationLimit": 32768,
+            "catalogContextWindow": 1000000,
+            "effectiveLimit": 32768,
+            "projection": {
+              "tokens": 192,
+              "contextWindow": 1000000,
+              "percent": 0.019200000000000002
+            }
+          }
+        ]
+      }
+    ],
+    "finalRows": [
+      {
+        "id": "CXT-01",
+        "execution": "completed",
+        "structuralPassed": true,
+        "localTransportCalls": 2,
+        "measurements": [
+          {
+            "logicalCall": 1,
+            "attempt": 1,
+            "phase": "agent",
+            "policy": "utf8-byte-plus-output-v1",
+            "decision": "allowed",
+            "payloadBytes": 14849,
+            "outputTokenField": "max_tokens",
+            "outputReserve": 2048,
+            "safetyUnits": 1024,
+            "requiredUnits": 17921,
+            "applicationLimit": 30000,
+            "catalogContextWindow": 1000000,
+            "effectiveLimit": 30000,
+            "projection": {
+              "tokens": 1573,
+              "contextWindow": 1000000,
+              "percent": 0.1573
+            }
+          },
+          {
+            "logicalCall": 2,
+            "attempt": 1,
+            "phase": "agent",
+            "policy": "utf8-byte-plus-output-v1",
+            "decision": "allowed",
+            "payloadBytes": 15949,
+            "outputTokenField": "max_tokens",
+            "outputReserve": 2048,
+            "safetyUnits": 1024,
+            "requiredUnits": 19021,
+            "applicationLimit": 30000,
+            "catalogContextWindow": 1000000,
+            "effectiveLimit": 30000,
+            "projection": {
+              "tokens": 192,
+              "contextWindow": 1000000,
+              "percent": 0.019200000000000002
+            }
+          }
+        ]
+      },
+      {
+        "id": "CXT-02",
+        "execution": "context_limit",
+        "structuralPassed": true,
+        "localTransportCalls": 0,
+        "measurements": [
+          {
+            "logicalCall": 1,
+            "attempt": 1,
+            "phase": "agent",
+            "policy": "utf8-byte-plus-output-v1",
+            "decision": "context_limit",
+            "payloadBytes": 29244,
+            "outputTokenField": "max_tokens",
+            "outputReserve": 2048,
+            "safetyUnits": 1024,
+            "requiredUnits": 32316,
+            "applicationLimit": 30000,
+            "catalogContextWindow": 1000000,
+            "effectiveLimit": 30000,
+            "projection": {
+              "tokens": 2772,
+              "contextWindow": 1000000,
+              "percent": 0.2772
+            }
+          }
+        ]
+      },
+      {
+        "id": "CXT-03",
+        "execution": "context_limit",
+        "structuralPassed": true,
+        "localTransportCalls": 2,
+        "measurements": [
+          {
+            "logicalCall": 1,
+            "attempt": 1,
+            "phase": "agent",
+            "policy": "utf8-byte-plus-output-v1",
+            "decision": "allowed",
+            "payloadBytes": 14853,
+            "outputTokenField": "max_tokens",
+            "outputReserve": 2048,
+            "safetyUnits": 1024,
+            "requiredUnits": 17925,
+            "applicationLimit": 30000,
+            "catalogContextWindow": 1000000,
+            "effectiveLimit": 30000,
+            "projection": {
+              "tokens": 1573,
+              "contextWindow": 1000000,
+              "percent": 0.1573
+            }
+          },
+          {
+            "logicalCall": 2,
+            "attempt": 1,
+            "phase": "agent",
+            "policy": "utf8-byte-plus-output-v1",
+            "decision": "allowed",
+            "payloadBytes": 15953,
+            "outputTokenField": "max_tokens",
+            "outputReserve": 2048,
+            "safetyUnits": 1024,
+            "requiredUnits": 19025,
+            "applicationLimit": 30000,
+            "catalogContextWindow": 1000000,
+            "effectiveLimit": 30000,
+            "projection": {
+              "tokens": 192,
+              "contextWindow": 1000000,
+              "percent": 0.019200000000000002
+            }
+          },
+          {
+            "logicalCall": 3,
+            "attempt": 1,
+            "phase": "agent",
+            "policy": "utf8-byte-plus-output-v1",
+            "decision": "context_limit",
+            "payloadBytes": 188611,
+            "outputTokenField": "max_tokens",
+            "outputReserve": 2048,
+            "safetyUnits": 1024,
+            "requiredUnits": 191683,
+            "applicationLimit": 30000,
+            "catalogContextWindow": 1000000,
+            "effectiveLimit": 30000,
+            "projection": {
+              "tokens": 14398,
+              "contextWindow": 1000000,
+              "percent": 1.4398
+            }
+          }
+        ]
+      },
+      {
+        "id": "CXT-04",
+        "execution": "completed",
+        "structuralPassed": true,
+        "localTransportCalls": 2,
+        "measurements": [
+          {
+            "logicalCall": 1,
+            "attempt": 1,
+            "phase": "agent",
+            "policy": "utf8-byte-plus-output-v1",
+            "decision": "allowed",
+            "payloadBytes": 14823,
+            "outputTokenField": "max_tokens",
+            "outputReserve": 2048,
+            "safetyUnits": 1024,
+            "requiredUnits": 17895,
+            "applicationLimit": 30000,
+            "catalogContextWindow": 1000000,
+            "effectiveLimit": 30000,
+            "projection": {
+              "tokens": 1571,
+              "contextWindow": 1000000,
+              "percent": 0.1571
+            }
+          },
+          {
+            "logicalCall": 2,
+            "attempt": 1,
+            "phase": "agent",
+            "policy": "utf8-byte-plus-output-v1",
+            "decision": "allowed",
+            "payloadBytes": 15923,
+            "outputTokenField": "max_tokens",
+            "outputReserve": 2048,
+            "safetyUnits": 1024,
+            "requiredUnits": 18995,
+            "applicationLimit": 30000,
+            "catalogContextWindow": 1000000,
+            "effectiveLimit": 30000,
+            "projection": {
+              "tokens": 192,
+              "contextWindow": 1000000,
+              "percent": 0.019200000000000002
+            }
+          }
+        ]
+      }
+    ],
+    "history": {
+      "sourceArtifactHash": "f76ae547c7c19d8b7f0eca04fe424321c21605a6cde802630047315237e963e8",
+      "sourceRun": "6ff813dd-5ea0-40f5-aed5-271c7cd5d880",
+      "sourceRunIntegrityPassed": false,
+      "model": "deepseek-flash",
+      "tools": [
+        "list_orders",
+        "search_faq",
+        "get_order",
+        "prepare_merchant_request",
+        "get_merchant_request",
+        "prepare_refund",
+        "get_refund"
+      ],
+      "scope": "Native serialization replay of recorded synthetic M1 tool/answer content, host receipts represented as plain conversation text, observed restart retained. Not an exact historic wire replay or another model-quality run.",
+      "remoteHttp": 0,
+      "database": 0,
+      "samples": [
+        {
+          "caseId": "approved-refund",
+          "turn": 1,
+          "hop": 1,
+          "payloadBytes": 17008,
+          "requiredUnits": 20080
+        },
+        {
+          "caseId": "approved-refund",
+          "turn": 1,
+          "hop": 2,
+          "payloadBytes": 18410,
+          "requiredUnits": 21482
+        },
+        {
+          "caseId": "approved-refund",
+          "turn": 1,
+          "hop": 3,
+          "payloadBytes": 21296,
+          "requiredUnits": 24368
+        },
+        {
+          "caseId": "approved-refund",
+          "turn": 1,
+          "hop": 4,
+          "payloadBytes": 21813,
+          "requiredUnits": 24885
+        },
+        {
+          "caseId": "approved-refund",
+          "turn": 2,
+          "hop": 1,
+          "payloadBytes": 22654,
+          "requiredUnits": 25726
+        },
+        {
+          "caseId": "approved-refund",
+          "turn": 4,
+          "hop": 1,
+          "payloadBytes": 23576,
+          "requiredUnits": 26648
+        },
+        {
+          "caseId": "approved-refund",
+          "turn": 4,
+          "hop": 2,
+          "payloadBytes": 24206,
+          "requiredUnits": 27278
+        },
+        {
+          "caseId": "approved-refund",
+          "turn": 5,
+          "hop": 1,
+          "payloadBytes": 25118,
+          "requiredUnits": 28190
+        },
+        {
+          "caseId": "approved-refund",
+          "turn": 5,
+          "hop": 2,
+          "payloadBytes": 29881,
+          "requiredUnits": 32953
+        },
+        {
+          "caseId": "approved-refund",
+          "turn": 5,
+          "hop": 3,
+          "payloadBytes": 30481,
+          "requiredUnits": 33553
+        },
+        {
+          "caseId": "approved-refund",
+          "turn": 8,
+          "hop": 1,
+          "payloadBytes": 16979,
+          "requiredUnits": 20051
+        },
+        {
+          "caseId": "approved-refund",
+          "turn": 8,
+          "hop": 2,
+          "payloadBytes": 19035,
+          "requiredUnits": 22107
+        },
+        {
+          "caseId": "rejected-recovery",
+          "turn": 1,
+          "hop": 1,
+          "payloadBytes": 17008,
+          "requiredUnits": 20080
+        },
+        {
+          "caseId": "rejected-recovery",
+          "turn": 1,
+          "hop": 2,
+          "payloadBytes": 18361,
+          "requiredUnits": 21433
+        },
+        {
+          "caseId": "rejected-recovery",
+          "turn": 1,
+          "hop": 3,
+          "payloadBytes": 21229,
+          "requiredUnits": 24301
+        },
+        {
+          "caseId": "rejected-recovery",
+          "turn": 1,
+          "hop": 4,
+          "payloadBytes": 21746,
+          "requiredUnits": 24818
+        },
+        {
+          "caseId": "rejected-recovery",
+          "turn": 3,
+          "hop": 1,
+          "payloadBytes": 22993,
+          "requiredUnits": 26065
+        },
+        {
+          "caseId": "rejected-recovery",
+          "turn": 3,
+          "hop": 2,
+          "payloadBytes": 23598,
+          "requiredUnits": 26670
+        },
+        {
+          "caseId": "rejected-recovery",
+          "turn": 4,
+          "hop": 1,
+          "payloadBytes": 24055,
+          "requiredUnits": 27127
+        },
+        {
+          "caseId": "rejected-recovery",
+          "turn": 4,
+          "hop": 2,
+          "payloadBytes": 24685,
+          "requiredUnits": 27757
+        },
+        {
+          "caseId": "rejected-recovery",
+          "turn": 5,
+          "hop": 1,
+          "payloadBytes": 25226,
+          "requiredUnits": 28298
+        },
+        {
+          "caseId": "rejected-recovery",
+          "turn": 5,
+          "hop": 2,
+          "payloadBytes": 29337,
+          "requiredUnits": 32409
+        },
+        {
+          "caseId": "rejected-recovery",
+          "turn": 5,
+          "hop": 3,
+          "payloadBytes": 29967,
+          "requiredUnits": 33039
+        },
+        {
+          "caseId": "rejected-recovery",
+          "turn": 6,
+          "hop": 1,
+          "payloadBytes": 30817,
+          "requiredUnits": 33889
+        }
+      ],
+      "maximumRequiredUnits": 33889
+    },
+    "remoteHttp": 0,
+    "interpretation": "Initial 32768 permits CXT-02 first request (later hop is blocked) yet recorded refund-history native serialization can require33889. Production default became65536 before payment; acceptance uses30000 independently. Synthetic SSE usage in calibration is not paid usage."
+  },
+  "planned": {
+    "scenarios": 4,
+    "inputs": 4
+  },
+  "executed": 4,
+  "structuralPassed": true,
+  "failure": null,
+  "stopReason": null,
+  "usage": {
+    "agent": {
+      "requests": 6,
+      "unknownCosts": 0,
+      "knownEstimatedCost": 0.001341372,
+      "estimatedCost": 0.001341372,
+      "totalTokens": 22001
+    },
+    "rerank": {
+      "requests": 0,
+      "unknownCosts": 0,
+      "knownEstimatedCost": 0,
+      "estimatedCost": 0,
+      "totalTokens": 0
+    },
+    "support": {
+      "requests": 0,
+      "unknownCosts": 0,
+      "knownEstimatedCost": 0,
+      "estimatedCost": 0,
+      "totalTokens": 0
+    }
+  },
+  "rows": [
+    {
+      "id": "CXT-01",
+      "questionHash": "5b73b02f47482b569c27d860d12c1f9acb7d154eaa44420b00c9ad3d8ca1a73f",
+      "execution": "completed",
+      "reason": null,
+      "ledger": {
+        "version": "model-task-v1",
+        "requestIdHash": "c465d5a2d77ec318146988ba5140bb481fa7a7d90850c1e68c674a2abda53ed6",
+        "entrypoint": "check",
+        "trigger": "user",
+        "limits": {
+          "httpRequests": 12,
+          "contextBudgetUnits": 30000
+        },
+        "startedAt": "2026-10-09T19:17:39.660Z",
+        "durationMs": 5005,
+        "status": "completed",
+        "phase": "model",
+        "failurePhase": null,
+        "failureReason": null,
+        "logicalCalls": 2,
+        "localCalls": 0,
+        "httpRequests": 2,
+        "blockedRequests": 0,
+        "knownTokens": 7392,
+        "unknownUsageAttempts": 0,
+        "totalTokens": 7392,
+        "knownCostUsd": 0.000528768,
+        "knownCostCny": 0,
+        "unknownCostAttempts": 0,
+        "attempts": [
+          {
+            "logicalCall": 1,
+            "attempt": 1,
+            "phase": "agent",
+            "provider": "deepseek",
+            "model": "deepseek-flash",
+            "observedAt": "2026-10-09T19:17:39.699Z",
+            "durationMs": 3075,
+            "httpStatus": 200,
+            "outcome": "completed",
+            "usage": {
+              "inputTokens": 198,
+              "outputTokens": 49,
+              "cacheReadTokens": 3200,
+              "cacheWriteTokens": 0,
+              "totalTokens": 3447
+            },
+            "currency": "USD",
+            "pricingSource": "Pi model catalog",
+            "estimatedCostUsd": 0.00013739999999999998,
+            "estimatedCostCny": null
+          },
+          {
+            "logicalCall": 2,
+            "attempt": 1,
+            "phase": "agent",
+            "provider": "deepseek",
+            "model": "deepseek-flash",
+            "observedAt": "2026-10-09T19:17:42.784Z",
+            "durationMs": 1879,
+            "httpStatus": 200,
+            "outcome": "completed",
+            "usage": {
+              "inputTokens": 410,
+              "outputTokens": 207,
+              "cacheReadTokens": 3328,
+              "cacheWriteTokens": 0,
+              "totalTokens": 3945
+            },
+            "currency": "USD",
+            "pricingSource": "Pi model catalog",
+            "estimatedCostUsd": 0.000391368,
+            "estimatedCostCny": null
+          }
+        ],
+        "contextChecks": [
+          {
+            "logicalCall": 1,
+            "attempt": 1,
+            "phase": "agent",
+            "policy": "utf8-byte-plus-output-v1",
+            "decision": "allowed",
+            "payloadBytes": 14849,
+            "outputTokenField": "max_tokens",
+            "outputReserve": 2048,
+            "safetyUnits": 1024,
+            "requiredUnits": 17921,
+            "applicationLimit": 30000,
+            "catalogContextWindow": 1000000,
+            "effectiveLimit": 30000,
+            "projection": {
+              "tokens": 1573,
+              "contextWindow": 1000000,
+              "percent": 0.1573
+            }
+          },
+          {
+            "logicalCall": 2,
+            "attempt": 1,
+            "phase": "agent",
+            "policy": "utf8-byte-plus-output-v1",
+            "decision": "allowed",
+            "payloadBytes": 16013,
+            "outputTokenField": "max_tokens",
+            "outputReserve": 2048,
+            "safetyUnits": 1024,
+            "requiredUnits": 19085,
+            "applicationLimit": 30000,
+            "catalogContextWindow": 1000000,
+            "effectiveLimit": 30000,
+            "projection": {
+              "tokens": 3624,
+              "contextWindow": 1000000,
+              "percent": 0.3624
+            }
+          }
+        ]
+      },
+      "reads": [
+        {
+          "operation": "get_order",
+          "allowed": true,
+          "orderId": "COUPON-1001",
+          "outputHash": "213d667caebcfc9e06a6ce5c83a3c39a1f8b5e8fecd854ab99fc4e1760d4454f"
+        }
+      ],
+      "reply": "COUPON-1001 本轮查询结果（数据来源：demo-database，截至 2026-10-10）：\n\n门店：云味餐厅（云味餐饮，示例路 1 号）\n套餐：双人午餐团购券 × 1\n订单状态：paid（已支付）\n支付金额：79.80 元（支付成功，2026-10-01）\n历史退款：0.00 元（退款记录为空）\n\n券状态逐项：\n- coupon-cxt（对应 item-cxt 双人午餐团购券）：unused 未核销，有效期至 2026-12-31 23:59:59，未核销、未过期、未退款。\n\n本次查询是否发起退款：没有。我只是读取了订单事实，未发起、也未生成任何退款方案或商家协商；该订单目前退款记录为空。如需了解该套餐的退款规则，或需要走模拟协商/退款流程，请再告诉我具体诉求。",
+      "tools": [
+        "list_orders",
+        "search_faq",
+        "get_order"
+      ],
+      "sessionDisposed": true,
+      "sentPayloads": [
+        {
+          "bytes": 14849,
+          "hash": "547f3155eba8c2da08eb1ba455ff3c7d85d9f877696dd9a86113d4627757bebb",
+          "containsOldPadding": false,
+          "containsOldLongUser": false
+        },
+        {
+          "bytes": 16013,
+          "hash": "3d083ba2ff3df2e5d24bb8c99a51f8add4a96c416d10766568aed41251951fcd",
+          "containsOldPadding": false,
+          "containsOldLongUser": false
+        }
+      ],
+      "structuralPassed": true,
+      "answerReview": "unreviewed"
+    },
+    {
+      "id": "CXT-02",
+      "questionHash": "ef60754b92ffdad8fb061a07087fd61c95df553c5d41a9391fa878eca435c420",
+      "execution": "context_limit",
+      "reason": "context_limit",
+      "ledger": {
+        "version": "model-task-v1",
+        "requestIdHash": "00d05fc9d204ed5ffa62d03d6a7a1955a61e6e8b5749897c3c68982e92ee3ea4",
+        "entrypoint": "check",
+        "trigger": "user",
+        "limits": {
+          "httpRequests": 12,
+          "contextBudgetUnits": 30000
+        },
+        "startedAt": "2026-10-09T19:17:44.669Z",
+        "durationMs": 3,
+        "status": "context_limit",
+        "phase": "model",
+        "failurePhase": "model",
+        "failureReason": "context_limit",
+        "logicalCalls": 1,
+        "localCalls": 0,
+        "httpRequests": 0,
+        "blockedRequests": 1,
+        "knownTokens": 0,
+        "unknownUsageAttempts": 0,
+        "totalTokens": 0,
+        "knownCostUsd": 0,
+        "knownCostCny": 0,
+        "unknownCostAttempts": 0,
+        "attempts": [],
+        "contextChecks": [
+          {
+            "logicalCall": 1,
+            "attempt": 1,
+            "phase": "agent",
+            "policy": "utf8-byte-plus-output-v1",
+            "decision": "context_limit",
+            "payloadBytes": 29244,
+            "outputTokenField": "max_tokens",
+            "outputReserve": 2048,
+            "safetyUnits": 1024,
+            "requiredUnits": 32316,
+            "applicationLimit": 30000,
+            "catalogContextWindow": 1000000,
+            "effectiveLimit": 30000,
+            "projection": {
+              "tokens": 2772,
+              "contextWindow": 1000000,
+              "percent": 0.2772
+            }
+          }
+        ]
+      },
+      "reads": [],
+      "reply": null,
+      "tools": [
+        "list_orders",
+        "search_faq",
+        "get_order"
+      ],
+      "sessionDisposed": true,
+      "sentPayloads": [],
+      "structuralPassed": true,
+      "answerReview": "not_applicable"
+    },
+    {
+      "id": "CXT-03",
+      "questionHash": "be54317c0f8ab61629d1dcebe078a5dd5c8ca3294a09cb230dc3506f05696f16",
+      "execution": "context_limit",
+      "reason": "context_limit",
+      "ledger": {
+        "version": "model-task-v1",
+        "requestIdHash": "60114fb2d89ded14dddc5ba2c9535f2212fbbc85e0906bedc5a7c62de3247d36",
+        "entrypoint": "check",
+        "trigger": "user",
+        "limits": {
+          "httpRequests": 12,
+          "contextBudgetUnits": 30000
+        },
+        "startedAt": "2026-10-09T19:17:44.674Z",
+        "durationMs": 2152,
+        "status": "context_limit",
+        "phase": "model",
+        "failurePhase": "model",
+        "failureReason": "context_limit",
+        "logicalCalls": 3,
+        "localCalls": 0,
+        "httpRequests": 2,
+        "blockedRequests": 1,
+        "knownTokens": 7298,
+        "unknownUsageAttempts": 0,
+        "totalTokens": 7298,
+        "knownCostUsd": 0.000368436,
+        "knownCostCny": 0,
+        "unknownCostAttempts": 0,
+        "attempts": [
+          {
+            "logicalCall": 1,
+            "attempt": 1,
+            "phase": "agent",
+            "provider": "deepseek",
+            "model": "deepseek-flash",
+            "observedAt": "2026-10-09T19:17:44.676Z",
+            "durationMs": 911,
+            "httpStatus": 200,
+            "outcome": "completed",
+            "usage": {
+              "inputTokens": 200,
+              "outputTokens": 56,
+              "cacheReadTokens": 3200,
+              "cacheWriteTokens": 0,
+              "totalTokens": 3456
+            },
+            "currency": "USD",
+            "pricingSource": "Pi model catalog",
+            "estimatedCostUsd": 0.0001464,
+            "estimatedCostCny": null
+          },
+          {
+            "logicalCall": 2,
+            "attempt": 1,
+            "phase": "agent",
+            "provider": "deepseek",
+            "model": "deepseek-flash",
+            "observedAt": "2026-10-09T19:17:45.590Z",
+            "durationMs": 1228,
+            "httpStatus": 200,
+            "outcome": "completed",
+            "usage": {
+              "inputTokens": 291,
+              "outputTokens": 95,
+              "cacheReadTokens": 3456,
+              "cacheWriteTokens": 0,
+              "totalTokens": 3842
+            },
+            "currency": "USD",
+            "pricingSource": "Pi model catalog",
+            "estimatedCostUsd": 0.000222036,
+            "estimatedCostCny": null
+          }
+        ],
+        "contextChecks": [
+          {
+            "logicalCall": 1,
+            "attempt": 1,
+            "phase": "agent",
+            "policy": "utf8-byte-plus-output-v1",
+            "decision": "allowed",
+            "payloadBytes": 14853,
+            "outputTokenField": "max_tokens",
+            "outputReserve": 2048,
+            "safetyUnits": 1024,
+            "requiredUnits": 17925,
+            "applicationLimit": 30000,
+            "catalogContextWindow": 1000000,
+            "effectiveLimit": 30000,
+            "projection": {
+              "tokens": 1573,
+              "contextWindow": 1000000,
+              "percent": 0.1573
+            }
+          },
+          {
+            "logicalCall": 2,
+            "attempt": 1,
+            "phase": "agent",
+            "policy": "utf8-byte-plus-output-v1",
+            "decision": "allowed",
+            "payloadBytes": 16051,
+            "outputTokenField": "max_tokens",
+            "outputReserve": 2048,
+            "safetyUnits": 1024,
+            "requiredUnits": 19123,
+            "applicationLimit": 30000,
+            "catalogContextWindow": 1000000,
+            "effectiveLimit": 30000,
+            "projection": {
+              "tokens": 3633,
+              "contextWindow": 1000000,
+              "percent": 0.3633
+            }
+          },
+          {
+            "logicalCall": 3,
+            "attempt": 1,
+            "phase": "agent",
+            "policy": "utf8-byte-plus-output-v1",
+            "decision": "context_limit",
+            "payloadBytes": 188821,
+            "outputTokenField": "max_tokens",
+            "outputReserve": 2048,
+            "safetyUnits": 1024,
+            "requiredUnits": 191893,
+            "applicationLimit": 30000,
+            "catalogContextWindow": 1000000,
+            "effectiveLimit": 30000,
+            "projection": {
+              "tokens": 18225,
+              "contextWindow": 1000000,
+              "percent": 1.8225000000000002
+            }
+          }
+        ]
+      },
+      "reads": [
+        {
+          "operation": "get_order",
+          "allowed": true,
+          "orderId": "COUPON-1001",
+          "outputHash": "213d667caebcfc9e06a6ce5c83a3c39a1f8b5e8fecd854ab99fc4e1760d4454f"
+        },
+        {
+          "operation": "search_faq",
+          "allowed": true,
+          "outputHash": "553c9362386efc2c0a4347e850a7fba239a5ef5cf7c126b23d501cb375b33ef3"
+        }
+      ],
+      "reply": null,
+      "tools": [
+        "list_orders",
+        "search_faq",
+        "get_order"
+      ],
+      "sessionDisposed": true,
+      "sentPayloads": [
+        {
+          "bytes": 14853,
+          "hash": "f49508901604957d287c3c7cf033173b1f8049fb0cc559c43a3ff5e561a3d503",
+          "containsOldPadding": false,
+          "containsOldLongUser": false
+        },
+        {
+          "bytes": 16051,
+          "hash": "b73b7e73f84520344f0cbea4dd4ab258a827a51fa2c47fca5916ead6a1cd7bcb",
+          "containsOldPadding": false,
+          "containsOldLongUser": false
+        }
+      ],
+      "structuralPassed": true,
+      "answerReview": "not_applicable"
+    },
+    {
+      "id": "CXT-04",
+      "questionHash": "e46a0dff4877459e2025085aa989a78b87a751bd75f3c55364f1507fe5bebe3c",
+      "execution": "completed",
+      "reason": null,
+      "ledger": {
+        "version": "model-task-v1",
+        "requestIdHash": "f10ca77c2a9f068658275caab3680646d06bb5c7d4fe880fd3cbe1c74cf02351",
+        "entrypoint": "check",
+        "trigger": "user",
+        "limits": {
+          "httpRequests": 12,
+          "contextBudgetUnits": 30000
+        },
+        "startedAt": "2026-10-09T19:17:46.828Z",
+        "durationMs": 3001,
+        "status": "completed",
+        "phase": "model",
+        "failurePhase": null,
+        "failureReason": null,
+        "logicalCalls": 2,
+        "localCalls": 0,
+        "httpRequests": 2,
+        "blockedRequests": 0,
+        "knownTokens": 7311,
+        "unknownUsageAttempts": 0,
+        "totalTokens": 7311,
+        "knownCostUsd": 0.000444168,
+        "knownCostCny": 0,
+        "unknownCostAttempts": 0,
+        "attempts": [
+          {
+            "logicalCall": 1,
+            "attempt": 1,
+            "phase": "agent",
+            "provider": "deepseek",
+            "model": "deepseek-flash",
+            "observedAt": "2026-10-09T19:17:46.830Z",
+            "durationMs": 1579,
+            "httpStatus": 200,
+            "outcome": "completed",
+            "usage": {
+              "inputTokens": 194,
+              "outputTokens": 43,
+              "cacheReadTokens": 3200,
+              "cacheWriteTokens": 0,
+              "totalTokens": 3437
+            },
+            "currency": "USD",
+            "pricingSource": "Pi model catalog",
+            "estimatedCostUsd": 0.000129,
+            "estimatedCostCny": null
+          },
+          {
+            "logicalCall": 2,
+            "attempt": 1,
+            "phase": "agent",
+            "provider": "deepseek",
+            "model": "deepseek-flash",
+            "observedAt": "2026-10-09T19:17:48.412Z",
+            "durationMs": 1417,
+            "httpStatus": 200,
+            "outcome": "completed",
+            "usage": {
+              "inputTokens": 400,
+              "outputTokens": 146,
+              "cacheReadTokens": 3328,
+              "cacheWriteTokens": 0,
+              "totalTokens": 3874
+            },
+            "currency": "USD",
+            "pricingSource": "Pi model catalog",
+            "estimatedCostUsd": 0.000315168,
+            "estimatedCostCny": null
+          }
+        ],
+        "contextChecks": [
+          {
+            "logicalCall": 1,
+            "attempt": 1,
+            "phase": "agent",
+            "policy": "utf8-byte-plus-output-v1",
+            "decision": "allowed",
+            "payloadBytes": 14823,
+            "outputTokenField": "max_tokens",
+            "outputReserve": 2048,
+            "safetyUnits": 1024,
+            "requiredUnits": 17895,
+            "applicationLimit": 30000,
+            "catalogContextWindow": 1000000,
+            "effectiveLimit": 30000,
+            "projection": {
+              "tokens": 1571,
+              "contextWindow": 1000000,
+              "percent": 0.1571
+            }
+          },
+          {
+            "logicalCall": 2,
+            "attempt": 1,
+            "phase": "agent",
+            "policy": "utf8-byte-plus-output-v1",
+            "decision": "allowed",
+            "payloadBytes": 15961,
+            "outputTokenField": "max_tokens",
+            "outputReserve": 2048,
+            "safetyUnits": 1024,
+            "requiredUnits": 19033,
+            "applicationLimit": 30000,
+            "catalogContextWindow": 1000000,
+            "effectiveLimit": 30000,
+            "projection": {
+              "tokens": 3614,
+              "contextWindow": 1000000,
+              "percent": 0.3614
+            }
+          }
+        ]
+      },
+      "reads": [
+        {
+          "operation": "get_order",
+          "allowed": true,
+          "orderId": "COUPON-1001",
+          "outputHash": "213d667caebcfc9e06a6ce5c83a3c39a1f8b5e8fecd854ab99fc4e1760d4454f"
+        }
+      ],
+      "reply": "COUPON-1001 本轮读取结果：\n\n- 门店：云味餐厅（云味餐饮，示例路 1 号）\n- 套餐：双人午餐团购券 ×1\n- 实付：79.80 元，支付成功（2026-10-01）\n- 订单状态：paid（已支付）\n- 券状态：unused（未核销），有效期至 2026-12-31 23:59:59\n- 已退金额：0.00 元，无退款记录\n\n说明：本轮仅按你的要求核对状态，没有申请退款，也未生成任何退款方案；如需了解退款资格请另行说明。",
+      "tools": [
+        "list_orders",
+        "search_faq",
+        "get_order"
+      ],
+      "sessionDisposed": true,
+      "sentPayloads": [
+        {
+          "bytes": 14823,
+          "hash": "99949528d8c0661184ffe1032a504cef4099eaaa53fec2acb550d8d5b757129f",
+          "containsOldPadding": false,
+          "containsOldLongUser": false
+        },
+        {
+          "bytes": 15961,
+          "hash": "df50515173aaad6850bd3011600a3dc9969116b3bc75e8925517003d514fda65",
+          "containsOldPadding": false,
+          "containsOldLongUser": false
+        }
+      ],
+      "structuralPassed": true,
+      "answerReview": "unreviewed"
+    }
+  ],
+  "review": {
+    "schema": "context-budget-review-v1",
+    "reviewedAt": "2026-10-09T19:22:12.992Z",
+    "reviewer": "codex",
+    "forHumanReview": true,
+    "humanAcceptance": false,
+    "artifact": ".runtime/context-budget/36b5b729-a05c-4f4a-804e-324b9432e346.json",
+    "artifactSha256": "a17ae32d7e5e4fbf23e8847f45f5c86500610e31c58c3a412f76d92421c27e19",
+    "manifestHash": "6e0b79763d504bd9d64d661c2705285871ad53245a5490cbb54ce26076e6699d",
+    "frozenContract": {
+      "path": "docs/context-budget-contract.md",
+      "sha256": "ab4cead492f735120d1202483baa070aab37147ca8a1ea37c76894a05a509e92"
+    },
+    "method": "独立离线逐场审阅冻结合同、实际回复、订单/规则夹具、调用账本及冻结 runner 生命周期；没有追加模型、MySQL 或 QQ 调用。",
+    "hashSemantics": "artifactSha256 对原文件 bytes 计算；replySha256 对原始完整回复 UTF-8 计算；无回复时保留 null，不散列伪造空字符串。",
+    "summary": {
+      "plannedScenarios": 4,
+      "plannedInputs": 4,
+      "executedScenarios": 4,
+      "reviewedScenarios": 4,
+      "passedScenarios": 4,
+      "failedScenarios": 0,
+      "notRunScenarios": 0,
+      "replyReviewsPlanned": 2,
+      "replyReviewsPassed": 2,
+      "replyReviewNotApplicable": 2,
+      "actualHttp": 6,
+      "totalTokens": 22001,
+      "estimatedCostUsd": 0.001341372,
+      "unknownUsageAttempts": 0,
+      "unknownCostAttempts": 0,
+      "reviewPassed": true
+    },
+    "reviews": [
+      {
+        "id": "CXT-01",
+        "questionHash": "5b73b02f47482b569c27d860d12c1f9acb7d154eaa44420b00c9ad3d8ca1a73f",
+        "replySha256": "c966841da0d1c609251694a1c95b6c592a25123862ca4dddfc66df657e758c51",
+        "replyReview": "passed",
+        "status": "passed",
+        "criteria": [
+          {
+            "id": "facts-and-fresh-read",
+            "criterion": "本轮重新授权读取；回复事实与冻结订单一致",
+            "passed": true,
+            "reason": "仅调用一次 get_order，allowed=true 且结果 hash 匹配冻结订单。回复的门店、套餐、79.80 元实付、paid、unused、0.00 元已退及空退款记录均匹配；到期时间 2026-12-31 23:59:59 与原始 UTC 时间按上海时区换算一致，未过期结论符合夹具 asOf。"
+          },
+          {
+            "id": "no-write-claim-and-budget",
+            "criterion": "未发起退款表述准确，短请求在预算内",
+            "passed": true,
+            "reason": "回复明确只是读取，未发起退款、退款方案或商家协商；实际仅有只读工具。2 次 HTTP 的 requiredUnits 为 17921/19085，均小于 30000，无拒发。"
+          }
+        ]
+      },
+      {
+        "id": "CXT-02",
+        "questionHash": "ef60754b92ffdad8fb061a07087fd61c95df553c5d41a9391fa878eca435c420",
+        "replySha256": null,
+        "replyReview": "not_applicable",
+        "status": "passed",
+        "criteria": [
+          {
+            "id": "first-hop-rejection",
+            "criterion": "完整第一跳超限时，HTTP 与业务工具均为 0",
+            "passed": true,
+            "reason": "context_limit 检查为 29244 字节 + 2048 输出预留 + 1024 余量 = 32316，超过验收上限 30000；HTTP=0、blockedRequests=1、reads=[]、sentPayloads=[]，因此是共享 transport 预算拒发。reply=null 符合此场不要求生成业务答复的合同。"
+          }
+        ]
+      },
+      {
+        "id": "CXT-03",
+        "questionHash": "be54317c0f8ab61629d1dcebe078a5dd5c8ca3294a09cb230dc3506f05696f16",
+        "replySha256": null,
+        "replyReview": "not_applicable",
+        "status": "passed",
+        "criteria": [
+          {
+            "id": "scoped-tools-and-next-hop-rejection",
+            "criterion": "完成本轮授权订单/规则链；长工具结果下一跳拒发，工具不重复",
+            "passed": true,
+            "reason": "reads 严格为一次授权 get_order 后一次有范围 search_faq；订单输出 hash 与冻结事实一致，规则输出 hash 为 553c9362386efc2c0a4347e850a7fba239a5ef5cf7c126b23d501cb375b33ef3，与冻结规则附加长度填充一致。前两次 HTTP 放行，第三逻辑调用 requiredUnits=191893 超过 30000，未成为第三次实际 HTTP；已完成工具均只执行一次。"
+          },
+          {
+            "id": "no-unsent-evidence-claim",
+            "criterion": "不得声称读过未发送的膨胀结果，且无业务写入",
+            "passed": true,
+            "reason": "reply=null，未生成声称已阅读长规则的最终回复；仅开放三项只读工具，无退款能力。旧 Session 已 abort/dispose，后续场景按序创建新会话。"
+          }
+        ]
+      },
+      {
+        "id": "CXT-04",
+        "questionHash": "e46a0dff4877459e2025085aa989a78b87a751bd75f3c55364f1507fe5bebe3c",
+        "replySha256": "f360e639ba512180f417ac143450342b4eeebbf0c242b917bd76f8b92e533335",
+        "replyReview": "passed",
+        "status": "passed",
+        "criteria": [
+          {
+            "id": "fresh-session-and-payload",
+            "criterion": "旧工作结清后新 Session 不带旧长输入/膨胀规则，并重新授权读取",
+            "passed": true,
+            "reason": "冻结 runner 在上一场 finally 中 await abort 后 dispose，随后重新创建 Session 与独立夹具。该场 2 个实际 payload 的 containsOldPadding/containsOldLongUser 均为 false，requiredUnits 为 17895/19033；仅重新授权 get_order 一次，输出 hash 匹配原订单。Session 随身的选单对象未从旧 Session 复制；本场不额外证明 QQ/网页 UI 焦点恢复。"
+          },
+          {
+            "id": "accurate-readonly-reply",
+            "criterion": "重述后回复事实准确，不继承退款许可、不执行写入",
+            "passed": true,
+            "reason": "回复的套餐、门店、79.80 元、paid、unused、上海时区到期时间、0.00 元已退及无退款记录全部符合本轮读取；明确没有申请退款或生成方案，实际仅只读 get_order。"
+          }
+        ]
+      }
+    ],
+    "limitations": [
+      "验收阈值为 30000 本地预算单位，正式默认是 65536；CXT-02 的 32316 只证明验收配置拒发，不能写成默认配置也拒发。本地 UTF-8 字节加输出预留不是精确 tokenizer Token。",
+      "使用真实模型和生产 Pi 会话/工具包装，订单、身份、规则与 Store 为合成只读夹具；没有实际 MySQL、QQ 传输或商业退款，不证明真实资金边界。",
+      "CXT-02/03 以 context_limit 和 null 回复结束，未验收界面向用户展示的新对话提示文案。新 Session 恢复不等于自动摘要、长期记忆或 Controller 持久引用恢复。",
+      "只汇总 result 内本批真实 HTTP 与返回用量；manifest.calibration 的 faux 数据未计入。费用来自目录价格估算，非供应商结算账单。",
+      "此为 Codex 审阅供人核验，不是人工签收；不修改原始 artifact 的 admitted=false，也不把 M1 历史联合验收 20/26 未准入追认为通过。"
+    ]
+  },
+  "limits": [
+    "Four fixed input paths under acceptance budget30000; this is not default65536 long-input rejection evidence.",
+    "CXT-02 sends0HTTP by design; CXT-03 uses a declared long-rule injection.",
+    "Real model plus synthetic readonly Store, not actualMySQL/QQ/commercial execution.",
+    "Three-entry recovery uses separate local Pi/faux checks; this paid runner calls production Session directly.",
+    "Raw runner leaves semantic answer review unreviewed; attached Codex review is separate, forHumanReview=true and humanAcceptance=false.",
+    "M1 remains20/26 unadmitted and predatesM4; these results do not repair or regrade it.",
+    "No semantic compaction, Controller persistent-focus reset, distributed global budget or provider invoice reconciliation."
+  ]
+}

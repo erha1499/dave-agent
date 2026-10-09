@@ -3,6 +3,7 @@ import type { AgentSession } from "@earendil-works/pi-coding-agent";
 import type { CouponStore, QQIdentity, QQIdentityBinding } from "./coupon-store.ts";
 import { createArrivalConsultation } from "./arrival-consultation.ts";
 import { runCliPrompt } from "./cli.ts";
+import { withModelTask, readModelTaskLimits } from "./model-request-budget.ts";
 import { renderReply, type Reply } from "./reply.ts";
 import { createOrderDiscovery } from "./order-discovery.ts";
 import { createWebChatSettingsCatalog, validateWebChatSettings, type WebChatSettings, type WebChatSettingsCatalog } from "./web-chat-settings.ts";
@@ -39,6 +40,7 @@ type Entry = { public: PublicSession; identity: QQIdentity; messages: WebChatMes
 export class WebChatSessions {
   private entries = new Map<string, Entry>();
   private closed = false;
+  private taskLimits = readModelTaskLimits();
   private store: Pick<CouponStore, "getOrder" | "listOrders" | "resolveBinding">;
   private createAgent: (identity: QQIdentity, id: string, settings: WebChatSettings) => Promise<AgentSession>;
   private timeoutMs: number;
@@ -197,94 +199,108 @@ export class WebChatSessions {
     let claimed: ReturnType<WebChatHistory["claim"]>;
     try { claimed = this.history.claim(entry.owner, sessionId, entry.tokenHash, requestId, text, this.timeoutMs); }
     catch (error) { if (error instanceof WebChatError) throw error; throw new WebChatError(503, "本轮未能保存，消息未发送。请稍后重试。"); }
-    entry.busy = true; entry.public.busy = true; entry.turns = claimed.turns; entry.public.turns = claimed.turns;
-    const abort = new AbortController(); entry.abort = abort;
-    const assertActive = () => { if (!entry.active || abort.signal.aborted || !this.history.active(entry.owner, sessionId, entry.tokenHash)) throw new Error("网页会话已失效"); };
-    const started = Date.now();
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    let unsubscribe: (() => void) | undefined;
-    const steps: WebChatStep[] = [];
-    const step = (id: string, label: string, status: WebChatStep["status"]) => {
-      const previous = steps.find(row => row.id === id);
-      if (previous) previous.status = status;
-      // ponytail: retain at most 64 public steps; a longer loop needs a separate bounded trace contract.
-      else if (steps.length < 64) steps.push({ id, label, status });
-      else return;
-      emit({ type: "step", id, label, status });
-    };
-    emit({ type: "start", replayed: false });
-    step("request", "受理咨询", "running");
-    const processing = async (): Promise<WebChatResult> => {
-      const arrivalReply = preflight ? undefined : await createArrivalConsultation(this.store, { signal: abort.signal })(entry.identity, text);
-      assertActive();
-      const prepared = preflight ?? (arrivalReply === undefined ? await entry.discovery.prepare(text) : { prompt: text, reply: arrivalReply });
-      const hostReply = prepared.reply;
-      assertActive();
-      if (hostReply?.kind === "order") step("orders", "查询最近订单", "done");
-      step("request", "受理咨询", "done");
-      let reply: Reply;
-      if (hostReply !== undefined) {
-        step("reply", "整理答复", "running");
-        reply = hostReply;
-        if (entry.agent) await entry.agent.sendCustomMessage({ customType: "web-consultation", display: false,
-          content: JSON.stringify({ userText: text, reply }) }, { triggerTurn: false });
-        step("reply", "整理答复", "done");
-      } else {
-        if (!entry.agent) {
-          const agent = await this.createAgent({ ...entry.identity }, entry.public.id, { ...entry.public.settings });
-          if (!entry.active || abort.signal.aborted) { agent.dispose(); throw new Error("网页会话已失效"); }
-          entry.agent = agent;
-          if (agent.getActiveToolNames().sort().join(",") !== "get_order,list_orders,search_faq") throw new Error("网页工具必须只读");
-          if (entry.messages.length) await agent.sendCustomMessage({ customType: "web-consultation-history", display: false,
-            content: JSON.stringify(entry.messages) }, { triggerTurn: false });
+    const abort = new AbortController();
+    return withModelTask({ requestId, entrypoint: "web", signal: abort.signal, limits: this.taskLimits,
+      onComplete: summary => console.error(`[model-task] ${JSON.stringify(summary)}`) }, async task => {
+      entry.busy = true; entry.public.busy = true; entry.turns = claimed.turns; entry.public.turns = claimed.turns;
+      entry.abort = abort;
+      const assertActive = () => { if (!entry.active || abort.signal.aborted || !this.history.active(entry.owner, sessionId, entry.tokenHash)) throw new Error("网页会话已失效"); };
+      const started = Date.now();
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      let unsubscribe: (() => void) | undefined;
+      const steps: WebChatStep[] = [];
+      const step = (id: string, label: string, status: WebChatStep["status"]) => {
+        const previous = steps.find(row => row.id === id);
+        if (previous) previous.status = status;
+        // ponytail: retain at most 64 public steps; a longer loop needs a separate bounded trace contract.
+        else if (steps.length < 64) steps.push({ id, label, status });
+        else return;
+        emit({ type: "step", id, label, status });
+      };
+      emit({ type: "start", replayed: false });
+      step("request", "受理咨询", "running");
+      const processing = async (): Promise<WebChatResult> => {
+        task.setPhase("host");
+        const arrivalReply = preflight ? undefined : await createArrivalConsultation(this.store, { signal: abort.signal })(entry.identity, text);
+        assertActive();
+        const prepared = preflight ?? (arrivalReply === undefined ? await entry.discovery.prepare(text) : { prompt: text, reply: arrivalReply });
+        const hostReply = prepared.reply;
+        assertActive();
+        if (hostReply?.kind === "order") step("orders", "查询最近订单", "done");
+        step("request", "受理咨询", "done");
+        let reply: Reply;
+        if (hostReply !== undefined) {
+          step("reply", "整理答复", "running");
+          reply = hostReply;
+          if (entry.agent) await entry.agent.sendCustomMessage({ customType: "web-consultation", display: false,
+            content: JSON.stringify({ userText: text, reply }) }, { triggerTurn: false });
+          step("reply", "整理答复", "done");
+        } else {
+          if (!entry.agent) {
+            task.setPhase("session");
+            const agent = await this.createAgent({ ...entry.identity }, entry.public.id, { ...entry.public.settings });
+            if (!entry.active || abort.signal.aborted) { agent.dispose(); throw new Error("网页会话已失效"); }
+            entry.agent = agent;
+            if (agent.getActiveToolNames().sort().join(",") !== "get_order,list_orders,search_faq") throw new Error("网页工具必须只读");
+            if (entry.messages.length) await agent.sendCustomMessage({ customType: "web-consultation-history", display: false,
+              content: JSON.stringify(entry.messages) }, { triggerTurn: false });
+          }
+          assertActive();
+          let messageId = "", messages = 0, calls = 0;
+          const pendingTools = new Map<string, { id: string; label: string }>();
+          unsubscribe = entry.agent.subscribe(event => {
+            if (!entry.active || abort.signal.aborted) return;
+            if (event.type === "message_start" && event.message.role === "assistant") {
+              messageId = `assistant-${++messages}`;
+              step(messageId, "整理答复", "running");
+            } else if (event.type === "message_update" && event.assistantMessageEvent.type === "text_delta" && messageId) {
+              emit({ type: "delta", messageId, text: event.assistantMessageEvent.delta });
+            } else if (event.type === "message_end" && event.message.role === "assistant" && messageId) {
+              step(messageId, "整理答复", ["error", "aborted"].includes(event.message.stopReason) ? "error" : "done");
+            } else if (event.type === "tool_execution_start" && Object.hasOwn(toolLabels, event.toolName)) {
+              const pending = { id: `tool-${++calls}`, label: toolLabels[event.toolName]! };
+              pendingTools.set(event.toolCallId, pending);
+              step(pending.id, pending.label, "running");
+            } else if (event.type === "tool_execution_end") {
+              const pending = pendingTools.get(event.toolCallId);
+              if (pending) { step(pending.id, pending.label, event.isError ? "error" : "done"); pendingTools.delete(event.toolCallId); }
+            }
+          });
+          // The existing atomic CLI driver owns the Pi prompt and actual tool-to-Reply conversion.
+          task.setPhase("model");
+          reply = await runCliPrompt(entry.agent, text, async () => {}, undefined, undefined, prepared);
         }
         assertActive();
-        let messageId = "", messages = 0, calls = 0;
-        const pendingTools = new Map<string, { id: string; label: string }>();
-        unsubscribe = entry.agent.subscribe(event => {
-          if (!entry.active || abort.signal.aborted) return;
-          if (event.type === "message_start" && event.message.role === "assistant") {
-            messageId = `assistant-${++messages}`;
-            step(messageId, "整理答复", "running");
-          } else if (event.type === "message_update" && event.assistantMessageEvent.type === "text_delta" && messageId) {
-            emit({ type: "delta", messageId, text: event.assistantMessageEvent.delta });
-          } else if (event.type === "message_end" && event.message.role === "assistant" && messageId) {
-            step(messageId, "整理答复", ["error", "aborted"].includes(event.message.stopReason) ? "error" : "done");
-          } else if (event.type === "tool_execution_start" && Object.hasOwn(toolLabels, event.toolName)) {
-            const pending = { id: `tool-${++calls}`, label: toolLabels[event.toolName]! };
-            pendingTools.set(event.toolCallId, pending);
-            step(pending.id, pending.label, "running");
-          } else if (event.type === "tool_execution_end") {
-            const pending = pendingTools.get(event.toolCallId);
-            if (pending) { step(pending.id, pending.label, event.isError ? "error" : "done"); pendingTools.delete(event.toolCallId); }
-          }
-        });
-        // The existing atomic CLI driver owns the Pi prompt and actual tool-to-Reply conversion.
-        reply = await runCliPrompt(entry.agent, text, async () => {}, undefined, undefined, prepared);
-      }
-      assertActive();
-      if (!["answer", "notice", "order"].includes(reply.kind)) throw new Error("网页仅支持只读回复");
-      const actual = reply as ReadReply;
-      const result: WebChatResult = { sessionId: entry.public.id, requestId, reply: actual,
-        durationMs: Date.now() - started, origin: hostReply === undefined ? "agent" : "host", steps: structuredClone(steps) };
-      const binding = await this.binding(entry.public.profileId);
-      assertActive();
-      if (binding.bindingId !== entry.binding.bindingId || binding.customerId !== entry.binding.customerId) throw new Error("客户绑定已变化");
-      entry.messages = this.history.complete(entry.owner, sessionId, entry.tokenHash, requestId, result,
-        { id: `${requestId}:assistant`, role: "assistant", text: renderReply(actual).text, reply: actual, steps: structuredClone(steps), createdAt: new Date().toISOString() });
-      entry.touched = Date.now();
-      entry.discovery.present(actual, text);
-      return structuredClone(result);
-    };
-    try {
-      return await Promise.race([processing(), new Promise<never>((_resolve, reject) => {
-        timer = setTimeout(() => reject(new Error("网页处理超时")), this.timeoutMs);
-      })]);
-    } catch {
-      // A failed/late provider turn is never retried or allowed to publish into a replacement conversation.
-      try { this.invalidate(token!, entry); } catch { /* Keep the durable pending receipt unknown if interruption cannot be saved. */ }
-      throw new WebChatError(503, "本轮未收到完整答复，会话已失效，记录已保留。请重新连接后查看。");
-    } finally { clearTimeout(timer); unsubscribe?.(); entry.busy = false; entry.public.busy = false; }
+        task.setPhase("render");
+        if (!["answer", "notice", "order"].includes(reply.kind)) throw new Error("网页仅支持只读回复");
+        const actual = reply as ReadReply;
+        const result: WebChatResult = { sessionId: entry.public.id, requestId, reply: actual,
+          durationMs: Date.now() - started, origin: hostReply === undefined ? "agent" : "host", steps: structuredClone(steps) };
+        task.setPhase("authorization");
+        const binding = await this.binding(entry.public.profileId);
+        assertActive();
+        if (binding.bindingId !== entry.binding.bindingId || binding.customerId !== entry.binding.customerId) throw new Error("客户绑定已变化");
+        task.setPhase("receipt");
+        entry.messages = this.history.complete(entry.owner, sessionId, entry.tokenHash, requestId, result,
+          { id: `${requestId}:assistant`, role: "assistant", text: renderReply(actual).text, reply: actual, steps: structuredClone(steps), createdAt: new Date().toISOString() });
+        entry.touched = Date.now();
+        entry.discovery.present(actual, text);
+        return structuredClone(result);
+      };
+      try {
+        return await Promise.race([processing(), new Promise<never>((_resolve, reject) => {
+          timer = setTimeout(() => { task.cancel(); reject(new Error("网页处理超时")); }, this.timeoutMs);
+        })]);
+      } catch {
+        const phase = task.snapshot().phase;
+        task.fail(phase === "send" ? "send_unknown" : phase === "receipt" ? "receipt_unknown" : `${phase}_failed`);
+        // A failed/late provider turn is never retried or allowed to publish into a replacement conversation.
+        try { this.invalidate(token!, entry); } catch { /* Keep the durable pending receipt unknown if interruption cannot be saved. */ }
+        throw new WebChatError(503, task.snapshot().failureReason === "context_limit"
+          ? "本次对话内容已超过当前处理范围，记录已保留。请新建对话并重新写明订单号及完整问题；重开原记录不会缩短上下文。"
+          : "本轮未收到完整答复，会话已失效，记录已保留。请重新连接后查看。");
+      } finally { clearTimeout(timer); unsubscribe?.(); entry.busy = false; entry.public.busy = false; }
+    });
   }
   close() {
     this.closed = true;

@@ -20,7 +20,8 @@ import type { CouponStore, QQIdentity } from "./coupon-store.ts";
 import type { AfterSalesStore } from "./after-sales.ts";
 import type { RefundStore } from "./refunds.ts";
 import { registerOrderDiscovery } from "./order-discovery.ts";
-import { normalizeBailianGenerationBaseUrl, resolveModelSelection, type ModelSelection } from "./model-selection.ts";
+import { modelPricing, normalizeBailianGenerationBaseUrl, resolveModelSelection, type ModelSelection } from "./model-selection.ts";
+import { createModelRequestFetch, currentModelTask, recordLocalModelCall, rejectUnsupportedModelTransport } from "./model-request-budget.ts";
 
 const projectDir = fileURLToPath(new URL("../", import.meta.url));
 const skillDir = fileURLToPath(new URL("../skills/shop-support", import.meta.url));
@@ -219,10 +220,32 @@ export async function createSession(
     resourceLoader,
     sessionManager: SessionManager.inMemory(projectDir),
     settingsManager: SettingsManager.inMemory({
-      // ponytail: short demo sessions only; add business-specific compaction before long-lived QQ sessions.
+      // Full HTTP payloads have a local budget; semantic compaction is not implemented.
       compaction: { enabled: false }, retry: { enabled: true, maxRetries: 2 },
       cacheWarming: "off",
     }),
   });
+  const stream = session.agent.streamFunction;
+  session.agent.streamFunction = async (selected, context, options) => {
+    const task = currentModelTask();
+    if (!task) return stream(selected, context, options);
+    const signal = options?.signal ? AbortSignal.any([options.signal, task.signal]) : task.signal;
+    signal.throwIfAborted();
+    // Pi's native faux provider performs no HTTP. Keep deterministic checks
+    // explicit instead of attributing synthetic usage to a paid provider.
+    if (/^faux(?::\d+:[a-z0-9]+)?$/u.test(selected.api) && selected.provider === "faux" && selected.baseUrl === "http://localhost:0") {
+      recordLocalModelCall(); return stream(selected, context, { ...options, signal });
+    }
+    if (selected.api !== "openai-completions" || options?.transport === "websocket" || options?.transport === "websocket-cached") {
+      return rejectUnsupportedModelTransport();
+    }
+    return stream(selected, context, { ...options, signal, transport: "sse",
+      fetch: createModelRequestFetch({ phase: "agent", provider: selected.provider, model: selected.id,
+        format: "openai-sse", pricing: modelPricing(selected), context: {
+          contextWindow: selected.contextWindow, maxOutputTokens: selected.maxTokens,
+          outputTokenField: selected.compat && "maxTokensField" in selected.compat ? selected.compat.maxTokensField : undefined,
+          projection: session.getContextUsage() ?? undefined,
+        } }, options?.fetch) });
+  };
   return session;
 }
