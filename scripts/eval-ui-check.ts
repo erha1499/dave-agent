@@ -10,12 +10,18 @@ class Element {
   value = "";
   className = "";
   disabled = false;
+  focused = false;
   open?: boolean;
   style: Record<string, string> = {};
   attrs = new Map<string, string>();
   styleAttr = false;
   events = new Map<string, () => unknown>();
-  classList = { toggle() {} };
+  classList = { toggle: (name: string, active: boolean) => {
+    const names = new Set(this.className.split(" ").filter(Boolean));
+    if (active) names.add(name);
+    else names.delete(name);
+    this.className = [...names].join(" ");
+  } };
   append(...children: Element[]) { this.children.push(...children); }
   replaceChildren(...children: Element[]) { this.children = children; }
   setAttribute(key: string, value: string) {
@@ -23,6 +29,8 @@ class Element {
     if (key === "style") this.styleAttr = true;
     this.attrs.set(key, value);
   }
+  getAttribute(key: string) { return this.attrs.get(key) ?? null; }
+  focus() { this.focused = true; }
   addEventListener(event: string, handler: () => unknown) { this.events.set(event, handler); }
   fire(event: string) { assert.ok(this.events.has(event)); return this.events.get(event)!(); }
 }
@@ -30,7 +38,7 @@ const content = (element: Element): string => element.textContent + element.chil
 const walk = (element: Element): Element[] => [element, ...element.children.flatMap(walk)];
 const findClass = (element: Element, cls: string) => walk(element).find(item => item.className.split(" ").includes(cls));
 const styleAttrCount = (element: Element): number => walk(element).filter(item => item.styleAttr).length;
-type Response = { ok: boolean; json: () => Promise<unknown> };
+type Response = { ok: boolean; status?: number; json: () => Promise<unknown> };
 type Pending = { path: string; resolve: (response: Response) => void; reject: (error: Error) => void };
 const respond = (request: Pending, body: unknown) => request.resolve({ ok: true, json: async () => body });
 const source = await readFile(new URL("../web/evaluation/app.js", import.meta.url), "utf8");
@@ -121,6 +129,70 @@ async function boot() {
   return { element, take, find, context, flush, pendingCount: () => pending.length };
 }
 
+// 同一个读取函数按真实服务分流恢复指引；相似前缀不能冒充实验接口。
+{
+  const { take, context, flush, pendingCount } = await boot();
+  respond(take(), { runs: [] }); await flush();
+  for (const path of ["/api/experiments", "/api/experiments/catalog", "/api/experiments/job-31",
+    "/api/runs", "/api/batches", "/api/compare?baseline=a&candidate=b", "/api/experiments-foo"]) {
+    for (const status of [503, 500]) {
+      const message = runInContext(`api(${JSON.stringify(path)}).catch(error => error.message)`, context) as Promise<string>;
+      const request = take(); assert.equal(request.path, path);
+      request.resolve({ ok: false, status, json: async () => ({ error: "不可信后端说明" }) });
+      const actual = await message;
+      if (["/api/experiments", "/api/experiments/catalog", "/api/experiments/job-31"].includes(path)) {
+        assert.equal(actual, status === 503 ? "实验服务暂不可用。请检查后台服务后重试当前操作。"
+          : "无法读取实验数据（HTTP 500）。请检查后台服务后重试。");
+        assert.ok(!actual.includes("MySQL"), "实验目录/任务不是评测数据库，不能误导用户排查 MySQL");
+      } else {
+        assert.equal(actual, status === 503 ? "评测数据库暂不可用。检查 MySQL 运行状态和评测数据库配置后，再刷新记录。"
+          : "无法读取评测记录（HTTP 500）。请检查后台服务后重试。");
+      }
+      assert.ok(!actual.includes("不可信后端说明"));
+    }
+  }
+  assert.equal(pendingCount(), 0);
+  console.log("PASS 评测前端：实验/评测服务错误恢复指引、有限路由前缀与非可信错误内容隔离。");
+}
+
+// 实验历史可带入当前总览筛选之外的运行，按钮按实际 A/B 选择门控，不按总览记录数。
+for (const listed of [0, 1]) {
+  const { element, take, find, context, flush, pendingCount } = await boot();
+  respond(take(), { runs: [] });
+  await flush();
+  runInContext(`state.kind = "engineering"; state.runs = ${listed ? '[{ id: "engineering-only" }]' : '[]'};
+    $("baseline").append(node("option", { value: "imported-a" }, "实验 A"));
+    $("candidate").append(node("option", { value: "imported-b" }, "实验 B"));`, context);
+  element("baseline").value = "imported-a";
+  element("candidate").value = "imported-b";
+  element("candidate").fire("change");
+  assert.equal(element("compare-button").disabled, false, `${listed} 条总览记录不能禁用已带入的有效 A/B`);
+  assert.match(content(element("compare-detail")), /点击“开始对比”/);
+  const failed = element("compare-button").fire("click");
+  assert.equal(element("compare-button").disabled, true, "对比请求中保持禁用");
+  find(path => path.startsWith("/api/compare"), "imported comparison").reject(new Error("对比服务暂不可用"));
+  respond(find(path => path === "/api/runs/imported-a", "imported A"), detailResult("imported-a"));
+  respond(find(path => path === "/api/runs/imported-b", "imported B"), detailResult("imported-b"));
+  await failed;
+  assert.match(content(element("compare-detail")), /对比服务暂不可用/);
+  assert.equal(element("compare-button").disabled, false, "合法历史 A/B 失败后可以原位重试");
+  const retry = element("compare-button").fire("click");
+  assert.equal(element("compare-button").disabled, true);
+  respond(find(path => path.startsWith("/api/compare"), "imported retry"), comparisonResult("imported-a", "imported-b", true));
+  await retry;
+  assert.match(content(element("compare-detail")), /场景对比/);
+  assert.equal(element("compare-button").disabled, false, "完成后仍可再次对比有效历史值");
+  for (const [a, b] of [["", "imported-b"], ["imported-a", ""], ["imported-a", "imported-a"]]) {
+    element("baseline").value = a!;
+    element("candidate").value = b!;
+    element("candidate").fire("change");
+    assert.equal(element("compare-button").disabled, true, "空值或同 ID 不开放对比");
+    await element("compare-button").fire("click");
+    assert.equal(pendingCount(), 0, "即使程序触发按钮，空值或同 ID 也不能请求");
+  }
+}
+console.log("PASS 评测前端：当前总览 0/1 条时，已带入的历史 A/B 可对比和失败重试；请求中禁用，空值/同 ID 零请求。");
+
 // 竞态：重置、切换 A/B、刷新后，旧成功/失败响应不覆盖当前对比结果。
 for (const action of ["reset", "selection", "refresh"]) for (const outcome of ["success", "failure"]) {
   const { element, take, context, flush, pendingCount } = await boot();
@@ -175,6 +247,72 @@ for (const action of ["reset", "selection", "refresh"]) for (const outcome of ["
   assert.equal(pendingCount(), 0, `${action}/${outcome}: unresolved request left behind`);
 }
 console.log("PASS 评测前端：重置、切换 A/B、刷新后，旧成功/失败响应不覆盖当前结果或按钮状态。");
+
+// 选择运行只更新选中状态，不移除浏览器当前聚焦的侧栏按钮；失败可原位重试。
+{
+  const { element, take, find, flush, context } = await boot();
+  respond(take(), { runs: [runRecord("focus-a"), runRecord("focus-b")] });
+  await flush();
+  const buttons = element("run-list").children;
+  find(path => path === "/api/runs/focus-a", "initial detail").reject(new Error("详情读取失败"));
+  respond(find(path => path.endsWith("/analysis"), "initial analysis"), analysisResult("focus-a"));
+  await flush();
+  assert.match(content(element("notice")), /详情读取失败/);
+
+  const selection = buttons[1]!.fire("click");
+  assert.equal(element("run-list").children, buttons, "运行切换不得移除当前聚焦的侧栏按钮");
+  assert.equal(buttons[0]!.attrs.get("aria-pressed"), "false");
+  assert.equal(buttons[1]!.attrs.get("aria-pressed"), "true");
+  assert.ok(buttons[1]!.className.split(" ").includes("selected"));
+  assert.equal(content(element("notice")), "", "新选择清除上一条记录的错误提示");
+  assert.equal(element("run-detail").attrs.get("aria-busy"), "true");
+  respond(find(path => path === "/api/runs/focus-b", "selected detail"), detailResult("focus-b"));
+  find(path => path.endsWith("/analysis"), "selected analysis").reject(new Error("分析读取失败"));
+  await selection;
+  assert.equal(element("run-detail").attrs.get("aria-busy"), "false");
+  const retry = walk(element("run-detail")).find(item => item.events.has("click") && content(item) === "重试这次运行");
+  assert.ok(retry, "详情失败态提供直接重试动作");
+  const retrying = retry.fire("click");
+  assert.equal(element("run-detail").attrs.get("aria-busy"), "true");
+  assert.equal(content(element("notice")), "");
+  assert.equal(buttons[1]!.focused, true, "重试时把焦点放回同一记录，不留在已移除的按钮上");
+  respond(find(path => path.endsWith("/analysis"), "retry analysis"), analysisResult("focus-b"));
+  await retrying;
+  assert.match(content(element("run-detail")), /focus-b/);
+  assert.equal(element("run-detail").attrs.get("aria-busy"), "false");
+  assert.equal(element("run-list").children, buttons);
+  runInContext('selectRun("outside-list")', context);
+  find(path => path === "/api/runs/outside-list", "outside detail").reject(new Error("详情读取失败"));
+  respond(find(path => path.endsWith("/analysis"), "outside analysis"), analysisResult("outside-list"));
+  await flush();
+  const outsideRetry = walk(element("run-detail")).find(item => item.events.has("click") && content(item) === "重试这次运行");
+  assert.ok(outsideRetry);
+  const outsidePending = outsideRetry.fire("click");
+  assert.equal(element("run-detail").focused, true, "批次或实验记录不在侧栏时，重试焦点回到详情区");
+  respond(find(path => path === "/api/runs/outside-list", "outside retry detail"), detailResult("outside-list"));
+  respond(find(path => path.endsWith("/analysis"), "outside retry analysis"), analysisResult("outside-list"));
+  await outsidePending;
+  console.log("PASS 评测前端：运行选择保留键盘焦点节点，清除旧错误，失败可原位重试且 busy 正确恢复。");
+}
+
+// 刷新废弃尚未完成的详情请求后，无记录或读库失败也要结束详情的 busy 状态。
+for (const outcome of ["empty", "failure"]) {
+  const { element, take, find, flush } = await boot();
+  respond(take(), { runs: [runRecord("busy-old")] });
+  await flush();
+  const oldDetail = find(path => path === "/api/runs/busy-old", "old busy detail");
+  const oldAnalysis = find(path => path.endsWith("/analysis"), "old busy analysis");
+  assert.equal(element("run-detail").attrs.get("aria-busy"), "true");
+  const refresh = element("refresh").fire("click");
+  if (outcome === "empty") respond(take(), { runs: [] });
+  else take().reject(new Error("运行列表暂不可用"));
+  await refresh;
+  assert.equal(element("run-detail").attrs.get("aria-busy"), "false");
+  respond(oldDetail, detailResult("busy-old"));
+  respond(oldAnalysis, analysisResult("busy-old"));
+  await flush();
+  assert.equal(element("run-detail").attrs.get("aria-busy"), "false");
+}
 
 // 客观运行：口径徽章、analysis 分母、覆盖标签、缺失分列、部分用量与批次不完整。
 {
@@ -289,7 +427,8 @@ console.log("PASS 评测前端：重置、切换 A/B、刷新后，旧成功/失
   await flush();
   const engineering = content(element("run-detail"));
   assert.match(engineering, /客观口径/);
-  assert.match(engineering, /无模型请求/);
+  assert.match(engineering, /Agent 用量：未记录模型步骤，覆盖率与 Tokens 不适用/);
+  assert.ok(!engineering.includes("无模型请求"));
   assert.match(engineering, /不适用/);
   assert.ok(!engineering.includes("$0.00000"), "无模型请求时费用不得补零");
   assert.ok(!engineering.includes("未采全"), "无模型请求时完整量属不适用而非未采全");
@@ -515,7 +654,8 @@ console.log("PASS 评测前端：重置、切换 A/B、刷新后，旧成功/失
   await flush();
   const html = content(element("run-detail"));
   assert.match(html, /稳定通过 1/, "批次概览含稳定通过计数");
-  assert.match(html, /无模型请求，用量、Tokens 与费用均不适用/);
+  assert.match(html, /未记录 Agent 模型步骤，Agent 用量、Tokens 与费用均不适用/);
+  assert.ok(!html.includes("无模型请求"));
   assert.ok(!html.includes("未采全"), "无模型请求时不得写未采全");
   console.log("PASS 评测前端：无模型请求的批次，Tokens 与费用整组不适用。");
 }
@@ -623,7 +763,8 @@ for (const outcome of ["success", "detail-failure", "analysis-failure"]) {
   assert.match(html, /执行错误/, "error 显示执行错误");
   assert.match(html, /执行分工 · 2 段/, "轮级归因折叠存在");
   assert.match(html, /暂无归因记录/, "空 spans 明确暂无归因记录，不补零");
-  assert.match(html, /本轮无模型请求/, "v2 轮无模型步骤时标注无模型请求");
+  assert.match(html, /未记录 Agent 模型步骤/, "仅声明 Agent 轨迹缺少模型步骤，不推断提供商零调用");
+  assert.ok(!html.includes("本轮无模型请求"));
   assert.match(html, /已记录 5 段/, "运行级归因折叠摘要");
   assert.match(html, /不与执行轨迹的调用量、Tokens、费用重复相加/);
   const attrFold = findClass(element("run-detail"), "attr-fold");
@@ -633,6 +774,36 @@ for (const outcome of ["success", "detail-failure", "analysis-failure"]) {
   assert.equal(rows.length, 3, "归因 groups 逐项列出：表头 + 2 行，不造合计行");
   assert.ok(!html.includes("合计"), "执行分工不造合计");
   console.log("PASS 评测前端：v2 中文名、trigger 标注、轮级/运行级归因折叠（denied/error 分列、不合计），空归因不补零。");
+}
+
+// Agent steps 为空仅证明未记录 Agent 模型步骤，不能否定独立的问题解析/重排提供商调用。
+{
+  const { take, context, flush } = await boot();
+  respond(take(), { runs: [] });
+  await flush();
+  const renderTurn = runInContext("turnNode", context);
+  const renderMetrics = runInContext("metricsPanel", context), renderBatch = runInContext("batchPanel", context);
+  const providerSpan = (component: string, name: string, kind: string) => ({
+    id: "provider-1", parentSpanId: "request-1", actor: "host", trigger: "user", component, name,
+    observedAt: T, durationMs: 200, outcome: "ok",
+    usage: { provider: "test", model: "test-model", kind, inputTokens: 120, outputTokens: 30, totalTokens: 150, cost: null },
+  });
+  for (const spans of [[], [providerSpan("support-question", "parse_question", "llm")], [providerSpan("knowledge-rerank", "rerank", "rerank")]]) {
+    const cases = [evalCase("scope-31", { turns: [turn({ steps: [], spans })] })];
+    const run = runRecord("scope-31", { batch: { id: BATCH, repetition: 1, plannedRepetitions: 1 } });
+    const usage = { modelRequests: 0, reportedRequests: 0, missingRequests: 0, coverage: null,
+      knownTokens: null, completeTokens: null, knownCostUsd: null, completeCostUsd: null };
+    const html = content(renderTurn(cases[0].turns[0]))
+      + content(renderMetrics(run, analysisResult(run.id, { usage }), cases))
+      + content(renderBatch(run, { batchId: BATCH, compatible: true, issues: [], runIds: [run.id],
+        plannedRepetitions: 1, startedRuns: 1, completedRuns: 1, missingRuns: 0, cases: [], usage }));
+    assert.ok(!html.includes("无模型请求"), "空 Agent steps 与 Agent 零用量不能宣称整个运行/批次零模型请求");
+    assert.match(html, /未记录 Agent 模型步骤；提供商调用见执行分工/);
+    assert.match(html, /Agent 用量：未记录模型步骤，覆盖率与 Tokens 不适用/);
+    assert.match(html, /未记录 Agent 模型步骤，Agent 用量、Tokens 与费用均不适用/);
+    if (spans.length) assert.match(html, /合计 150/, "独立提供商已采集用量保持展示");
+  }
+  console.log("PASS 评测前端：空 Agent steps 不宣称整轮零调用，问题解析/重排提供商用量保留。");
 }
 
 // 坏归因记录：null/原始值/数组/缺字段/非法 actor/trigger/outcome 不崩溃、不标正常、原始 JSON 可查；invalid 口径与归因 issues 外露。

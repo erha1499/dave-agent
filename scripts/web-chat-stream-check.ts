@@ -7,6 +7,7 @@ import { createCouponSession, createModelRuntime } from "../src/agent.ts";
 import type { CouponStore, QQIdentity } from "../src/coupon-store.ts";
 import { WebChatSessions } from "../src/web-chat.ts";
 import { createWebChatServer } from "../src/web-chat-server.ts";
+import { createWebChatSettingsCatalog } from "../src/web-chat-settings.ts";
 
 type Frame = { event: string; data: any };
 const deadline = <T>(value: Promise<T>) => Promise.race([value, new Promise<never>((_resolve, reject) => {
@@ -19,6 +20,7 @@ export async function checkWebChatStream() {
   runtime.registerNativeProvider(faux.provider);
   let blocked: Promise<void> | undefined, reads = 0;
   const store = {
+    async resolveBinding(identity: QQIdentity) { return { bindingId: `binding-${identity.senderId}`, customerId: `customer-${identity.senderId}` }; },
     async listOrders(identity: QQIdentity) {
       return { source: "demo-database", asOf: new Date().toISOString(), hasMore: false,
         orders: identity.senderId === "TEST_USER1" ? [{ id: "COUPON-1001", status: "paid", paidCents: 7980, refundedCents: 0,
@@ -35,9 +37,11 @@ export async function checkWebChatStream() {
     async searchKnowledge() { return []; },
   } as unknown as CouponStore;
   const factory = (identity: QQIdentity) => createCouponSession(identity, store, runtime, faux.getModel());
-  const chat = new WebChatSessions(store, factory, 2000), server = createWebChatServer(chat);
+  const catalog = createWebChatSettingsCatalog({ DEEPSEEK_API_KEY: "synthetic-stream-key" });
+  const chat = new WebChatSessions(store, factory, 2000, catalog), server = createWebChatServer(chat);
   await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve));
   const address = server.address(); assert.ok(address && typeof address !== "string"); const port = address.port;
+  const owners = new Map<string, string>();
   function http(path: string, body?: unknown, cookie?: string, observe?: (frame: Frame) => void) {
     const frames: Frame[] = [];
     let onHeaders!: (value: { status: number; headers: IncomingHttpHeaders }) => void;
@@ -45,8 +49,10 @@ export async function checkWebChatStream() {
     let finish!: (value: { status: number; data: any; headers: IncomingHttpHeaders }) => void, fail!: (error: unknown) => void;
     const finished = new Promise<{ status: number; data: any; headers: IncomingHttpHeaders }>((resolve, reject) => { finish = resolve; fail = reject; });
     const req = request({ hostname: "127.0.0.1", port, path, method: body === undefined ? "GET" : "POST", headers: {
-      ...(body === undefined ? {} : { "Content-Type": "application/json", "X-Chat-Request": "1" }), ...(cookie ? { Cookie: cookie } : {}),
+      ...(body === undefined ? {} : { "Content-Type": "application/json", "X-Chat-Request": "1" }), ...(cookie ? { Cookie: owners.has(cookie) ? `${cookie}; ${owners.get(cookie)}` : cookie } : {}),
     } }, res => {
+      const cookies = res.headers["set-cookie"]?.map(value => value.split(";")[0]!) ?? [];
+      if (cookies[0] && cookies[1]) owners.set(cookies[0], cookies[1]);
       onHeaders({ status: res.statusCode!, headers: res.headers });
       const decoder = new TextDecoder(); let pending = "", text = "";
       res.on("data", chunk => {
@@ -201,21 +207,21 @@ export async function checkWebChatStream() {
     const selectedHistory = await http("/api/chat/session", undefined, pending.cookie).finished;
     assert.equal(selectedHistory.data.messages[2].text, selectionBody.text, "host continuation preserves the clicked user text in public history");
 
-    const timeoutChat = new WebChatSessions(store, factory, 80);
+    const timeoutChat = new WebChatSessions(store, factory, 80, catalog);
     try {
       const old = await timeoutChat.create(undefined, "demo-a"), progress: unknown[] = [];
       blocked = new Promise<void>(resolve => { release = resolve; });
       faux.setResponses([fauxAssistantMessage(fauxToolCall("get_order", { orderId: "COUPON-1001" }), { stopReason: "toolUse" })]);
       await assert.rejects(deadline(timeoutChat.send(old.token, randomUUID(), "合成超时问题 COUPON-1001", old.session.id,
         event => { progress.push(event); })), error => error instanceof Error && Reflect.get(error, "status") === 503);
-      assert.equal(timeoutChat.get(old.token).session, null);
+      assert.equal((await timeoutChat.get(old.token)).session, null);
       const published = progress.length, replacement = await timeoutChat.create(undefined, "demo-b");
       const replacementReply = await timeoutChat.send(replacement.token, randomUUID(), "查询到账 电子钱包", replacement.session.id);
       assert.equal(replacementReply.origin, "host");
       release(); blocked = undefined;
       await new Promise<void>(resolve => setTimeout(resolve, 15));
       assert.equal(progress.length, published, "a timed-out native turn cannot publish late progress into its old response");
-      assert.equal(timeoutChat.get(replacement.token).messages.length, 2);
+      assert.equal((await timeoutChat.get(replacement.token)).messages.length, 2);
     } finally { blocked = undefined; timeoutChat.close(); }
     console.log(`网页流式检查通过：实际 HTTP / Pi faux 增量、公开步骤、私有信息过滤、最终事实卡/历史、预校验、回放、断流重试、宿主无伪增量、越权及模型失败；${faux.state.callCount} 次本地调用，0 远程/DB/QQ。`);
   } finally { chat.close(); server.closeAllConnections(); await new Promise<void>(resolve => server.close(() => resolve())); }

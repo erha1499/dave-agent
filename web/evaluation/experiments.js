@@ -7,8 +7,9 @@ const expState = {
   loaded: false, catalog: null, presetId: null, draft: null,
   jobs: [], selected: null, job: null,
   loadEpoch: 0, jobsEpoch: 0, pollEpoch: 0, pollTimer: 0, pollMs: 2000,
-  jobsLoading: false, submitting: false, formError: "", jobsError: "",
+  jobsLoading: false, submitting: false, formError: "", jobsError: "", jobsErrorSource: "",
   formSlot: null, sideSlot: null, diffSlot: null, remoteSlot: null, actionsSlot: null,
+  jobsView: null, jobView: null,
 };
 const expKindNames = { support: "业务架构", retrieval: "检索实验" };
 const expJobStatus = { running: "运行中", completed: "已完成", completed_with_failures: "部分失败", failed: "失败", interrupted: "已中断" };
@@ -29,11 +30,12 @@ function experimentViewChanged(view) {
 
 async function loadExperimentData() {
   const epoch = ++expState.loadEpoch;
-  expState.jobsError = "";
+  if (expState.jobsErrorSource === "catalog") { expState.jobsError = ""; expState.jobsErrorSource = ""; }
   renderExperiments();
   try {
     const [catalog, jobs] = await Promise.all([api("/api/experiments/catalog"), api("/api/experiments")]);
     if (epoch !== expState.loadEpoch) return;
+    if (expState.jobsErrorSource === "catalog") { expState.jobsError = ""; expState.jobsErrorSource = ""; }
     expState.catalog = catalog;
     expState.jobs = jobs.jobs || [];
     expState.loaded = true;
@@ -43,6 +45,7 @@ async function loadExperimentData() {
   } catch (error) {
     if (epoch !== expState.loadEpoch) return;
     expState.jobsError = error.message;
+    expState.jobsErrorSource = "catalog";
     renderExperiments();
   }
 }
@@ -56,10 +59,11 @@ async function refreshJobs() {
     // 列表是旧快照：只更新列表本身，绝不覆盖当前详情；详情仅由 selectJob / 轮询响应更新。
     if (epoch !== expState.jobsEpoch) return;
     expState.jobs = result.jobs || [];
-    expState.jobsError = "";
+    if (expState.jobsErrorSource === "list") { expState.jobsError = ""; expState.jobsErrorSource = ""; }
   } catch (error) {
     if (epoch !== expState.jobsEpoch) return;
     expState.jobsError = error.message;
+    expState.jobsErrorSource = "list";
   } finally {
     // 解锁与重绘放在 finally：按钮在响应（含旧响应被丢弃）后必定恢复可点。
     expState.jobsLoading = false;
@@ -79,11 +83,13 @@ async function selectJob(id, force = false) {
     const job = await api(`/api/experiments/${encodeURIComponent(id)}`);
     if (epoch !== expState.pollEpoch || expState.selected !== id) return;
     expState.job = job;
+    if (expState.jobsErrorSource === "detail") { expState.jobsError = ""; expState.jobsErrorSource = ""; }
     renderSide();
     resumeExpPoll();
   } catch (error) {
     if (epoch !== expState.pollEpoch || expState.selected !== id) return;
     expState.jobsError = error.message;
+    expState.jobsErrorSource = "detail";
     renderSide();
   }
 }
@@ -107,12 +113,13 @@ function resumeExpPoll() {
       expState.job = fresh;
       const listed = expState.jobs.find(item => item.id === fresh.id);
       if (listed) Object.assign(listed, fresh);
-      expState.jobsError = "";
+      if (expState.jobsErrorSource === "detail") { expState.jobsError = ""; expState.jobsErrorSource = ""; }
       renderSide();
       if (fresh.status === "running") expState.pollTimer = setTimeout(tick, expState.pollMs);
     } catch (error) {
       if (epoch !== expState.pollEpoch) return;
       expState.jobsError = `${error.message}（轮询已暂停，可重试）`;
+      expState.jobsErrorSource = "detail";
       renderSide();
     }
   };
@@ -217,11 +224,13 @@ function validateDraft(config) {
 async function submitExperiment() {
   const draft = expState.draft;
   if (!draft || expState.submitting) return;
+  const formSlot = expState.formSlot;
+  const focusSource = document.activeElement === expState.actionsSlot?.children[0] ? document.activeElement : null;
   const error = validateDraft(draft);
-  if (error) { expState.formError = error; renderExperiments(); return; }
+  if (error) { expState.formError = error; renderExpActions(); return; }
   expState.submitting = true;
   expState.formError = "";
-  renderExperiments();
+  renderExpActions();
   try {
     const response = await fetch("/api/experiments", {
       method: "POST",
@@ -238,7 +247,13 @@ async function submitExperiment() {
     expState.formError = submitError.message;
   } finally {
     expState.submitting = false;
-    renderExperiments();
+    const restoreFocus = focusSource && expState.draft === draft && expState.formSlot === formSlot && state.view === "experiments"
+      && (!document.activeElement || document.activeElement === document.body || document.activeElement === focusSource)
+      && window.getSelection?.()?.isCollapsed !== false;
+    renderExpActions();
+    renderSide();
+    if (restoreFocus && focusSource.isConnected && !focusSource.disabled && !focusSource.hidden && focusSource.getClientRects().length)
+      focusSource.focus({ preventScroll: true });
   }
 }
 
@@ -250,7 +265,7 @@ function downloadExpConfig() {
   URL.revokeObjectURL(url);
 }
 
-// 整页重建仅限初始加载与用户主动操作（切预设/改架构/复制方案/提交等）；
+// 整页重建仅限初始加载与用户主动操作（切预设/改架构/复制方案等）；
 // 轮询与列表刷新只走 renderSide，避免重建表单导致输入中值、焦点和高级参数展开态丢失。
 function renderExperiments() {
   const root = $("experiments");
@@ -266,6 +281,8 @@ function renderExperiments() {
   }
   const formSlot = node("div", { class: "exp-form-slot" });
   const sideSlot = node("div", { class: "exp-side" });
+  expState.jobsView = null;
+  expState.jobView = null;
   root.replaceChildren(node("div", { class: "exp-layout" }, formSlot, sideSlot));
   expState.formSlot = formSlot;
   expState.sideSlot = sideSlot;
@@ -292,13 +309,31 @@ function renderExpRemote() {
   if (expState.remoteSlot && expState.draft) expState.remoteSlot.replaceChildren(...expRemoteChildren(expState.draft));
 }
 function renderExpActions() {
-  if (expState.actionsSlot && expState.draft) expState.actionsSlot.replaceChildren(...expActionsChildren(expState.draft));
+  const slot = expState.actionsSlot;
+  if (!slot || !expState.draft) return;
+  const children = expActionsChildren(expState.draft);
+  const submit = slot.children[0];
+  submit.disabled = children[0].disabled;
+  expUpdateText(submit, children[0].textContent);
+  for (const child of [...slot.children].slice(2)) slot.removeChild(child);
+  slot.append(...children.slice(2));
 }
 
 function renderSide() {
   if (!expState.sideSlot) return;
-  expState.sideSlot.replaceChildren(expJobsPanel(), expJobPanel());
+  if (!expState.jobsView) expState.sideSlot.append(expJobsPanel());
+  renderExpJobs();
+  const previous = expState.jobView;
+  if (!previous || previous.id !== (expState.job?.id ?? null)) {
+    const panel = expJobPanel();
+    if (previous) expState.sideSlot.replaceChild(panel, previous.panel);
+    else expState.sideSlot.append(panel);
+  }
+  if (expState.job) renderExpJob();
 }
+
+// 同值不改文本节点，保留轮询期间的选区与焦点；只更新实际变化的状态槽。
+const expUpdateText = (element, value) => { if (element.textContent !== value) element.textContent = value; };
 
 const expLabeled = (label, control) => node("label", { class: "exp-field" }, text("span", label, "exp-field-label"), control);
 
@@ -306,6 +341,7 @@ function expFormPanel() {
   const catalog = expState.catalog;
   const draft = expState.draft;
   if (!catalog || !draft) return node("section", { class: "panel" }, text("p", "实验目录不可用，请重试。", "batch-note"));
+  const copyId = draft.variants[0]?.id === "B" ? "A" : "B";
   const diffSlot = node("div", { class: "exp-diff-slot" });
   const remoteSlot = node("div", { class: "exp-remote-slot" });
   const actionsSlot = node("div", { class: "exp-actions" });
@@ -316,7 +352,7 @@ function expFormPanel() {
   remoteSlot.replaceChildren(...expRemoteChildren(draft));
   actionsSlot.replaceChildren(...expActionsChildren(draft));
   return node("section", { class: "panel exp-form", "aria-label": "实验配置" },
-    node("div", { class: "panel-heading" }, text("h3", "实验配置"), text("p", "仅本次评测生效")),
+    node("div", { class: "panel-heading" }, text("h3", "实验配置"), text("p", "修改用于下一次提交")),
     node("div", { class: "exp-form-body" },
       node("div", { class: "exp-fields" },
         expLabeled("方案预设", expPresetSelect(catalog)),
@@ -325,7 +361,7 @@ function expFormPanel() {
       text("p", `${expKindNames[draft.kind] || draft.kind} · 类型由预设确定`, "metric-note"),
       node("div", { class: "exp-variants" }, ...draft.variants.map((variant, index) => expVariantCard(draft, variant, index))),
       draft.variants.length === 1
-        ? node("button", { class: "quiet-button", type: "button", "data-action": "copy-b", onclick: () => { const b = expCopy(draft.variants[0]); b.id = "B"; draft.variants.push(b); renderExperiments(); } }, "复制 A 成 B 对照")
+        ? node("button", { class: "quiet-button", type: "button", "data-action": "copy-b", onclick: () => { const b = expCopy(draft.variants[0]); b.id = copyId; draft.variants.push(b); renderExperiments(); } }, `复制 ${draft.variants[0].id} 成 ${copyId} 对照`)
         : null,
       diffSlot,
       remoteSlot,
@@ -366,7 +402,7 @@ function expRepeatInput(draft) {
 function expVariantCard(draft, variant, index) {
   const children = [node("div", { class: "exp-variant-head" },
     text("h4", `方案 ${variant.id}`),
-    index === 1 ? node("button", { class: "quiet-button", type: "button", "data-action": "delete-b", onclick: () => { draft.variants.splice(1, 1); renderExperiments(); } }, "删除 B") : null)];
+    index === 1 ? node("button", { class: "quiet-button", type: "button", "data-action": "delete-b", onclick: () => { draft.variants.splice(1, 1); renderExperiments(); } }, `删除 ${variant.id}`) : null)];
   if (draft.kind === "support") children.push(expLabeled("架构", expArchSelect(variant)));
   else children.push(node("div", { class: "exp-field" }, text("span", "模式（多选）", "exp-field-label"),
     node("div", { class: "exp-modes" }, ...(expState.catalog.modes || []).map(mode => expModeChip(variant, mode)))));
@@ -417,9 +453,9 @@ function expV2Fields(variant) {
   });
   return [
     expLabeled("数据集", datasetSelect),
-    node("div", { class: "exp-field" }, text("span", modeField?.label || "证据接收策略", "exp-field-label"), modeSelect,
+    node("label", { class: "exp-field" }, text("span", modeField?.label || "证据接收策略", "exp-field-label"), modeSelect,
       modeField?.note ? text("small", modeField.note, "exp-note") : null),
-    node("div", { class: "exp-field" }, text("span", thresholdField?.label || "接收分数阈值", "exp-field-label"), thresholdInput,
+    node("label", { class: "exp-field" }, text("span", thresholdField?.label || "接收分数阈值", "exp-field-label"), thresholdInput,
       thresholdField?.note ? text("small", thresholdField.note, "exp-note") : null),
   ];
 }
@@ -541,8 +577,8 @@ function expParamRow(draft, variant, field, controls) {
     if (params[field.key] !== undefined && params[field.key] !== null) control.value = String(params[field.key]);
     control.addEventListener("change", () => {
       const value = Number(control.value);
-      if (Number.isFinite(value)) params[field.key] = value;
-      else control.value = params[field.key] === undefined ? "" : String(params[field.key]);
+      if (control.value !== "" && Number.isFinite(value)) params[field.key] = value;
+      else control.value = params[field.key] == null ? "" : String(params[field.key]);
       renderExpDiff();
       renderExpRemote();
       renderExpActions();
@@ -581,7 +617,7 @@ function expDiffChildren(draft) {
     diffs.length
       ? node("div", { class: "condition-tags" }, ...diffs.map(([key, value]) => text("span", `${key} ${value}`, "condition-tag different")))
       : text("p", "两个方案参数完全一致。", "metric-note"),
-    node("details", { class: "conditions" }, node("summary", {}, "完整参数 JSON"), json({ A: a, B: b })),
+    node("details", { class: "conditions" }, node("summary", {}, "完整参数 JSON"), json({ [a.id]: a, [b.id]: b })),
   ];
 }
 
@@ -618,20 +654,53 @@ function expActionsChildren(draft) {
 }
 
 function expJobsPanel() {
-  return node("section", { class: "panel", "aria-label": "实验任务" },
+  const refresh = node("button", { class: "quiet-button", type: "button", "data-action": "refresh-jobs", onclick: () => refreshJobs() }, "刷新");
+  const errorText = text("span", "");
+  const error = node("p", { class: "batch-caution", hidden: true }, errorText, " ",
+    node("button", { class: "quiet-button", type: "button", "data-action": "retry-jobs", onclick: () => {
+      const detailRetry = expState.jobsErrorSource === "detail" && expState.selected;
+      const pending = detailRetry ? selectJob(expState.selected, true) : refreshJobs();
+      (detailRetry ? expState.jobsView.rows.get(expState.selected)?.button || refresh : refresh).focus({ preventScroll: true });
+      return pending;
+    } }, "重试"));
+  const list = node("div", { class: "exp-jobs" });
+  const emptyNote = text("p", "还没有实验任务。", "sidebar-empty");
+  const panel = node("section", { class: "panel", "aria-label": "实验任务" },
     node("div", { class: "panel-heading" }, text("h3", "实验任务"),
-      node("button", { class: "quiet-button", type: "button", "data-action": "refresh-jobs", disabled: expState.jobsLoading, onclick: () => refreshJobs() }, "刷新")),
-    expState.jobsError ? node("p", { class: "batch-caution" }, expState.jobsError, " ",
-      node("button", { class: "quiet-button", type: "button", "data-action": "retry-jobs", onclick: () => expState.selected ? selectJob(expState.selected, true) : refreshJobs() }, "重试")) : null,
-    node("div", { class: "exp-jobs" }, ...expState.jobs.map(job => node("button", {
-      class: `exp-job${job.id === expState.selected ? " selected" : ""}`, type: "button", onclick: () => selectJob(job.id),
-    },
-      text("span", job.config?.label || job.id, "exp-job-title"),
-      node("span", { class: "exp-job-row" },
-        text("span", expJobStatus[job.status] || job.status, `status ${expJobTone[job.status] || "pending"}`),
-        text("span", `${job.results.length} / ${job.plannedRuns}`, "case-meta"),
-        text("span", date(job.createdAt), "run-date"))))),
-    !expState.jobs.length && !expState.jobsError ? text("p", "还没有实验任务。", "sidebar-empty") : null);
+      refresh), error, list, emptyNote);
+  expState.jobsView = { panel, refresh, error, errorText, list, emptyNote, rows: new Map() };
+  return panel;
+}
+
+function renderExpJobs() {
+  const view = expState.jobsView;
+  view.refresh.disabled = expState.jobsLoading;
+  view.error.hidden = !expState.jobsError;
+  expUpdateText(view.errorText, expState.jobsError);
+  view.emptyNote.hidden = Boolean(expState.jobs.length || expState.jobsError);
+  for (const [id, row] of view.rows) if (!expState.jobs.some(job => job.id === id)) {
+    view.list.removeChild(row.button);
+    view.rows.delete(id);
+  }
+  expState.jobs.forEach((listed, index) => {
+    const job = listed.id === expState.selected && listed.id === expState.job?.id ? expState.job : listed;
+    let row = view.rows.get(job.id);
+    if (!row) {
+      const title = text("span", "", "exp-job-title"), status = text("span", ""), count = text("span", "", "case-meta"), createdAt = text("span", "", "run-date");
+      const button = node("button", { class: "exp-job", type: "button", onclick: () => selectJob(job.id) },
+        title, node("span", { class: "exp-job-row" }, status, count, createdAt));
+      row = { button, title, status, count, createdAt };
+      view.rows.set(job.id, row);
+    }
+    if (view.list.children[index] !== row.button) view.list.insertBefore(row.button, view.list.children[index] || null);
+    row.button.classList.toggle("selected", job.id === expState.selected);
+    row.button.setAttribute("aria-pressed", String(job.id === expState.selected));
+    expUpdateText(row.title, job.config?.label || job.id);
+    expUpdateText(row.status, expJobStatus[job.status] || job.status);
+    row.status.className = `status ${expJobTone[job.status] || "pending"}`;
+    expUpdateText(row.count, `${job.results.length} / ${job.plannedRuns}`);
+    expUpdateText(row.createdAt, date(job.createdAt));
+  });
 }
 
 const expConfigSummary = config => !config ? "配置未采集。"
@@ -645,28 +714,58 @@ const expConfigSummary = config => !config ? "配置未采集。"
 
 function expJobPanel() {
   const job = expState.job;
-  if (!job) return node("section", { class: "panel" }, text("p", "选择任务查看进度与结果；提交新实验后自动跟踪。任务配置以保存的快照为准，不随表单编辑变化。", "batch-note"));
+  if (!job) {
+    const panel = node("section", { class: "panel" }, text("p", "选择任务查看进度与结果；提交新实验后自动跟踪。任务配置以保存的快照为准，不随表单编辑变化。", "batch-note"));
+    expState.jobView = { id: null, panel };
+    return panel;
+  }
+  const title = text("h3", ""), meta = text("p", ""), status = text("span", ""), progress = text("span", "");
+  const missingNote = node("p", { class: "batch-caution", hidden: true }), error = node("p", { class: "turn-error", hidden: true });
+  const config = text("p", "", "metric-note");
+  const compare = node("div", { hidden: true }, node("button", { class: "quiet-button", type: "button", "data-action": "compare-btn",
+    onclick: () => expCompare(expState.job.results.filter(result => result.kind === "support" && result.runId)) }, "带入 A/B 对比"));
+  const body = node("div", { class: "exp-job-body" },
+    node("p", { class: "exp-progress" }, status, progress), missingNote, error,
+    node("div", { class: "exp-job-config" }, config,
+      node("button", { class: "quiet-button", type: "button", "data-action": "load-config", onclick: () => { expState.draft = expCopy(expState.job.config); normalizeDraftQuestionKeys(expState.draft); expState.presetId = null; expState.formError = ""; renderExperiments(); } }, "载入配置到表单")), compare);
+  const panel = node("section", { class: "panel", "aria-label": "任务详情" },
+    node("div", { class: "panel-heading" }, title, meta), body);
+  expState.jobView = { id: job.id, panel, body, title, meta, status, progress, missingNote, error, config, compare, results: new Map() };
+  return panel;
+}
+
+function renderExpJob() {
+  const job = expState.job, view = expState.jobView;
   const terminal = job.status !== "running";
   const done = job.results.length;
   const missing = terminal ? Math.max(0, job.plannedRuns - done) : 0;
-  const comparable = job.results.filter(result => result.kind === "support" && result.runId);
-  return node("section", { class: "panel", "aria-label": "任务详情" },
-    node("div", { class: "panel-heading" }, text("h3", job.config?.label || "实验任务"), text("p", `ID ${short(job.id)} · ${date(job.createdAt)}`)),
-    node("div", { class: "exp-job-body" },
-      node("p", { class: "exp-progress" },
-        text("span", expJobStatus[job.status] || job.status, `status ${expJobTone[job.status] || "pending"}`),
-        text("span", job.status === "running" && job.current
-          ? `正在执行 方案 ${job.current.variantId} · 第 ${job.current.repetition} 次 · 已完成 ${done} / ${job.plannedRuns}`
-          : `已完成 ${done} / ${job.plannedRuns}`)),
-      missing ? text("p", `未执行 ${missing} 次；中断及未执行的重复不算通过。`, "batch-caution") : null,
-      job.error ? text("p", job.error, "turn-error") : null,
-      node("div", { class: "exp-job-config" },
-        text("p", `配置快照：${expConfigSummary(job.config)}`, "metric-note"),
-        node("button", { class: "quiet-button", type: "button", "data-action": "load-config", onclick: () => { expState.draft = expCopy(job.config); normalizeDraftQuestionKeys(expState.draft); expState.presetId = null; expState.formError = ""; renderExperiments(); } }, "载入配置到表单")),
-      ...job.results.map(result => expResultNode(job, result)),
-      comparable.length >= 2
-        ? node("div", {}, node("button", { class: "quiet-button", type: "button", "data-action": "compare-btn", onclick: () => expCompare(comparable) }, "带入 A/B 对比"))
-        : null));
+  expUpdateText(view.title, job.config?.label || "实验任务");
+  expUpdateText(view.meta, `ID ${short(job.id)} · ${date(job.createdAt)}`);
+  expUpdateText(view.status, expJobStatus[job.status] || job.status);
+  view.status.className = `status ${expJobTone[job.status] || "pending"}`;
+  expUpdateText(view.progress, job.status === "running" && job.current
+    ? `正在执行 方案 ${job.current.variantId} · 第 ${job.current.repetition} 次 · 已完成 ${done} / ${job.plannedRuns}` : `已完成 ${done} / ${job.plannedRuns}`);
+  view.missingNote.hidden = !missing;
+  expUpdateText(view.missingNote, missing ? `未执行 ${missing} 次；中断及未执行的重复不算通过。` : "");
+  view.error.hidden = !job.error;
+  expUpdateText(view.error, job.error || "");
+  expUpdateText(view.config, `配置快照：${expConfigSummary(job.config)}`);
+  const keys = new Set(job.results.map(result => `${result.variantId}:${result.repetition}`));
+  for (const [key, previous] of view.results) if (!keys.has(key)) {
+    view.body.removeChild(previous.node);
+    view.results.delete(key);
+  }
+  for (const result of job.results) {
+    const key = `${result.variantId}:${result.repetition}`;
+    const signature = JSON.stringify([result, job.config?.variants?.find(variant => variant.id === result.variantId)]);
+    const previous = view.results.get(key);
+    if (previous?.signature === signature) continue;
+    const resultNode = expResultNode(job, result);
+    if (previous) view.body.replaceChild(resultNode, previous.node);
+    else view.body.insertBefore(resultNode, view.compare);
+    view.results.set(key, { signature, node: resultNode });
+  }
+  view.compare.hidden = job.results.filter(result => result.kind === "support" && result.runId).length < 2;
 }
 
 function expResultNode(job, result) {
@@ -677,7 +776,7 @@ function expResultNode(job, result) {
       text("span", expJobStatus[result.status] || result.status, `status ${result.status === "completed" ? "passed" : result.status === "failed" ? "failed" : "skipped"}`),
       text("code", short(result.runId), "evidence-tag"),
       result.kind === "support"
-        ? node("button", { class: "quiet-button", type: "button", "data-action": "view-run", onclick: () => { setView("overview"); selectRun(result.runId); } }, "查看运行")
+        ? node("button", { class: "quiet-button", type: "button", "data-action": "view-run", onclick: () => { setView("overview"); selectRun(result.runId); $("run-detail").focus(); } }, "查看运行")
         : null),
     result.kind === "support" ? expSupportSummary(result.summary) : expRetrievalSummary(result.summary, variant),
     node("details", { class: "trace" }, node("summary", {}, "原始 summary JSON"), json(result.summary ?? null)));
@@ -693,7 +792,7 @@ function expSupportSummary(summary) {
     cases ? `场景 通过 ${cases.passed} / ${cases.planned}${cases.failed ? ` · 失败 ${cases.failed}` : ""}${cases.skipped ? ` · 跳过 ${cases.skipped}` : ""}${cases.missing ? ` · 缺失 ${cases.missing}` : ""}` : "场景计数未采集",
     checks ? `检查 通过 ${checks.passed} / ${checks.planned}${checks.failed ? ` · 失败 ${checks.failed}` : ""}${checks.missing ? ` · 缺失 ${checks.missing}` : ""}` : null,
     `单轮耗时 P95 ${duration(summary?.timing?.durationP95Ms)}`,
-    noModel ? "Tokens 不适用（无模型请求）" : `Tokens 已知 ${number(usage?.knownTokens)} · 完整 ${usage?.completeTokens === null || usage?.completeTokens === undefined ? "未采全" : number(usage.completeTokens)}`,
+    noModel ? "Agent Tokens 不适用（未记录 Agent 模型步骤）" : `Agent Tokens 已知 ${number(usage?.knownTokens)} · 完整 ${usage?.completeTokens === null || usage?.completeTokens === undefined ? "未采全" : number(usage.completeTokens)}`,
     ...(summary?.issues || []).map(issue => `问题：${issue}`),
   ].filter(Boolean);
   return node("div", { class: "exp-summary" }, ...lines.map(line => text("p", line, "exp-summary-line")));
@@ -805,9 +904,12 @@ function expCompare(results) {
   for (const [id, result] of [["baseline", a], ["candidate", b]]) {
     const select = $(id);
     if (!select) continue;
-    select.append(node("option", { value: result.runId }, `实验 · 方案 ${result.variantId} 第 ${result.repetition} 次 · ${short(result.runId)}`));
+    if (![...select.options].some(option => option.value === result.runId)) {
+      select.append(node("option", { value: result.runId }, `实验 · 方案 ${result.variantId} 第 ${result.repetition} 次 · ${short(result.runId)}`));
+    }
     select.value = result.runId;
   }
   setView("compare");
   compare();
+  $("baseline").focus();
 }

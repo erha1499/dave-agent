@@ -77,7 +77,11 @@ function notice(message, error = false) {
 
 async function api(path) {
   const response = await fetch(path, { headers: { Accept: "application/json" }, cache: "no-store" });
-  if (!response.ok) throw new Error(response.status === 503 ? "评测数据库暂不可用。检查 MySQL 运行状态和评测数据库配置后，再刷新记录。" : `无法读取评测记录（HTTP ${response.status}）。请检查后台服务后重试。`);
+  if (!response.ok) {
+    const experiment = path === "/api/experiments" || path.startsWith("/api/experiments/");
+    if (experiment) throw new Error(response.status === 503 ? "实验服务暂不可用。请检查后台服务后重试当前操作。" : `无法读取实验数据（HTTP ${response.status}）。请检查后台服务后重试。`);
+    throw new Error(response.status === 503 ? "评测数据库暂不可用。检查 MySQL 运行状态和评测数据库配置后，再刷新记录。" : `无法读取评测记录（HTTP ${response.status}）。请检查后台服务后重试。`);
+  }
   return response.json();
 }
 
@@ -149,6 +153,7 @@ function miniStrip(run) {
 function renderRunList() {
   $("run-list").replaceChildren(...state.runs.map(run => node("button", {
     type: "button", class: `run-button${run.id === state.selected ? " selected" : ""}`,
+    "data-run-id": run.id,
     "aria-pressed": String(run.id === state.selected), onclick: () => selectRun(run.id),
   }, text("span", run.label || run.suiteName, "run-title"),
   // 日期与比分同一行；常态（已完成）不占用文字，只有进行中或失败才标记；↻ 表示同批次重复运行。
@@ -171,10 +176,13 @@ function renderPickers() {
   resetComparison();
 }
 
+const distinctRunIds = (a, b) => Boolean(a && b && a !== b);
+
 function resetComparison() {
   state.comparison++;
-  $("compare-button").disabled = state.runs.length < 2;
-  $("compare-detail").replaceChildren(empty("选择两次运行", state.runs.length < 2 ? "至少需要两次评测记录。" : "点击“开始对比”查看变化。"));
+  const ready = distinctRunIds($("baseline").value, $("candidate").value);
+  $("compare-button").disabled = !ready;
+  $("compare-detail").replaceChildren(empty("选择两次运行", ready ? "点击“开始对比”查看变化。" : "基线 A 与候选 B 请选择两次不同的运行。"));
 }
 
 async function loadRuns() {
@@ -194,11 +202,15 @@ async function loadRuns() {
     renderPickers();
     notice("");
     if (state.selected) await selectRun(state.selected);
-    else $("run-detail").replaceChildren(empty("暂无评测记录", "执行评测后刷新页面。", state.kind === "model" ? "npm run check:model" : "npm run check:eval-db"));
+    else {
+      $("run-detail").replaceChildren(empty("暂无评测记录", "执行评测后刷新页面。", state.kind === "model" ? "npm run check:model" : "npm run check:eval-db"));
+      $("run-detail").setAttribute("aria-busy", "false");
+    }
   } catch (error) {
     if (request !== state.request) return;
     notice(error.message, true);
     $("run-detail").replaceChildren(empty("暂时无法读取评测", "检查数据库与本机服务后，点击“刷新记录”重试。"));
+    $("run-detail").setAttribute("aria-busy", "false");
   } finally {
     if (request === state.request) $("refresh").disabled = false;
   }
@@ -209,8 +221,15 @@ async function selectRun(id) {
   const selection = ++state.selection;
   const request = state.request;
   state.selected = id;
-  renderRunList();
-  $("run-detail").replaceChildren(empty("正在读取…", ""));
+  for (const button of $("run-list").children) {
+    const runId = button.getAttribute("data-run-id");
+    if (!runId) continue;
+    button.classList.toggle("selected", runId === id);
+    button.setAttribute("aria-pressed", String(runId === id));
+  }
+  notice("");
+  $("run-detail").setAttribute("aria-busy", "true");
+  $("run-detail").replaceChildren(empty("正在读取运行详情…", "正在获取检查结果、用量与配置快照。"));
   try {
     const [result, analysis] = await Promise.all([detail(id), runAnalysis(id)]);
     const batch = result.run.batch
@@ -220,9 +239,18 @@ async function selectRun(id) {
     renderDetail(result, analysis, batch);
   } catch (error) {
     if (selection === state.selection && request === state.request) {
-      $("run-detail").replaceChildren(empty("这次运行暂时无法打开", error.message));
+      const failure = empty("这次运行暂时无法打开", error.message);
+      failure.append(node("button", { class: "quiet-button", type: "button", onclick: () => {
+        const pending = selectRun(id);
+        const record = [...$("run-list").children].find(button => button.getAttribute("data-run-id") === id);
+        (record || $("run-detail")).focus({ preventScroll: true });
+        return pending;
+      } }, "重试这次运行"));
+      $("run-detail").replaceChildren(failure);
       notice(error.message, true);
     }
+  } finally {
+    if (selection === state.selection && request === state.request) $("run-detail").setAttribute("aria-busy", "false");
   }
 }
 
@@ -330,7 +358,7 @@ function batchPanel(run, batch) {
   const noModel = usage.modelRequests === 0;
   const usageDetails = node("details", { class: "metric-details batch-usage" }, node("summary", {}, "批次用量"),
     node("div", { class: "metrics-foot" },
-      noModel ? text("span", "无模型请求，用量、Tokens 与费用均不适用") : text("span", `模型请求 ${usage.modelRequests} · 已报用量 ${usage.reportedRequests} · 覆盖率 ${percent(usage.coverage)}`),
+      noModel ? text("span", "未记录 Agent 模型步骤，Agent 用量、Tokens 与费用均不适用") : text("span", `Agent 模型步骤 ${usage.modelRequests} · 已报用量 ${usage.reportedRequests} · 覆盖率 ${percent(usage.coverage)}`),
       noModel ? null : text("span", `已知 Tokens ${number(usage.knownTokens)} · 完整 Tokens ${usage.completeTokens === null ? "未采全" : number(usage.completeTokens)}`),
       noModel ? null : text("span", `已知费用 ${money(usage.knownCostUsd)} · 完整费用 ${usage.completeCostUsd === null ? "未采全" : money(usage.completeCostUsd)}`),
       noModel ? null : text("span", "缺任何一次计划运行时完整批次用量为 null，不补零。")));
@@ -422,7 +450,7 @@ function metricsPanel(run, analysis, cases) {
   })() : [];
   panel.append(node("details", { class: "metric-details" }, node("summary", {}, "指标明细与口径"),
     node("div", { class: "metrics-foot" },
-      text("span", noModel ? "用量：无模型请求，覆盖率与 Tokens 不适用" : `用量覆盖 ${usage.reportedRequests} / ${usage.modelRequests} 次模型请求 · 覆盖率 ${percent(usage.coverage)}${partial ? ` · 缺报 ${usage.missingRequests} 次，仅统计已报告部分` : ""}`),
+      text("span", noModel ? "Agent 用量：未记录模型步骤，覆盖率与 Tokens 不适用" : `Agent 用量覆盖 ${usage.reportedRequests} / ${usage.modelRequests} 次模型请求 · 覆盖率 ${percent(usage.coverage)}${partial ? ` · 缺报 ${usage.missingRequests} 次，仅统计已报告部分` : ""}`),
       text("span", `Tokens：已知 ${noModel ? "不适用" : number(usage.knownTokens)} · 完整 ${complete(usage.completeTokens, number)}`),
       text("span", `费用：已知 ${noModel ? "不适用" : money(usage.knownCostUsd)} · 完整 ${complete(usage.completeCostUsd, money)}`),
       text("span", `执行：工具调用 ${number(execution.toolCalls)} · 非预期工具错误 ${number(execution.toolErrors)} · 预期身份拒绝 ${number(execution.expectedDenials)} · 模型错误 ${number(execution.modelErrors)}`),
@@ -755,13 +783,13 @@ function turnNode(turn, compact = false) {
       node("details", { class: "trace" }, node("summary", {}, `执行轨迹 · ${turn.steps.length} 步`), text("p", `首个文本 ${duration(turn.firstTextMs)}，可能是中间回答；模型步骤仅计响应流，不含请求等待。`, "metric-note"), ...turn.steps.map(stepNode)));
     // v2 归因 span 是同一次执行的另一视角，逐项展示但不与 steps 计数相加；旧记录无 spans 不渲染、不补零。
     if (spans) {
-      const noModel = !turn.steps.some(step => step.type === "model");
+      const noRecordedAgentModel = !turn.steps.some(step => step.type === "model");
       element.append(node("details", { class: "trace" },
         node("summary", {}, spans.length ? `执行分工 · ${spans.length} 段` : "执行分工"),
         spans.length
           ? spans.map(spanNode)
           : text("p", "暂无归因记录；显式为空不代表模型调用为零。", "metric-note"),
-        noModel ? text("p", "本轮无模型请求。", "metric-note") : null));
+        noRecordedAgentModel ? text("p", "未记录 Agent 模型步骤；提供商调用见执行分工。", "metric-note") : null));
       // 知识取证：一轮可能有多次 FAQ 调用，逐次展示；旧记录无 knowledge 不渲染。
       const knowledgeSpans = spans.filter(span => isSpanRecord(span) && span.knowledge && typeof span.knowledge === "object");
       if (knowledgeSpans.length) {
@@ -996,11 +1024,11 @@ async function compare() {
   const request = ++state.comparison;
   const aId = $("baseline").value;
   const bId = $("candidate").value;
-  if (!aId || !bId || aId === bId) {
+  $("compare-button").disabled = true;
+  if (!distinctRunIds(aId, bId)) {
     $("compare-detail").replaceChildren(empty("请选择两次不同的运行", "基线 A 与候选 B 应来自两次独立评测。"));
     return;
   }
-  $("compare-button").disabled = true;
   $("compare-detail").replaceChildren(empty("正在对比…", ""));
   try {
     const [comparison, a, b] = await Promise.all([
@@ -1018,7 +1046,7 @@ async function compare() {
   } catch (error) {
     if (request === state.comparison) $("compare-detail").replaceChildren(empty("暂时无法完成对比", error.message));
   } finally {
-    if (request === state.comparison) $("compare-button").disabled = state.runs.length < 2;
+    if (request === state.comparison) $("compare-button").disabled = !distinctRunIds($("baseline").value, $("candidate").value);
   }
 }
 

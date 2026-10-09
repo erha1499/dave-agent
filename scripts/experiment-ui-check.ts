@@ -5,20 +5,57 @@ import { createContext, runInContext } from "node:vm";
 
 // 实验调试 tab 的离线检查：独立 FakeDOM（与 eval-ui-check.ts 互不影响），同时加载 app.js 与 experiments.js。
 class Element {
+  tagName = "";
   children: Element[] = [];
-  textContent = "";
+  get options() { return this.children.filter(child => child.tagName === "OPTION"); }
+  ownText = "";
+  get textContent(): string { return this.ownText + this.children.map(child => child.textContent).join(""); }
+  set textContent(value: string) { this.ownText = value; this.children = []; }
   value = "";
   className = "";
-  disabled = false;
+  private inactive = false;
+  get disabled() { return this.inactive; }
+  set disabled(value: boolean) { this.inactive = value; if (value) this.onDisable?.(); }
+  hidden = false;
   checked = false;
   open?: boolean;
   style: Record<string, string> = {};
   attrs = new Map<string, string>();
   styleAttr = false;
   events = new Map<string, () => unknown>();
-  classList = { toggle() {} };
+  classList = { toggle: (name: string, active: boolean) => {
+    const names = new Set(this.className.split(" ").filter(Boolean));
+    if (active) names.add(name);
+    else names.delete(name);
+    this.className = [...names].join(" ");
+  } };
   append(...children: Element[]) { this.children.push(...children); }
   replaceChildren(...children: Element[]) { this.children = children; }
+  insertBefore(child: Element, reference: Element | null) {
+    const previous = this.children.indexOf(child);
+    if (previous >= 0) this.children.splice(previous, 1);
+    const index = reference ? this.children.indexOf(reference) : this.children.length;
+    assert.ok(index >= 0, "insertBefore reference must be a current child");
+    this.children.splice(index, 0, child);
+  }
+  removeChild(child: Element) {
+    const index = this.children.indexOf(child);
+    assert.ok(index >= 0, "removeChild target must be a current child");
+    this.children.splice(index, 1);
+  }
+  replaceChild(child: Element, previous: Element) {
+    const index = this.children.indexOf(previous);
+    assert.ok(index >= 0, "replaceChild target must be a current child");
+    this.children[index] = child;
+  }
+  getAttribute(key: string) { return this.attrs.get(key) ?? null; }
+  focused = false;
+  onFocus?: () => void;
+  onDisable?: () => void;
+  connected?: () => boolean;
+  get isConnected() { return this.connected?.() ?? false; }
+  getClientRects() { return this.hidden || !this.isConnected ? [] : [{}]; }
+  focus() { this.focused = true; this.onFocus?.(); }
   setAttribute(key: string, value: string) {
     if (key === "value") this.value = value;
     if (key === "style") this.styleAttr = true;
@@ -26,9 +63,10 @@ class Element {
   }
   removeAttribute(key: string) { this.attrs.delete(key); }
   addEventListener(event: string, handler: () => unknown) { this.events.set(event, handler); }
+  click() { this.events.get("click")?.(); }
   fire(event: string) { assert.ok(this.events.has(event), `no handler for ${event}`); return this.events.get(event)!(); }
 }
-const content = (element: Element): string => element.textContent + element.children.map(content).join("");
+const content = (element: Element): string => element.textContent;
 const walk = (element: Element): Element[] => [element, ...element.children.flatMap(walk)];
 const findClass = (element: Element, cls: string) => walk(element).find(item => item.className.split(" ").includes(cls));
 const findAttr = (element: Element, key: string, value: string) => walk(element).find(item => item.attrs.get(key) === value);
@@ -43,8 +81,18 @@ const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 async function boot() {
   const elements = new Map<string, Element>();
+  let activeElement: Element | null = null;
+  const body = Object.assign(new Element(), { tagName: "BODY" });
+  body.onFocus = () => { activeElement = body; };
+  const createElement = () => {
+    const element = new Element();
+    element.onFocus = () => { activeElement = element; };
+    element.onDisable = () => { if (activeElement === element) body.focus(); };
+    element.connected = () => [...elements.values()].some(root => walk(root).includes(element));
+    return element;
+  };
   const element = (id: string) => {
-    if (!elements.has(id)) elements.set(id, new Element());
+    if (!elements.has(id)) elements.set(id, createElement());
     return elements.get(id)!;
   };
   const pending: Pending[] = [];
@@ -57,9 +105,12 @@ async function boot() {
   const context = createContext({
     Node: Element,
     document: {
-      getElementById: element, createElement: () => new Element(),
-      createTextNode: (text: string) => Object.assign(new Element(), { textContent: text }),
+      body,
+      get activeElement() { return activeElement; },
+      getElementById: element, createElement: (tag: string) => Object.assign(createElement(), { tagName: tag.toUpperCase() }),
+      createTextNode: (text: string) => Object.assign(createElement(), { textContent: text }),
     },
+    window: { getSelection: () => null },
     fetch: (path: string, options?: Pending["options"]) => new Promise<Response>((resolve, reject) => pending.push({ path, options, resolve, reject })),
     setTimeout: (handler: () => void, ms: number) => setTimeout(handler, ms),
     clearTimeout: (id: never) => clearTimeout(id),
@@ -67,7 +118,7 @@ async function boot() {
   runInContext(appSource, context, { filename: "web/evaluation/app.js" });
   runInContext(expSource, context, { filename: "web/evaluation/experiments.js" });
   const flush = async (rounds = 6) => { for (let i = 0; i < rounds; i++) await setImmediate(); };
-  return { element, take, find, context, flush, pendingCount: () => pending.length };
+  return { element, take, find, context, flush, activeElement: () => activeElement, pendingCount: () => pending.length };
 }
 
 // 合成 catalog：结构与 src/experiment-config.ts 的 experimentCatalog 一致。
@@ -189,6 +240,9 @@ const job = (id: string, over: Record<string, unknown> = {}): any => ({
   config: { version: 1, kind: "support", label: id, repeat: 1, allowRemote: true, variants: [{ id: "A", architecture: "controller", parameters: supportParams() }] },
   configHash: "h", plannedRuns: 1, current: null, error: null, results: [], ...over,
 });
+const detailOf = (id: string) => ({ run: { id, label: id, suiteId: "suite", suiteName: "套件", kind: "model", status: "completed",
+  plannedCases: 1, plannedTurns: 1, startedAt: T, finishedAt: T, metrics: null,
+  snapshot: { gitCommit: "abc", gitDirty: false, model: { provider: "test", id: "k", maxTokens: 1, thinking: "off", temperature: null }, hashes: {}, asOf: T, content: {} } }, cases: [] });
 const openExperiments = async (booted: Awaited<ReturnType<typeof boot>>, jobs: unknown[] = []) => {
   const { element, take, find, flush } = booted;
   respond(take(), { runs: [] });
@@ -200,6 +254,394 @@ const openExperiments = async (booted: Awaited<ReturnType<typeof boot>>, jobs: u
   respond(find(request => request.path === "/api/experiments", "jobs"), { jobs });
   await flush();
 };
+
+// 零 Agent 步骤不代表咨询解析等其他提供商没有请求；非零/未知用量仍保留口径。
+{
+  const { take, context, flush, pendingCount } = await boot();
+  respond(take(), { runs: [] }); await flush();
+  const summary = supportSummary(2);
+  summary.usage = { ...summary.usage, modelRequests: 0, reportedRequests: 0, coverage: null,
+    knownTokens: null, completeTokens: null, knownCostUsd: null, completeCostUsd: null };
+  const provider = { role: "question", requests: 1, knownTokenRequests: 1, unknownTokenRequests: 0,
+    knownTokens: 80, completeTokens: 80, unknownCurrencyRequests: 0, currencies: [] };
+  summary.attribution = { spans: 1, groups: [], providers: [{ provider: "synthetic", model: "parser", kind: "model", requests: 1,
+    usageReported: 1, knownTokens: 80, costs: [] }], providerUsage: [provider], providerTotals: provider, issues: [] };
+  assert.ok(summary.attribution.providerUsage[0].requests > 0);
+  assert.equal(summary.usage.knownCostUsd, null); assert.equal(summary.usage.completeCostUsd, null);
+  context.round31Summary = summary;
+  const rendered = () => content(runInContext("expSupportSummary(round31Summary)", context) as Element);
+  assert.match(rendered(), /Agent Tokens 不适用（未记录 Agent 模型步骤）/);
+  assert.ok(!rendered().includes("无模型请求"), "有其他提供商正数请求时不能把 Agent 零步骤说成全部无模型请求");
+  summary.usage = { ...summary.usage, modelRequests: 4, reportedRequests: 4, coverage: 1,
+    knownTokens: 1200, completeTokens: 1200, knownCostUsd: 0.01, completeCostUsd: 0.01 };
+  assert.match(rendered(), /Agent Tokens 已知 1,200 · 完整 1,200/);
+  summary.usage = { ...summary.usage, modelRequests: undefined, coverage: null,
+    knownTokens: 1200, completeTokens: null, completeCostUsd: null };
+  assert.match(rendered(), /Agent Tokens 已知 1,200 · 完整 未采全/);
+  assert.ok(!rendered().includes("不适用"), "未知 Agent 请求数不能补零");
+  assert.equal(pendingCount(), 0);
+  console.log("PASS 实验调试：Agent 零步骤与其他提供商正数并存，非零及未知用量口径保留。");
+}
+
+// 提交是异步动作，校验/等待/终态只更新动作及任务区，不销毁正在编辑的表单。
+for (const success of [false, true]) for (const movedFocus of ["parameter", "download"]) {
+  const booted = await boot(), { element, find, context, flush, activeElement, pendingCount } = booted;
+  await openExperiments(booted);
+  const root = element("experiments"), preset = findAttr(root, "data-field", "preset")!;
+  preset.value = "retrieval-local"; preset.fire("change");
+  const form = findClass(root, "exp-form")!, label = findAttr(root, "data-field", "exp-label")!;
+  const advanced = findClass(root, "exp-advanced")!, topK = findAttr(root, "data-field", "candidateTopK")!;
+  const actions = findClass(root, "exp-actions")!, submit = actions.children[0]!, download = actions.children[1]!;
+  advanced.open = true; label.value = " "; label.fire("input"); label.focus();
+  await runInContext("submitExperiment()", context);
+  const assertForm = (phase: string) => {
+    assert.equal(findClass(root, "exp-form"), form, `${phase}保留同一个表单`);
+    assert.equal(findAttr(root, "data-field", "exp-label"), label, `${phase}保留原输入节点`);
+    assert.equal(findClass(root, "exp-advanced"), advanced, `${phase}保留高级参数节点`);
+    assert.equal(findAttr(root, "data-field", "candidateTopK"), topK);
+    assert.equal(findClass(root, "exp-actions"), actions);
+    assert.equal(actions.children[0], submit, `${phase}保留提交按钮`);
+    assert.equal(actions.children[1], download, `${phase}保留下载按钮`);
+    assert.equal(advanced.open, true);
+    assert.ok([form, label, advanced, topK, submit, download].every(node => walk(root).includes(node)), `${phase}节点仍连接在根树`);
+  };
+  assertForm("校验失败"); assert.equal(label.value, " "); assert.equal(activeElement(), label);
+  assert.match(content(actions), /名称/); assert.equal(pendingCount(), 0, "校验失败不能发送 POST");
+  label.value = "  提交快照  "; label.fire("input");
+  const snapshot = JSON.parse(runInContext("JSON.stringify(expState.draft)", context)); snapshot.label = snapshot.label.trim();
+  assert.equal(submit.disabled, false, "本地 M0/M1 不需要远程授权");
+  submit.focus(); submit.fire("click");
+  const request = find(request => request.path === "/api/experiments" && request.options?.method === "POST", "held submit");
+  assertForm("等待提交"); assert.equal(submit.disabled, true);
+  assert.equal(activeElement(), runInContext("document.body", context), "原生禁用已聚焦按钮后焦点退回 BODY");
+  assert.deepEqual(JSON.parse(request.options!.body!), snapshot, "POST 记录发送时完整参数快照");
+  await runInContext("submitExperiment()", context); assert.equal(pendingCount(), 0, "等待期间重复提交只有原 POST");
+  label.value = "  等待中保留名称  "; label.fire("input");
+  topK.value = "31"; topK.fire("change");
+  const focus = movedFocus === "parameter" ? topK : download; focus.focus();
+  assertForm("等待中编辑"); assert.equal(activeElement(), focus);
+  if (success) respond(request, job("round31-local", { config: snapshot }));
+  else respondError(request, { error: "合成提交被拒绝" });
+  await flush();
+  assertForm(success ? "提交成功" : "提交失败");
+  assert.equal(label.value, "  等待中保留名称  "); assert.equal(topK.value, "31");
+  assert.equal(runInContext("expState.draft.label", context), label.value);
+  assert.equal(runInContext("expState.draft.variants[0].parameters.candidateTopK", context), 31);
+  assert.equal(activeElement(), focus, "终态不得抢走等待期间主动转移的焦点");
+  assert.equal(submit.disabled, false);
+  assert.deepEqual(JSON.parse(request.options!.body!), snapshot, "等待中编辑不会修改已经发送的快照");
+  if (success) { assert.equal(runInContext("expState.selected", context), "round31-local"); assert.ok(!content(actions).includes("合成提交被拒绝")); }
+  else assert.match(content(actions), /合成提交被拒绝/);
+  assert.equal(pendingCount(), 0, "终态不自动重发、不调用真实实验");
+}
+
+// 已聚焦的提交按钮被禁用后退到 BODY；只在没有主动选文时归还同一个可操作按钮。
+for (const success of [false, true]) for (const guard of ["restore", "selection", "hidden", "disabled", "preset", "view"]) {
+  const booted = await boot(), { element, find, context, flush, activeElement, pendingCount } = booted;
+  await openExperiments(booted);
+  const root = element("experiments"), preset = findAttr(root, "data-field", "preset")!;
+  preset.value = "retrieval-local"; preset.fire("change");
+  const form = findClass(root, "exp-form")!, source = findClass(root, "primary-button")!;
+  source.focus(); source.fire("click");
+  const request = find(request => request.options?.method === "POST", "source focus submit");
+  const body = runInContext("document.body", context);
+  assert.equal(activeElement(), body); assert.equal(source.disabled, true);
+  context.window.getSelection = () => guard === "selection" ? { isCollapsed: false } : null;
+  if (guard === "hidden") source.hidden = true;
+  if (guard === "disabled") {
+    const remoteMode = findAttr(root, "data-mode", "M4")!;
+    remoteMode.checked = true; remoteMode.fire("change");
+  }
+  if (guard === "preset") { preset.value = "support-controller"; preset.fire("change"); }
+  if (guard === "view") element("overview-tab").fire("click");
+  if (success) respond(request, job("round31-focus", { config: JSON.parse(request.options!.body!) }));
+  else respondError(request, { error: "合成提交失败" });
+  await flush();
+  if (guard === "preset") {
+    assert.notEqual(findClass(root, "exp-form"), form); assert.equal(source.isConnected, false);
+  } else {
+    assert.equal(findClass(root, "exp-form"), form);
+    assert.equal(findClass(root, "primary-button"), source); assert.equal(source.isConnected, true);
+    assert.equal(source.disabled, guard === "disabled", "等待中改成远程方案后仍须授权，不能因回执解锁门禁");
+  }
+  assert.equal(activeElement(), guard === "restore" ? source : body, `${guard}：成功/失败仅在原源仍可操作且未转移阅读时回焦`);
+  assert.equal(pendingCount(), 0);
+}
+console.log("PASS 实验调试：校验、提交等待及成功/失败不重建表单或动作按钮；参数/下载主动焦点、选区与原入口守卫保留。");
+
+// 合法历史首方案未必叫 A；复制使用另一个 ID，原方案/快照不重编号，删除对应第二项。
+for (const [sourceId, copyId] of [["B", "A"], ["A", "B"], ["control", "B"]]) {
+  const booted = await boot(), { element, find, context, flush, pendingCount } = booted;
+  const original = { id: sourceId, modes: ["M4"], dataset: "acceptance-development",
+    acceptance: { mode: "score", threshold: 0.71 }, parameters: retrievalParams() };
+  const historical = job("copy-history", { config: { version: 2, kind: "retrieval", label: "历史方案复制", repeat: 1, allowRemote: false, variants: [original] } });
+  const snapshot = JSON.stringify(historical.config);
+  await openExperiments(booted, [historical]);
+  runInContext('selectJob("copy-history")', context);
+  respond(find(request => request.path === "/api/experiments/copy-history", "copy history"), historical); await flush();
+  const root = element("experiments");
+  findAttr(root, "data-action", "load-config")!.fire("click");
+  const originalObject = runInContext("expState.draft.variants[0]", context);
+  const copy = findAttr(root, "data-action", "copy-b")!, copyLabel = content(copy);
+  copy.fire("click");
+  const variants = () => JSON.parse(runInContext("JSON.stringify(expState.draft.variants)", context));
+  assert.deepEqual(variants().map((variant: any) => variant.id), [sourceId, copyId], "合法单 B 历史复制不能生成重复 B/B");
+  assert.equal(copyLabel, `复制 ${sourceId} 成 ${copyId} 对照`);
+  assert.deepEqual(variants(), [original, { ...original, id: copyId }], "仅复制件 ID 变化，全部配置深复制");
+  assert.equal(runInContext("expState.draft.variants[0]", context), originalObject);
+  assert.equal(runInContext("['modes','acceptance','parameters'].every(key => expState.draft.variants[0][key] !== expState.draft.variants[1][key])", context), true, "数组与嵌套对象不能共享引用");
+  assert.equal(findAttr(root, "data-action", "copy-b"), undefined, "两方案时不提供第三项复制");
+  const byField = (field: string) => findAllAttr(root, "data-field", field).find(input => input.getAttribute("data-variant") === copyId)!;
+  const topK = byField("candidateTopK"); topK.value = "30"; topK.fire("change");
+  const threshold = byField("acceptance-threshold"); threshold.value = "0.65"; threshold.fire("change");
+  const mode = findAllAttr(root, "data-mode", "M5").find(input => input.getAttribute("data-variant") === copyId)!;
+  mode.checked = true; mode.fire("change");
+  assert.deepEqual(variants()[0], original, "编辑复制件不改变原参数、策略和模式");
+  assert.equal(variants()[1].parameters.candidateTopK, 30);
+  assert.equal(variants()[1].acceptance.threshold, 0.65);
+  assert.deepEqual(variants()[1].modes, ["M4", "M5"]);
+  const displayed = JSON.parse(content(walk(findClass(root, "exp-diff-slot")!).find(item => item.tagName === "PRE")!));
+  assert.deepEqual(Object.keys(displayed), [sourceId, copyId], "完整参数 JSON 按实际方案 ID 标名");
+  assert.ok(Object.entries(displayed).every(([id, variant]: [string, any]) => id === variant.id));
+  assert.deepEqual(Object.values(displayed), variants(), "展示完整参数与编辑中的两项方案一致");
+  assert.equal(findClass(root, "primary-button")!.disabled, true, "复制保留未授权远程门禁");
+  const allow = findAttr(root, "data-field", "allow-remote")!; allow.checked = true; allow.fire("change");
+  assert.equal(findClass(root, "primary-button")!.disabled, false);
+  let downloaded: Blob | undefined;
+  context.Blob = Blob;
+  context.URL = { createObjectURL: (blob: Blob) => { downloaded = blob; return "blob:copy-config"; }, revokeObjectURL: () => {} };
+  runInContext("downloadExpConfig()", context); assert.ok(downloaded instanceof Blob);
+  const exported = JSON.parse(await downloaded.text());
+  assert.deepEqual(exported.variants.map((variant: any) => variant.id), [sourceId, copyId]);
+  assert.equal(new Set(exported.variants.map((variant: any) => variant.id)).size, 2);
+  findClass(root, "primary-button")!.fire("click");
+  const post = find(request => request.path === "/api/experiments" && request.options?.method === "POST", "unique copy synthetic POST");
+  assert.deepEqual(JSON.parse(post.options?.body || "{}"), exported, "下载与合成提交的 ID/全部参数一致");
+  respondError(post, { error: "合成提交拒绝" }); await flush();
+  assert.equal(pendingCount(), 0);
+  const remove = findAttr(root, "data-action", "delete-b")!;
+  assert.equal(content(remove), `删除 ${copyId}`, "删除按钮按实际第二项命名");
+  remove.fire("click");
+  assert.deepEqual(variants(), [original]);
+  assert.equal(runInContext("expState.draft.variants[0]", context), originalObject, "删除保留原方案对象");
+  assert.equal(content(findAttr(root, "data-action", "copy-b")!), `复制 ${sourceId} 成 ${copyId} 对照`);
+  assert.equal(JSON.stringify(historical.config), snapshot, "历史快照未被载入后的编辑改写");
+}
+{
+  const booted = await boot(), { element, find, context, flush } = booted;
+  const historical = job("custom-history", { config: { version: 1, kind: "support", label: "两项自定义方案", repeat: 1, allowRemote: false,
+    variants: [{ id: "control", architecture: "controller", parameters: supportParams() },
+      { id: "candidate", architecture: "atomic", parameters: supportParams({ repairBudget: 0 }) }] } });
+  await openExperiments(booted, [historical]);
+  runInContext('selectJob("custom-history")', context);
+  respond(find(request => request.path === "/api/experiments/custom-history", "two custom variants"), historical); await flush();
+  const root = element("experiments"); findAttr(root, "data-action", "load-config")!.fire("click");
+  const original = runInContext("expState.draft.variants[0]", context);
+  const displayed = JSON.parse(content(walk(findClass(root, "exp-diff-slot")!).find(item => item.tagName === "PRE")!));
+  assert.deepEqual(Object.keys(displayed), ["control", "candidate"]);
+  assert.ok(Object.entries(displayed).every(([id, variant]: [string, any]) => id === variant.id));
+  assert.deepEqual(Object.values(displayed), historical.config.variants, "自定义两项完整 JSON 保留实际 ID 和参数");
+  const remove = findAttr(root, "data-action", "delete-b")!;
+  assert.equal(content(remove), "删除 candidate"); remove.fire("click");
+  assert.equal(runInContext("expState.draft.variants[0]", context), original);
+  assert.deepEqual(JSON.parse(runInContext("JSON.stringify(expState.draft.variants)", context)), [historical.config.variants[0]]);
+}
+console.log("PASS 历史方案复制：B→A/A→B/自定义→B 唯一ID与深复制，实际删除对象/文案，快照/远程门禁及下载提交一致。");
+
+// 高级数值清空不能偷改为 0；下载与提交沿用实际编辑结果，历史缺省/null 不补造数值。
+{
+  const booted = await boot(), { element, find, context, flush, pendingCount } = booted;
+  const legacy = job("numeric-history", { config: { version: 1, kind: "support", label: "历史参数", repeat: 1, allowRemote: false,
+    variants: [{ id: "A", architecture: "controller", parameters: { timeoutMs: 60000, merchantEvents: "architecture",
+      knowledgeMode: "lexical", questionContract: "v3", questionModel: "configured", questionTimeoutMs: null } }] } });
+  await openExperiments(booted, [legacy]);
+  const root = element("experiments");
+  const preset = findAttr(root, "data-field", "preset")!;
+  preset.value = "support-knowledge-model-ab"; preset.fire("change"); await flush();
+  const byField = (field: string) => findAllAttr(root, "data-field", field).find(input => input.getAttribute("data-variant") === "A")!;
+  const params = () => JSON.parse(runInContext("JSON.stringify(expState.draft.variants[0].parameters)", context));
+  const threshold = byField("knowledgeThreshold");
+  assert.equal(threshold.value, "0.5");
+  threshold.value = ""; threshold.fire("change");
+  assert.equal(threshold.value, "0.5", "清空已设数值后显示原值，不能空显示而偷改为 0");
+  assert.equal(params().knowledgeThreshold, 0.5);
+  threshold.value = "0"; threshold.fire("change");
+  assert.equal(params().knowledgeThreshold, 0, "显式 0 仍是合法数值");
+  threshold.value = ""; threshold.fire("change");
+  assert.equal(threshold.value, "0"); assert.equal(params().knowledgeThreshold, 0);
+  threshold.value = "0.37"; threshold.fire("change");
+  assert.equal(params().knowledgeThreshold, 0.37, "有限小数仍正常编辑");
+  for (const invalid of ["Infinity", "NaN", "非法数值"]) {
+    threshold.value = invalid; threshold.fire("change");
+    assert.equal(threshold.value, "0.37"); assert.equal(params().knowledgeThreshold, 0.37, "非法数值沿用原回退");
+  }
+  let downloaded: Blob | undefined;
+  context.Blob = Blob;
+  context.URL = { createObjectURL: (blob: Blob) => { downloaded = blob; return "blob:experiment-config"; }, revokeObjectURL: () => {} };
+  const download = async () => {
+    runInContext("downloadExpConfig()", context);
+    assert.ok(downloaded instanceof Blob, "调用实际下载入口生成 JSON Blob");
+    return JSON.parse(await downloaded.text());
+  };
+  const allow = findAttr(root, "data-field", "allow-remote")!;
+  allow.checked = true; allow.fire("change");
+  const exported = await download();
+  assert.equal(exported.variants[0].parameters.knowledgeThreshold, 0.37);
+  findClass(root, "primary-button")!.fire("click");
+  const post = find(request => request.path === "/api/experiments" && request.options?.method === "POST", "numeric synthetic POST");
+  assert.deepEqual(JSON.parse(post.options?.body || "{}"), exported, "实际下载与合成提交使用同一参数");
+  respondError(post, { error: "合成提交拒绝" }); await flush();
+  assert.equal(pendingCount(), 0);
+  runInContext('selectJob("numeric-history")', context);
+  respond(find(request => request.path === "/api/experiments/numeric-history", "numeric history"), legacy); await flush();
+  findAttr(root, "data-action", "load-config")!.fire("click");
+  const missing = byField("repairBudget");
+  assert.equal(missing.value, ""); missing.fire("change");
+  assert.equal(missing.value, ""); assert.equal(Object.hasOwn(params(), "repairBudget"), false, "缺省数值清空不新增字段");
+  const nullable = byField("questionTimeoutMs");
+  assert.equal(nullable.disabled, false); assert.equal(nullable.value, "");
+  for (const raw of ["", "Infinity"]) {
+    nullable.value = raw; nullable.fire("change");
+    assert.equal(nullable.value, "", "null 回退显示为空而非字串 null");
+    assert.equal(params().questionTimeoutMs, null, "非法历史 null 保留给原组合门禁");
+  }
+  const disabled = byField("knowledgeThreshold");
+  assert.equal(disabled.disabled, true);
+  assert.equal(disabled.value, "");
+  assert.equal(Object.hasOwn(params(), "knowledgeThreshold"), false, "原禁用参数及缺省状态保持");
+  assert.equal(findClass(root, "primary-button")!.disabled, true, "v3/null 与远程原门禁保留");
+  const historicalExport = await download();
+  assert.equal(Object.hasOwn(historicalExport.variants[0].parameters, "repairBudget"), false);
+  assert.equal(Object.hasOwn(historicalExport.variants[0].parameters, "knowledgeThreshold"), false);
+  assert.equal(historicalExport.variants[0].parameters.questionTimeoutMs, null);
+  assert.equal(pendingCount(), 0);
+  console.log("PASS 高级数值：清空恢复原值、显式0/有限数正常、非法数回退、省略/null/禁用保留，实际下载与提交一致。");
+}
+
+// 同一运行按完整 ID 复用选项；已有名称/时间与节点保持，新 ID 不按短名称误合并。
+{
+  const booted = await boot(), { element, take, find, context, flush, activeElement, pendingCount } = booted;
+  respond(take(), { runs: [] }); await flush();
+  const ids = ["22222222-2222-4222-8222-222222222222", "33333333-3333-4333-8333-333333333333"];
+  const cached = new Set<string>();
+  const importPair = async (pair: string[]) => {
+    runInContext(`expCompare(${JSON.stringify(pair.map((runId, index) => ({ runId, variantId: index ? "B" : "A", repetition: 1 })))})`, context);
+    assert.equal(element("baseline").value, pair[0]);
+    assert.equal(element("candidate").value, pair[1]);
+    assert.equal(activeElement(), element("baseline"), "复用/追加选项均同步聚焦基线");
+    assert.equal(element("compare-button").disabled, true);
+    if (pair[0] === pair[1]) {
+      assert.equal(pendingCount(), 0, "同 ID 对比仍由既有门禁拒绝，零请求");
+      assert.match(content(element("compare-detail")), /请选择两次不同的运行/);
+      return;
+    }
+    respond(find(request => request.path === `/api/compare?baseline=${pair[0]}&candidate=${pair[1]}`, "imported pair"), {
+      baseline: pair[0], candidate: pair[1], comparable: true, repeatCompatible: true,
+      conditions: [], configuration: [], issues: [],
+      analyses: { baseline: supportSummary(2), candidate: supportSummary(3) }, cases: [],
+    });
+    for (const id of pair) if (!cached.has(id)) {
+      respond(find(request => request.path === `/api/runs/${id}`, "imported detail"), detailOf(id));
+      cached.add(id);
+    }
+    await flush();
+    assert.equal(pendingCount(), 0);
+    assert.equal(element("compare-button").disabled, false, "不同 ID 完成后仍可继续对比");
+  };
+  const matches = (select: string, id: string) => element(select).options.filter(option => option.value === id);
+  await importPair(ids);
+  const imported = [matches("baseline", ids[0]!)[0]!, matches("candidate", ids[1]!)[0]!];
+  await importPair(ids);
+  for (const [index, select] of ["baseline", "candidate"].entries()) {
+    assert.equal(matches(select, ids[index]!).length, 1, "重复导入每侧同一运行只出现一次");
+    assert.equal(matches(select, ids[index]!)[0], imported[index], "重复导入保留原 option 节点");
+  }
+  const otherIds = ["22222222-2222-4222-8222-222222222221", "33333333-3333-4333-8333-333333333334"];
+  await importPair(otherIds);
+  for (const [index, select] of ["baseline", "candidate"].entries()) {
+    assert.equal(element(select).options.filter(option => option.value).length, 2, "不同完整 ID 追加新选项");
+    assert.equal(content(matches(select, otherIds[index]!)[0]!), content(imported[index]!), "短 ID 与文案相同也不能合并不同运行");
+    assert.equal(matches(select, ids[index]!)[0], imported[index]);
+  }
+  runInContext(`state.runs = ${JSON.stringify(ids.map((id, index) => ({ ...detailOf(id).run, label: `原运行名称 ${index}` })))}; renderPickers()`, context);
+  const original = [matches("baseline", ids[0]!)[0]!, matches("candidate", ids[1]!)[0]!];
+  const originalLabels = original.map(content);
+  await importPair(ids);
+  for (const [index, select] of ["baseline", "candidate"].entries()) {
+    assert.equal(matches(select, ids[index]!).length, 1, "已有同 ID 运行不追加实验别名");
+    assert.equal(matches(select, ids[index]!)[0], original[index]);
+    assert.equal(content(original[index]!), originalLabels[index], "保留既有运行名称与时间");
+    assert.match(content(original[index]!), /原运行名称.*2026/);
+  }
+  await importPair([ids[0]!, ids[0]!]);
+  for (const select of ["baseline", "candidate"]) assert.equal(matches(select, ids[0]!).length, 1);
+  console.log("PASS 实验 A/B 导入：重复/已有 ID 复用节点与名称，短 ID 相同的新运行追加，同 ID 门禁与焦点保持。");
+}
+
+// 跨视图动作在请求等待时同步交接焦点；成功/失败均不夺走等待期间转移的焦点。
+for (const action of ["view-run", "compare-btn"]) for (const fails of [false, true]) for (const movesFocus of [false, true]) {
+  const booted = await boot(), { element, find, context, flush, activeElement, pendingCount } = booted;
+  const completed = job("jump-job", { plannedRuns: 2, results: [
+    { variantId: "A", repetition: 1, kind: "support", status: "completed", runId: "jump-a", summary: supportSummary(2) },
+    { variantId: "A", repetition: 2, kind: "support", status: "completed", runId: "jump-b", summary: supportSummary(3) },
+  ] });
+  await openExperiments(booted, [completed]);
+  runInContext('selectJob("jump-job")', context);
+  respond(find(request => request.path === "/api/experiments/jump-job", "jump task"), completed);
+  await flush();
+  const source = findAttr(element("experiments"), "data-action", action)!;
+  const target = element(action === "view-run" ? "run-detail" : "baseline");
+  source.focus();
+  source.fire("click");
+  assert.equal(activeElement(), target, `${action} 请求未完成时必须同步聚焦可见目标`);
+  assert.equal(runInContext('$("experiments").hidden', context), true);
+  assert.equal(target.disabled, false, "跳转目标始终可操作");
+  if (action === "view-run") {
+    assert.equal(target.getAttribute("aria-busy"), "true");
+    assert.match(content(target), /正在读取运行详情/);
+  } else {
+    assert.equal(element("baseline").value, "jump-a");
+    assert.equal(element("candidate").value, "jump-b");
+    assert.equal(element("compare-button").disabled, true);
+    assert.match(content(element("compare-detail")), /正在对比/);
+  }
+  const userTarget = element(action === "view-run" ? "overview-tab" : "candidate");
+  if (movesFocus) userTarget.focus();
+  if (action === "view-run") {
+    const detailRequest = find(request => request.path === "/api/runs/jump-a", "jump run detail");
+    if (fails) respondError(detailRequest, { error: "合成详情失败" });
+    else respond(detailRequest, detailOf("jump-a"));
+    respond(find(request => request.path === "/api/runs/jump-a/analysis", "jump run analysis"), supportSummary(2));
+  } else {
+    const comparison = find(request => request.path.startsWith("/api/compare"), "jump comparison");
+    if (fails) respondError(comparison, { error: "合成对比失败" });
+    else respond(comparison, {
+      baseline: "jump-a", candidate: "jump-b", comparable: true, repeatCompatible: true,
+      conditions: [], configuration: [], issues: [],
+      analyses: { baseline: supportSummary(2), candidate: supportSummary(3) }, cases: [],
+    });
+    for (const id of ["jump-a", "jump-b"]) respond(find(request => request.path === `/api/runs/${id}`, id), detailOf(id));
+  }
+  await flush();
+  assert.equal(pendingCount(), 0);
+  assert.equal(activeElement(), movesFocus ? userTarget : target, `${action} 完成/失败不得异步夺焦`);
+  if (action === "view-run") {
+    assert.equal(element("run-detail"), target, "运行详情容器保持同一节点");
+    assert.equal(target.getAttribute("aria-busy"), "false");
+    assert.match(content(target), fails ? /这次运行暂时无法打开.*重试这次运行/ : /jump-a/);
+  } else {
+    assert.equal(element("compare-button").disabled, false, "成功/失败均可继续对比");
+    assert.match(content(element("compare-detail")), fails ? /暂时无法完成对比/ : /场景对比/);
+  }
+}
+{
+  const booted = await boot();
+  await openExperiments(booted);
+  const tab = booted.element("overview-tab");
+  tab.focus(); tab.fire("click");
+  assert.equal(booted.activeElement(), tab, "普通页签切换保留页签焦点");
+}
+console.log("PASS 实验结果跨视图：两动作成功/失败同步交接，等待期转焦不被夺回，普通页签保持焦点。");
 
 // Existing metadata-driven controls preserve a valid prompt comparison; backend
 // combination rejection is covered by experiment-check, not inferred from UI.
@@ -350,13 +792,18 @@ const openExperiments = async (booted: Awaited<ReturnType<typeof boot>>, jobs: u
     configuration: ["model", "prompt", "skill", "tools", "implementation", "runtime", "settings"].map(key => ({ key, status: "equal" })),
     issues: [], analyses: { baseline: supportSummary(2), candidate: supportSummary(3) }, cases: [],
   });
-  const detailOf = (id: string) => ({ run: { id, label: id, suiteId: "suite", suiteName: "套件", kind: "model", status: "completed",
-    plannedCases: 1, plannedTurns: 1, startedAt: T, finishedAt: T, metrics: null,
-    snapshot: { gitCommit: "abc", gitDirty: false, model: { provider: "test", id: "k", maxTokens: 1, thinking: "off", temperature: null }, hashes: {}, asOf: T, content: {} } }, cases: [] });
   respond(find(request => request.path === "/api/runs/run-a1", "baseline detail"), detailOf("run-a1"));
   respond(find(request => request.path === "/api/runs/run-a2", "candidate detail"), detailOf("run-a2"));
   await flush();
   assert.match(content(element("compare-detail")), /场景对比/, "带入后进入既有对比视图");
+  assert.equal(element("compare-button").disabled, false, "总览无记录也能再次对比导入的两次运行");
+  const retryCompare = element("compare-button").fire("click");
+  await flush(1);
+  assert.equal(element("compare-button").disabled, true);
+  respondError(find(request => request.path.startsWith("/api/compare"), "imported comparison retry failure"), { error: "合成对比失败" });
+  await retryCompare;
+  assert.equal(element("compare-button").disabled, false, "实验导入对比失败后仍可重试");
+  assert.equal(pendingCount(), 0);
   console.log("PASS 实验调试：POST 头、运行轮询、tab 停/续、终态停轮、support 结果与带入对比。");
 }
 
@@ -447,7 +894,7 @@ const openExperiments = async (booted: Awaited<ReturnType<typeof boot>>, jobs: u
 // 任务详情竞态：快速切换任务时，晚到的旧详情不覆盖当前选择。
 {
   const booted = await boot();
-  const { element, find, flush, pendingCount } = booted;
+  const { element, find, flush, pendingCount, activeElement } = booted;
   await openExperiments(booted, [
     job("job-1", { status: "running", finishedAt: null, config: { version: 1, kind: "support", label: "任务甲", repeat: 1, allowRemote: true, variants: [{ id: "A", architecture: "atomic", parameters: supportParams() }] } }),
     job("job-2", { config: { version: 1, kind: "support", label: "任务乙", repeat: 1, allowRemote: true, variants: [{ id: "A", architecture: "controller", parameters: supportParams() }] } }),
@@ -457,6 +904,7 @@ const openExperiments = async (booted: Awaited<ReturnType<typeof boot>>, jobs: u
   jobs[0]!.fire("click");
   await flush(1);
   const stale = find(request => request.path === "/api/experiments/job-1", "first job detail");
+  jobs[1]!.focus();
   jobs[1]!.fire("click");
   await flush(1);
   respond(find(request => request.path === "/api/experiments/job-2", "second job detail"), job("job-2", { config: { version: 1, kind: "support", label: "任务乙", repeat: 1, allowRemote: true, variants: [{ id: "A", architecture: "controller", parameters: supportParams() }] } }));
@@ -467,18 +915,66 @@ const openExperiments = async (booted: Awaited<ReturnType<typeof boot>>, jobs: u
   await flush();
   assert.match(detail(), /任务乙/, "晚到的旧详情不得覆盖当前选择");
   assert.ok(!detail().includes("任务甲") || detail().indexOf("任务甲") < 0, "旧任务标签不进入详情面板");
+  assert.equal(content(findClass(jobs[0]!, "status")!), "运行中", "迟到的甲详情不能串改甲列表快照");
+  assert.equal(content(findClass(jobs[1]!, "status")!), "已完成", "当前乙行按乙详情显示");
+  assert.equal(content(findClass(jobs[1]!, "case-meta")!), "0 / 1");
+  assert.equal(activeElement(), jobs[1], "旧详情到达保持乙按钮焦点");
   assert.equal(pendingCount(), 0);
   console.log("PASS 实验调试：任务详情竞态，旧响应不覆盖当前选择。");
 }
 
-// 列表快照不覆盖详情：列表请求发出 → 详情返回 completed → 旧列表 running 晚到，详情不得退回旧进度。
+// 首次详情直达终态与旧列表晚到，都必须让当前行显示同一状态/完整分母。
+const terminalRows: Array<{ path: string; status: string; count: string }> = [];
+{
+  const booted = await boot(), { element, find, flush, activeElement, pendingCount } = booted;
+  const firstResult = { variantId: "A", repetition: 1, kind: "support", status: "completed", runId: "direct-run-1", summary: supportSummary(2) };
+  const running = job("same-prefix-job-a", { status: "running", finishedAt: null, plannedRuns: 3,
+    current: { variantId: "A", repetition: 2 }, results: [firstResult] });
+  const other = job("same-prefix-job-b", { status: "completed_with_failures", plannedRuns: 4, results: [firstResult] });
+  await openExperiments(booted, [structuredClone(running), structuredClone(other)]);
+  const root = element("experiments"), buttons = walk(root).filter(item => item.className.split(" ").includes("exp-job"));
+  const selected = buttons[0]!, otherButton = buttons[1]!, otherText = content(otherButton);
+  const advanced = findClass(root, "exp-advanced")!; advanced.open = true;
+  selected.focus(); selected.fire("click");
+  const panel = findAttr(root, "aria-label", "任务详情")!, config = findClass(panel, "exp-job-config")!;
+  const trace = findClass(panel, "trace")!; trace.open = true;
+  const traceJson = trace.children[1]!;
+  const terminal = { ...running, status: "interrupted", current: null, finishedAt: T, error: "合成中断", results: [firstResult,
+    { ...firstResult, repetition: 2, runId: "direct-run-2", summary: supportSummary(1) }] };
+  respond(find(request => request.path === "/api/experiments/same-prefix-job-a", "first terminal detail"), terminal); await flush();
+  terminalRows.push({ path: "首次详情终态", status: content(findClass(selected, "status")!), count: content(findClass(selected, "case-meta")!) });
+  assert.match(content(panel), /已中断已完成 2 \/ 3/);
+  assert.match(content(panel), /未执行 1 次/);
+  assert.equal(walk(root).filter(item => item.className.split(" ").includes("exp-job"))[0], selected);
+  assert.equal(content(otherButton), otherText, "相同前缀的其他完整 ID 不串改");
+  assert.equal(findAttr(root, "aria-label", "任务详情"), panel);
+  assert.equal(findClass(panel, "exp-job-config"), config);
+  assert.equal(findClass(panel, "trace"), trace); assert.equal(trace.open, true);
+  assert.equal(trace.children[1], traceJson, "已完成结果 JSON 保留文本节点");
+  assert.equal(findClass(root, "exp-advanced"), advanced); assert.equal(advanced.open, true);
+  assert.equal(activeElement(), selected);
+  assert.equal(pendingCount(), 0, "首次终态不发起轮询");
+  const refresh = findAttr(root, "data-action", "refresh-jobs")!; refresh.fire("click");
+  find(request => request.path === "/api/experiments", "terminal list error").reject(new Error("合成列表失败")); await flush();
+  assert.match(content(root), /合成列表失败/);
+  assert.equal(refresh.disabled, false);
+  assert.equal(content(findClass(selected, "status")!), terminalRows[0]!.status, "列表失败保留当前已知行状态");
+  assert.equal(content(findClass(selected, "case-meta")!), terminalRows[0]!.count);
+  assert.equal(findAttr(root, "aria-label", "任务详情"), panel);
+  assert.equal(activeElement(), selected); assert.equal(trace.open, true); assert.equal(pendingCount(), 0);
+}
+
+// 列表请求先发出 → 详情返回 completed → 旧列表 running 晚到，当前行与详情都不得退回旧进度。
 {
   const booted = await boot();
-  const { element, find, flush } = booted;
+  const { element, find, flush, pendingCount, activeElement } = booted;
   const staleListed = job("job-s", { status: "running", finishedAt: null, plannedRuns: 1, current: { variantId: "A", repetition: 1 } });
   await openExperiments(booted, [staleListed]);
   const root = element("experiments");
-  walk(root).find(item => item.className.split(" ").includes("exp-job"))!.fire("click");
+  const selected = findClass(root, "exp-job")!;
+  findAttr(root, "data-action", "refresh-jobs")!.fire("click");
+  const staleList = find(request => request.path === "/api/experiments", "stale list before terminal");
+  selected.focus(); selected.fire("click");
   await flush(1);
   respond(find(request => request.path === "/api/experiments/job-s", "job detail"), job("job-s", {
     plannedRuns: 1, results: [{ variantId: "A", repetition: 1, kind: "support", status: "completed", runId: "run-s1", summary: supportSummary(3) }],
@@ -486,16 +982,22 @@ const openExperiments = async (booted: Awaited<ReturnType<typeof boot>>, jobs: u
   await flush();
   const detail = () => content(findAttr(root, "aria-label", "任务详情")!);
   assert.match(detail(), /已完成 1 \/ 1/);
-  // 旧列表快照（running）晚到：只能更新列表行，不得把详情退回去。
-  findAttr(root, "data-action", "refresh-jobs")!.fire("click");
-  await flush(1);
-  respond(find(request => request.path === "/api/experiments", "stale list"), { jobs: [staleListed] });
+  // 旧列表快照（running）晚到：保留当前详情并用其显示同 ID 行。
+  respond(staleList, { jobs: [staleListed] });
   await flush();
   assert.match(detail(), /已完成 1 \/ 1/, "旧列表 running 响应不得覆盖已完成详情");
   assert.ok(!detail().includes("运行中"), "详情不得停在旧进度");
+  terminalRows.push({ path: "旧列表晚到", status: content(findClass(selected, "status")!), count: content(findClass(selected, "case-meta")!) });
+  assert.equal(findClass(root, "exp-job"), selected);
+  assert.equal(activeElement(), selected);
+  assert.equal(pendingCount(), 0);
   assert.ok(findAttr(root, "aria-label", "实验任务")!.children.length > 0);
-  console.log("PASS 实验调试：旧列表 running 晚到不覆盖已完成详情。");
 }
+assert.deepEqual(terminalRows, [
+  { path: "首次详情终态", status: "已中断", count: "2 / 3" },
+  { path: "旧列表晚到", status: "已完成", count: "1 / 1" },
+], "当前任务行必须和详情终态一致，保留完整计划分母");
+console.log("PASS 实验调试：首次终态/旧列表晚到保持当前行状态分母，其他 ID、错误及原节点/焦点/展开保持。");
 
 // 轮询不重建表单：输入中值、节点身份与高级参数展开态在轮询后保持不变。
 {
@@ -530,6 +1032,90 @@ const openExperiments = async (booted: Awaited<ReturnType<typeof boot>>, jobs: u
   assert.equal(advanced.open, true, "高级参数展开态保持");
   assert.equal(timeoutInput.value, "99999", "未提交的数字输入不被重置");
   console.log("PASS 实验调试：轮询只刷任务区，表单节点、输入中值与展开态保持。");
+}
+
+// 同任务轮询保留任务按钮、配置与已完成结果的 details；新进度/结果/终态仍更新。
+{
+  const booted = await boot();
+  const { element, find, context, flush, pendingCount } = booted;
+  const firstResult = { variantId: "A", repetition: 1, kind: "support", status: "completed", runId: "stable-run-1", summary: supportSummary(2) };
+  const running = job("stable-job", { status: "running", finishedAt: null, plannedRuns: 3,
+    current: { variantId: "A", repetition: 2 }, results: [firstResult] });
+  await openExperiments(booted, [structuredClone(running)]);
+  const root = element("experiments");
+  runInContext("expState.pollMs = 1", context);
+  const taskButton = findClass(root, "exp-job")!;
+  taskButton.fire("click");
+  respond(find(request => request.path === "/api/experiments/stable-job", "stable job detail"), structuredClone(running));
+  await flush();
+  const selectedButton = findClass(root, "exp-job")!;
+  assert.equal(selectedButton, taskButton, "选择任务本身也保留键盘激活的按钮");
+  const panel = findAttr(root, "aria-label", "任务详情")!;
+  const config = findClass(panel, "exp-job-config")!;
+  const result = findClass(panel, "exp-result")!;
+  const details = findClass(result, "trace")!;
+  details.open = true;
+  const resultText = details.children[1]!;
+  const summaryControl = details.children[0]!;
+  await sleep(10);
+  respond(find(request => request.path === "/api/experiments/stable-job", "unchanged poll"), structuredClone(running));
+  await flush();
+  assert.equal(findClass(root, "exp-job"), selectedButton, "无变化轮询不移除当前任务按钮");
+  assert.equal(findAttr(root, "aria-label", "任务详情"), panel);
+  assert.equal(findClass(panel, "exp-job-config"), config);
+  assert.equal(findClass(panel, "trace"), details, "原始JSON details不被重建");
+  assert.equal(details.open, true, "JSON展开态保持");
+  assert.equal(details.children[0], summaryControl, "键盘聚焦的summary节点保持");
+  assert.equal(details.children[1], resultText, "已完成JSON的文本选择节点保持");
+
+  await sleep(10);
+  const progressing = { ...running, current: { variantId: "A", repetition: 3 } };
+  respond(find(request => request.path === "/api/experiments/stable-job", "progress poll"), structuredClone(progressing));
+  await flush();
+  assert.match(content(panel), /第 3 次 · 已完成 1 \/ 3/, "真实进度继续更新");
+  assert.equal(findClass(panel, "exp-result"), result, "进度改变不移除已完成结果");
+  assert.equal(details.open, true);
+
+  await sleep(10);
+  const secondResult = { ...firstResult, repetition: 2, runId: "stable-run-2", summary: supportSummary(3) };
+  const interrupted = { ...progressing, status: "interrupted", current: null, error: "第二批中断", results: [firstResult, secondResult] };
+  respond(find(request => request.path === "/api/experiments/stable-job", "result append/terminal poll"), structuredClone(interrupted));
+  await flush();
+  assert.equal(findClass(root, "exp-job"), selectedButton);
+  assert.equal(findClass(panel, "exp-job-config"), config);
+  assert.equal(findClass(panel, "exp-result"), result);
+  assert.equal(details.open, true);
+  assert.match(content(panel), /已完成 2 \/ 3/);
+  assert.match(content(panel), /未执行 1 次/);
+  assert.match(content(panel), /第二批中断/);
+  assert.ok(findAttr(panel, "data-action", "compare-btn"), "新增第二个结果后出现对比入口");
+  const resultNodes = walk(panel).filter(item => item.className.split(" ").includes("exp-result"));
+  assert.equal(resultNodes.length, 2);
+  await sleep(10);
+  assert.equal(pendingCount(), 0, "终态停止轮询");
+
+  const retry = runInContext('selectJob("stable-job", true)', context);
+  const corrected = { ...interrupted, results: [{ ...firstResult, summary: supportSummary(1) }, secondResult] };
+  respond(find(request => request.path === "/api/experiments/stable-job", "revised result"), structuredClone(corrected));
+  await retry;
+  assert.match(content(panel), /场景 通过 1 \/ 3 · 失败 2/, "服务端修订结果不能被旧DOM吞掉");
+  const revisedNodes = walk(panel).filter(item => item.className.split(" ").includes("exp-result"));
+  assert.notEqual(revisedNodes[0], result);
+  assert.equal(revisedNodes[1], resultNodes[1], "修订一个结果不重建其他结果");
+  runInContext('selectJob("stable-job", true)', context);
+  find(request => request.path === "/api/experiments/stable-job", "retry error").reject(new Error("合成详情读取失败"));
+  await flush();
+  assert.match(content(root), /合成详情读取失败/);
+  const retryControl = findAttr(root, "data-action", "retry-jobs")!;
+  const retrying = retryControl.fire("click");
+  assert.equal(selectedButton.focused, true, "重试焦点转回同一任务按钮");
+  respond(find(request => request.path === "/api/experiments/stable-job", "retry recovery"), structuredClone(corrected));
+  await retrying;
+  assert.ok(!content(root).includes("合成详情读取失败"), "成功重试清除旧错误");
+  assert.equal(findAttr(root, "data-action", "retry-jobs"), retryControl, "重试控件保持稳定");
+  assert.equal(findAttr(root, "aria-label", "任务详情"), panel);
+  assert.equal(walk(panel).filter(item => item.className.split(" ").includes("exp-result"))[1], resultNodes[1]);
+  console.log("PASS 实验调试：任务按钮/配置/已完成JSON节点稳定，真实进度、追加/修订结果与终态更新。");
 }
 
 // 连续调参：参数 change 只写 draft 并局部更新差异/提示，参数卡与输入节点不重建，可继续改第二项。
@@ -601,6 +1187,110 @@ const openExperiments = async (booted: Awaited<ReturnType<typeof boot>>, jobs: u
   console.log("PASS 实验调试：成功/失败刷新后按钮恢复可点，可连续刷新。");
 }
 
+// 共享错误条按失败来源重试；成功只清同来源错误，不能用详情成功冒充列表恢复。
+for (const selected of [true, false]) {
+  const booted = await boot(), { element, find, take, flush, activeElement, pendingCount } = booted;
+  const first = job("retry-first", { results: [{ variantId: "A", repetition: 1, kind: "support", status: "completed", runId: "retry-run", summary: supportSummary(2) }] });
+  await openExperiments(booted, [first]);
+  const root = element("experiments"), row = findClass(root, "exp-job")!;
+  if (selected) {
+    row.fire("click"); respond(find(request => request.path === "/api/experiments/retry-first", "selected retry detail"), first); await flush();
+  }
+  const panel = selected ? findAttr(root, "aria-label", "任务详情")! : null;
+  const trace = panel ? findClass(panel, "trace")! : null; if (trace) trace.open = true;
+  const refresh = findAttr(root, "data-action", "refresh-jobs")!;
+  refresh.fire("click"); find(request => request.path === "/api/experiments", "list failure").reject(new Error("集合读取失败")); await flush();
+  const error = findClass(findAttr(root, "aria-label", "实验任务")!, "batch-caution")!;
+  const retry = findAttr(root, "data-action", "retry-jobs")!;
+  retry.fire("click");
+  const failedRetry = take();
+  assert.equal(failedRetry.path, "/api/experiments", `列表错误红条重试必须读取集合（selected=${selected}）`);
+  assert.equal(activeElement(), refresh, "列表重试焦点交接现有刷新入口");
+  failedRetry.reject(new Error("集合重试仍失败")); await flush();
+  assert.equal(error.hidden, false); assert.match(content(error), /集合重试仍失败/);
+  assert.equal(findAttr(root, "data-action", "retry-jobs"), retry);
+  retry.fire("click");
+  respond(find(request => request.path === "/api/experiments", "successful collection retry"), { jobs: [first, job("newly-discovered")] }); await flush();
+  assert.equal(error.hidden, true, "集合自身成功才清列表错误");
+  const rows = walk(root).filter(item => item.className.split(" ").includes("exp-job"));
+  assert.equal(rows[0], row); assert.equal(rows.length, 2); assert.match(content(rows[1]!), /newly-discovered/);
+  if (panel) { assert.equal(findAttr(root, "aria-label", "任务详情"), panel); assert.equal(findClass(panel, "trace"), trace); assert.equal(trace!.open, true); }
+  assert.equal(activeElement(), refresh); assert.equal(pendingCount(), 0);
+}
+{
+  const booted = await boot(), { element, find, take, flush, activeElement, pendingCount } = booted;
+  const a = job("error-epoch-a"), b = job("error-epoch-b");
+  await openExperiments(booted, [a, b]);
+  const root = element("experiments"), rows = walk(root).filter(item => item.className.split(" ").includes("exp-job"));
+  rows[0]!.fire("click"); const stale = find(request => request.path === "/api/experiments/error-epoch-a", "old error detail");
+  rows[1]!.focus(); rows[1]!.fire("click"); const current = find(request => request.path === "/api/experiments/error-epoch-b", "current error detail");
+  findAttr(root, "data-action", "refresh-jobs")!.fire("click");
+  find(request => request.path === "/api/experiments", "current collection error").reject(new Error("当前集合错误")); await flush();
+  stale.reject(new Error("旧甲详情错误")); respond(current, b); await flush();
+  const error = findClass(findAttr(root, "aria-label", "实验任务")!, "batch-caution")!;
+  assert.equal(error.hidden, false); assert.match(content(error), /当前集合错误/); assert.ok(!content(error).includes("旧甲详情错误"));
+  assert.equal(activeElement(), rows[1]); assert.match(content(findAttr(root, "aria-label", "任务详情")!), /error-epoch-b/);
+  findAttr(root, "data-action", "retry-jobs")!.fire("click"); const retry = take(); assert.equal(retry.path, "/api/experiments", "迟到旧错误不得改变当前集合重试来源");
+  respond(retry, { jobs: [a, b] }); await flush(); assert.equal(error.hidden, true); assert.equal(pendingCount(), 0);
+}
+for (const source of ["detail", "poll"]) {
+  const booted = await boot(), { element, find, take, context, flush, activeElement, pendingCount } = booted;
+  const running = job("source-current", { status: "running", finishedAt: null });
+  await openExperiments(booted, [running]); runInContext("expState.pollMs = 1", context);
+  const root = element("experiments"), row = findClass(root, "exp-job")!;
+  row.fire("click");
+  const initial = find(request => request.path === "/api/experiments/source-current", "source detail");
+  if (source === "poll") { respond(initial, running); await flush(); await sleep(10); }
+  const failure = source === "poll" ? find(request => request.path === "/api/experiments/source-current", "source poll") : initial;
+  failure.reject(new Error(`${source}读取失败`)); await flush();
+  const error = findClass(findAttr(root, "aria-label", "实验任务")!, "batch-caution")!;
+  const panel = findAttr(root, "aria-label", "任务详情")!;
+  findAttr(root, "data-action", "refresh-jobs")!.fire("click");
+  respond(find(request => request.path === "/api/experiments", "other source collection success"), { jobs: [running, job("new-list-row")] }); await flush();
+  assert.equal(error.hidden, false, "列表成功不能清详情或轮询错误"); assert.match(content(error), new RegExp(`${source}读取失败`));
+  const retry = findAttr(root, "data-action", "retry-jobs")!; retry.fire("click");
+  const retryFailure = take(); assert.equal(retryFailure.path, "/api/experiments/source-current");
+  assert.equal(activeElement(), row); retryFailure.reject(new Error("详情重试仍失败")); await flush();
+  assert.equal(error.hidden, false); assert.match(content(error), /详情重试仍失败/);
+  retry.fire("click"); respond(find(request => request.path === "/api/experiments/source-current", "source recovery"), job("source-current")); await flush();
+  assert.equal(error.hidden, true); assert.equal(findAttr(root, "aria-label", "任务详情"), panel);
+  assert.equal(findClass(root, "exp-job"), row); assert.equal(activeElement(), row); assert.equal(pendingCount(), 0);
+}
+for (const success of ["detail", "poll"]) {
+  const booted = await boot(), { element, find, take, context, flush, pendingCount } = booted;
+  const current = job("list-error-current", success === "poll" ? { status: "running", finishedAt: null } : {});
+  const other = job("list-error-other");
+  await openExperiments(booted, [current, other]); runInContext("expState.pollMs = 1", context);
+  const root = element("experiments"), rows = walk(root).filter(item => item.className.split(" ").includes("exp-job"));
+  rows[0]!.fire("click"); respond(find(request => request.path === "/api/experiments/list-error-current", "initial list error detail"), current); await flush();
+  findAttr(root, "data-action", "refresh-jobs")!.fire("click");
+  find(request => request.path === "/api/experiments", "independent list failure").reject(new Error("集合错误须保留")); await flush();
+  if (success === "poll") {
+    await sleep(10); respond(find(request => request.path === "/api/experiments/list-error-current", "independent poll success"), job("list-error-current"));
+  } else {
+    rows[1]!.fire("click"); respond(find(request => request.path === "/api/experiments/list-error-other", "independent detail success"), other);
+  }
+  await flush();
+  const error = findClass(findAttr(root, "aria-label", "实验任务")!, "batch-caution")!;
+  assert.equal(error.hidden, false, `${success}成功不得清另一来源的列表错误`); assert.match(content(error), /集合错误须保留/);
+  findAttr(root, "data-action", "retry-jobs")!.fire("click"); const collection = take(); assert.equal(collection.path, "/api/experiments");
+  respond(collection, { jobs: [job("list-error-current"), other] }); await flush();
+  assert.equal(error.hidden, true); assert.equal(pendingCount(), 0);
+}
+{
+  const booted = await boot(), { element, take, find, flush, pendingCount } = booted;
+  respond(take(), { runs: [] }); await flush(); element("experiments-tab").fire("click");
+  find(request => request.path === "/api/experiments/catalog", "catalog failure").reject(new Error("目录读取失败"));
+  respond(find(request => request.path === "/api/experiments", "initial collection"), { jobs: [] }); await flush();
+  const root = element("experiments"); assert.match(content(root), /暂时无法读取实验目录.*目录读取失败/);
+  walk(root).find(item => item.tagName === "BUTTON" && content(item) === "重试")!.fire("click");
+  respond(find(request => request.path === "/api/experiments/catalog", "catalog retry"), catalog());
+  respond(find(request => request.path === "/api/experiments", "catalog paired collection retry"), { jobs: [job("catalog-recovered")] }); await flush();
+  assert.ok(!content(root).includes("目录读取失败")); assert.match(content(findClass(root, "exp-job")!), /catalog-recovered/);
+  assert.equal(pendingCount(), 0);
+}
+console.log("PASS 实验调试：错误来源重试真实集合/当前详情，异源成功不清错，目录恢复及稳定行/展开/焦点保持。");
+
 // v2 表单：数据集/接收策略回填、阈值启停、组合校验禁提交不丢字段、编辑不重建、提交体原样。
 {
   const booted = await boot();
@@ -613,6 +1303,14 @@ const openExperiments = async (booted: Awaited<ReturnType<typeof boot>>, jobs: u
   await flush();
   const byField = (field: string, variant: string) => findAllAttr(root, "data-field", field).find(item => item.attrs.get("data-variant") === variant)!;
   const byMode = (mode: string, variant: string) => findAllAttr(root, "data-mode", mode).find(item => item.attrs.get("data-variant") === variant)!;
+  for (const variant of ["A", "B"]) for (const [field, name] of [["acceptance-mode", "证据接收策略"], ["acceptance-threshold", "接收分数阈值"]] as const) {
+    const control = byField(field, variant);
+    const label = walk(root).find(item => item.tagName === "LABEL" && item.children.includes(control));
+    assert.ok(label, `方案 ${variant} 的 ${name} 必须有原生 label 关联`);
+    assert.equal(content(findClass(label, "exp-field-label")!), name);
+    assert.equal(label.children.filter(item => item.tagName === "INPUT" || item.tagName === "SELECT").length, 1, "每个 label 只关联一个控件");
+  }
+  console.log("PASS 实验调试：v2 A/B 策略及阈值四控件均有原生 label 关联，标签文案保留。");
   assert.match(content(root), /数据集/);
   assert.match(content(root), /证据接收策略/);
   assert.equal(byField("dataset", "A").value, "acceptance-development");

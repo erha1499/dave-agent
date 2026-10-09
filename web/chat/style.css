@@ -1,125 +1,225 @@
-/* Dave 客服 — 复用 /ui.css 评测工作台视觉系统；仅 .chat-page 作用域内的聊天布局与窄域兼容样式，不新增令牌 */
-.chat-page .chat-layout{display:grid;grid-template-columns:minmax(0,1fr) 252px;gap:22px;align-items:start}
-.chat-page .chat-main{min-width:0}
-.chat-page .chat-panel{display:flex;flex-direction:column;margin-bottom:0}
-.chat-page .chat-head-side{display:flex;align-items:center;gap:10px;min-width:0}
-.chat-page #app-status{overflow-wrap:anywhere}
-.chat-page #app-status.error{color:var(--red)}
+/* 客服咨询与会话记录；复用 /ui.css 的主题与原生控件。 */
+.chat-page{height:100dvh;overflow:hidden;font-size:14px;background:var(--panel)}
+.chat-page .chat-workspace{height:100%;display:grid;grid-template-columns:248px minmax(0,1fr)}
+.chat-page button,.chat-page select,.chat-page .secondary-link{min-height:44px}
+.chat-page svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
+.chat-page .visually-hidden{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 
-/* 消息流：居中可读宽度，软气泡，全文可换行不截断 */
-.chat-page #chat-messages{height:clamp(320px,calc(100vh - 350px),660px);overflow-y:auto;padding:24px;scrollbar-gutter:stable}
-.chat-page #chat-messages>.message,.chat-page #chat-messages>.notice{max-width:760px;margin:0 auto 24px}
-.chat-page #chat-messages>#chat-empty{max-width:560px;margin:26px auto;border:0;background:none}
+/* 历史是主导航；配置保留为次级入口。 */
+.chat-page .conversation-sidebar{display:flex;flex-direction:column;gap:28px;min-height:0;padding:24px 16px 16px;border-right:1px solid var(--line);background:var(--bench)}
+.chat-page .sidebar-top{display:grid;gap:24px}
+.chat-page .brand{gap:10px;padding:0 10px}
+.chat-page .brand-mark{width:34px;height:34px;background:var(--sage-deep);font-size:18px}
+.chat-page .brand-name{display:block;font-size:19px;line-height:1.3;font-weight:650}
+.chat-page .brand-caption{display:block;font-size:12px;font-weight:400;color:var(--muted)}
+.chat-page .new-conversation-button{display:flex;align-items:center;justify-content:center;gap:9px;min-width:44px;padding:10px 16px;border-color:#d3e0d0;border-radius:12px;background:var(--sage-tint);color:var(--sage-deep);font-size:14px;font-weight:600}
+.chat-page .new-conversation-button:hover{border-color:var(--sage);background:var(--panel)}
+.chat-page .sidebar-history{display:flex;flex-direction:column;flex:1;min-height:0;gap:12px}
+.chat-page .sidebar-history h2{padding:0 12px;font-size:13px;font-weight:500;color:var(--muted)}
+.chat-page .conversation-list{display:grid;grid-template-columns:minmax(0,1fr);align-content:start;gap:6px;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:2px}
+.chat-page .conversation-rows{min-width:0}
+.chat-page .sidebar-history .conversation-list{flex:1}
+.chat-page .conversation-button{display:flex;flex-direction:column;align-items:flex-start;gap:5px;width:100%;min-width:0;padding:11px 12px;text-align:left;border:1px solid transparent;border-radius:10px;background:transparent}
+.chat-page .conversation-button:hover{background:var(--panel)}
+.chat-page .conversation-button[aria-current="page"]{border-color:#d3e0d0;background:var(--sage-tint);color:var(--sage-deep)}
+.chat-page .conversation-name{display:block;width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px;font-weight:500}
+.chat-page .conversation-meta{font-size:12px;color:var(--muted);overflow-wrap:anywhere}
+.chat-page .conversation-empty,.chat-page .conversation-error{padding:10px 12px;font-size:14px;line-height:1.7;color:var(--muted);overflow-wrap:anywhere}
+.chat-page .conversation-error{color:var(--red)}
+.chat-page .conversation-list .quiet-button{justify-self:start;margin-left:12px;font-size:13px}
+.chat-page .sidebar-bottom{border-top:1px solid var(--line);padding-top:12px}
+.chat-page .sidebar-action{display:flex;align-items:center;gap:10px;width:100%;padding:10px 12px;border-color:transparent;background:transparent;font-size:14px;color:var(--muted)}
+.chat-page .sidebar-action:hover{color:var(--sage-deep);background:var(--panel)}
+.chat-page .evaluation-link{border-radius:10px;text-decoration:none}
+.chat-page .evaluation-link[aria-disabled="true"]{opacity:.5;cursor:wait}
+.chat-page .icon-button{display:grid;place-items:center;width:44px;min-width:44px;height:44px;padding:0;border:1px solid transparent;border-radius:10px;background:transparent;color:var(--muted)}
+.chat-page .icon-button:hover{border-color:var(--line);background:var(--panel-soft);color:var(--sage-deep)}
+.chat-page .mobile-history-button{display:none}
+
+/* 对话与输入共享一条可读轴线。 */
+.chat-page .chat-main{display:flex;flex-direction:column;min-width:0;min-height:0;max-width:none;margin:0;padding:0}
+.chat-page .chat-topbar{padding:18px 28px 10px;border-bottom:1px solid var(--line)}
+.chat-page .conversation-heading{display:flex;justify-content:space-between;align-items:center;gap:24px;min-width:0}
+.chat-page #conversation-title{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:17px;line-height:1.5;font-weight:600}
+.chat-page .profile-control{display:flex;align-items:center;gap:8px;flex-shrink:0;font-size:14px;color:var(--muted)}
+.chat-page .profile-control select{min-width:110px;font-size:14px;padding:7px 28px 7px 12px;background:var(--panel);color:var(--ink)}
+.chat-page .conversation-status{display:flex;align-items:center;gap:12px;min-height:25px;margin-top:6px}
+.chat-page #app-status{min-width:0;font-size:13px;line-height:1.6;color:var(--muted);overflow-wrap:anywhere}
+.chat-page #app-status.error{color:var(--red)}
+.chat-page #init-retry{flex-shrink:0;margin-left:0;font-size:13px}
+.chat-page .chat-panel{display:flex;flex-direction:column;flex:1;min-height:0;min-width:0}
+.chat-page #chat-messages{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:28px clamp(16px,5vw,64px) 8px;scrollbar-gutter:stable}
+.chat-page #chat-messages>.message,.chat-page #chat-messages>.notice{max-width:760px;margin:0 auto 28px}
 .chat-page .message{display:flex;align-items:flex-start;gap:12px;min-width:0}
 .chat-page .message-body{min-width:0;max-width:calc(100% - 46px);flex:1}
 .chat-page .message-avatar{width:34px;height:34px;flex:0 0 34px;border-radius:50%;display:grid;place-items:center;background:var(--sage-deep);color:#fff;font:600 17px var(--mono)}
 .chat-page .message.user .message-avatar{background:#e8edf5;color:#4a6a94;font:600 13px var(--body)}
-.chat-page .empty-avatar{margin:0 auto 16px;width:48px;height:48px;font-size:24px}
 .chat-page .message.user{flex-direction:row-reverse}
 .chat-page .message.user .message-body{flex:0 1 auto;display:flex;flex-direction:column;align-items:flex-end}
-.chat-page .message-label{font:11px var(--body);color:var(--muted);margin-bottom:6px}
-.chat-page .message-text{max-width:100%;font-size:14px;line-height:1.85;white-space:pre-wrap;overflow-wrap:anywhere}
-.chat-page .message.assistant .message-text{background:var(--panel-soft);border:1px solid var(--line);border-radius:var(--radius);padding:12px 15px}
-.chat-page .message.user .message-text{background:var(--sage-tint);border:1px solid #d3e0d0;border-radius:var(--radius);padding:12px 15px}
-
-/* 共享 .notice 落在消息流时的中性化兼容（error 仍用共享红） */
-.chat-page #chat-messages>.notice{background:none;border:0;color:var(--ink);padding:0;font-size:14px;overflow-wrap:anywhere}
-.chat-page #chat-messages>.notice.error{background:#f9ece9;border-color:#eed0ca;color:var(--red)}
-.chat-page #chat-messages>.notice .message-text{background:#eef2f7;border:1px solid #d7e1ee;padding:12px 15px}
+.chat-page .message-label{font-size:13px;color:var(--muted);margin-bottom:7px}
+.chat-page .message-text{max-width:100%;font-size:16px;line-height:1.7;white-space:pre-wrap;overflow-wrap:anywhere}
+.chat-page .message.assistant .message-text{padding:3px 0 8px}
+.chat-page .message.user .message-text{background:var(--sage-tint);border:1px solid #d3e0d0;border-radius:14px;padding:11px 15px}
+.chat-page #chat-messages>.notice{background:none;border:0;color:var(--ink);padding:0;font-size:16px;overflow-wrap:anywhere}
+.chat-page #chat-messages>.notice.error{background:#f9ece9;border:1px solid #eed0ca;border-radius:12px;padding:12px;color:var(--red)}
+.chat-page #chat-messages>.notice .message-text{background:#eef2f7;border:1px solid #d7e1ee;border-radius:12px;padding:12px 15px}
 .chat-page #chat-messages>.notice:not(.error) .message-text{color:var(--ink)}
 
-/* 公开步骤与订单结果：状态真实来自服务端 */
-.chat-page .turn-status{font-size:12px;color:var(--muted);margin-bottom:8px}
+/* 欢迎内容直接说明可用帮助；问题卡只填入草稿。 */
+.chat-page #chat-empty{max-width:760px;margin:clamp(24px,7vh,72px) auto 24px;padding:0;text-align:left;color:var(--ink)}
+.chat-page #chat-empty h2{font:600 32px/1.4 var(--display);color:var(--sage-deep);margin:0 0 14px}
+.chat-page #chat-empty>p{max-width:560px;font-size:16px;line-height:1.8;color:var(--muted)}
+.chat-page #starter-list{list-style:none;margin:28px 0 0;padding:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.chat-page #starter-list li{min-width:0}
+.chat-page .starter-button{display:flex;flex-direction:column;gap:8px;width:100%;min-height:124px;padding:17px 16px;text-align:left;background:var(--panel);border:1px solid var(--line);border-radius:14px;white-space:normal;overflow-wrap:anywhere}
+.chat-page .starter-button:hover{border-color:var(--sage);background:var(--panel-soft)}
+.chat-page .starter-title{font-size:15px;line-height:1.6;font-weight:600;color:var(--sage-deep)}
+.chat-page .starter-description{font-size:14px;line-height:1.7;color:var(--muted)}
+.chat-page #chat-form{flex-shrink:0;width:min(100%,820px);margin:0 auto;padding:12px 30px 22px}
+.chat-page .composer-box{padding:10px 12px;border:1px solid var(--line);border-radius:18px;background:var(--panel);box-shadow:var(--shadow)}
+.chat-page .composer-box:focus-within{outline:2px solid var(--sage);outline-offset:2px}
+.chat-page #chat-input{display:block;width:100%;resize:vertical;min-height:72px;max-height:180px;padding:7px 4px;border:0;border-radius:8px;background:transparent;font:16px/1.7 var(--body);color:var(--ink)}
+.chat-page #chat-input:focus-visible{outline:0}
+.chat-page #chat-input:disabled,.chat-page select:disabled{opacity:.55;cursor:wait}
+.chat-page #chat-input::placeholder{color:var(--muted)}
+.chat-page .composer-footer{display:flex;align-items:center;gap:12px;min-height:44px;margin-top:4px}
+.chat-page .key-note{font-size:12px;color:var(--muted)}
+.chat-page #char-count{margin-left:auto;font:12px var(--mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.chat-page #char-count.over{color:var(--red)}
+.chat-page #send-button{flex-shrink:0;min-width:64px;padding:9px 18px;border-radius:12px;font-size:14px}
+
+/* 原生弹窗容纳设置与手机历史，保持可取消及清楚的名称。 */
+.chat-page .chat-dialog{width:min(520px,calc(100vw - 32px));max-width:none;max-height:calc(100dvh - 32px);padding:0;border:1px solid var(--line);border-radius:16px;background:var(--panel);color:var(--ink);box-shadow:var(--shadow);overflow:auto;overscroll-behavior:contain}
+.chat-page .chat-dialog::backdrop{background:rgb(44 53 48 / .35)}
+.chat-page .dialog-heading{position:sticky;top:0;z-index:1;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 18px;border-bottom:1px solid var(--line);background:var(--panel)}
+.chat-page .dialog-heading h2{font-size:20px;line-height:1.4;font-weight:600}
+.chat-page .dialog-body{padding:20px;display:grid;gap:20px}
+.chat-page .active-settings-section{display:grid;gap:12px}
+.chat-page .active-settings-section h3{font-size:14px;font-weight:500;color:var(--muted)}
+.chat-page #active-settings{display:grid;gap:10px;font-size:14px}
+.chat-page .settings-row{display:grid;grid-template-columns:80px minmax(0,1fr);gap:5px 10px;align-items:baseline}
+.chat-page .settings-row-label{color:var(--muted)}
+.chat-page .settings-row-value{overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
+.chat-page .settings-row-value.mono{font-family:var(--mono);font-size:13px}
+.chat-page #chat-settings{border-top:1px solid var(--line);padding-top:20px}
+.chat-page #settings-form{display:grid;gap:14px}
+.chat-page #settings-form .exp-field{gap:7px}
+.chat-page #settings-form .exp-field-label{font-size:14px;letter-spacing:0}
+.chat-page #settings-form select{font-size:16px;padding:9px 30px 9px 12px}
+.chat-page #apply-settings{width:100%;margin-top:4px;font-size:14px}
+.chat-page .settings-note,.chat-page #settings-status{font-size:14px;line-height:1.7;color:var(--muted);overflow-wrap:anywhere}
+.chat-page #settings-status.error{color:var(--red)}
+.chat-page .secondary-link{display:inline-flex;align-items:center;gap:8px;border-radius:8px;padding:8px 0;font-size:14px;color:var(--sage-deep)}
+.chat-page .secondary-link[aria-disabled="true"]{opacity:.45}
+.chat-page .history-dialog{height:min(640px,calc(100dvh - 32px))}
+.chat-page .history-dialog[open]{display:flex;flex-direction:column}
+.chat-page .history-dialog .conversation-list{flex:1;padding:12px}
+.chat-page .profile-switch-dialog{width:min(440px,calc(100vw - 32px))}
+.chat-page .profile-switch-body{padding:24px}
+.chat-page .profile-switch-body h2{font-size:20px;margin-bottom:12px}
+.chat-page .profile-switch-body p{font-size:16px;line-height:1.7;color:var(--muted)}
+.chat-page .profile-switch-actions{display:flex;justify-content:flex-end;flex-wrap:wrap;gap:10px;margin-top:22px}
+.chat-page .profile-switch-actions .quiet-button{margin-left:0;padding:9px 14px;font-size:14px}
+.chat-page .profile-switch-actions .primary-button{font-size:14px}
+
+/* 公开步骤、可信订单卡和依据仍按既有合同呈现。 */
+.chat-page .turn-status{font-size:14px;color:var(--muted);margin-bottom:8px}
 .chat-page .turn-status.error{color:var(--red)}
-.chat-page .processing-steps{margin:4px 0 12px;font-size:12px;color:var(--muted)}
-.chat-page .processing-steps summary{cursor:pointer;color:var(--sage-deep);padding:4px 0}
+.chat-page .processing-steps{margin:4px 0 12px;font-size:14px;color:var(--muted)}
+.chat-page .processing-steps summary{cursor:pointer;color:var(--sage-deep);min-height:44px;padding:10px 0}
 .chat-page .processing-steps ul{list-style:none;margin:8px 0 0;padding:0 0 0 12px;border-left:2px solid var(--line);display:grid;gap:8px}
 .chat-page .processing-step{display:flex;justify-content:space-between;gap:14px;align-items:baseline}
 .chat-page .step-label{overflow-wrap:anywhere;color:var(--ink)}
-.chat-page .step-status{white-space:nowrap;font-size:11px}
+.chat-page .step-status{white-space:nowrap;font-size:13px}
 .chat-page .processing-step.running .step-status{color:var(--sage-deep)}
 .chat-page .processing-step.done .step-status{color:var(--green)}
 .chat-page .processing-step.error .step-status{color:var(--red)}
 .chat-page .order-cards{display:grid;gap:10px;margin-top:10px}
-.chat-page .order-card{width:100%;background:#fff;border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;display:grid;gap:7px;font-size:12px;line-height:1.65;min-width:0}
+.chat-page .order-card{width:100%;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px;display:grid;gap:8px;font-size:14px;line-height:1.7;min-width:0}
 .chat-page .order-card-heading{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
-.chat-page .order-product{font-size:14px;font-weight:600;overflow-wrap:anywhere;min-width:0}
-.chat-page .order-status{flex-shrink:0;font-size:11px;color:var(--sage-deep);background:var(--sage-tint);padding:2px 7px;border-radius:6px}
+.chat-page .order-product{font-size:16px;font-weight:600;overflow-wrap:anywhere;min-width:0}
+.chat-page .order-status{flex-shrink:0;font-size:12px;color:var(--sage-deep);background:var(--sage-tint);padding:3px 8px;border-radius:6px}
 .chat-page .order-shop{color:var(--muted);overflow-wrap:anywhere}
-.chat-page .order-id,.chat-page .order-date{font-size:11px;color:var(--muted);overflow-wrap:anywhere}
+.chat-page .order-id,.chat-page .order-date{font-size:12px;color:var(--muted);overflow-wrap:anywhere}
 .chat-page .order-id{font-family:var(--mono)}
-.chat-page .order-amounts{display:flex;gap:18px;flex-wrap:wrap;font-variant-numeric:tabular-nums}
+.chat-page .order-amounts{display:flex;gap:16px;flex-wrap:wrap;font-variant-numeric:tabular-nums}
 .chat-page .order-paid{color:var(--sage-deep);font-weight:600}
 .chat-page .order-refunded{color:var(--muted)}
-.chat-page .order-coupons{font-size:11px;color:var(--muted);overflow-wrap:anywhere}
-.chat-page .order-select-button{justify-self:start;margin-top:3px;background:var(--sage-tint);color:var(--sage-deep);border:1px solid #d3e0d0;padding:7px 12px;font-size:12px}
+.chat-page .order-coupons{font-size:13px;color:var(--muted);overflow-wrap:anywhere}
+.chat-page .order-select-button{justify-self:start;margin-top:3px;background:var(--sage-tint);color:var(--sage-deep);border:1px solid #d3e0d0;padding:8px 12px;font-size:14px}
 .chat-page .order-select-button:hover{border-color:var(--sage)}
-.chat-page .order-more{font-size:12px;color:var(--muted);margin-top:10px;overflow-wrap:anywhere}
-
-/* 证据折叠：低强调 */
+.chat-page .order-more{font-size:14px;color:var(--muted);margin-top:10px;overflow-wrap:anywhere}
 .chat-page .evidence{margin-top:8px}
-.chat-page .evidence>summary{font-size:11px;color:var(--sage-deep);cursor:pointer}
+.chat-page .evidence>summary{font-size:14px;color:var(--sage-deep);cursor:pointer;min-height:44px;padding:10px 0}
 .chat-page .evidence>summary:hover{color:var(--sage)}
-.chat-page .evidence ul{margin:6px 0 0;padding-left:18px;font-size:11px;color:var(--muted)}
-.chat-page .evidence li{margin-bottom:3px;overflow-wrap:anywhere}
+.chat-page .evidence ul{margin:6px 0 0;padding-left:18px;font-size:13px;color:var(--muted)}
+.chat-page .evidence li{margin-bottom:4px;overflow-wrap:anywhere}
 
-/* 空态引导：动态 3 例，仅填充草稿 */
-.chat-page #starter-list{list-style:none;margin:14px 0 0;padding:0;display:grid;gap:8px}
-.chat-page .starter-button{width:100%;background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:8px 16px;font-size:12px;color:var(--sage-deep);white-space:normal;overflow-wrap:anywhere}
-.chat-page .starter-button:hover{border-color:var(--sage);background:var(--sage-tint)}
-
-/* 输入区：作为 panel 页脚 */
-.chat-page #chat-form{border-top:1px solid var(--line);padding:13px 18px 15px;display:grid;gap:8px}
-.chat-page .field-label{font-size:11px;color:var(--muted)}
-.chat-page #chat-input{width:100%;box-sizing:border-box;resize:vertical;min-height:66px;max-height:220px;border:1px solid var(--line);border-radius:var(--radius);background:var(--panel-soft);padding:9px 12px;font:inherit;font-size:14px;line-height:1.7;color:var(--ink)}
-.chat-page #chat-input:hover{border-color:var(--sage)}
-.chat-page #chat-input:focus-visible{outline:2px solid var(--sage);outline-offset:1px;border-color:var(--sage)}
-.chat-page #chat-input:disabled,.chat-page select:disabled{opacity:.55;cursor:wait}
-.chat-page .composer-footer{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
-.chat-page .key-note{color:var(--muted)}
-.chat-page #char-count{margin-left:auto;font:10px var(--mono);color:var(--muted);font-variant-numeric:tabular-nums}
-.chat-page #send-button{flex-shrink:0}
-
-/* 侧栏：配置快照常显 + 原生折叠设置 + 订单提示 */
-.chat-page .chat-side{display:grid;gap:16px;align-content:start;min-width:0;position:sticky;top:14px}
-.chat-page .chat-side .panel{margin-bottom:0}
-.chat-page .side-body{padding:13px 18px 15px;display:grid;gap:12px}
-.chat-page #active-settings{display:grid;gap:6px;font-size:11px}
-.chat-page .settings-row{display:grid;grid-template-columns:44px minmax(0,1fr);gap:4px 8px;align-items:baseline}
-.chat-page .settings-row-label{color:var(--muted)}
-.chat-page .settings-row-value{overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
-.chat-page .settings-row-value.mono{font-family:var(--mono)}
-.chat-page #chat-settings{border-top:1px dashed var(--line);padding-top:10px}
-.chat-page #chat-settings>summary{font-size:11px;color:var(--sage-deep);cursor:pointer}
-.chat-page #chat-settings>summary:hover{color:var(--sage)}
-.chat-page #settings-form{display:grid;gap:10px;margin-top:12px}
-.chat-page #apply-settings{width:100%}
-.chat-page #settings-status{margin:0;font-size:11px;color:var(--muted);overflow-wrap:anywhere}
-.chat-page #settings-status.error{color:var(--red)}
-.chat-page .hints-panel>summary{display:flex;align-items:center;gap:8px;padding:13px 18px;font-size:13px;font-weight:600;cursor:pointer;list-style:none}
-.chat-page .hints-panel>summary::-webkit-details-marker{display:none}
-.chat-page .hints-panel>summary::before{content:"›";color:var(--sage);font:16px var(--mono);width:9px;flex-shrink:0}
-.chat-page .hints-panel[open]>summary::before{content:"⌄";font-size:13px}
-.chat-page .hints-panel[open]>summary{border-bottom:1px solid var(--line)}
-.chat-page #order-hints{padding:12px 18px 14px;display:grid;gap:6px;font-size:11px;color:var(--muted)}
-.chat-page #order-hints li{list-style:none;background:var(--panel-soft);border:1px solid var(--line);border-radius:8px;padding:7px 10px;overflow-wrap:anywhere;line-height:1.6}
-
-@media(max-width:1100px){.chat-page .chat-layout{grid-template-columns:minmax(0,1fr) 240px;gap:18px}}
-@media(max-width:900px){.chat-page .chat-layout{grid-template-columns:1fr;gap:16px}.chat-page .chat-side{position:static}}
+@media(max-width:900px){
+.chat-page .chat-workspace{grid-template-columns:220px minmax(0,1fr)}
+.chat-page #chat-empty{margin:16px auto 16px}
+.chat-page #starter-list{grid-template-columns:1fr;gap:8px}
+.chat-page .starter-button{min-height:80px;padding:13px 16px;gap:4px}
+.chat-page #chat-form{padding-inline:20px}
+}
 @media(max-width:760px){
-.chat-page #chat-messages{height:52vh;min-height:240px;max-height:560px;padding:16px 12px}
+.chat-page .chat-workspace{display:flex;flex-direction:column}
+.chat-page .conversation-sidebar{flex-shrink:0;flex-direction:row;align-items:center;gap:8px;padding:9px 12px;border-right:0;border-bottom:1px solid var(--line)}
+.chat-page .sidebar-top{display:flex;align-items:center;gap:8px;flex:1;min-width:0}
+.chat-page .brand{padding:0;margin-right:auto;gap:7px}
+.chat-page .brand-mark{width:28px;height:28px;font-size:16px;border-radius:8px}
+.chat-page .brand-name{font-size:17px}
+.chat-page .brand-caption,.chat-page .sidebar-history,.chat-page .sidebar-action-label{display:none}
+.chat-page .new-conversation-button{flex-shrink:0;min-height:44px;padding:8px 10px;gap:5px;border-radius:10px;font-size:13px}
+.chat-page .new-conversation-button svg{width:16px;height:16px}
+.chat-page .mobile-history-button{display:grid;flex-shrink:0}
+.chat-page .sidebar-bottom{display:flex;align-items:center;gap:4px;border:0;padding:0}
+.chat-page .sidebar-action{width:44px;min-width:44px;height:44px;padding:0;justify-content:center}
+.chat-page .evaluation-link{width:auto;padding:0 8px;gap:0;font-size:13px;white-space:nowrap}
+.chat-page .evaluation-link svg{display:none}
+.chat-page .chat-main{flex:1}
+.chat-page .chat-topbar{padding:10px 16px 8px}
+.chat-page .conversation-heading{gap:12px}
+.chat-page #conversation-title{font-size:16px}
+.chat-page .profile-control{gap:6px;font-size:13px}
+.chat-page .profile-control select{min-width:100px;max-width:150px;font-size:14px;padding-left:9px}
+.chat-page .conversation-status{gap:8px;margin-top:4px}
+.chat-page #app-status{font-size:13px}
+.chat-page #init-retry{font-size:13px;padding:7px 11px}
+.chat-page #chat-messages{padding:20px 16px 6px}
+.chat-page #chat-messages>.message,.chat-page #chat-messages>.notice{margin-bottom:24px}
 .chat-page .message{gap:8px}
 .chat-page .message-avatar{width:30px;height:30px;flex-basis:30px;font-size:15px}
 .chat-page .message-body{max-width:calc(100% - 38px)}
 .chat-page .order-card{padding:12px}
 .chat-page .order-card-heading{gap:6px}
 .chat-page .order-status{flex-shrink:1;white-space:nowrap}
-.chat-page #chat-form{padding:12px 14px 13px}
+.chat-page #chat-empty{margin:16px auto 20px}
+.chat-page #chat-empty h2{font-size:27px;margin-bottom:10px}
+.chat-page #chat-empty>p{font-size:16px;line-height:1.7}
+.chat-page #starter-list{margin-top:20px}
+.chat-page .starter-title{font-size:15px}
+.chat-page #chat-form{padding:10px 16px 14px}
+.chat-page .composer-box{padding:8px 10px;border-radius:16px}
+.chat-page #chat-input{resize:none;min-height:66px;max-height:140px;font-size:16px}
 .chat-page .key-note{display:none}
-.chat-page .composer-footer{justify-content:flex-end}
-.chat-page #char-count{margin-left:0}
-.chat-page .side-body{padding:12px 14px 13px}
-.chat-page .hints-panel>summary{padding:12px 14px}
-.chat-page #order-hints{padding:10px 14px 12px}
+.chat-page .composer-footer{gap:10px;margin-top:2px}
+.chat-page .chat-dialog{width:calc(100vw - 24px);max-height:calc(100dvh - 24px)}
+.chat-page .dialog-heading{padding:10px 14px}
+.chat-page .dialog-body{padding:16px;gap:18px}
+.chat-page .settings-row{grid-template-columns:72px minmax(0,1fr)}
+.chat-page .history-dialog{height:min(640px,calc(100dvh - 24px))}
+.chat-page .profile-switch-body{padding:20px}
 }
-@media(prefers-reduced-motion:no-preference){.chat-page .starter-button,.chat-page #chat-input{transition:border-color .13s,background-color .13s}}
+@media(max-width:400px){
+.chat-page .brand-mark,.chat-page .new-conversation-button span{display:none}
+.chat-page .new-conversation-button{width:44px;padding:0}
+}
+@media(max-width:760px) and (max-height:500px){
+.chat-page{height:auto;min-height:100dvh;overflow-y:auto}
+.chat-page .chat-workspace{height:auto;min-height:100dvh}
+.chat-page #chat-messages{flex:0 0 160px;height:160px;min-height:160px}
+}
+@media(prefers-reduced-motion:no-preference){
+.chat-page .conversation-button,.chat-page .new-conversation-button,.chat-page .starter-button,.chat-page .icon-button,.chat-page .sidebar-action{transition:background-color .13s,border-color .13s,color .13s}
+}

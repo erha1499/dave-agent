@@ -4,85 +4,83 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="color-scheme" content="light">
-  <title>Dave Agent · 本地生活客服</title>
+  <title>Dave · 客服助手</title>
   <link rel="stylesheet" href="/ui.css">
   <link rel="stylesheet" href="./style.css">
   <script src="./app.js" defer></script>
 </head>
 <body class="chat-page">
-  <header class="masthead">
-    <a class="brand" href="./" aria-label="Dave Agent 客服首页"><span class="brand-mark" aria-hidden="true">d.</span><div>Dave Agent <h1>本地生活客服</h1></div></a>
-    <div class="header-meta"><button type="button" id="new-chat" class="quiet-button" disabled>新对话</button></div>
-  </header>
-  <main>
-    <div class="toolbar">
-      <nav class="tabs" aria-label="主导航">
-        <a href="./" class="tab active" aria-current="page">客服问答</a>
-        <a id="eval-link" class="tab" hidden>评测工作台</a>
-      </nav>
-      <label class="kind-filter" for="profile-select">客户 <select id="profile-select" disabled></select></label>
-    </div>
-    <div class="chat-layout">
-      <section class="chat-main" aria-label="客服对话">
-        <div class="panel chat-panel">
-          <div class="panel-heading">
-            <h3>客服问答</h3>
-            <div class="chat-head-side">
-              <p class="chat-status" role="status" aria-live="polite" id="app-status"></p>
-              <button type="button" id="init-retry" class="quiet-button" hidden>重试连接</button>
-            </div>
-          </div>
-          <section class="chat-scroll" id="chat-messages" aria-label="聊天记录" role="log" aria-live="polite" aria-relevant="additions">
-            <div id="chat-empty" class="empty-state">
-              <div class="message-avatar empty-avatar" aria-hidden="true">d.</div>
-              <h2>有什么可以帮你？</h2>
-              <p>咨询团购券使用、本人订单和到账规则。</p>
-              <ul id="starter-list" class="starter-list"></ul>
-            </div>
-          </section>
-          <form id="chat-form" class="composer">
-            <label class="field-label" for="chat-input">你的问题</label>
-            <textarea id="chat-input" maxlength="2000" rows="2" disabled placeholder="例如：我有哪些订单，或者我要退款"></textarea>
-            <div class="composer-footer">
-              <small class="key-note">Enter 发送 · Shift+Enter 换行</small>
-              <span id="char-count" class="char-count">0/2000</span>
-              <button type="submit" id="send-button" class="primary-button" disabled>发送</button>
-            </div>
-          </form>
-        </div>
+  <div class="chat-workspace">
+    <aside class="conversation-sidebar" aria-label="会话导航">
+      <div class="sidebar-top">
+        <div class="brand"><span class="brand-mark" aria-hidden="true">d.</span><div><span class="brand-name">Dave</span><span class="brand-caption">客服助手</span></div></div>
+        <button type="button" id="new-chat" class="new-conversation-button" aria-label="新对话" disabled><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg><span>新对话</span></button>
+        <button type="button" id="history-open" class="icon-button mobile-history-button" aria-label="会话记录" aria-controls="history-dialog" aria-haspopup="dialog"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h11"/></svg></button>
+      </div>
+      <section class="sidebar-history" aria-labelledby="history-heading">
+        <h2 id="history-heading">会话记录</h2>
+        <div id="conversation-list" class="conversation-list"><p class="conversation-empty">正在读取会话…</p></div>
       </section>
-      <aside class="chat-side" aria-label="会话信息">
-        <section class="panel" aria-label="当前配置">
-          <div class="panel-heading"><h3>当前配置</h3></div>
-          <div class="side-body">
-            <div id="active-settings" class="settings-snapshot">连接中…</div>
-            <details id="chat-settings" class="settings-details">
-              <summary>聊天设置</summary>
-              <form id="settings-form" class="settings-form">
-                <div class="exp-field"><label class="exp-field-label" for="model-select">模型</label><select id="model-select" disabled></select></div>
-                <div class="exp-field"><label class="exp-field-label" for="thinking-select">思考模式</label><select id="thinking-select" disabled>
-                  <option value="off">关闭</option>
-                  <option value="high">开启</option>
-                </select></div>
-                <div class="exp-field"><label class="exp-field-label" for="tokens-select">输出上限（Token）</label><select id="tokens-select" disabled>
-                  <option value="512">512</option>
-                  <option value="1024">1024</option>
-                  <option value="2048" selected>2048</option>
-                </select></div>
-                <button type="submit" id="apply-settings" class="primary-button" disabled>应用并新建对话</button>
-                <small class="exp-note">应用后会清空当前对话。</small>
-                <p role="status" aria-live="polite" id="settings-status" class="settings-status"></p>
-              </form>
-            </details>
+      <div class="sidebar-bottom">
+        <a id="eval-link" class="sidebar-action evaluation-link" hidden><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 19V5m0 14h16M8 15v-4m5 4V7m5 8v-6"/></svg><span>评测工作台</span></a>
+        <button type="button" id="settings-open" class="sidebar-action" aria-label="对话设置" aria-controls="settings-dialog" aria-haspopup="dialog"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 6h6m4 0h6M4 12h10m4 0h2M4 18h2m4 0h10"/><circle cx="12" cy="6" r="2"/><circle cx="16" cy="12" r="2"/><circle cx="8" cy="18" r="2"/></svg><span class="sidebar-action-label">对话设置</span></button>
+      </div>
+    </aside>
+    <main class="chat-main">
+      <header class="chat-topbar">
+        <div class="conversation-heading">
+          <h1 id="conversation-title">新对话</h1>
+          <label class="profile-control" for="profile-select"><span>客户</span><select id="profile-select" disabled></select></label>
+        </div>
+        <div class="conversation-status"><p role="status" aria-live="polite" id="app-status"></p><button type="button" id="init-retry" class="quiet-button" hidden>重试连接</button></div>
+      </header>
+      <section class="chat-panel" aria-label="客服对话">
+        <section id="chat-messages" aria-label="聊天记录" role="log" aria-live="polite" aria-relevant="additions">
+          <div id="chat-empty" class="chat-welcome">
+            <h2>你好，我是 Dave。</h2>
+            <p>可以帮你查本人订单和券状态，解释预约、使用与退款条件。</p>
+            <ul id="starter-list" class="starter-list"></ul>
           </div>
         </section>
-        <details class="panel hints-panel">
-          <summary>订单提示</summary>
-          <div id="order-hints"></div>
-        </details>
-      </aside>
+        <form id="chat-form" class="composer">
+          <label class="field-label visually-hidden" for="chat-input">你的问题</label>
+          <div class="composer-box">
+            <textarea id="chat-input" maxlength="2000" rows="2" disabled aria-describedby="char-count" placeholder="写下你的问题…"></textarea>
+            <div class="composer-footer">
+              <small class="key-note">Enter 发送 · Shift+Enter 换行</small>
+              <span id="char-count">0/2000</span>
+              <button type="submit" id="send-button" class="primary-button" disabled>发送</button>
+            </div>
+          </div>
+        </form>
+      </section>
+    </main>
+  </div>
+  <dialog id="history-dialog" class="chat-dialog history-dialog" aria-labelledby="mobile-history-heading">
+    <div class="dialog-heading"><h2 id="mobile-history-heading">会话记录</h2><button type="button" id="history-close" class="icon-button" aria-label="关闭会话记录"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></svg></button></div>
+    <div id="conversation-mobile-list" class="conversation-list"><p class="conversation-empty">正在读取会话…</p></div>
+  </dialog>
+  <dialog id="settings-dialog" class="chat-dialog settings-dialog" aria-labelledby="settings-heading">
+    <div class="dialog-heading"><h2 id="settings-heading">对话设置</h2><button type="button" id="settings-close" class="icon-button" aria-label="关闭对话设置"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></svg></button></div>
+    <div class="dialog-body">
+      <section class="active-settings-section" aria-labelledby="active-settings-heading"><h3 id="active-settings-heading">当前使用</h3><div id="active-settings" class="settings-snapshot">连接中…</div></section>
+      <div id="chat-settings">
+        <form id="settings-form">
+          <div class="exp-field"><label class="exp-field-label" for="model-select">回答模型</label><select id="model-select" disabled></select></div>
+          <div class="exp-field"><label class="exp-field-label" for="thinking-select">思考模式</label><select id="thinking-select" disabled><option value="off">关闭</option><option value="high">开启</option></select></div>
+          <div class="exp-field"><label class="exp-field-label" for="tokens-select">输出上限（Token）</label><select id="tokens-select" disabled><option value="512">512</option><option value="1024">1024</option><option value="2048" selected>2048</option></select></div>
+          <button type="submit" id="apply-settings" class="primary-button" disabled>应用并新建对话</button>
+          <p class="settings-note">已有会话和未发送的问题都会保留。</p>
+          <p role="status" aria-live="polite" id="settings-status"></p>
+        </form>
+      </div>
     </div>
-  </main>
-  <footer><span>团购券使用 · 本人订单 · 到账规则</span><span>Dave Agent · 本地生活客服</span></footer>
+  </dialog>
+  <dialog id="profile-switch-dialog" class="chat-dialog profile-switch-dialog" aria-labelledby="profile-switch-title" aria-describedby="profile-switch-description">
+    <div class="profile-switch-body"><h2 id="profile-switch-title">确认切换客户</h2><p id="profile-switch-description">未发送的问题会清空，已有会话会保留。</p><form method="dialog" class="profile-switch-actions"><button id="profile-switch-cancel" class="quiet-button" value="cancel" autofocus>保留当前客户</button><button class="primary-button" value="switch">切换并清空草稿</button></form></div>
+  </dialog>
+  <dialog id="eval-leave-dialog" class="chat-dialog profile-switch-dialog" aria-labelledby="eval-leave-title" aria-describedby="eval-leave-description">
+    <div class="profile-switch-body"><h2 id="eval-leave-title">还有未发送的问题</h2><p id="eval-leave-description">进入评测工作台会丢弃本页各个会话的草稿，已有会话记录会保留。</p><form method="dialog" class="profile-switch-actions"><button id="eval-leave-cancel" class="quiet-button" value="cancel" autofocus>继续编辑</button><button class="primary-button" value="leave">离开并丢弃草稿</button></form></div>
+  </dialog>
 </body>
 </html>

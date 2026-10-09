@@ -5,6 +5,8 @@ import { createPool, type RowDataPacket } from "mysql2/promise";
 import { CouponStore, readDatabaseConfig } from "./coupon-store.ts";
 import { WebChatError, WebChatSessions } from "./web-chat.ts";
 import { createWebChatAgentFactory, createWebChatSettingsCatalog } from "./web-chat-settings.ts";
+import { WebChatHistory } from "./web-chat-history.ts";
+import { resolve } from "node:path";
 
 const pages = new Map([
   ["/", ["../web/chat/index.html", "text/html; charset=utf-8"]],
@@ -13,10 +15,11 @@ const pages = new Map([
   ["/ui.css", ["../web/evaluation/style.css", "text/css; charset=utf-8"]],
 ]);
 const cookieName = "dave_chat";
-function capability(req: IncomingMessage) {
-  const values = (req.headers.cookie ?? "").split(";").map(value => value.trim()).filter(value => value.startsWith(`${cookieName}=`));
+const ownerCookieName = "dave_chat_owner";
+function capability(req: IncomingMessage, name = cookieName) {
+  const values = (req.headers.cookie ?? "").split(";").map(value => value.trim()).filter(value => value.startsWith(`${name}=`));
   if (values.length !== 1) return undefined;
-  const value = values[0]!.slice(cookieName.length + 1);
+  const value = values[0]!.slice(name.length + 1);
   return /^[A-Za-z0-9_-]{43}$/u.test(value) ? value : undefined;
 }
 function object(value: unknown): value is Record<string, unknown> { return !!value && typeof value === "object" && !Array.isArray(value); }
@@ -64,27 +67,40 @@ export function createWebChatServer(chat: WebChatSessions) {
     try {
       if (!req.url?.startsWith("/") || req.url.startsWith("//")) throw new WebChatError(400, "请求地址无效。");
       const url = new URL(req.url, `http://${req.headers.host}`);
-      if (url.search) throw new WebChatError(400, "客服入口不接受查询参数。");
-      const token = capability(req);
+      const list = req.method === "GET" && url.pathname === "/api/chat/sessions";
+      if (list ? [...url.searchParams].length !== 1 || !["demo-a", "demo-b"].includes(url.searchParams.get("profileId") ?? "")
+        || [...url.searchParams.keys()][0] !== "profileId" : !!url.search) throw new WebChatError(400, "客服入口查询参数无效。");
+      const token = capability(req), owner = capability(req, ownerCookieName);
       if (req.method === "GET" && url.pathname === "/api/chat/config") {
         req.resume(); json(200, await chat.config()); return;
       }
       if (req.method === "GET" && url.pathname === "/api/chat/session") {
-        req.resume(); json(200, chat.get(token)); return;
+        req.resume(); json(200, owner ? await chat.get(token, owner) : { session: null, messages: [] }); return;
       }
-      if (req.method === "POST" && ["/api/chat/session", "/api/chat/messages", "/api/chat/messages/stream"].includes(url.pathname)) {
+      if (list) { req.resume(); json(200, await chat.list(owner, url.searchParams.get("profileId")!)); return; }
+      if (req.method === "POST" && ["/api/chat/session", "/api/chat/session/open", "/api/chat/messages", "/api/chat/messages/stream"].includes(url.pathname)) {
         const body = await readBody(req);
+        const createdResponse = (created: Awaited<ReturnType<WebChatSessions["create"]>>) => {
+          res.setHeader("Set-Cookie", [`${cookieName}=${created.token}; HttpOnly; SameSite=Strict; Path=/`,
+            `${ownerCookieName}=${created.ownerToken}; HttpOnly; SameSite=Strict; Path=/; Max-Age=31536000`]);
+          json(200, { session: created.session, messages: created.messages });
+        };
+        if (url.pathname === "/api/chat/session/open") {
+          if (Object.keys(body).length !== 3 || !["conversationId", "profileId", "sessionId"].every(key => Object.hasOwn(body, key))
+            || typeof body.profileId !== "string") throw new WebChatError(400, "打开对话只接受 conversationId、profileId 和 sessionId。");
+          createdResponse(await chat.open(token, owner, body.conversationId, body.profileId, body.sessionId)); return;
+        }
         if (url.pathname === "/api/chat/session") {
           if (typeof body.profileId !== "string" || !Object.hasOwn(body, "sessionId")
             || Object.keys(body).some(key => !["profileId", "settings", "sessionId"].includes(key)))
             throw new WebChatError(400, "新对话只接受 profileId、sessionId 及完整 settings。");
-          const created = await chat.create(token, body.profileId, body.settings, body.sessionId);
-          res.setHeader("Set-Cookie", `${cookieName}=${created.token}; HttpOnly; SameSite=Strict; Path=/`);
-          json(200, { session: created.session, messages: created.messages }); return;
+          if (token && !owner && body.sessionId !== null) throw new WebChatError(401, "浏览器会话已失效，请重新连接。");
+          createdResponse(await chat.create(owner ? token : undefined, body.profileId, body.settings, body.sessionId, owner)); return;
         }
         if (Object.keys(body).length !== 3 || !["text", "requestId", "sessionId"].every(key => Object.hasOwn(body, key))
           || typeof body.text !== "string" || typeof body.requestId !== "string" || typeof body.sessionId !== "string")
           throw new WebChatError(400, "发送消息只接受 sessionId、requestId 和 text。");
+        if (!owner) throw new WebChatError(401, "浏览器会话已失效，请重新连接。");
         if (url.pathname === "/api/chat/messages/stream") {
           const stream = (event: string, data: unknown) => {
             if (res.destroyed || res.writableEnded) return;
@@ -95,7 +111,7 @@ export function createWebChatServer(chat: WebChatSessions) {
             res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
           };
           try {
-            const result = await chat.send(token, body.requestId, body.text, body.sessionId, ({ type, ...data }) => stream(type, data));
+            const result = await chat.send(token, body.requestId, body.text, body.sessionId, ({ type, ...data }) => stream(type, data), owner);
             stream("result", result);
           } catch (error) {
             if (!res.headersSent) throw error;
@@ -106,7 +122,7 @@ export function createWebChatServer(chat: WebChatSessions) {
           if (!res.destroyed && !res.writableEnded) res.end();
           return;
         }
-        const result = await chat.send(token, body.requestId, body.text, body.sessionId);
+        const result = await chat.send(token, body.requestId, body.text, body.sessionId, undefined, owner);
         // Only creation sets the cookie: a late message response must not replace or clear a newer conversation.
         json(200, result); return;
       }
@@ -140,7 +156,7 @@ async function main() {
     await store.ping();
     const env = { ...process.env }, catalog = createWebChatSettingsCatalog(env);
     await catalog;
-    chat = new WebChatSessions(store, createWebChatAgentFactory(store, env), 60_000, catalog);
+    chat = new WebChatSessions(store, createWebChatAgentFactory(store, env), 60_000, catalog, new WebChatHistory(resolve(".runtime/web-chat/history.sqlite")));
     const server = createWebChatServer(chat);
     await new Promise<void>((resolve, reject) => { server.once("error", reject); server.listen(Number(port), "127.0.0.1", resolve); });
     console.log(`网页客服：http://127.0.0.1:${port}（合成数据，仅只读咨询）`);

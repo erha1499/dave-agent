@@ -15,6 +15,7 @@ export async function checkWebChat() {
   let factories = 0, requests = 0, block: Promise<void> | undefined, onRead: (() => void) | undefined;
   const reads: Array<{ identity: QQIdentity; orderId: string }> = [];
   const store = {
+    async resolveBinding(identity: QQIdentity) { return { bindingId: `binding-${identity.senderId}`, customerId: `customer-${identity.senderId}` }; },
     async listOrders() { return { source: "demo-database", asOf: new Date().toISOString(), orders: [], hasMore: false }; },
     async getOrder(identity: QQIdentity, orderId: string) {
       reads.push({ identity: { ...identity }, orderId }); onRead?.(); await block;
@@ -38,23 +39,28 @@ export async function checkWebChat() {
   const server = createWebChatServer(chat);
   await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve));
   const address = server.address(); assert.ok(address && typeof address !== "string"); const port = address.port;
+  const owners = new Map<string, string>();
+  const combinedCookie = (cookie: string) => owners.has(cookie) ? `${cookie}; ${owners.get(cookie)}` : cookie;
   async function http(path: string, method = "GET", body?: unknown, cookie?: string, headers: Record<string, string> = {}) {
     const bytes = body === undefined ? undefined : Buffer.isBuffer(body) ? body : Buffer.from(typeof body === "string" ? body : JSON.stringify(body));
     return new Promise<{ status: number; data: any; bytes: Buffer; cookie?: string; headers: import("node:http").IncomingHttpHeaders }>((resolve, reject) => {
       const req = request({ hostname: "127.0.0.1", port, path, method, headers: {
         ...(method === "POST" ? { "Content-Type": "application/json", "X-Chat-Request": "1" } : {}),
-        ...(cookie ? { Cookie: cookie } : {}), ...headers,
+        ...(cookie ? { Cookie: combinedCookie(cookie) } : {}), ...headers,
       } }, res => {
         const chunks: Buffer[] = []; res.on("data", data => chunks.push(data));
-        res.once("end", () => { const buffer = Buffer.concat(chunks), text = buffer.toString("utf8"); resolve({ status: res.statusCode!, bytes: buffer,
+        res.once("end", () => {
+          const cookies = res.headers["set-cookie"]?.map(value => value.split(";")[0]!) ?? [];
+          if (cookies[0] && cookies[1]) owners.set(cookies[0], cookies[1]);
+          const buffer = Buffer.concat(chunks), text = buffer.toString("utf8"); resolve({ status: res.statusCode!, bytes: buffer,
           data: res.headers["content-type"]?.includes("application/json") ? JSON.parse(text) : text,
           cookie: res.headers["set-cookie"]?.[0]?.split(";")[0], headers: res.headers }); });
       });
       req.once("error", reject); req.end(bytes);
     });
   }
-  const send = (cookie: string, text: string, requestId = randomUUID()) => http("/api/chat/messages", "POST",
-    { sessionId: chat.get(cookie.split("=")[1]).session?.id ?? randomUUID(), requestId, text }, cookie);
+  const send = async (cookie: string, text: string, requestId = randomUUID()) => http("/api/chat/messages", "POST",
+    { sessionId: (await chat.get(cookie.split("=")[1])).session?.id ?? randomUUID(), requestId, text }, cookie);
   try {
     const sharedCss = await readFile(new URL("../web/evaluation/style.css", import.meta.url));
     const sharedCssHash = createHash("sha256").update(sharedCss).digest("hex");
@@ -93,9 +99,29 @@ export async function checkWebChat() {
       assert.equal((await http("/api/chat/session", "POST", body, b.cookie)).status, 400);
     const liveNull = await http("/api/chat/session", "POST", { profileId: "demo-a", sessionId: null }, b.cookie);
     assert.equal(liveNull.status, 401); assert.equal(liveNull.headers["set-cookie"], undefined);
-    assert.equal(chat.get(b.cookie.split("=")[1]).session?.id, b.data.session.id);
+    assert.equal((await chat.get(b.cookie.split("=")[1])).session?.id, b.data.session.id);
     assert.match(a.headers["set-cookie"]![0]!, /HttpOnly; SameSite=Strict; Path=\//);
     assert.doesNotMatch(a.headers["set-cookie"]![0]!, /Max-Age=/, "server idle expiry must not become a fixed cookie lifetime");
+    const runtimeOnly = a.cookie, ownerOnly = owners.get(a.cookie)!;
+    const legacyGet = await http("/api/chat/session", "GET", undefined, undefined, { Cookie: runtimeOnly });
+    assert.deepEqual(legacyGet.data, { session: null, messages: [] }); assert.equal(legacyGet.headers["set-cookie"], undefined);
+    const legacyNonNull = await http("/api/chat/session", "POST", { profileId: "demo-a", sessionId: a.data.session.id }, undefined, { Cookie: runtimeOnly });
+    assert.equal(legacyNonNull.status, 401); assert.equal(legacyNonNull.headers["set-cookie"], undefined);
+    const upgraded = await http("/api/chat/session", "POST", { profileId: "demo-a", sessionId: null }, undefined, { Cookie: runtimeOnly });
+    assert.equal(upgraded.status, 200, "an explicit null create upgrades a browser without owner capability instead of trapping it in 401");
+    assert.equal(upgraded.headers["set-cookie"]?.length, 2); assert.notEqual(upgraded.cookie, a.cookie);
+    assert.notEqual(owners.get(upgraded.cookie!), ownerOnly); assert.notEqual(upgraded.data.session.conversationId, a.data.session.conversationId);
+    assert.deepEqual(upgraded.data.messages, []); assert.equal(upgraded.data.session.turns, 0);
+    const missingOwnerMessage = { sessionId: a.data.session.id, requestId: randomUUID(), text: "旧能力不能发送消息" };
+    for (const path of ["/api/chat/messages", "/api/chat/messages/stream"]) {
+      const refused = await http(path, "POST", missingOwnerMessage, undefined, { Cookie: runtimeOnly });
+      assert.equal(refused.status, 401); assert.equal(refused.headers["set-cookie"], undefined);
+    }
+    const wrongPair = `${upgraded.cookie}; ${ownerOnly}`;
+    assert.deepEqual((await http("/api/chat/session", "GET", undefined, undefined, { Cookie: wrongPair })).data, { session: null, messages: [] });
+    assert.equal((await http("/api/chat/messages", "POST", { ...missingOwnerMessage, sessionId: upgraded.data.session.id }, undefined, { Cookie: wrongPair })).status, 401);
+    assert.equal((await http("/api/chat/session", "GET", undefined, a.cookie)).data.session.id, a.data.session.id,
+      "missing owner upgrade creates independent authority without reading, adopting or invalidating an existing owner history");
     assert.deepEqual(a.data.session.settings, config.data.defaults); assert.deepEqual(a.data.session.model, { provider: "deepseek", id: "deepseek-flash" });
     for (const settings of [null, {}, { modelSelection: "configured", thinkingLevel: "off" },
       { modelSelection: "arbitrary", thinkingLevel: "off", maxTokens: 512 },
@@ -176,16 +202,16 @@ export async function checkWebChat() {
     const historyA = await http("/api/chat/session", "POST", { profileId: "demo-a", sessionId: null });
     const historyB = await http("/api/chat/session", "POST", { profileId: "demo-b", sessionId: historyA.data.session.id }, historyA.cookie);
     assert.ok(historyB.cookie); await send(historyB.cookie, "查询到账 电子钱包");
-    const beforeReset = chat.get(historyB.cookie.split("=")[1]);
+    const beforeReset = (await chat.get(historyB.cookie.split("=")[1]));
     const staleReset = await http("/api/chat/session", "POST", { profileId: "demo-a", sessionId: historyA.data.session.id }, historyB.cookie);
     assert.equal(staleReset.status, 401); assert.equal(staleReset.headers["set-cookie"], undefined);
     await assert.rejects(chat.create(historyB.cookie.split("=")[1], "demo-a", undefined, historyA.data.session.id),
       error => error instanceof Error && Reflect.get(error, "status") === 401);
-    assert.deepEqual(chat.get(historyB.cookie.split("=")[1]), beforeReset);
+    assert.deepEqual((await chat.get(historyB.cookie.split("=")[1])), beforeReset);
     const resetOld = await http("/api/chat/session", "POST", { profileId: "demo-a", sessionId: null });
     const resetEntered = new Promise<void>(resolve => server.once("request", () => resolve()));
     const resetSplit = request({ hostname: "127.0.0.1", port, path: "/api/chat/session", method: "POST",
-      headers: { "Content-Type": "application/json", "X-Chat-Request": "1", Cookie: resetOld.cookie! } });
+      headers: { "Content-Type": "application/json", "X-Chat-Request": "1", Cookie: combinedCookie(resetOld.cookie!) } });
     const resetReceipt = new Promise<{ status: number; cookie?: string[] }>((resolve, reject) => {
       resetSplit.once("error", reject); resetSplit.once("response", res => { res.resume(); res.once("end", () => resolve({ status: res.statusCode!, cookie: res.headers["set-cookie"] })); });
     });
@@ -194,7 +220,7 @@ export async function checkWebChat() {
     assert.equal(resetNew.status, 200);
     resetSplit.end(JSON.stringify({ profileId: "demo-a", sessionId: resetOld.data.session.id }).slice(1));
     const lateReset = await resetReceipt; assert.equal(lateReset.status, 401); assert.equal(lateReset.cookie, undefined);
-    assert.equal(chat.get(resetNew.cookie!.split("=")[1]).session?.id, resetNew.data.session.id);
+    assert.equal((await chat.get(resetNew.cookie!.split("=")[1])).session?.id, resetNew.data.session.id);
     const racing = await chat.create(undefined, "demo-a");
     const competitors = await Promise.allSettled([
       chat.create(racing.token, "demo-b", undefined, racing.session.id),
@@ -208,7 +234,7 @@ export async function checkWebChat() {
     const splitOld = await http("/api/chat/session", "POST", { profileId: "demo-a", sessionId: null });
     const splitEntered = new Promise<void>(resolve => server.once("request", () => resolve()));
     const split = request({ hostname: "127.0.0.1", port, path: "/api/chat/messages", method: "POST",
-      headers: { "Content-Type": "application/json", "X-Chat-Request": "1", Cookie: splitOld.cookie! } });
+      headers: { "Content-Type": "application/json", "X-Chat-Request": "1", Cookie: combinedCookie(splitOld.cookie!) } });
     const splitReceipt = new Promise<{ status: number; cookie?: string[] }>((resolve, reject) => {
       split.once("error", reject); split.once("response", res => { res.resume(); res.once("end", () => resolve({ status: res.statusCode!, cookie: res.headers["set-cookie"] })); });
     });
@@ -260,7 +286,7 @@ export async function checkWebChat() {
     const droppedEntered = new Promise<void>(resolve => { onRead = resolve; });
     const droppedId = randomUUID(), droppedText = "查询到账 COUPON-1002 电子钱包";
     const dropped = request({ hostname: "127.0.0.1", port, path: "/api/chat/messages", method: "POST",
-      headers: { "Content-Type": "application/json", "X-Chat-Request": "1", Cookie: b.cookie } });
+      headers: { "Content-Type": "application/json", "X-Chat-Request": "1", Cookie: combinedCookie(b.cookie) } });
     dropped.on("error", () => {}); dropped.end(JSON.stringify({ sessionId: b.data.session.id, requestId: droppedId, text: droppedText }));
     await droppedEntered; onRead = undefined; dropped.destroy(); release(); block = undefined;
     let replay = await send(b.cookie, droppedText, droppedId);
@@ -272,13 +298,13 @@ export async function checkWebChat() {
     const reset = await http("/api/chat/session", "POST", { profileId: "demo-b", sessionId: b.data.session.id }, b.cookie);
     assert.equal(reset.status, 200); assert.ok(reset.cookie); assert.notEqual(reset.data.session.id, b.data.session.id); assert.deepEqual(reset.data.messages, []);
 
-    const timeoutChat = new WebChatSessions(store, async () => { throw new Error("must remain host"); }, 25);
+    const timeoutChat = new WebChatSessions(store, async () => { throw new Error("must remain host"); }, 25, catalog);
     const old = await timeoutChat.create(undefined, "demo-a");
     block = new Promise<void>(resolve => { release = resolve; });
     await assert.rejects(timeoutChat.send(old.token, randomUUID(), "查询到账 COUPON-1001 银行卡", old.session.id), error => error instanceof Error && Reflect.get(error, "status") === 503);
-    assert.equal(timeoutChat.get(old.token).session, null);
+    assert.equal((await timeoutChat.get(old.token)).session, null);
     const replacement = await timeoutChat.create(undefined, "demo-b"); release(); block = undefined;
-    await new Promise<void>(resolve => setTimeout(resolve, 10)); assert.deepEqual(timeoutChat.get(replacement.token).messages, []);
+    await new Promise<void>(resolve => setTimeout(resolve, 10)); assert.deepEqual((await timeoutChat.get(replacement.token)).messages, []);
     timeoutChat.close();
 
     // Creating a native Pi session may finish after the request deadline; dispose it before any provider prompt.
@@ -292,7 +318,7 @@ export async function checkWebChat() {
     const factoryChat = new WebChatSessions(store, async identity => {
       if (identity.senderId === "TEST_USER1") { enteredFactory(); await factoryGate; return lateCreated; }
       return createCouponSession(identity, store, runtime, faux.getModel());
-    }, 30);
+    }, 30, catalog);
     const lateFactorySession = await factoryChat.create(undefined, "demo-a");
     const lateFactoryTurn = factoryChat.send(lateFactorySession.token, randomUUID(), "旧会话创建迟到", lateFactorySession.session.id);
     await factoryEntered;
@@ -301,8 +327,8 @@ export async function checkWebChat() {
     faux.setResponses([() => { requests++; return fauxAssistantMessage("新身份的独立回复"); }]);
     assert.equal((await factoryChat.send(newFactorySession.token, randomUUID(), "新身份正常问题", newFactorySession.session.id)).reply.text, "新身份的独立回复");
     releaseFactory(); await new Promise<void>(resolve => setTimeout(resolve, 10));
-    assert.equal(lateDisposals, 1); assert.equal(factoryChat.get(lateFactorySession.token).session, null);
-    assert.deepEqual(factoryChat.get(newFactorySession.token).messages.map(row => row.text), ["新身份正常问题", "新身份的独立回复"]);
+    assert.equal(lateDisposals, 1); assert.equal((await factoryChat.get(lateFactorySession.token)).session, null);
+    assert.deepEqual((await factoryChat.get(newFactorySession.token)).messages.map(row => row.text), ["新身份正常问题", "新身份的独立回复"]);
     factoryChat.close();
 
     // An already-running native Pi prompt is aborted/disposed; even an ignored provider signal cannot publish its late answer.
@@ -318,7 +344,7 @@ export async function checkWebChat() {
         session.dispose = () => { disposedNative++; disposeNative(); };
       }
       return session;
-    }, 30);
+    }, 30, catalog);
     faux.setResponses([async (_context, options) => {
       requests++; providerSignal = options?.signal; enteredProvider(); await providerGate; return fauxAssistantMessage("迟到的旧身份回复");
     }]);
@@ -331,8 +357,8 @@ export async function checkWebChat() {
     faux.setResponses([() => { requests++; return fauxAssistantMessage("当前身份的回复"); }]);
     assert.equal((await promptChat.send(newPromptSession.token, randomUUID(), "当前身份的问题", newPromptSession.session.id)).reply.text, "当前身份的回复");
     releaseProvider(); await new Promise<void>(resolve => setTimeout(resolve, 10));
-    assert.equal(promptChat.get(latePromptSession.token).session, null);
-    assert.deepEqual(promptChat.get(newPromptSession.token).messages.map(row => row.text), ["当前身份的问题", "当前身份的回复"]);
+    assert.equal((await promptChat.get(latePromptSession.token)).session, null);
+    assert.deepEqual((await promptChat.get(newPromptSession.token)).messages.map(row => row.text), ["当前身份的问题", "当前身份的回复"]);
     promptChat.close();
 
     for (let turn = 0; turn < 20; turn++) assert.equal((await send(reset.cookie, "查询到账 银行卡")).status, 200);
@@ -342,7 +368,7 @@ export async function checkWebChat() {
     const idle = await idleChat.create(undefined, "demo-a"), realNow = Date.now, idleNow = realNow();
     try {
       Date.now = () => idleNow + 30 * 60_000;
-      assert.equal(idleChat.get(idle.token).session, null);
+      assert.equal((await idleChat.get(idle.token)).session, null);
       await assert.rejects(idleChat.create(idle.token, "demo-a", undefined, idle.session.id),
         error => error instanceof Error && Reflect.get(error, "status") === 401);
       const idleRecovered = await idleChat.create(idle.token, "demo-a", undefined, null);
@@ -360,7 +386,7 @@ async function checkWebChatSettings() {
   const originalFetch = globalThis.fetch;
   const env = { DEEPSEEK_API_KEY: "synthetic-deepseek", DASHSCOPE_API_KEY: "synthetic-bailian", EVAL_PORT: "3011" };
   const wires: Array<Record<string, any>> = [];
-  const store = { async getOrder() { throw new Error("unexpected DB read"); }, async searchKnowledge() { throw new Error("unexpected DB read"); } } as unknown as CouponStore;
+  const store = { async resolveBinding(identity: QQIdentity) { return { bindingId: `binding-${identity.senderId}`, customerId: `customer-${identity.senderId}` }; }, async getOrder() { throw new Error("unexpected DB read"); }, async searchKnowledge() { throw new Error("unexpected DB read"); } } as unknown as CouponStore;
   globalThis.fetch = async (url, init) => {
     assert.ok(["https://api.deepseek.com/chat/completions", "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions"].includes(String(url)), "unknown endpoint never reaches a network");
     const headers = new Headers(init?.headers), body = JSON.parse(String(init?.body));
@@ -391,7 +417,7 @@ async function checkWebChatSettings() {
     const host = await hostOnly.create(undefined, "demo-a");
     assert.equal((await hostOnly.send(host.token, randomUUID(), "查询到账 银行卡", host.session.id)).origin, "host");
     await assert.rejects(hostOnly.create(host.token, "demo-b", noKeys.defaults, host.session.id), /当前不可用/);
-    assert.equal(hostOnly.get(host.token).session?.id, host.session.id);
+    assert.equal((await hostOnly.get(host.token)).session?.id, host.session.id);
     const nextHost = await hostOnly.create(host.token, "demo-b", undefined, host.session.id);
     assert.deepEqual(nextHost.session.settings, noKeys.defaults); hostOnly.close();
     assert.equal(wires.length, 0);
@@ -410,9 +436,9 @@ async function checkWebChatSettings() {
     let cookie: string | undefined;
     for (const settings of cases) {
       const before: number = wires.length;
-      const created = await chat.create(cookie, "demo-a", settings, chat.get(cookie).session?.id ?? null); cookie = created.token;
+      const created = await chat.create(cookie, "demo-a", settings, (await chat.get(cookie)).session?.id ?? null); cookie = created.token;
       assert.equal(wires.length, before, "creating/resetting settings does not prompt the model");
-      assert.deepEqual(chat.get(cookie).session?.settings, settings, "refresh exposes the actually applied snapshot");
+      assert.deepEqual((await chat.get(cookie)).session?.settings, settings, "refresh exposes the actually applied snapshot");
       assert.equal((await chat.send(cookie, randomUUID(), "查询到账 电子钱包", created.session.id)).origin, "host");
       assert.equal(wires.length, before, "host consultation never initializes a selected generation model");
       const result = await chat.send(cookie, randomUUID(), "普通合成问答，不查询任何订单", created.session.id);
@@ -429,7 +455,7 @@ async function checkWebChatSettings() {
       assert.deepEqual(native.getActiveToolNames().sort(), ["get_order", "list_orders", "search_faq"]);
       assert.equal(native.thinkingLevel, settings.thinkingLevel); assert.equal(native.model?.maxTokens, settings.maxTokens);
     }
-    const preserved = await chat.create(cookie, "demo-b", cases.at(-1), chat.get(cookie).session?.id ?? null); cookie = preserved.token;
+    const preserved = await chat.create(cookie, "demo-b", cases.at(-1), (await chat.get(cookie)).session?.id ?? null); cookie = preserved.token;
     assert.deepEqual(preserved.session.settings, cases.at(-1)); assert.deepEqual(preserved.messages, []);
     assert.equal(wires.length, 6);
     console.log("网页参数检查通过：4 个目录选项、完整配置快照、默认无密钥宿主兼容、坏设置保留旧会话；6 次原生 Pi 替代 HTTP 验证模型、off/high 与 512/1024/2048 实际请求；0 远程/DB/QQ。");

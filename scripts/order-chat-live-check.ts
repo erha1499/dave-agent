@@ -77,7 +77,7 @@ async function run(fresh = false) {
       const response = await fetch(`${origin}/api/chat/session`, { method: "POST", headers: { "Content-Type": "application/json", "X-Chat-Request": "1" },
         body: JSON.stringify({ profileId, sessionId: null }), signal: deadline });
       assert.equal(response.status, 200);
-      cookie = response.headers.get("set-cookie")!.split(";")[0]!;
+      cookie = response.headers.getSetCookie().map(value => value.split(";")[0]!).join("; ");
       const body = await response.json(); sessionId = body.session.id; result.configuration = { settings: body.session.settings, model: body.session.model };
     }
     async function send(index: number, text: string) {

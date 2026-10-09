@@ -21,8 +21,8 @@ async function run() {
     const response = await fetch(origin + path, { method: body === undefined ? "GET" : "POST", redirect: "error",
       headers: { ...(cookie ? { Cookie: cookie } : {}), ...(body === undefined ? {} : { "Content-Type": "application/json", "X-Chat-Request": "1" }) },
       ...(body === undefined ? {} : { body: JSON.stringify(body) }), signal: AbortSignal.timeout(90_000) });
-    const next = response.headers.get("set-cookie");
-    if (next) cookie = next.split(";")[0]!;
+    const next = response.headers.getSetCookie();
+    if (next.length) cookie = next.map(value => value.split(";")[0]!).join("; ");
     assert.equal(response.status, 200, "local chat HTTP receipt must be successful");
     return response.json();
   }

@@ -29,6 +29,7 @@ export async function checkOrderDiscovery() {
   let listings = 0, denied = false;
   const reads: Array<{ identity: QQIdentity; orderId: string }> = [];
   const store = {
+    async resolveBinding(who: QQIdentity) { assert.deepEqual(who, identity); return { bindingId: "discovery-binding", customerId: "discovery-customer" }; },
     async listOrders(who: QQIdentity) { assert.deepEqual(who, identity); listings++; return structuredClone(list); },
     async getOrder(who: QQIdentity, orderId: string) {
       assert.deepEqual(who, identity); reads.push({ identity: { ...who }, orderId });
