@@ -1,16 +1,16 @@
 {
   "version": 1,
-  "createdAt": "2026-10-10T04:08:53.474080+00:00",
+  "createdAt": "2026-10-10T04:29:30.686247+00:00",
   "publicationStatus": "local-drafts-not-published",
   "authorization": "Publish after the requested repairs and their required validation; local draft checks do not confirm publication.",
-  "baseGitCommit": "d6a54dce41264da58d58db9a7a28e6fcf941b78a",
+  "baseGitCommit": "c0c170fcd746c13d701aa0ff29286a9f8913ea50",
   "plannedDelivery": {
-    "existingLessonsExpanded": 9,
+    "existingLessonsExpanded": 15,
     "newLessons": 3,
     "navigationUpdated": 1,
     "instructions": 1,
-    "publicationDocuments": 13,
-    "markdownFiles": 14
+    "publicationDocuments": 19,
+    "markdownFiles": 20
   },
   "historicalOnlineSourceAudit": {
     "auditedAt": "2026-10-09T17:54:04.066051+00:00",
@@ -22,14 +22,14 @@
   "validation": {
     "relativeLinks": "passed",
     "sourceExcerpts": "passed after stripping outer indentation; explicitly combined schema lines permit trailing commas",
-    "sourceBlockCount": 65,
-    "imageCount": 26,
+    "sourceBlockCount": 92,
+    "imageCount": 38,
     "newVisuals": "6 PNG exports and 6 SVG originals present; this build records file hashes and PNG dimensions, not a fresh visual review.",
-    "remoteImages": "20 references match the prior verified source archive; no fresh image-network check in this local build.",
+    "remoteImages": "32 references match the prior verified source archive; no fresh image-network check in this local build.",
     "limitations": [
       "Codex-assisted answer review is not human acceptance",
       "M1 real-model frozen version predates M4; its 20/26 unadmitted outcome is not overwritten",
-      "Current source excerpts explain implementation, not acceptance of the new repair batch; report its actual result separately when available",
+      "Current source excerpts explain final host mechanisms; the closed Web batch remains engineering 7/7, answer and joint 6/7, not admitted. The final fixed wording has deterministic checks and does not rewrite that batch.",
       "Import and reload every actual Yuque reading page before claiming publication"
     ]
   },
@@ -38,11 +38,15 @@
     "scripts/stable-joint-contract.ts": "76fe37ed4ff8874ec91359195031d1a26f5be5ea1ba07830781272f19ede35b4",
     "scripts/stable-joint-run.ts": "598a03cbe90708ef4be2c829e91aa359f259e496338081021affd81940cd26ef",
     "scripts/web-evidence-live-check.ts": "87057bdb3c66615fbffbb066c8e209695546120e6aa795d9252a6e5c6f9bf1e8",
+    "src/after-sales.ts": "a26db542010fb3471215ff63295fc3d0dbbb7ce6d2be7ba8fe8550b008148cd1",
     "src/agent.ts": "0a0ec2e4a45488fcbda57b8cb052d835875ded94d36be9cc28e62d084e73641c",
     "src/cli.ts": "aa11840be389b53f9b9b5b26e2cefa496f5d352479c0a3001a2a562344ff6439",
     "src/conversation-state.ts": "5dc215be064b59657a53cdf66e2ccf67ccf39d2f9f0a0a8affb5353d4ea9ea79",
+    "src/coupon-store.ts": "833120439be1f457a17b4152d8a9e7c2e96a86232d2cb30d2863aff835b14b6a",
     "src/eval-analysis.ts": "8e7f23098e84eb841a445c90e91c84f1d12647aa3d453c7041c1dd4f533281b9",
     "src/eval-capture.ts": "180fa2da5f8ebc88224ffb28f3f3397595476dc9a057e88ec31fa1403de7f72c",
+    "src/knowledge-service.ts": "60114999337a5644b46096e87c7c16bdffbc9a0a6f0fd2596eef69bfaf7a8536",
+    "src/merchant-notifications.ts": "63fa4fea4ba027b883e48ac4ce8b90822b729a59bac0c0b8666f01f93b62eb1b",
     "src/model-request-budget.ts": "d676cdd0817aa7364dec06ecd400dd4cde4c4faa5951a43ff1eb8165ce393159",
     "src/model-selection.ts": "e9b1eedd0d6a22d1a67164a07bed9bc425e7c85c0e575d2c1dca3bd7e0a21631",
     "src/qq-agent.ts": "41f95c7499b45df2c30c176c9f70cd06e93cd9e4207997988ff736a32476f780",
@@ -53,6 +57,7 @@
     "src/support-context-action.ts": "8fbf6e09b699e5542f11c0cc0ffb7b59c900c69dd7fe121180fbc6725b0194c6",
     "src/support-context.ts": "6d7e251dab36f6d12bf0365d0ab90f6cc41f5318f36f84b4b1777fd97c2d7bfb",
     "src/support-controller.ts": "42e02738efe2243ebf72bff199eda0b405308bb9891bab1b1e9265f69f3a4f42",
+    "src/support-session.ts": "ae0fb522d68e48961e011cae6b275c34b5a54fd8becdba99999dcaeba706e088",
     "src/web-chat-history.ts": "ec62b8724b13e3d095abb75da12ea319eea9c0bf71d11c02292c2722b359c98e",
     "src/web-chat.ts": "b4d10b65f3aa0790e7a730c08efec15cce1ae2e272720dddf200fce983d48f80"
   },
@@ -159,6 +164,100 @@
         "onlineVerifiedAt": "2026-10-09T17:48:08.722Z",
         "snapshotSha256": "dbff8ea5530de21e4a4a9b9bf5849c1875a8b4e8ef14085d44693bcdf9900ac1",
         "draftSha256": "1bbf04b2016b149e83968cc01de0fa19be7440d74daf7ce887e5d8a029a19771"
+      },
+      "remoteImagesMatchPriorArchive": true
+    },
+    {
+      "file": "01.10-startup.md",
+      "sha256": "8f2cd054032f624b1c0a8f698eab245efa886be292c1e9637cd10a645c0deba0",
+      "images": [
+        {
+          "alt": "售后业务主线",
+          "url": "https://cdn.nlark.com/yuque/0/2026/png/67086517/1791438662607-f1042921-fa53-4302-926e-fa7cdb34672a.png"
+        },
+        {
+          "alt": "配置与实际生效",
+          "url": "https://cdn.nlark.com/yuque/0/2026/png/67086517/1791471063241-f31d9327-78ab-4f0b-b308-0a9678906439.png"
+        }
+      ],
+      "sourceBlocks": [
+        {
+          "index": 1,
+          "sources": [
+            "src/support-session.ts"
+          ]
+        },
+        {
+          "index": 2,
+          "sources": [
+            "src/support-session.ts"
+          ]
+        },
+        {
+          "index": 3,
+          "sources": [
+            "src/cli.ts"
+          ]
+        },
+        {
+          "index": 4,
+          "sources": [
+            "src/cli.ts"
+          ]
+        }
+      ],
+      "delivery": "replace-existing",
+      "targetUrl": "https://www.yuque.com/erha-vrnso/repg3o/piqm37taos3w4v96",
+      "source": {
+        "slug": "piqm37taos3w4v96",
+        "title": "01.10｜启动配置：让参数真正决定运行路径",
+        "onlineVerifiedAt": "2026-10-09T17:48:24.642Z",
+        "snapshotSha256": "a3234c03ab7bda176990dbbe508cd3af8f9827a6cdfd241e5c41dfe1f999f07d",
+        "draftSha256": "61cf9c778696f3e499b2a9d6557aa9824ef1f551a6ed17448d2fa3d8f913a1a7"
+      },
+      "remoteImagesMatchPriorArchive": true
+    },
+    {
+      "file": "02.10-identity.md",
+      "sha256": "cc84021985e05c608f471c90fe5ecce17712650479ea8a1ff366c831bfb8b620",
+      "images": [
+        {
+          "alt": "身份、确认与事务保护",
+          "url": "https://cdn.nlark.com/yuque/0/2026/png/67086517/1791438761607-8fefff0c-06c2-4284-b67f-7c1ce4359751.png"
+        },
+        {
+          "alt": "引用定位与重新查证",
+          "url": "https://cdn.nlark.com/yuque/0/2026/png/67086517/1791472091434-60041415-cd71-43cc-a5e4-70e4201df596.png"
+        }
+      ],
+      "sourceBlocks": [
+        {
+          "index": 1,
+          "sources": [
+            "src/coupon-store.ts"
+          ]
+        },
+        {
+          "index": 2,
+          "sources": [
+            "src/qq-agent.ts"
+          ]
+        },
+        {
+          "index": 3,
+          "sources": [
+            "src/qq-agent.ts"
+          ]
+        }
+      ],
+      "delivery": "replace-existing",
+      "targetUrl": "https://www.yuque.com/erha-vrnso/repg3o/hkarf7z7sp68lw1p",
+      "source": {
+        "slug": "hkarf7z7sp68lw1p",
+        "title": "02.10｜可信身份：订单授权与旧上下文失效",
+        "onlineVerifiedAt": "2026-10-09T17:48:43.190Z",
+        "snapshotSha256": "790607361dc248b06dbdc39e28f944a2775e8b45074a8f00a65ee162b037de2f",
+        "draftSha256": "38148497d6c3d29c3ae58f82976653a7d386181b6a80b090d457a4aa1a1dcde1"
       },
       "remoteImagesMatchPriorArchive": true
     },
@@ -293,6 +392,62 @@
       "remoteImagesMatchPriorArchive": true
     },
     {
+      "file": "03.40-notifications.md",
+      "sha256": "827e3b4a82897953ac2808e386dcdbc91ed6f9b2edb4643f7abf1adf68741e65",
+      "images": [
+        {
+          "alt": "身份、绑定与订单归属",
+          "url": "https://cdn.nlark.com/yuque/0/2026/png/67086517/1791471224430-bea540b2-07a1-4b41-8fbe-e00f0a260e94.png"
+        },
+        {
+          "alt": "业务状态与通知投递分离",
+          "url": "https://cdn.nlark.com/yuque/0/2026/png/67086517/1791438796562-ea4c4ad8-ee3f-4667-9cd7-9502cdf40f89.png"
+        }
+      ],
+      "sourceBlocks": [
+        {
+          "index": 1,
+          "sources": [
+            "src/merchant-notifications.ts"
+          ]
+        },
+        {
+          "index": 2,
+          "sources": [
+            "src/after-sales.ts"
+          ]
+        },
+        {
+          "index": 3,
+          "sources": [
+            "src/qq-agent.ts"
+          ]
+        },
+        {
+          "index": 4,
+          "sources": [
+            "src/qq-agent.ts"
+          ]
+        },
+        {
+          "index": 5,
+          "sources": [
+            "src/agent.ts"
+          ]
+        }
+      ],
+      "delivery": "replace-existing",
+      "targetUrl": "https://www.yuque.com/erha-vrnso/repg3o/us8q9ourkbvuzaaq",
+      "source": {
+        "slug": "us8q9ourkbvuzaaq",
+        "title": "03.40｜结果通知：原路由、领取与查询恢复",
+        "onlineVerifiedAt": "2026-10-09T17:50:16.254Z",
+        "snapshotSha256": "280e73797f4a26b8a063138cae47c297ef4c1c80f8120ea258940e53be3fbcbb",
+        "draftSha256": "3e68767cca3fbf994326eb79ce027a12ab54bb656ac7905361d551932a783579"
+      },
+      "remoteImagesMatchPriorArchive": true
+    },
+    {
       "file": "03.50-failures.md",
       "sha256": "4af497735c54c2c04d22946f0612ee762c42a25a7404933d6fcdd5b678c9a6d6",
       "images": [
@@ -357,6 +512,50 @@
         "onlineVerifiedAt": "2026-10-09T17:44:32.292Z",
         "snapshotSha256": "eb4662110621c1f47bc24b082d8d2e2c10620abede405c85aeddf618568d22c6",
         "draftSha256": "4ec05ceb18ddba25c2d5381fb43d3ca594f929c432fa05aaf638468fcf70fddb"
+      },
+      "remoteImagesMatchPriorArchive": true
+    },
+    {
+      "file": "04.10-session-rebuild.md",
+      "sha256": "9949f087c0e5c9c02cf49624b9f2eb6994c5c44d14a5e0f61ed6083a2160528f",
+      "images": [
+        {
+          "alt": "业务状态与通知投递分离",
+          "url": "https://cdn.nlark.com/yuque/0/2026/png/67086517/1791438796562-ea4c4ad8-ee3f-4667-9cd7-9502cdf40f89.png"
+        },
+        {
+          "alt": "检索候选的范围与时效",
+          "url": "https://cdn.nlark.com/yuque/0/2026/png/67086517/1791472299872-db5d70af-0b42-4a8d-9a0f-d7394deac3e9.png"
+        }
+      ],
+      "sourceBlocks": [
+        {
+          "index": 1,
+          "sources": [
+            "src/qq-agent.ts"
+          ]
+        },
+        {
+          "index": 2,
+          "sources": [
+            "src/support-session.ts"
+          ]
+        },
+        {
+          "index": 3,
+          "sources": [
+            "src/conversation-state.ts"
+          ]
+        }
+      ],
+      "delivery": "replace-existing",
+      "targetUrl": "https://www.yuque.com/erha-vrnso/repg3o/scb40rh02au61uo6",
+      "source": {
+        "slug": "scb40rh02au61uo6",
+        "title": "04.10｜会话重建：恢复定位，重新授权",
+        "onlineVerifiedAt": "2026-10-09T17:50:33.337Z",
+        "snapshotSha256": "33e160ff9720ae8d6c6f339795d10d80f823733e8e1ed5c8df0b904473029e7e",
+        "draftSha256": "1520bb88c3906b1d0ea849887f9edcf071c8b96f51e703b4b4e90dbf1c4222b3"
       },
       "remoteImagesMatchPriorArchive": true
     },
@@ -483,6 +682,130 @@
       "targetUrl": null,
       "source": null,
       "remoteImagesMatchPriorArchive": null
+    },
+    {
+      "file": "05.10-rules.md",
+      "sha256": "fcd96f6ca51157d6a65399e2554a2622fc6ae0378ca481031cabf1e3647084e2",
+      "images": [
+        {
+          "alt": "售后业务主线",
+          "url": "https://cdn.nlark.com/yuque/0/2026/png/67086517/1791438662607-f1042921-fa53-4302-926e-fa7cdb34672a.png"
+        },
+        {
+          "alt": "检索候选的范围与时效",
+          "url": "https://cdn.nlark.com/yuque/0/2026/png/67086517/1791472299872-db5d70af-0b42-4a8d-9a0f-d7394deac3e9.png"
+        }
+      ],
+      "sourceBlocks": [
+        {
+          "index": 1,
+          "sources": [
+            "src/coupon-store.ts"
+          ]
+        },
+        {
+          "index": 2,
+          "sources": [
+            "src/agent.ts"
+          ]
+        },
+        {
+          "index": 3,
+          "sources": [
+            "src/coupon-store.ts"
+          ]
+        },
+        {
+          "index": 4,
+          "sources": [
+            "src/knowledge-service.ts"
+          ]
+        },
+        {
+          "index": 5,
+          "sources": [
+            "src/knowledge-service.ts"
+          ]
+        }
+      ],
+      "delivery": "replace-existing",
+      "targetUrl": "https://www.yuque.com/erha-vrnso/repg3o/gfgtkqz4ov2yy0kf",
+      "source": {
+        "slug": "gfgtkqz4ov2yy0kf",
+        "title": "05.10｜规则来源：范围、内容变化与适用性",
+        "onlineVerifiedAt": "2026-10-09T17:51:36.187Z",
+        "snapshotSha256": "b3659873e8a57c3a5cb79b9c1da27290d26b62af2b89168d4866971842bedc5c",
+        "draftSha256": "608b41527ecdfd4684fbe14bcba8ac797165ef3c9f47c469130aaf201ee66843"
+      },
+      "remoteImagesMatchPriorArchive": true
+    },
+    {
+      "file": "05.20-retrieval.md",
+      "sha256": "7c219458433b02529dec38e0fec71f1eabd9ec3fcd243a2ec2fb381e7f8885b4",
+      "images": [
+        {
+          "alt": "检索候选的范围与时效",
+          "url": "https://cdn.nlark.com/yuque/0/2026/png/67086517/1791472299872-db5d70af-0b42-4a8d-9a0f-d7394deac3e9.png"
+        },
+        {
+          "alt": "售后业务主线",
+          "url": "https://cdn.nlark.com/yuque/0/2026/png/67086517/1791438662607-f1042921-fa53-4302-926e-fa7cdb34672a.png"
+        }
+      ],
+      "sourceBlocks": [
+        {
+          "index": 1,
+          "sources": [
+            "src/agent.ts"
+          ]
+        },
+        {
+          "index": 2,
+          "sources": [
+            "src/coupon-store.ts"
+          ]
+        },
+        {
+          "index": 3,
+          "sources": [
+            "src/agent.ts"
+          ]
+        },
+        {
+          "index": 4,
+          "sources": [
+            "src/reply-from-tools.ts"
+          ]
+        },
+        {
+          "index": 5,
+          "sources": [
+            "src/reply-from-tools.ts"
+          ]
+        },
+        {
+          "index": 6,
+          "sources": [
+            "src/reply-from-tools.ts"
+          ]
+        },
+        {
+          "index": 7,
+          "sources": [
+            "src/reply-from-tools.ts"
+          ]
+        }
+      ],
+      "delivery": "replace-existing",
+      "targetUrl": "https://www.yuque.com/erha-vrnso/repg3o/bgk7n1zx4we3gcvn",
+      "source": {
+        "slug": "bgk7n1zx4we3gcvn",
+        "title": "05.20｜订单取证：事实、依据与回答",
+        "onlineVerifiedAt": "2026-10-09T17:51:54.104Z",
+        "snapshotSha256": "cf14c6e86787b09f1ef3a977edcb708fd22ad2510e8446676dd5fa493d3a7dfb",
+        "draftSha256": "e7efa830158b5f9b0bad9d6e14396f06f2280e38cc03c5117de606bcc77b2a1a"
+      },
+      "remoteImagesMatchPriorArchive": true
     },
     {
       "file": "06.20-web-replay.md",
@@ -768,7 +1091,7 @@
     },
     {
       "file": "README.md",
-      "sha256": "c6e1a01854a74d76afdcd9b92c0f9d2c18084fdf6ba9285bfce33b1f09597f72",
+      "sha256": "5943f697cec6025a5d14ca80379a4b63eabd4c0c2b82de8743a904c876b2f624",
       "images": [],
       "sourceBlocks": [],
       "delivery": "instructions",
@@ -856,7 +1179,7 @@
     "deterministicHostFix": "passed; no paid rerun or historical score rewrite",
     "realModelBatch": "closed: engineering 7/7; answer and joint 6/7; not admitted",
     "verification": "data/web-repair-verification-20261010.json",
-    "onlinePublication": "pending Yuque sign-in and 26-page plus directory reload",
+    "onlinePublication": "Native Chrome Yuque sign-in found; 19-page publication and all 26 reading pages plus directory reload remain pending.",
     "scope": "Teaching current mechanisms and evidence boundaries, not promotion of historical merchant or entire Web batch quality."
   }
 }
