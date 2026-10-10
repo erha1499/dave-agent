@@ -1,6 +1,6 @@
 # 网页客服问答
 
-日期：2026-10-09；当前状态：会话产品与持久记录、客户与多页原稿恢复、能力简介、响应式与键盘阅读、评测草稿保护和工作台编辑保持已完成相应验收。第33轮持续监测于北京时间10:00结束；用户随后另授权第34轮导航与文案修复、截图检查和自动commit/push。第34轮最终专项与完整 validate 均通过，另有当前版本只读MySQL与临时SQLite联调；运行版本、结果及局限见末节。本轮及持续优化由 Codex 实现，不使用 Kimi。首版Kimi来源、旧进程内历史和逐轮结果保留在历史章节，不能替代当前证据。
+文档核对：2026-10-10；最近验收：2026-10-09。会话产品与持久记录、客户与多页原稿恢复、能力简介、响应式与键盘阅读、评测草稿保护和工作台编辑保持已完成相应验收。第33轮持续监测于北京时间10:00结束；用户随后另授权第34轮导航与文案修复、截图检查和自动commit/push。第34轮最终专项与完整 validate 均通过，另有该轮版本只读MySQL与临时SQLite联调；运行版本、结果及局限见末节。第23—34轮由 Codex 实现，不使用 Kimi。首版Kimi来源、旧进程内历史和逐轮结果保留在历史章节，不能替代当前合同或算作本次新增验收。
 
 <a id="current-history"></a>
 
@@ -16,16 +16,22 @@ node --env-file-if-exists=.env src/web-chat-server.ts
 
 打开 `http://127.0.0.1:3002/`。`dave_agent_read` 必须实际只有 USAGE/SELECT；模型和数据库凭据只留在服务端。新建、回访、处理中刷新、客户切换及保存失败的最终结果见[第23轮记录](#round23-history)。
 
+当前网页复用 atomic 主线与 Pi，只开放 `list_orders/get_order/search_faq` 三项只读工具。完整到账指令、最近订单及缺单咨询可由宿主处理；需要模型的咨询才惰性创建 Pi。订单、绑定和业务授权读取仍由 MySQL 执行，SQLite 只保存网页会话、原文、公开回复及回执。
+
+POST 必须同源并携带 `Content-Type: application/json` 和 `X-Chat-Request: 1`；cookie定位浏览器归属与运行会话，首次新建成功后才获得这两项能力。正文最多8KiB，原文1..2000字符，UUID与字段集合由宿主严格校验。除下表历史列表外，接口不接受查询参数。HTTP/来源校验和固定合成身份映射见 [web-chat-server.ts](../src/web-chat-server.ts)，会话及最后绑定复核见 [web-chat.ts](../src/web-chat.ts)，持久回执和 owner CAS 见 [web-chat-history.ts](../src/web-chat-history.ts)。
+
 | 当前接口与状态 | 合同 |
 | --- | --- |
-| `GET /api/chat/config` | 继续版本2；增加每对话20轮、每浏览器归属/客户100条历史限额，模型可用性与实际配置目录沿原合同。 |
+| `GET /api/chat/config` | `version:2`、`simulation:true`、`readOnly:true`；返回固定客户目录、`defaults`、`models`、`options`、本机 `evaluationUrl` 和 `limits:{messageCharacters:2000,conversationTurns:20,historyPerProfile:100}`。 |
 | `GET /api/chat/session` | 返回当前运行会话或null，以及服务端已保存消息；公开session包括运行UUID `id`、稳定 `conversationId`、`turns`、`busy`、`modelAvailable`，保留实际settings/model。 |
 | `GET /api/chat/sessions?profileId=demo-a或demo-b` | 唯一允许该查询字段的入口；只列至少受理过一轮、且当前浏览器归属与重新授权客户绑定共同允许的会话。返回 `{conversations:[{id,profileId,title,createdAt,updatedAt,turns,status,current}],limit:100}`；标题来自首条受理原文，不让模型生成。 |
 | `POST /api/chat/session` | `{profileId,sessionId:<当前UUID或null>,settings?:完整设置}`；新建并轮换运行UUID/token，保留已受理对话。 |
 | `POST /api/chat/session/open` | 严格 `{conversationId,profileId,sessionId:<当前UUID或null>}`；回看及续聊复核归属与当前客户绑定，建立新运行UUID，不恢复历史选单权限。 |
-| 消息与流式入口 | 仍严格 `{sessionId,requestId:<UUID>,text:<原文>}`；保留原文、代次/UUID、同轮回执与迟到保护。受理先持久保存pending，完成Reply/步骤与回执同事务保存后才发布最终result；失败或重启中断不自动重发。 |
+| `POST /api/chat/messages`、`POST /api/chat/messages/stream` | 严格 `{sessionId:<当前UUID>,requestId:<UUID>,text:<原文>}`；受理先持久保存pending，完成Reply/步骤与回执同事务保存后才发布最终result。JSON结果为 `{sessionId,requestId,reply,durationMs,origin,steps}`；流式事件为 `start/step/delta/result/error`，均带同一会话与请求UUID。失败或重启中断不自动重发。 |
 
-`dave_chat` 是运行会话能力；新增 `dave_chat_owner` 是一年有效的本机浏览器归属能力。两者均 HttpOnly/SameSite=Strict，服务端仅保存其哈希。历史存于忽略目录 `.runtime/web-chat/history.sqlite`，使用 Node 内置 SQLite；30分钟释放运行资源，历史可在服务重启后从列表回访。20轮属于稳定对话，打开不会重新获得额度；100条/归属/客户和全局1000条达到上限时拒绝新增，保留已有受理记录。
+完整 `settings` 为 `{modelSelection,thinkingLevel,maxTokens}`：模型沿允许目录，推理仅 `off/high`，输出上限仅整数 `512/1024/2048`；省略时默认 `configured/off/2048`。目录的 `available` 只证明本机配置和离线元数据可解析，不证明远程认证、额度或回答质量。格式错误400、会话前提不符401、来源拒绝403、记录不存在404、忙碌409、容量429和服务/存储失败503分别保留；业务拒绝可以是200的 `notice`。流已经开始后，失败改由 `error` 事件表达，不能以HTTP200判业务完成。
+
+`dave_chat` 是运行会话能力，`dave_chat_owner` 是一年有效的本机浏览器归属能力。两者均 HttpOnly/SameSite=Strict，持久记录只保存其哈希；仅成功新建或打开记录设置 cookie，消息响应不会覆盖或清除 cookie。历史存于忽略目录 `.runtime/web-chat/history.sqlite`，使用 Node 内置 SQLite；30分钟闲置释放运行资源，历史可在服务重启后从列表回访。内存最多20个活动运行会话；20轮属于稳定对话，打开不会重新获得额度；100条/归属/客户和全局1000条达到上限时拒绝新增，保留已有受理记录。
 
 过去的订单卡只展示过去结果，回访后入口先重新查询最近订单；当前订单与最后绑定复核仍由既有业务代码执行。模型不可用或实际配置变化时仍可回看原记录、走宿主只读订单咨询；需要模型的问题明确拒绝且不登记新轮次，不静默替换原模型。
 
@@ -41,7 +47,7 @@ node --env-file-if-exists=.env src/web-chat-server.ts
 
 以下为2026-10-08首版及逐轮修订记录，历史能力和接口不得替代上方当前合同。首版前端由实际Kimi CLI K3 / Max完成，Codex完成后端与独立联调；后续用户调整分工后由Codex优化。
 
-## P0与范围
+## 首版P0与范围
 
 - **业务约束：** 本机只读咨询入口，支持普通问答、本人订单、已验证的完整到账指令。浏览器选择两个固定合成客户；可信TEST_APP/TEST_USER身份由服务端目录绑定，不接收客户端senderId/customerId/appId。不同会话及身份隔离，原始输入不裁剪后当确认；金额和依据由现有工具边界取得。使用演示数据，不发生商家或退款写入。
 - **面试追问：** QQ和网页如何复用同一Pi客服而不重复Agent loop？客户端的角色选择为什么不能成为任意身份授权？重复点击、超时、换身份和XSS怎样影响多轮会话及实际回复？
@@ -51,7 +57,7 @@ node --env-file-if-exists=.env src/web-chat-server.ts
 
 上述两个用户回合可能包含多次Pi工具循环和SDK的既有网络重试，不能解释为两个供应商HTTP请求。首版live只验实际接口/会话/工具订单卡接线，普通模型文字不作为已确定性验证的业务事实或语义准确率；供应商请求数和用量未采集时如实保留未知，不补零。
 
-## 页面与入口
+## 首版页面与入口
 
 独立本机端口默认3002，与3001评测工作台并列；首版页面及后续设置、共享样式、导航修订分节记录。首屏以对话为主：简洁品牌、客户选择、新对话、空态示例、消息列表、输入框和发送状态；日常界面不反复强调模拟实现，具体业务结果仍如实显示。电脑右侧可放当前客户的合成订单提示，窄屏收起；后续设置片提供实际模型配置，评测指标留在工作台。回复以安全文本和结构化订单/依据展示，禁止执行模型HTML或让模型拼按钮。
 
@@ -63,7 +69,7 @@ API合同由Codex冻结后追加在本页；Kimi只依合同构建，不硬编�
 
 ## 首版HTTP合同（实施前冻结）
 
-以下是首版历史接口，保留当轮合同与结果。当前配置按会话设置v2，消息按[消息会话前置条件](#旧页消息拒收与迟到-cookie2026-10-08)，新建/替换按[重置会话前置条件](#旧页重置的会话前置条件2026-10-08)；调用当前接口不能继续使用历史两字段消息或不带sessionId的新建正文。
+以下是首版历史接口，保留当轮合同与结果；现行调用以[当前合同](#current-history)为准。后续[消息会话前置条件](#旧页消息拒收与迟到-cookie2026-10-08)、[重置会话前置条件](#旧页重置的会话前置条件2026-10-08)及持久历史均已改变接口；不能继续使用历史两字段消息或不带sessionId的新建正文。
 
 本机`http://127.0.0.1:3002/`，同源cookie（HttpOnly、SameSite=Strict、Path=/）；POST必须`Content-Type: application/json`、`X-Chat-Request: 1`，不接受查询参数。Host/Origin/Fetch-Site校验沿用本机工作台边界；body最多8KiB，消息1..2000字符（原文保留）。无CORS、无外部字体/CDN或密钥表单。
 
@@ -76,9 +82,11 @@ API合同由Codex冻结后追加在本页；Kimi只依合同构建，不硬编�
 
 Kimi只修改`web/chat/index.html`、`web/chat/app.js`、`web/chat/style.css`；禁止修改后端/数据/计划/已有工作台/依赖、提交推送、数据库写入、真实业务模型或QQ发送。Codex独立编写前端行为检查并联调。独立页面风格采用简洁明亮的客服会话、蓝/青色强调、清晰留白，重点是可读结果而非技术文字。参考frontend-design的层级、空态和可访问性；不增加装饰性大标题/KPI。
 
-## 后端实现与复现
+## 首版后端实现与复现
 
-`src/web-chat-server.ts`提供固定静态文件及严格JSON接口，只绑定127.0.0.1。启动要求`dave_agent_read`，实际SHOW GRANTS核验仅USAGE/SELECT，不读取或启动售后/退款写账户。普通问答延迟初始化已配置模型，调用`createCouponSession`与`runCliPrompt`，精确只开放`get_order/search_faq`；采用已有atomic主线，不切QQ配置或Controller候选。到账咨询复用`createArrivalConsultation`，不需要模型初始化。
+本节只记录首版两工具、内存历史与当时复现路径；当前三工具、持久历史和新建/回访合同见[顶部入口](#current-history)。下表相对源码链接用于定位同一模块，首版固定代码与结果按后续审计及首版验收记录核对。
+
+首版 `src/web-chat-server.ts`提供固定静态文件及严格JSON接口，只绑定127.0.0.1。启动要求`dave_agent_read`，实际SHOW GRANTS核验仅USAGE/SELECT，不读取或启动售后/退款写账户。普通问答延迟初始化已配置模型，调用`createCouponSession`与`runCliPrompt`，当时精确只开放`get_order/search_faq`；采用已有atomic主线，不切QQ配置或Controller候选。到账咨询复用`createArrivalConsultation`，不需要模型初始化。
 
 `src/web-chat.ts`用32字节随机cookie能力绑定服务端目录，响应公开UUID不是授权token。内存最多20个会话、每会话20轮、30分钟闲置失效；一次只处理一轮，原requestId+原文可回放，冲突拒绝。新对话删除旧上下文；SDK错误或60秒超时失效整会话，迟到factory/session/reply不能进入新客户。HTTP连接中断可继续完成本轮只读处理并按原ID回放，不能保证客户端abort取消远程请求或停止供应商计费。
 
@@ -88,7 +96,7 @@ Kimi只修改`web/chat/index.html`、`web/chat/app.js`、`web/chat/style.css`；
 node --env-file-if-exists=.env src/web-chat-server.ts
 ```
 
-然后打开`http://127.0.0.1:3002/`。可用`CHAT_PORT`指定其他本机端口。历史仅在进程内，浏览器刷新可恢复当前有限历史，服务重启后需新对话；这不是公网用户登录或长期对话存储。每条消息返回实际结构化Reply；订单卡由当前成功工具结果决定，普通模型text没有因此成为确定性校验的事实。
+然后打开`http://127.0.0.1:3002/`。可用`CHAT_PORT`指定其他本机端口。首版历史仅在进程内，浏览器刷新可恢复当时的有限历史，服务重启后需新对话；这不是公网用户登录或长期对话存储。每条消息返回实际结构化Reply；订单卡由当轮成功工具结果决定，普通模型text没有因此成为确定性校验的事实。
 
 演示时可从以下入口追到代码：
 
@@ -96,12 +104,14 @@ node --env-file-if-exists=.env src/web-chat-server.ts
 | --- | --- |
 | 页面提交和安全展示 | [app.js](../web/chat/app.js)：原文与请求UUID、会话代次、安全DOM、实际Reply订单卡；使用浏览器原生控件，不引入前端框架。 |
 | HTTP到可信演示身份 | [web-chat-server.ts](../src/web-chat-server.ts)与[web-chat.ts](../src/web-chat.ts)：cookie能力、固定目录、串行与失效；公开会话ID不能代替授权cookie。 |
-| 普通问答到Pi | [agent.ts](../src/agent.ts)的`createCouponSession`与[cli.ts](../src/cli.ts)的`runCliPrompt`：复用现有SDK与回复转换，只开放两项只读工具。 |
+| 普通问答到Pi | [agent.ts](../src/agent.ts)的`createCouponSession`与[cli.ts](../src/cli.ts)的`runCliPrompt`：复用SDK与回复转换，首版只开放两项只读工具；当前增加 `list_orders`。 |
 | 完整到账指令 | [arrival-consultation.ts](../src/arrival-consultation.ts)：复用既有范围/双授权和目录复核，直接返回宿主Reply，无模型初始化。 |
 
-低成本演示可先发`查询到账 银行卡`，再切客户B发`查询到账 COUPON-1001 银行卡`查看归属拒绝；完整命令不会调用模型。普通问答或订单示例仅填草稿，点击发送才会调用真实模型。新对话清空服务端上下文，刷新保留当前内存历史；服务端失效后须新建会话，不能在旧身份下盲重试。
+首版低成本演示先发`查询到账 银行卡`，再切客户B发`查询到账 COUPON-1001 银行卡`查看归属拒绝；完整命令不会调用模型。首版普通问答或订单示例仅填草稿，点击发送才会调用真实模型。首版新对话清空服务端上下文，刷新保留内存历史，服务端失效后须新建会话；当前已有宿主最近订单与持久回访，不沿用这条历史恢复限制。
 
 ## 网页请求去重与迟到隔离审计（2026-10-08）
+
+以下为固定旧版本的审计记录；Map回执、重启丢历史和旧消息正文只描述该版本。当前回执持久化与恢复边界见[顶部合同](#current-history)，原审计及未验项不改写为新验收。
 
 **本轮合同：** 真实约束是只读咨询断连后可能已经处理完成，重试不能无意多跑一轮，旧客户迟到结果不能进入新对话。面试追问是“禁用发送按钮之外，宿主怎样去重、超时后恢复了什么、为何不等于资金幂等或取消计费”。个人实现为HTTP、cookie会话、请求结果缓存与失效边界；复用Pi生命周期、原生只读工具和`runCliPrompt`，前端沿用Kimi K3 Max产物。本轮预算30分钟，只审阅固定源码、既有断言与文档差异/链接；0新增模型/DB/QQ调用，无新失败证据则不改代码或追加实验。
 
@@ -168,6 +178,8 @@ Node `v26.10.0`；最终UI定向、完整`npm run validate`（含后端/UI、类
 
 ## 问答页设置与评测导航（2026-10-07，本轮实施合同）
 
+以下为当轮v2设置接线记录。历史正文兼容和两工具边界已被后续会话前提、最近订单及持久记录替代，当前调用见[顶部合同](#current-history)。
+
 用户已选择“聊天模型参数＋评测入口”。这轮补齐演示入口与配置可核验性，首版不展示模型参数的限制由此更新；完整检索、Controller及评测实验参数仍复用3001工作台。
 
 - **真实业务约束：** 两合成客户与两只读工具保持现有边界。参数只随新会话生效，当前处理期间不得切换；校验失败保留旧会话和草稿。页面不能填写密钥、任意模型、URL、身份或Prompt，不提供关闭业务保护的开关。
@@ -200,6 +212,8 @@ npm run validate
 ```
 
 ## 网页会话参数生效调用链审计（2026-10-08）
+
+以下按固定 `cb40012` 版本审计，表内两工具、替换清历史及失败丢上下文均是当时行为；当前三工具与持久回访见[顶部合同](#current-history)。
 
 **本轮合同：** 真实约束是同一段历史不混用新旧模型配置，参数坏值或处理中切换不能删掉旧会话，设置不得扩大只读权限。面试追问是“页面显示已应用，究竟证明到了哪一步；如何定位到真正的Pi请求”。个人实现为目录、严格校验、会话替换、配置快照和请求检查；复用Pi生命周期、模型注册与已有只读工具，前端沿用Kimi K3 Max产物。本轮预算30分钟，仅审阅已提交源码和既有证据、补差异与链接；0新增模型/DB/QQ调用，没有明确缺陷不改代码或追加实验。
 
@@ -292,6 +306,8 @@ npm run validate
 
 ## 最近订单、选单续轮与真实流式（2026-10-09）
 
+本节记录当轮最近订单与流式验收；当时会话与步骤尚只在内存。后续第23轮将原文、Reply、步骤与回执持久化，选单授权仍不随历史恢复；当前接口见[顶部合同](#current-history)。
+
 本轮合同与投入见 [plan 的 P0 记录](../plan.md#订单发现与网页连续交互2026-10-09已验收)。以下实现已完成本轮工程、实库只读、真实模型接线及浏览器分层验收。
 
 - **业务入口：** “我有哪些订单”与缺少订单的“我要退款”先读取可信客户的最近三笔订单，按创建时间及订单号倒序；有更多订单时明确提示可按订单号查询。列表保留商品、门店、整数分金额及券状态，空客户、身份未绑定和数据库失败分别处理。列表不等于退款资格或批准。
@@ -349,9 +365,9 @@ v1 的“这张券现在有没有核销？”只沿用历史订单事实，还�
 
 最终完整验证日志为忽略的 `.runtime/business-chat-20261009/validate-final-accessibility.log`，原始模型记录及 Kimi 来源也保留该目录。公开结果包含固定分母、合成回执、实际配置与源码哈希；本地原有依赖改动只纳入哈希快照、未混入本轮提交。`--live-fresh` 对应 v2（4 输入 / 12 HTTP / 10 分钟），与 v1 一样每批只允许一次；本轮两批预算均已关闭，不追加付费浏览器问答或其他候选实验。
 
-## 前端体验持续优化（2026-10-09，进行中）
+## 前端体验持续优化（2026-10-09，已收尾）
 
-用户要求由 Codex 直接优化客服问答与评测工作台，不使用 Kimi，持续检查至北京时间 2026-10-09 10:00。按可复现问题逐片实现、验证和收尾；到点停止新增改动，保留未验项。当前目标不改变 C1/O4/O5、默认模型或网页只读业务范围。
+当时用户要求由 Codex 直接优化客服问答与评测工作台，不使用 Kimi，持续检查至北京时间 2026-10-09 10:00；该目标已按第33轮收尾，第34轮为随后另授权的修订。以下保留逐轮合同、失败、检查与当时服务状态；“目标继续”、常驻handle和“未提交”均只描述对应记录时点，不表示当前仍在运行或待提交。历史工作不改变 C1/O4/O5、默认模型或网页只读业务范围。
 
 | P0 项目 | 当前合同 |
 | --- | --- |

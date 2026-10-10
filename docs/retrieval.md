@@ -34,7 +34,7 @@ node scripts/retrieval-baseline.ts
 
 | 环节 | 实际保护与边界 |
 | --- | --- |
-| 入口和工具 | [`qq.ts`](../src/qq.ts) 从可信SDK事件构造AppID/发送者，[`cli.ts`](../src/cli.ts) 使用合成绑定；两者选择atomic时调用 [`createCouponSession`](../src/agent.ts)。[`网页工厂`](../src/web-chat-settings.ts)也复用该函数，仅提供两只读工具。`get_order` 参数只有订单号，身份在宿主闭包内；模型声明客户ID不能覆盖身份。 |
+| 入口和工具 | [`qq.ts`](../src/qq.ts) 从可信SDK事件构造AppID/发送者，[`cli.ts`](../src/cli.ts) 使用合成绑定；两者选择atomic时调用 [`createCouponSession`](../src/agent.ts)。[`网页工厂`](../src/web-chat-settings.ts)也复用该函数，当前仅提供 `list_orders`、`get_order`、`search_faq` 三项只读工具；历史审计时为两项，新增列表证据见[本人订单与选单](./after-sales.md#未知订单号时的入口与连续选择2026-10-09)。身份在宿主闭包内，`list_orders` 无参数、`get_order` 只有订单号；模型声明客户ID不能覆盖身份。 |
 | 重新授权和快照 | [`CouponStore.getOrder`](../src/coupon-store.ts) 每次按订单＋当前身份绑定联查，同一只读REPEATABLE READ事务读取订单项、券、付款和退款。首次SELECT建立一致快照；下一次调用才读取后续提交，不能把`asOf`或聊天历史视作持续有效的授权。失败回滚，初始化/回滚不确定时丢弃连接。 |
 | 规则召回 | `searchKnowledge → readKnowledgeDocuments →` [`rankKnowledge`](../src/knowledge-retrieval.ts)。SQL校验活跃门店/套餐关联，过滤通用及显式范围的活跃规则，最多200候选，词项排序后取前5条。FAQ是公开规则，未绑定用户也能咨询；此入口不接收身份/订单，也不在宿主证明模型所传范围来自该用户刚查的订单。按订单范围查规则的调用次序仍由Prompt/Skill约束，不能冒称确定性授权链。 |
 | 回复与依据 | CLI/QQ只向 [`replyFromTools`](../src/reply-from-tools.ts) 传本轮工具结果；成功`get_order`的整数金额/状态生成订单卡，失败或旧轮结果不生成卡，格式异常返回notice。`search_faq`的合法sourceId加入依据列表，证明本轮召回过该ID；并未验证模型每句话由正文支持。订单卡后的`text`与普通answer仍保留模型话术，Markdown转义和限长仅约束展示。 |
@@ -99,7 +99,7 @@ P0 原有的 [8 个边界样例](../data/retrieval-boundaries.json) 单独报告
 - 排名改善与退步同时记录：旧版 `standard-0019`“怎么查退款进度”的同分挤出得到改善，`standard-0083` 的第二至第三名退步留作后续分析。
 - 相关不等于可回答：标题/正文中的“过敏原未录入”等否定事实也会命中；新增业务回归保留这些原文，并检查套餐隔离，真实模型另验是否明确未知。
 
-P1 两轮生产检索仍只使用 query 与显式范围；上下文离线对照已完成，见下文，暂不接线上。核心 MVP 和客观评测已收尾，后续按[v2 优化方案](./optimization-plan.md)比较 BM25、dense、RRF、专属 rerank，并验证无答案接收与可信上下文。小语料全候选 rerank 是正式候选，复杂链路是否上线由实测收益决定。当前固定题集用于开发调优，没有独立留出集；成绩变化只说明这份基准上的表现，不能宣称对未见问法的泛化提升。
+P1 两轮稳定检索仍只使用 query 与显式范围；本页的上下文拼接离线对照见下文，未接默认主线。后续 [M0–M6 对照](./v2-implementation-results.md)与 [A1 证据接收](./a1-support-results.md)已分别完成开发集比较及独立组件验收，小语料全候选 rerank 被选为 Controller 候选。整链 [C1](./c1-implementation-results.md)仍未准入，默认继续使用 atomic + lexical；阶段结果和分母不合并。本页固定题集已用于开发调优，其成绩变化只说明这份基准上的表现，不能宣称对未见问法的泛化提升。
 
 第一轮 `validate`、`check:business` 及表述校准通过，新增口语退款取证、过敏原“非空但未知”和门店/套餐隔离检查。该轮最终只读真实模型 run `c2386b13-e29b-4caf-88f7-01be2455d75e` 为 **10/10 场景、11/11 轮、101/101 检查**；D2/D3 联合 run `5b0b2e2e-9520-4097-9871-10b3913ea9d5` 为 **3/3、15/15、100/100**，QQ 发信本地替代，未重验真实 QQ，资金仍为模拟。
 
