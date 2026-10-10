@@ -63,6 +63,7 @@ await (await import("./web-chat-stream-check.ts")).checkWebChatStream();
 await (await import("./web-chat-history-check.ts")).checkWebChatHistory();
 await (await import("./order-chat-live-check.ts")).checkOrderChatLiveContract();
 await (await import("./web-chat-live-check.ts")).checkWebChatLiveContract();
+await (await import("./web-evidence-live-check.ts")).checkWebEvidenceLive();
 await (await import(new URL("./web-chat-ui-check.mjs", import.meta.url).href)).checkWebChatUI();
 (await import("./atomic-refund-recovery-db-check.ts")).checkAtomicRefundRecovery();
 await import("./support-session-race-check.ts");

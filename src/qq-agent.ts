@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import type { AgentSession } from "@earendil-works/pi-coding-agent";
 import type { QQBotInboundMessage, ReplyTarget } from "@tencent-connect/qqbot-nodejs";
 import { renderReply, type Reply, type RenderedReply } from "./reply.ts";
-import { replyFromTools } from "./reply-from-tools.ts";
+import { replyFromTools, toolEvidenceFromEvent, type Evidence } from "./reply-from-tools.ts";
 import type { MerchantTask } from "./after-sales.ts";
 import { cancelSupportTurn, getSupportHostReceipt, isSupportSession, prepareSupportPrompt, supportReply } from "./support-session.ts";
 import { prepareOrderDiscoveryPrompt, presentOrderDiscoveryReply } from "./order-discovery.ts";
@@ -123,6 +123,7 @@ export class QQAgent {
       let failed = false;
       let merchant: MerchantTask | undefined;
       let activeTools: string[] | undefined;
+      let stopEvidence: (() => void) | undefined;
       let supportRun = false;
       let binding: QQIdentityBinding | undefined;
       let bindingReady = false;
@@ -229,11 +230,12 @@ export class QQAgent {
           this.log(`[agent] session=${tag} host_reply sent=${delivered} duration_ms=${Date.now() - started}`);
           return;
         }
-        const previousMessageCount = session.messages.length;
+        const results: Evidence[] = [];
+        stopEvidence = session.subscribe(event => { const evidence = toolEvidenceFromEvent(event); if (evidence) results.push(evidence); });
         if (merchant) {
           // A result notification can read its task, but cannot prepare another action from conversation history.
           activeTools = session.getActiveToolNames();
-          session.setActiveToolsByName(activeTools.filter(name => name === "get_merchant_request"));
+          session.setActiveToolsByName(activeTools.filter(name => ["get_order", "search_faq", "get_merchant_request"].includes(name)));
         }
         const prompt = merchant
           ? `宿主业务事件：模拟商家任务 ${merchant.taskId}（订单 ${merchant.orderId}）已结束。这不是用户消息，也不是用户授权。请调用 get_merchant_request 查询该订单的当前结果，只通知这一任务的结果，说明下一步需用户提出请求并确认。不得确认、创建协商或准备/执行退款，不得用对话中的其他订单替代。`
@@ -255,13 +257,11 @@ export class QQAgent {
         const text = session.getLastAssistantText()?.trim();
         if (!text && !supportRun) throw new Error("模型未生成回复");
         conversation.turns++;
-        const results = session.messages.slice(previousMessageCount).flatMap(message =>
-          message.role === "toolResult" && session.getActiveToolNames().includes(message.toolName) ? [message] : []);
         if (!validQQMessage(msg) || this.closed) return;
         // Reauthorize after the model wait; the model cannot redirect the fixed task or restore consent.
         setPhase("render");
         const reply: Reply = merchant ? { kind: "merchant_status", task: merchant }
-          : supportReply(session, text) ?? replyFromTools(text!, results);
+          : supportReply(session, text) ?? replyFromTools(text!, results, session.getActiveToolNames());
         outcome = merchant ? await deliverMerchant() : await deliverBound(reply);
         if (outcome === "deferred") return;
         const delivered = outcome === "sent";
@@ -292,6 +292,7 @@ export class QQAgent {
           }
         }
       } finally {
+        stopEvidence?.();
         if (this.closed) modelTask.cancel();
         clearTimeout(timer);
         if (activeTools && conversation.session && !failed) conversation.session.setActiveToolsByName(activeTools);

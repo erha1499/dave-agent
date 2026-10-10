@@ -28,7 +28,7 @@ import { renderReply, type Reply } from "../src/reply.ts";
 import type { C1AnswerReview } from "./c1-session-validation-check.ts";
 import { createC1ValidationGuard, readC1ValidationDependencies } from "./c1-session-validation-live.ts";
 import { createMerchantFixture } from "./merchant-test-fixture.ts";
-import { jointCheckerRevision, jointChecks, jointLimits, jointPlanPath, jointRoot, jointSourceHashes, jointTools, loadJointPlan, manifestHash,
+import { jointChecks, jointLimits, jointRepairLimits, jointRepairSuiteId, jointMerchantRefreshLimits, jointMerchantRefreshSuiteId, jointRoot, jointSourceHashes, jointSuiteId, jointSuiteSettings, jointTools, loadJointPlan, manifestHash,
   plannedJointRows, summarizeJoint, validateJointPlan, jointReviewPassed,
   type JointCase, type JointEvidence, type JointFacts, type JointManifest, type JointReceipt, type JointRound, type JointTurn } from "./stable-joint-contract.ts";
 
@@ -55,27 +55,30 @@ async function databasePreflight(configs: { merchant: PoolOptions; history: Pool
     return { observedAt: new Date().toISOString(), ...counts };
   } finally { await Promise.all([merchant.end(), history.end()]); }
 }
-export async function freezeStableJoint(path: string) {
+export async function freezeStableJoint(path: string, suiteId = jointSuiteId) {
+  const settings = jointSuiteSettings(suiteId), plan = await loadJointPlan(suiteId);
   const runtime = await createModelRuntime(), selected = resolveModelSelection();
   const model = runtime.getModel(selected.provider, selected.modelId);
   assert.ok(model && model.provider === "deepseek" && model.api === "openai-completions", "M1 freezes the current DeepSeek atomic default; model comparisons are a separate slice");
-  const base: Omit<JointManifest, "hash"> = { version: 1, frozenAt: new Date().toISOString(), checkerRevision: jointCheckerRevision, plan: await loadJointPlan(), sourceHashes: await jointSourceHashes(),
+  const base: Omit<JointManifest, "hash"> = { version: 1, frozenAt: new Date().toISOString(), checkerRevision: settings.checkerRevision, plan, sourceHashes: await jointSourceHashes(suiteId),
     git: { commit: execFileSync("git", ["rev-parse", "HEAD"], { cwd: jointRoot, encoding: "utf8" }).trim(),
       dirty: Boolean(execFileSync("git", ["status", "--porcelain", "--untracked-files=normal"], { cwd: jointRoot, encoding: "utf8" }).trim()) },
     dependencies: await readC1ValidationDependencies(), configuration: { architecture: "atomic", knowledge: "lexical", model: modelSnapshot(model),
-      tools: jointTools, limits: jointLimits, modelTaskLimits: readModelTaskLimits(), sessionRetries: 2, providerRetries: 0, compaction: false, qqSend: "local-receipt" } };
+      tools: jointTools, limits: settings.limits, modelTaskLimits: readModelTaskLimits(), sessionRetries: 2, providerRetries: 0, compaction: false, qqSend: "local-receipt" } };
   const manifest: JointManifest = { ...base, hash: manifestHash(base) };
   await mkdir(dirname(resolve(path)), { recursive: true }); await writeFile(path, `${JSON.stringify(manifest, null, 2)}\n`, { flag: "wx" });
-  console.log(JSON.stringify({ manifest: resolve(path), hash: manifest.hash, userInputs: 24, events: 2, actualHttp: 0 }));
+  const counts = summarizeJoint(plan, plannedJointRows(plan));
+  console.log(JSON.stringify({ manifest: resolve(path), hash: manifest.hash, suiteId, userInputs: counts.plannedUserInputs, events: counts.plannedEvents, actualHttp: 0 }));
 }
 async function loadManifest(path: string) {
   const manifest = JSON.parse(await readFile(path, "utf8")) as JointManifest;
   assert.equal(manifest.version, 1); assert.equal(manifest.hash, manifestHash(manifest)); validateJointPlan(manifest.plan);
-  assert.deepEqual(manifest.checkerRevision, jointCheckerRevision, "Freeze a new manifest for this explicitly revised checker; preserve the old result");
-  assert.deepEqual(manifest.plan, await loadJointPlan(), "Questions/rubric changed after freeze");
-  assert.deepEqual(manifest.sourceHashes, await jointSourceHashes(), "Runtime, rubric or dependency declaration changed after freeze");
+  const settings = jointSuiteSettings(manifest.plan.suiteId);
+  assert.deepEqual(manifest.checkerRevision, settings.checkerRevision, "Freeze a new manifest for this explicitly revised checker; preserve the old result");
+  assert.deepEqual(manifest.plan, await loadJointPlan(manifest.plan.suiteId), "Questions/rubric changed after freeze");
+  assert.deepEqual(manifest.sourceHashes, await jointSourceHashes(manifest.plan.suiteId), "Runtime, rubric or dependency declaration changed after freeze");
   assert.deepEqual(manifest.dependencies, await readC1ValidationDependencies(), "Installed runtime changed after freeze");
-  assert.deepEqual(manifest.configuration.limits, jointLimits); assert.deepEqual(manifest.configuration.tools, jointTools);
+  assert.deepEqual(manifest.configuration.limits, settings.limits); assert.deepEqual(manifest.configuration.tools, jointTools);
   assert.deepEqual(manifest.configuration.modelTaskLimits, readModelTaskLimits(), "Production per-message HTTP budget changed after freeze");
   assert.equal(manifest.configuration.architecture, "atomic"); assert.equal(manifest.configuration.knowledge, "lexical");
   return manifest;
@@ -136,24 +139,25 @@ export function reviewInputs(plan: JointManifest["plan"], rows: JointTurn[]) {
 }
 export async function runStableJoint(mode: "db" | "live", manifestPath: string) {
   const manifest = await loadManifest(manifestPath), plan = manifest.plan;
+  const limits = manifest.configuration.limits, repair = plan.suiteId !== jointSuiteId, refresh = plan.suiteId === jointMerchantRefreshSuiteId;
   const configs = { order: readDatabaseConfig(), merchant: readAfterSalesDatabaseConfig(), refund: readRefundDatabaseConfig(), history: readEvalDatabaseConfig() };
   checkJointDatabaseTargets(Object.values(configs));
   const preflight = await databasePreflight(configs);
   // One live attempt per frozen manifest. Failures remain evidence; do not spend the remaining budget chasing a score.
   if (mode === "live") await writeFile(`${manifestPath}.live-started`, new Date().toISOString(), { flag: "wx" });
   const runId = randomUUID(), startedAt = new Date().toISOString();
-  const guard = createC1ValidationGuard(fetch, Date.now, jointLimits), rows = plannedJointRows(plan);
+  const guard = createC1ValidationGuard(fetch, Date.now, limits), rows = plannedJointRows(plan), counts = summarizeJoint(plan, rows);
   const directory = new URL(".runtime/stable-joint/", jointRoot); await mkdir(directory, { recursive: true });
   const output = new URL(`${runId}-${mode}.json`, directory);
-  const run: EvalRun = { id: runId, suiteId: plan.suiteId, suiteName: "稳定atomic+lexical联合验收", kind: mode === "live" ? "model" : "engineering",
-    label: `M1-${mode}`, status: "running", startedAt, finishedAt: null, plannedCases: plan.cases.length, plannedTurns: rows.length, metrics: null,
+  const run: EvalRun = { id: runId, suiteId: plan.suiteId, suiteName: refresh ? "商家结果重新取证新题联合验收" : repair ? "稳定主线修复新题联合验收" : "稳定atomic+lexical联合验收", kind: mode === "live" ? "model" : "engineering",
+    label: `${refresh ? "merchant-refresh-v1" : repair ? "repair-v1" : "M1"}-${mode}`, status: "running", startedAt, finishedAt: null, plannedCases: plan.cases.length, plannedTurns: rows.length, metrics: null,
     snapshot: { gitCommit: manifest.git.commit, gitDirty: manifest.git.dirty, asOf: manifest.frozenAt,
       model: { provider: manifest.configuration.model.provider, id: manifest.configuration.model.id, maxTokens: manifest.configuration.model.maxTokens, thinking: "off", temperature: null },
       hashes: { prompt: manifest.sourceHashes["prompts/customer-service.md"]!, skill: manifest.sourceHashes["skills/shop-support/SKILL.md"]!,
         tools: contentHash(jointTools), dataset: contentHash(plan), checker: manifest.sourceHashes["scripts/stable-joint-contract.ts"]!, business: "captured-per-case" },
       content: { manifest, answerQuality: "separate-hash-bound-codex-review-for-human", defaultConfiguration: true,
         scope: mode === "live" ? "真实模型+真实MySQL合成fixture+正式QQAgent，本地送达代替真实QQ" : "Pi faux模型+真实MySQL合成fixture+正式QQAgent，无真实模型或QQ",
-        measurement: "最终实际rendered reply；26计划轮含24用户输入及2事件；modelRequests为Pi assistant迭代，actualHttp由fetch边界单独记录；宿主轮无模型用量。重建对象和连接不等于OS崩溃恢复。" } } };
+        measurement: `最终实际rendered reply；${rows.length}计划轮含${counts.plannedUserInputs}用户输入及${counts.plannedEvents}事件；modelRequests为Pi assistant迭代，actualHttp由fetch边界单独记录；宿主轮无模型用量。重建对象和连接不等于OS崩溃恢复。` } } };
   const artifact = { version: 1, mode, run, manifest, preflight, dispatchPreflights: [] as Array<{ caseId: string; pendingTasks: number; terminalNotifications: number; evaluationRunning: number; observedAt: string }>,
     rows, requests: guard.requests, cleanup: [] as Array<{ caseId: string; ok: boolean }>,
     fixtures: [] as Array<{ caseId: string; orders: string[]; identity: { appId: string; senderId: string }; initial: JointFacts[] }>,
@@ -224,7 +228,7 @@ export async function runStableJoint(mode: "db" | "live", manifestPath: string) 
             const summary = JSON.parse(text.slice("[model-task] ".length)) as ModelTaskSummary;
             if (summary.version === "model-task-v1") activeRow.modelTasks.push(summary);
           }
-        }, jointLimits.turnTimeoutMs, async msg => {
+        }, limits.turnTimeoutMs, async msg => {
           const reply = await confirmRefundReply(refunds!, identity, sourceKey, msg.content)
             ?? await confirmMerchantReply(merchant!, identity, sourceKey, msg.content, { groupOpenid: group, messageId: msg.messageId, timestamp: msg.timestamp });
           if (reply !== undefined) handled++; return reply;
@@ -291,7 +295,7 @@ export async function runStableJoint(mode: "db" | "live", manifestPath: string) 
             agentUsageCursor = requestStart;
             const abort = new AbortController(), requestId = `${runId}:${example.id}:${index + 1}`;
             guard.setActive({ caseId: example.id, turn: index + 1, requestId, signal: abort.signal });
-            const timer = setTimeout(() => { abort.abort(); void session?.abort().catch(() => {}); }, Math.min(jointLimits.turnTimeoutMs, guard.remainingMs()));
+            const timer = setTimeout(() => { abort.abort(); void session?.abort().catch(() => {}); }, Math.min(limits.turnTimeoutMs, guard.remainingMs()));
             row.startedAt = new Date().toISOString(); row.execution = "failed"; delete row.error;
             let failure: string | undefined, duplicateSuppressed = false;
             const message = inbound(row.question, group);
@@ -350,7 +354,7 @@ export async function runStableJoint(mode: "db" | "live", manifestPath: string) 
     guard.seal(); restoreStream?.(); artifact.stopReason = guard.stopped();
     for (const row of rows) if (row.error === "not_started") row.error = artifact.stopReason ?? artifact.failure ?? "not_executed";
     try {
-      artifact.sourceHashesAfter = await jointSourceHashes(); artifact.dependenciesAfter = await readC1ValidationDependencies();
+      artifact.sourceHashesAfter = await jointSourceHashes(plan.suiteId); artifact.dependenciesAfter = await readC1ValidationDependencies();
       artifact.codeStable = isDeepStrictEqual(manifest.sourceHashes, artifact.sourceHashesAfter) && isDeepStrictEqual(manifest.dependencies, artifact.dependenciesAfter);
     } catch { artifact.failure ??= "post_snapshot_failed"; }
     artifact.usage = guard.usage(); artifact.summary = summarizeJoint(plan, rows);
@@ -375,7 +379,7 @@ export async function scoreStableJoint(resultPath: string, reviewPath: string) {
   const reviews = JSON.parse(await readFile(reviewPath, "utf8")) as { artifactHash: string; reviews: C1AnswerReview[] };
   assert.equal(reviews.artifactHash, contentHash(artifact), "Review must bind the entire executed artifact, not just one reply");
   assert.equal(artifact.manifest.hash, manifestHash(artifact.manifest)); validateJointPlan(artifact.manifest.plan);
-  assert.deepEqual(artifact.manifest.checkerRevision, jointCheckerRevision, "Do not silently rescore a historical run with another checker revision");
+  assert.deepEqual(artifact.manifest.checkerRevision, jointSuiteSettings(artifact.manifest.plan.suiteId).checkerRevision, "Do not silently rescore a historical run with another checker revision");
   const summary = summarizeJoint(artifact.manifest.plan, artifact.rows, reviews.reviews);
   const result = { artifact: resolve(resultPath), artifactHash: contentHash(artifact), summary, mode: artifact.mode,
     humanAcceptance: false, admitted: artifact.mode === "live" && artifact.runIntegrityPassed && summary.completeDenominator && summary.jointPassed === summary.plannedTurns };
@@ -397,6 +401,41 @@ export async function checkStableJoint() {
     assert.throws(() => checkJointDatabaseTargets([db, wrong, db]), /local Docker/);
   }
   const plan = await loadJointPlan(), rows = plannedJointRows(plan);
+  const repairPlan = await loadJointPlan(jointRepairSuiteId), repairRows = plannedJointRows(repairPlan);
+  assert.equal(plan.suiteId, jointSuiteId); assert.equal(rows.length, 26);
+  assert.equal(repairRows.length, 11); assert.equal(summarizeJoint(repairPlan, repairRows).plannedUserInputs, 10);
+  assert.equal(summarizeJoint(repairPlan, repairRows).plannedEvents, 1);
+  assert.equal(summarizeJoint(repairPlan, repairRows.slice(1)).completeDenominator, false);
+  assert.throws(() => jointSuiteSettings("unregistered-suite"), /Unknown joint suite/);
+  assert.deepEqual(jointSuiteSettings().limits, jointLimits);
+  assert.deepEqual(jointSuiteSettings(jointRepairSuiteId).limits, jointRepairLimits);
+  assert.equal(jointRepairLimits.requests.agent, 50); assert.equal(jointRepairLimits.deadlineMs, 15 * 60_000);
+  const droppedRepairTurn = structuredClone(repairPlan); droppedRepairTurn.cases[2]!.turns.splice(1, 1);
+  assert.throws(() => validateJointPlan(droppedRepairTurn), "Missing planned merchant event is never removed from the denominator");
+  const changedTransition = structuredClone(repairPlan); changedTransition.cases[1]!.turns[1]!.action = "order";
+  assert.throws(() => validateJointPlan(changedTransition), "The second turn must change and re-read the coupon state");
+  const approvedInstead = structuredClone(repairPlan); approvedInstead.cases[2]!.outcome = "approve";
+  assert.throws(() => validateJointPlan(approvedInstead), "Quoted private approval cannot change the rejection fixture");
+  const repairHashes = await jointSourceHashes(jointRepairSuiteId);
+  assert.ok(repairHashes[jointSuiteSettings(jointRepairSuiteId).planPath]);
+  assert.ok(repairHashes["scripts/stable-joint-run.ts"] && repairHashes["scripts/stable-joint-contract.ts"]);
+  const refreshPlan = await loadJointPlan(jointMerchantRefreshSuiteId), refreshRows = plannedJointRows(refreshPlan);
+  const refreshCounts = summarizeJoint(refreshPlan, refreshRows);
+  assert.equal(refreshCounts.plannedCases, 2); assert.equal(refreshCounts.plannedTurns, 6);
+  assert.equal(refreshCounts.plannedUserInputs, 4); assert.equal(refreshCounts.plannedEvents, 2);
+  assert.equal(summarizeJoint(refreshPlan, refreshRows.slice(1)).completeDenominator, false);
+  assert.deepEqual(jointSuiteSettings(jointMerchantRefreshSuiteId).limits, jointMerchantRefreshLimits);
+  assert.equal(jointMerchantRefreshLimits.requests.agent, 16); assert.equal(jointMerchantRefreshLimits.deadlineMs, 8 * 60_000);
+  assert.equal(jointMerchantRefreshLimits.estimatedUsd, .10);
+  const oldQuestions = new Set([...plan.cases, ...repairPlan.cases].flatMap(c => c.turns.map(t => t.question)));
+  for (const [i, example] of refreshPlan.cases.entries()) {
+    assert.ok(!oldQuestions.has(example.turns[2]!.question), "Merchant refresh final questions must be new");
+    const forgedApproval = structuredClone(refreshPlan); forgedApproval.cases[i]!.outcome = "approve";
+    assert.throws(() => validateJointPlan(forgedApproval), "Relayed approval cannot change either rejected fixture");
+    const missingEvent = structuredClone(refreshPlan); missingEvent.cases[i]!.turns.splice(1, 1);
+    assert.throws(() => validateJointPlan(missingEvent), "Each independent scenario requires its rejection event");
+  }
+  assert.ok((await jointSourceHashes(jointMerchantRefreshSuiteId))[jointSuiteSettings(jointMerchantRefreshSuiteId).planPath]);
   const seed = JSON.parse(await readFile(new URL("data/acceptance-online.json", jointRoot), "utf8")) as { documents: RetrievalDocument[] };
   const scopedSeed = seed.documents.filter(d => d.status === "active" && (d.shopId === null || d.shopId === "shop-demo-1")
     && (d.productId === null || d.productId === "product-demo-1"));
@@ -441,6 +480,26 @@ export async function checkStableJoint() {
       group: "synthetic-group", sender: "synthetic-actor", messageId: "synthetic-message", toolsBefore: jointTools, toolsAfter: jointTools, hostHandled: 0,
       duplicateSuppressed: false, restarted: false, expectedOrderId: facts.order.id, expectedStatus: "approved" } };
   assert.ok(jointChecks(round, valid).every(c => c.status === "passed"));
+  const freshRound = repairPlan.cases[0]!.turns[0]!, fresh = structuredClone(valid);
+  fresh.caseId = repairPlan.cases[0]!.id; fresh.action = "fresh";
+  for (const snapshot of [...fresh.evidence!.before, ...fresh.evidence!.after]) snapshot.order.coupons[0]!.status = "redeemed";
+  fresh.steps = fresh.steps.filter(s => s.name !== "search_faq");
+  fresh.steps[1]!.output = { content: [{ type: "text", text: JSON.stringify(fresh.evidence!.after[0]!.order) }] };
+  const freshCard = fresh.evidence!.delivered[0]!;
+  assert.equal(freshCard.kind, "order");
+  if (freshCard.kind === "order") { freshCard.text = "本轮券已核销，订单仍已支付，已退0.00元。"; freshCard.orders[0]!.couponStatuses = ["redeemed"]; }
+  fresh.evidence!.receipts[0]!.rendered = renderReply(freshCard);
+  fresh.reply = fresh.evidence!.receipts[0]!.rendered.text; fresh.replyHash = contentHash(fresh.reply);
+  assert.ok(jointChecks(freshRound, fresh).every(c => c.status === "passed"), "Current redeemed facts require a fresh order read, not an inapplicable unused-coupon policy");
+  const staleFresh = structuredClone(fresh);
+  staleFresh.steps[1]!.output = valid.steps[1]!.output;
+  assert.equal(jointChecks(freshRound, staleFresh).find(c => c.id === "trace.fresh-order")?.status, "failed", "Old unused facts cannot stand in for the current redeemed order");
+  for (const rejectedRound of [...repairPlan.cases[2]!.turns.slice(2), ...refreshPlan.cases.map(c => c.turns[2]!)]) {
+    const fallbackOnly = structuredClone(valid); fallbackOnly.steps = fallbackOnly.steps.filter(s => s.type === "model");
+    const checks = jointChecks(rejectedRound, fallbackOnly);
+    assert.equal(checks.find(c => c.id === "trace.scoped-rules")?.status, "failed");
+    assert.equal(checks.find(c => c.id === "trace.current-task")?.status, "failed", "A fixed safe fallback is not a successful current rejection query");
+  }
   const onlyPackage = structuredClone(valid), packageDoc = seed.documents.find(d => d.id === "KB-PRODUCT-LUNCH")!;
   onlyPackage.steps[2]!.output = { content: [{ type: "text", text: JSON.stringify([{ sourceId: packageDoc.id, body: packageDoc.body,
     scope: { shopId: packageDoc.shopId, productId: packageDoc.productId } }]) }] };
@@ -482,15 +541,17 @@ export async function checkStableJoint() {
   assert.equal(guard.usage().agent.estimatedCost, null); assert.equal(guard.usage().agent.unknownCosts, 1);
   const deadline = createC1ValidationGuard(async () => { sends++; return new Response("{}"); }, () => clock, jointLimits); deadline.setActive(active);
   clock = jointLimits.deadlineMs; await assert.rejects(deadline.fetchFor("agent")("https://example.invalid"), /run_deadline/); assert.equal(sends, 1);
-  console.log("stable-joint checks passed: 8 cases / 24 inputs + 2 events, C1 hash-bound final reply review, missing evidence/full denominator, native provider retry HTTP cap, unknown usage/deadline; zero DB, QQ or provider network.");
+  console.log("stable-joint checks passed: baseline 8 cases / 24 inputs + 2 events; repair 4 cases / 10 inputs + 1 event; merchant refresh 2 cases / 4 inputs + 2 events; suite isolation, fresh redeemed evidence, rejection query requirements, C1 hash-bound final reply review, full denominator, native retry HTTP cap and unknown usage/deadline; zero DB, QQ or provider network.");
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
   const [action, path, other, ...rest] = process.argv.slice(2); assert.equal(rest.length, 0);
   if ((action === "--check" || action === undefined) && !path && !other) await checkStableJoint();
   else if (action === "--freeze" && path && !other) await freezeStableJoint(path);
+  else if (action === "--freeze-repair" && path && !other) await freezeStableJoint(path, jointRepairSuiteId);
+  else if (action === "--freeze-merchant-refresh" && path && !other) await freezeStableJoint(path, jointMerchantRefreshSuiteId);
   else if ((action === "--db" || action === "--live") && path && !other) { const result = await runStableJoint(action === "--db" ? "db" : "live", path); if (!result.passed) process.exitCode = 1; }
   else if (action === "--score" && path && other) { const result = await scoreStableJoint(path, other); if (!result.admitted) process.exitCode = 1; }
   else if (action === "--review-template" && path && other) await writeReviewTemplate(path, other);
-  else throw new Error("Use --check | --freeze MANIFEST | --db MANIFEST | --live MANIFEST | --review-template RESULT REVIEWS | --score RESULT REVIEWS");
+  else throw new Error("Use --check | --freeze MANIFEST | --freeze-repair MANIFEST | --freeze-merchant-refresh MANIFEST | --db MANIFEST | --live MANIFEST | --review-template RESULT REVIEWS | --score RESULT REVIEWS");
 }

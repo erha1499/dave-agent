@@ -13,6 +13,7 @@ import {
   type BeforeProviderRequestEvent,
   type Extension,
   type ExtensionContext,
+  type ExtensionToolContext,
   type ResourceLoader,
   type ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
@@ -22,6 +23,7 @@ import type { RefundStore } from "./refunds.ts";
 import { registerOrderDiscovery } from "./order-discovery.ts";
 import { modelPricing, normalizeBailianGenerationBaseUrl, resolveModelSelection, type ModelSelection } from "./model-selection.ts";
 import { createModelRequestFetch, currentModelTask, recordLocalModelCall, rejectUnsupportedModelTransport } from "./model-request-budget.ts";
+import { orderRefundState } from "./support-evidence-context.ts";
 
 const projectDir = fileURLToPath(new URL("../", import.meta.url));
 const skillDir = fileURLToPath(new URL("../skills/shop-support", import.meta.url));
@@ -86,6 +88,42 @@ export async function createCouponSession(
   const skills = loadSkillsFromDir({ dir: skillDir, source: "project" });
   if (skills.skills.length !== 1 || skills.diagnostics.length) throw new Error("客服 Skill 加载失败。");
 
+  type Order = Awaited<ReturnType<CouponStore["getOrder"]>>;
+  type OrderScope = { shopId: string; productIds: string[] };
+  const newTurn = () => ({ revision: 0, scopes: new Map<string, OrderScope>() });
+  let currentTurn = newTurn();
+  function assertCurrent(turn: typeof currentTurn, revision: number, signal?: AbortSignal) {
+    signal?.throwIfAborted();
+    if (turn !== currentTurn || revision !== turn.revision) throw new Error("本轮订单取证已失效，请重新查询本人订单。");
+  }
+  function retireScopes(turn: typeof currentTurn, revision: number) {
+    if (turn === currentTurn && revision === turn.revision) { turn.scopes.clear(); turn.revision++; }
+  }
+  async function requiredTool(ctx: ExtensionToolContext, name: string, args: Record<string, string>, signal?: AbortSignal) {
+    signal?.throwIfAborted();
+    const outcome = await ctx.executeTool(name, args, { signal });
+    signal?.throwIfAborted();
+    if (outcome.isError) throw new Error(`必要取证 ${name} 未完成，当前不能继续业务操作。`);
+    return JSON.parse(outcome.result.content.map(part => part.type === "text" ? part.text : "").join(""));
+  }
+  async function orderRules(ctx: ExtensionToolContext, orderId: string, signal?: AbortSignal) {
+    const turn = currentTurn, revision = turn.revision;
+    const order = await requiredTool(ctx, "get_order", { orderId }, signal) as Order;
+    assertCurrent(turn, revision, signal);
+    const scope = turn.scopes.get(orderId);
+    if (order.id !== orderId || !scope) throw new Error("未取得当前订单的门店和套餐范围，不能继续业务操作。");
+    for (const productId of scope.productIds) {
+      const rules = await requiredTool(ctx, "search_faq", { query: orderRefundState(order), shopId: scope.shopId, productId }, signal);
+      assertCurrent(turn, revision, signal);
+      if (!Array.isArray(rules) || !rules.length || rules.some(rule => rule?.source !== "demo-knowledge"
+        || typeof rule.sourceId !== "string" || !rule.sourceId || typeof rule.body !== "string" || !rule.body.trim()
+        || !rule.scope || rule.scope.shopId !== null && rule.scope.shopId !== scope.shopId
+        || rule.scope.productId !== null && rule.scope.productId !== productId)) {
+        throw new Error("未查到当前订单的适用规则，不能继续业务操作。");
+      }
+    }
+  }
+
   const tools: ToolDefinition[] = [
     defineTool({
       name: "list_orders", label: "查看本人最近订单",
@@ -102,14 +140,40 @@ export async function createCouponSession(
         shopId: Type.Optional(Type.String({ minLength: 1, maxLength: 64 })),
         productId: Type.Optional(Type.String({ minLength: 1, maxLength: 64 })),
       }, { additionalProperties: false }),
-      execute: async (_id, { query, shopId, productId }) => ({ content: [{ type: "text", text: JSON.stringify(await store.searchKnowledge(query, shopId, productId)) }], details: {} }),
+      execute: async (_id, { query, shopId, productId }, signal) => {
+        const turn = currentTurn, revision = turn.revision;
+        assertCurrent(turn, revision, signal);
+        if ((shopId || productId) && ![...turn.scopes.values()].some(scope => (!shopId || scope.shopId === shopId)
+          && (!productId || scope.productIds.includes(productId)))) {
+          throw new Error("查询具体门店或套餐规则前，须在本轮先查询匹配的本人订单。");
+        }
+        const rules = await store.searchKnowledge(query, shopId, productId);
+        assertCurrent(turn, revision, signal);
+        return { content: [{ type: "text", text: JSON.stringify(rules) }], details: {} };
+      },
     }),
     defineTool({
       name: "get_order",
       label: "查询本人订单",
       description: "按COUPON-1001格式订单号查询当前QQ身份的模拟团购券订单、门店/套餐范围、核销、付款和历史退款事实。查询具体订单的套餐政策前先用本工具确定FAQ范围。每次回答具体订单或券的当前状态、核销、付款、已退金额或有效期，都在最新用户消息之后重新调用本工具；“这张”“这笔”等省略表达也一样。历史结果、最近列表和旧卡只帮助定位，不能代替本轮读取或被称为本轮查询证据。判断退款资格或金额还须随后查询适用FAQ。无get_refund时只能说明本轮读取的付款/退款历史，不能推断方案状态或真实到账。指代不清先询问，不猜单。身份由宿主绑定并在每次执行时校验；不能查询他人或修改数据。金额单位为分。",
       parameters: Type.Object({ orderId: Type.String({ pattern: "^COUPON-\\d{4}$" }) }, { additionalProperties: false }),
-      execute: async (_id, { orderId }) => ({ content: [{ type: "text", text: JSON.stringify(await store.getOrder(identity, orderId)) }], details: {} }),
+      execute: async (_id, { orderId }, signal) => {
+        const turn = currentTurn, revision = turn.revision;
+        try {
+          assertCurrent(turn, revision, signal);
+          const order = await store.getOrder(identity, orderId);
+          assertCurrent(turn, revision, signal);
+          if (order.source === "demo-database" && order.id === orderId && typeof order.shop?.id === "string" && order.shop.id
+            && Array.isArray(order.items) && order.items.length && order.items.every(item => typeof item.productId === "string" && item.productId)) {
+            turn.scopes.set(orderId, { shopId: order.shop.id, productIds: [...new Set(order.items.map(item => item.productId))] });
+          } else turn.scopes.delete(orderId);
+          return { content: [{ type: "text", text: JSON.stringify(order) }], details: {} };
+        } catch (error) {
+          // A failed concurrent read must also retire successes still in flight.
+          retireScopes(turn, revision);
+          throw error;
+        }
+      },
     }),
   ];
   if (afterSales) tools.push(
@@ -121,18 +185,28 @@ export async function createCouponSession(
         orderId: Type.String({ pattern: "^COUPON-\\d{4}$" }),
         reason: Type.String({ minLength: 1, maxLength: 200 }),
       }, { additionalProperties: false }),
-      execute: async (_id, { orderId, reason }) => ({
-        content: [{ type: "text", text: JSON.stringify(await afterSales.store.prepare(identity, afterSales.sourceKey, orderId, reason)) }], details: {},
-      }),
+      execute: async (_id, { orderId, reason }, signal, _update, ctx) => {
+        const turn = currentTurn, revision = turn.revision;
+        await orderRules(ctx, orderId, signal);
+        assertCurrent(turn, revision, signal);
+        const value = await afterSales.store.prepare(identity, afterSales.sourceKey, orderId, reason);
+        assertCurrent(turn, revision, signal);
+        return { content: [{ type: "text", text: JSON.stringify(value) }], details: {} };
+      },
     }),
     defineTool({
       name: "get_merchant_request",
       label: "查询模拟协商进度",
-      description: "查询当前用户在当前会话中为本人订单创建的模拟商家协商。无任务返回null；pending仍在等待，approved仅为模拟商家同意，绝不代表已退款。",
+      description: "查询当前用户在当前会话中为本人订单创建的模拟商家协商。用户再次要求退款或生成方案、转述商家批准时，即使上一轮为rejected/timed_out，也必须在本条消息之后依次get_order、按订单范围search_faq、调用本工具；不能查完规则就沿用旧协商状态停止。独立的一般规则咨询不强制查询协商。无任务返回null；pending仍在等待，approved仅为模拟商家同意，绝不代表已退款。",
       parameters: Type.Object({ orderId: Type.String({ pattern: "^COUPON-\\d{4}$" }) }, { additionalProperties: false }),
-      execute: async (_id, { orderId }) => ({
-        content: [{ type: "text", text: JSON.stringify(await afterSales.store.getTask(identity, afterSales.sourceKey, orderId) ?? null) }], details: {},
-      }),
+      execute: async (_id, { orderId }, signal, _update, ctx) => {
+        const turn = currentTurn, revision = turn.revision;
+        await orderRules(ctx, orderId, signal);
+        assertCurrent(turn, revision, signal);
+        const value = await afterSales.store.getTask(identity, afterSales.sourceKey, orderId) ?? null;
+        assertCurrent(turn, revision, signal);
+        return { content: [{ type: "text", text: JSON.stringify(value) }], details: {} };
+      },
     }),
   );
   if (afterSales?.refunds) {
@@ -143,7 +217,15 @@ export async function createCouponSession(
         label: "生成模拟退款方案",
         description: "为本人在当前会话已获模拟商家批准的单张未核销券生成整笔退款方案。仅保存待确认方案，不执行退款；金额由业务服务计算，不能传入或修改金额。必须展示操作编号和方案，请用户本人另发确认。",
         parameters: Type.Object({ orderId: Type.String({ pattern: "^COUPON-2\\d{3}$" }) }, { additionalProperties: false }),
-        execute: async (_id, { orderId }) => ({ content: [{ type: "text", text: JSON.stringify(await refunds.prepare(identity, afterSales.sourceKey, orderId)) }], details: {} }),
+        execute: async (_id, { orderId }, signal, _update, ctx) => {
+          const turn = currentTurn, revision = turn.revision;
+          const task = await requiredTool(ctx, "get_merchant_request", { orderId }, signal);
+          assertCurrent(turn, revision, signal);
+          if (task?.orderId !== orderId || task.status !== "approved") throw new Error("本轮未取得当前订单的商家批准，不能生成退款方案。");
+          const value = await refunds.prepare(identity, afterSales.sourceKey, orderId);
+          assertCurrent(turn, revision, signal);
+          return { content: [{ type: "text", text: JSON.stringify(value) }], details: {} };
+        },
       }),
       defineTool({
         name: "get_refund",
@@ -154,7 +236,19 @@ export async function createCouponSession(
       }),
     );
   }
-  const session = await createSession(modelRuntime, { ...model, maxTokens: Math.min(model.maxTokens, 2048) }, systemPrompt, tools, skills);
+  const pendingOrders = new Map<string, { turn: typeof currentTurn; revision: number }>();
+  const session = await createSession(modelRuntime, { ...model, maxTokens: Math.min(model.maxTokens, 2048) }, systemPrompt, tools, skills,
+    async () => { currentTurn = newTurn(); pendingOrders.clear(); return undefined; });
+  session.subscribe(event => {
+    if (event.type === "tool_execution_start" && event.toolName === "get_order") {
+      pendingOrders.set(event.toolCallId, { turn: currentTurn, revision: currentTurn.revision });
+    } else if (event.type === "tool_execution_end" && event.toolName === "get_order") {
+      const pending = pendingOrders.get(event.toolCallId);
+      pendingOrders.delete(event.toolCallId);
+      // Schema or extension rejection can fail before execute() runs.
+      if (event.isError && pending) retireScopes(pending.turn, pending.revision);
+    }
+  });
   registerOrderDiscovery(session, store, identity);
   return session;
 }

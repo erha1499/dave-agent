@@ -5,6 +5,7 @@ import { createArrivalConsultation } from "./arrival-consultation.ts";
 import { runCliPrompt } from "./cli.ts";
 import { withModelTask, readModelTaskLimits } from "./model-request-budget.ts";
 import { renderReply, type Reply } from "./reply.ts";
+import { canStreamBusinessText, toolEvidenceFromEvent, type Evidence } from "./reply-from-tools.ts";
 import { createOrderDiscovery } from "./order-discovery.ts";
 import { createWebChatSettingsCatalog, validateWebChatSettings, type WebChatSettings, type WebChatSettingsCatalog } from "./web-chat-settings.ts";
 import { chatTokenHash, WebChatError, WebChatHistory } from "./web-chat-history.ts";
@@ -246,14 +247,16 @@ export class WebChatSessions {
               content: JSON.stringify(entry.messages) }, { triggerTurn: false });
           }
           assertActive();
-          let messageId = "", messages = 0, calls = 0;
+          let messageId = "", messages = 0, calls = 0, streamAllowed = false;
+          const currentEvidence: Evidence[] = [];
           const pendingTools = new Map<string, { id: string; label: string }>();
           unsubscribe = entry.agent.subscribe(event => {
             if (!entry.active || abort.signal.aborted) return;
             if (event.type === "message_start" && event.message.role === "assistant") {
               messageId = `assistant-${++messages}`;
+              streamAllowed = canStreamBusinessText(currentEvidence);
               step(messageId, "整理答复", "running");
-            } else if (event.type === "message_update" && event.assistantMessageEvent.type === "text_delta" && messageId) {
+            } else if (event.type === "message_update" && event.assistantMessageEvent.type === "text_delta" && messageId && streamAllowed) {
               emit({ type: "delta", messageId, text: event.assistantMessageEvent.delta });
             } else if (event.type === "message_end" && event.message.role === "assistant" && messageId) {
               step(messageId, "整理答复", ["error", "aborted"].includes(event.message.stopReason) ? "error" : "done");
@@ -262,6 +265,8 @@ export class WebChatSessions {
               pendingTools.set(event.toolCallId, pending);
               step(pending.id, pending.label, "running");
             } else if (event.type === "tool_execution_end") {
+              const evidence = toolEvidenceFromEvent(event);
+              if (evidence) currentEvidence.push(evidence);
               const pending = pendingTools.get(event.toolCallId);
               if (pending) { step(pending.id, pending.label, event.isError ? "error" : "done"); pendingTools.delete(event.toolCallId); }
             }

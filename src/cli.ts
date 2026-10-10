@@ -11,7 +11,7 @@ import { confirmMerchantReply, merchantSourceKey } from "./after-sales-entry.ts"
 import { RefundStore, readRefundDatabaseConfig } from "./refunds.ts";
 import { confirmRefundReply, markRefundReplyPresented } from "./refund-entry.ts";
 import { renderReply, type Reply } from "./reply.ts";
-import { replyFromTools } from "./reply-from-tools.ts";
+import { replyFromTools, toolEvidenceFromEvent, type Evidence } from "./reply-from-tools.ts";
 import { cancelSupportTurn, createSupportSession, getSupportHostReceipt, getSupportResult, prepareSupportPrompt, readSupportArchitecture, readSupportContextMode, supportReply } from "./support-session.ts";
 import { ConversationStateStore } from "./conversation-state.ts";
 import { createKnowledgeService } from "./knowledge-service.ts";
@@ -74,7 +74,8 @@ export async function runCliPrompt(
       catch { /* Delivery already succeeded; do not retry the consultation or send. */ }
       return hostReply;
     }
-    const previous = session.messages.length;
+    const results: Evidence[] = [];
+    const unsubscribe = session.subscribe(event => { const evidence = toolEvidenceFromEvent(event); if (evidence) results.push(evidence); });
     const requestId = randomUUID();
     prepareSupportPrompt(session, { requestId, groupOpenid: "cli", messageId: requestId });
     let modelFailed = false;
@@ -90,11 +91,10 @@ export async function runCliPrompt(
       await session.abort();
       if (task.snapshot().failureReason === "context_limit") throw new ContextBudgetError();
       if (!getSupportResult(session)) throw new Error("模型请求失败，请检查模型配置或稍后重试。");
-    }
+    } finally { unsubscribe(); }
     task.setPhase("render");
-    const results = session.messages.slice(previous).flatMap(message => message.role === "toolResult" ? [message] : []);
     const assistantText = modelFailed ? "" : session.getLastAssistantText() ?? "未生成回复，请重试。";
-    const reply = supportReply(session, assistantText) ?? replyFromTools(assistantText, results);
+    const reply = supportReply(session, assistantText) ?? replyFromTools(assistantText, results, session.getActiveToolNames());
     // Delivery failures do not re-enter the model fallback or retry any business action.
     const rendered = `客服：${renderReply(reply).text}\n`;
     task.setPhase("send");

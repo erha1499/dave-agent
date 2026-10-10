@@ -53,7 +53,8 @@ export async function checkQQBinding() {
       async listOrders() { if (state.binding?.customerId !== a.customerId) throw new OrderAccessError("未找到当前客户可查询的订单。");
         return { source: "demo-database", asOf: now, hasMore: false, orders: [{ id: orderId, status: "paid", paidCents: 7980,
           refundedCents: 0, couponStatuses: ["unused"], productName: "双人午餐", shopName: privateFact, createdAt: now }] }; },
-      async searchKnowledge() { return []; },
+      async searchKnowledge() { return [{ source: "demo-knowledge", sourceId: "KB-BINDING-PUBLIC", title: "公开查询说明",
+        body: "公开规则可查询，具体订单须由本人重新授权读取。", scope: { shopId: null, productId: null } }]; },
     } as unknown as CouponStore;
     const merchant = { async getTask() { return structuredClone(task); }, async prepare() { state.hostWrites++; throw new Error("unexpected write"); } } as unknown as AfterSalesStore;
     const options = { merchantEvents, async resolveBinding(msg: QQBotInboundMessage) {
@@ -72,6 +73,10 @@ export async function checkQQBinding() {
     const response = (reply = "公开咨询已完成", effect = () => {}) => (context: TranscriptContext) => {
       contexts.push(JSON.stringify(context.messages)); effect(); return fauxAssistantMessage(reply);
     };
+    const publicQuery = (context: TranscriptContext) => {
+      contexts.push(JSON.stringify(context.messages));
+      return fauxAssistantMessage(fauxToolCall("search_faq", { query: "公开规则如何规定" }), { stopReason: "toolUse" });
+    };
     async function warm() {
       faux.setResponses([context => { contexts.push(JSON.stringify(context.messages)); return fauxAssistantMessage(fauxToolCall("get_order", { orderId }), { stopReason: "toolUse" }); }, response()]);
       await agent.handle(message("private-order", `查询订单 ${orderId}`));
@@ -79,12 +84,13 @@ export async function checkQQBinding() {
       assert.equal(sends.at(-1)!.kind, "order"); assert.ok(sends.at(-1)!.text.includes(orderId)); assert.equal(sessions.length, 1);
     }
     async function recover() {
-      const before = contexts.length; faux.setResponses([response()]); await agent.handle(message("recovery"));
-      assert.equal(contexts.length, before + 1); assert.ok(!contexts.at(-1)!.includes(privateFact), "replacement provider input contains no old private tool results or receipts");
-      assert.equal(sends.at(-1)!.text, "公开咨询已完成"); assert.equal(sessions.length, 2);
+      const before = contexts.length; faux.setResponses([publicQuery, response()]); await agent.handle(message("recovery"));
+      assert.equal(contexts.length, before + 2); assert.ok(contexts.slice(before).every(context => !context.includes(privateFact)), "replacement provider input contains no old private tool results or receipts");
+      assert.match(sends.at(-1)!.text, /公开规则可查询，具体订单须由本人重新授权读取。/);
+      assert.doesNotMatch(sends.at(-1)!.text, /PRIVATE_A_OLD_ORDER|公开咨询已完成/); assert.equal(sessions.length, 2);
     }
     async function finish() { assert.equal(faux.getPendingResponseCount(), 0); assert.ok(!logs.join("\n").includes("synthetic private")); await agent.close(); }
-    return { state, agent, contexts, sends, sessions, response, warm, recover, finish };
+    return { state, agent, contexts, sends, sessions, response, publicQuery, warm, recover, finish };
   }
   async function run(check: (f: Awaited<ReturnType<typeof fixture>>) => Promise<void>, mode?: "host" | "model") {
     const f = await fixture(mode); try { await check(f); controls++; } finally { await f.finish(); }
@@ -95,11 +101,13 @@ export async function checkQQBinding() {
     assert.ok(f.contexts.at(-1)!.includes(privateFact), "unchanged bindings retain history rather than rebuilding every turn"); assert.equal(f.sessions.length, 1);
   });
   await run(async f => {
-    f.state.binding = undefined; faux.setResponses([f.response(), f.response()]);
+    f.state.binding = undefined; faux.setResponses([f.publicQuery, f.response(), f.publicQuery, f.response()]);
     await f.agent.handle(message("unbound-first")); await f.agent.handle(message("unbound-second"));
-    assert.equal(f.sessions.length, 1); assert.equal(f.contexts.length, 2);
-    assert.equal(JSON.parse(f.contexts[1]!).filter((item: { role: string }) => item.role === "user").length, 2);
+    assert.equal(f.sessions.length, 1); assert.equal(f.contexts.length, 4);
+    assert.equal(JSON.parse(f.contexts[3]!).filter((item: { role: string }) => item.role === "user").length, 2);
     assert.equal(f.sends.length, 2, "unbound users can still ask public questions");
+    assert.ok(f.sends.every(reply => reply.kind === "answer" && reply.text.includes("公开规则可查询，具体订单须由本人重新授权读取。")
+      && reply.text.includes("依据：KB-BINDING-PUBLIC") && !reply.text.includes("公开咨询已完成")));
   });
   // A→undefined and A→B are the original baseline 0/2 history-protection failures.
   for (const binding of changed) await run(async f => { await f.warm(); f.state.binding = binding; await f.recover(); });

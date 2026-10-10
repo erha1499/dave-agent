@@ -48,7 +48,7 @@ Dave-Agent 用这个场景学习 Agent 工程：模型负责理解与组织语�
 | 05.20 | [订单取证](https://www.yuque.com/erha-vrnso/repg3o/bgk7n1zx4we3gcvn) | 把实时订单事实和规则依据分开 |
 | 05.30 | [原问与澄清](https://www.yuque.com/erha-vrnso/repg3o/pkpmew1sxmf99o2e) | 理解短回复如何补回原问题而不偷换问题 |
 | 06.10 | [网页配置](https://www.yuque.com/erha-vrnso/repg3o/hk0gwwgm4rqk4ncu) | 从表单、配置快照追到 Pi Session |
-| 06.20 | [网页重试与历史](https://www.yuque.com/erha-vrnso/repg3o/tu9dm4a5wev2otqf) | 区分对话、运行、请求和持久回执 |
+| 06.20 | [网页重试与历史](./06.20-web-replay.md) | 区分对话、运行、请求和持久回执 |
 | 07.10 | [客观评测](./07.10-evaluation-cost.md) | 正确计算失败、计划分母、延迟和费用 |
 | 07.15 | [稳定主线联合验收](./07.15-joint-acceptance.md) | 同时检查答复、工具、状态和费用，识别未验项 |
 | 07.20 | [模型选型](./07.20-model-selection.md) | 设计公平对照，用收益和预算决定停止 |
@@ -56,10 +56,6 @@ Dave-Agent 用这个场景学习 Agent 工程：模型负责理解与组织语�
 | 08.10 | [选修：Coding Agent](./08.10-coding-agent.md) | 理解代码上下文、搜索、AST / LSP 与 Harness 职责 |
 | 案例 | [到账咨询](https://www.yuque.com/erha-vrnso/repg3o/gudinkahr1hknxmf) | 区分渠道规则与实际资金到账 |
 | 案例 | [部分核销](https://www.yuque.com/erha-vrnso/repg3o/rixwimb2cfm7fexc) | 区分剩余实付金额与可退权限 |
-
-本包是本地教学草稿；已有课程的语雀页面尚未被替换，新课尚未发布。导入顺序、目标页面和检查要求见 [导入说明](./README.md)。
-
-阅读时区分当前证据：M1 真实模型联合验收为 **20/26，未准入**；M2 正式请求预算与账本已有实现和验证；M3 两个退款事务中止窗口实库 **2/2**；M4 完整上下文预算正在实施，不能先写成通过。各自的版本、结果和限制集中在[面试补齐记录](../../minimax-interview-coverage.md)，不以课程齐全代替能力验收。
 
 ## 用一条消息串起各章
 

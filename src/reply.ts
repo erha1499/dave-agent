@@ -124,9 +124,9 @@ const strategies: { [K in keyof Replies]: (reply: Replies[K]) => Content } = {
       || task.approvedAmountCents > task.amountCents)) throw new Error("模拟协商批准金额无效。");
     const statuses: Record<MerchantTask["status"], string> = {
       pending: "已登记，正在等待模拟商家结果。你可以继续咨询，稍后按订单号查询进度。",
-      approved: task.status === "approved" ? `模拟商家已同意 ${money(task.approvedAmountCents!)} 元的协商结果。` : "",
-      rejected: "模拟商家已拒绝本次协商。",
-      timed_out: "等待模拟商家结果已超时，可联系测试管理员核实。",
+      approved: task.status === "approved" ? `模拟商家已同意 ${money(task.approvedAmountCents!)} 元的协商结果。如需退款，请先提出退款请求，待方案展示后再由本人确认。` : "",
+      rejected: "模拟商家已拒绝本次协商。当前不能据此生成退款方案；如需继续处理，请自行联系商家或测试管理员核实。",
+      timed_out: "等待模拟商家结果已超时，尚未获得批准，当前不能据此生成退款方案；如需继续处理，请自行联系商家或测试管理员核实。",
     };
     const status = statuses[task.status];
     if (!status) throw new Error("模拟协商状态无效。");

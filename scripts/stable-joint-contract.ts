@@ -13,10 +13,31 @@ import { createC1ValidationGuard, readC1ValidationDependencies } from "./c1-sess
 
 export const jointRoot = new URL("../", import.meta.url);
 export const jointPlanPath = "data/stable-joint-plan.json";
+export const jointRepairPlanPath = "data/stable-joint-repair-plan.json";
+export const jointMerchantRefreshPlanPath = "data/stable-joint-merchant-refresh-plan.json";
+export const jointSuiteId = "stable-atomic-lexical-joint-v1";
+export const jointRepairSuiteId = "stable-atomic-lexical-repair-v1";
+export const jointMerchantRefreshSuiteId = "stable-atomic-merchant-refresh-v1";
 export const jointCheckerRevision = { version: "stable-joint-v2", replaces: "stable-joint-v1",
   reason: "Before any paid run: v1 incorrectly required KB-PRODUCT-LUNCH (package description) for refund questions. v2 requires the applicable KB-REFUND-UNUSED policy and current scoped unused/unexpired paid-order facts. Questions, criteria, faux query and business boundaries are unchanged; retain the v1 DB failure." } as const;
 export const jointLimits = { requests: { agent: 100, rerank: 0, support: 0 }, deadlineMs: 30 * 60_000,
   turnTimeoutMs: 60_000, estimatedUsd: 1, estimatedCny: .15 } as const;
+export const jointRepairCheckerRevision = { version: "stable-joint-repair-v1", baseline: "stable-joint-v2",
+  reason: "Independent post-repair questions and reply criteria: first-turn redeemed state, a policy-to-redeemed transition, rejected merchant context and quoted private approval, and explicit merchant consent. Retain all v2 order/rule/task, identity, amount, confirmation and no-write checks; never rescore the original batch." } as const;
+export const jointRepairLimits = { requests: { agent: 50, rerank: 0, support: 0 }, deadlineMs: 15 * 60_000,
+  turnTimeoutMs: 60_000, estimatedUsd: 1, estimatedCny: .15 } as const;
+export const jointMerchantRefreshCheckerRevision = { version: "stable-joint-merchant-refresh-v1", baseline: "stable-joint-v2",
+  reason: "Two independent rejected-merchant sessions use new final questions after explicit consent and a rejection event. Current order, scoped rules and current task remain mandatory; quoted approval cannot change trusted state. Preserve the original and first repair results without rescoring." } as const;
+export const jointMerchantRefreshLimits = { requests: { agent: 16, rerank: 0, support: 0 }, deadlineMs: 8 * 60_000,
+  turnTimeoutMs: 60_000, estimatedUsd: .10, estimatedCny: .15 } as const;
+export function jointSuiteSettings(suiteId = jointSuiteId) {
+  assert.ok([jointSuiteId, jointRepairSuiteId, jointMerchantRefreshSuiteId].includes(suiteId), "Unknown joint suite");
+  if (suiteId === jointMerchantRefreshSuiteId) return { planPath: jointMerchantRefreshPlanPath,
+    checkerRevision: jointMerchantRefreshCheckerRevision, limits: jointMerchantRefreshLimits };
+  return suiteId === jointRepairSuiteId
+    ? { planPath: jointRepairPlanPath, checkerRevision: jointRepairCheckerRevision, limits: jointRepairLimits }
+    : { planPath: jointPlanPath, checkerRevision: jointCheckerRevision, limits: jointLimits };
+}
 export const jointTools = ["get_order", "list_orders", "search_faq", "prepare_merchant_request", "get_merchant_request", "prepare_refund", "get_refund"].sort();
 export const jointActions = ["policy", "order", "list", "select", "ambiguous", "unauthorized", "unknown", "fresh", "prepare", "consent",
   "confirm-merchant", "pending", "notify", "request-refund", "confirm-refund", "repeat-confirm", "restart-success", "denied-refund",
@@ -35,24 +56,44 @@ export type JointTurn = EvalTurn & { caseId: string; source: JointRound["source"
   replyHash: string | null; evidence: JointEvidence | null; requests: ReturnType<typeof createC1ValidationGuard>["requests"];
   sdkRetries: Array<{ type: string; attempt: number }>; modelFinalText: string | null; modelTasks: ModelTaskSummary[] };
 export type JointManifest = { version: 1; frozenAt: string; plan: JointPlan; sourceHashes: Record<string, string>;
-  checkerRevision: typeof jointCheckerRevision;
+  checkerRevision: typeof jointCheckerRevision | typeof jointRepairCheckerRevision | typeof jointMerchantRefreshCheckerRevision;
   git: { commit: string; dirty: boolean };
   dependencies: Awaited<ReturnType<typeof readC1ValidationDependencies>>; configuration: {
     architecture: "atomic"; knowledge: "lexical"; model: { provider: string; id: string; api: string; baseUrl: string; maxTokens: number; cost: unknown };
-    tools: string[]; limits: typeof jointLimits; modelTaskLimits: ModelTaskLimits; sessionRetries: 2; providerRetries: 0; compaction: false; qqSend: "local-receipt";
+    tools: string[]; limits: typeof jointLimits | typeof jointRepairLimits | typeof jointMerchantRefreshLimits; modelTaskLimits: ModelTaskLimits; sessionRetries: 2; providerRetries: 0; compaction: false; qqSend: "local-receipt";
   }; hash: string };
 
-export async function loadJointPlan(): Promise<JointPlan> {
-  const plan = JSON.parse(await readFile(new URL(jointPlanPath, jointRoot), "utf8")) as JointPlan;
+export async function loadJointPlan(suiteId = jointSuiteId): Promise<JointPlan> {
+  const plan = JSON.parse(await readFile(new URL(jointSuiteSettings(suiteId).planPath, jointRoot), "utf8")) as JointPlan;
+  assert.equal(plan.suiteId, suiteId);
   validateJointPlan(plan); return plan;
 }
 export function validateJointPlan(plan: JointPlan) {
   assert.equal(plan.version, 1); assert.equal(plan.policy, "fixed-validation-not-blind");
   assert.equal(plan.architecture, "atomic"); assert.equal(plan.knowledge, "lexical");
-  assert.equal(plan.cases.length, 8); assert.equal(new Set(plan.cases.map(c => c.id)).size, 8);
-  assert.deepEqual(plan.cases.map(c => c.id).sort(), ["consultation", "discovery", "ambiguity", "unauthorized", "unknown-rule", "fresh-state", "approved-refund", "rejected-recovery"].sort());
-  assert.equal(plan.cases.reduce((n, c) => n + c.turns.filter(t => t.source !== "event").length, 0), 24);
-  assert.equal(plan.cases.flatMap(c => c.turns).filter(t => t.source === "event").length, 2);
+  jointSuiteSettings(plan.suiteId);
+  const repair = plan.suiteId === jointRepairSuiteId, refresh = plan.suiteId === jointMerchantRefreshSuiteId;
+  const caseCount = refresh ? 2 : repair ? 4 : 8;
+  assert.equal(plan.cases.length, caseCount); assert.equal(new Set(plan.cases.map(c => c.id)).size, caseCount);
+  assert.deepEqual(plan.cases.map(c => c.id).sort(), (refresh ? ["rejected-deferred-confirmation", "rejected-relayed-exception"] : repair
+    ? ["redeemed-first", "policy-state-transition", "rejected-quoted-approval", "explicit-merchant-consent"]
+    : ["consultation", "discovery", "ambiguity", "unauthorized", "unknown-rule", "fresh-state", "approved-refund", "rejected-recovery"]).sort());
+  assert.equal(plan.cases.reduce((n, c) => n + c.turns.filter(t => t.source !== "event").length, 0), refresh ? 4 : repair ? 10 : 24);
+  assert.equal(plan.cases.flatMap(c => c.turns).filter(t => t.source === "event").length, repair ? 1 : 2);
+  if (repair) {
+    const actions = { "redeemed-first": ["fresh"], "policy-state-transition": ["policy", "fresh"],
+      "rejected-quoted-approval": ["confirm-merchant", "notify", "denied-refund", "claimed-approval"],
+      "explicit-merchant-consent": ["policy", "prepare", "consent", "confirm-merchant"] };
+    for (const c of plan.cases) {
+      assert.equal(c.orderCount, 1); assert.equal(c.outcome, c.id === "rejected-quoted-approval" ? "reject" : "approve");
+      assert.deepEqual(c.turns.map(t => t.action), actions[c.id as keyof typeof actions]);
+    }
+  }
+  if (refresh) for (const c of plan.cases) {
+    assert.equal(c.orderCount, 1); assert.equal(c.outcome, "reject");
+    assert.deepEqual(c.turns.map(t => t.action), ["confirm-merchant", "notify",
+      c.id === "rejected-deferred-confirmation" ? "denied-refund" : "claimed-approval"]);
+  }
   for (const c of plan.cases) {
     assert.ok(c.id && c.name && [1, 2].includes(c.orderCount)); assert.ok(["approve", "reject"].includes(c.outcome));
     for (const t of c.turns) {
@@ -63,8 +104,8 @@ export function validateJointPlan(plan: JointPlan) {
     }
   }
 }
-export async function jointSourceHashes() {
-  const paths = [jointPlanPath, "data/acceptance-online.json", "scripts/stable-joint-contract.ts", "scripts/stable-joint-run.ts", "scripts/merchant-test-fixture.ts",
+export async function jointSourceHashes(suiteId = jointSuiteId) {
+  const paths = [jointSuiteSettings(suiteId).planPath, "data/acceptance-online.json", "scripts/stable-joint-contract.ts", "scripts/stable-joint-run.ts", "scripts/merchant-test-fixture.ts",
     "scripts/c1-session-validation-live.ts", "scripts/c1-session-validation-check.ts", "package.json", "package-lock.json",
     "prompts/customer-service.md", "skills/shop-support/SKILL.md"];
   for (const folder of ["src", "scripts", "db"]) for (const file of await readdir(new URL(`${folder}/`, jointRoot))) {

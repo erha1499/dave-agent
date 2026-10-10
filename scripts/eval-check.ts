@@ -45,12 +45,15 @@ for (const orderId of ["COUPON-1002", "COUPON-1001"]) {
   capture.receive({ type: "tool_execution_end", toolName: "get_order", toolCallId: orderId, isError: true,
     result: { content: [{ type: "text", text: "未找到当前客户可查询的订单，请核对订单号或联系人工客服。" }] } });
 }
-capture.receive({ type: "tool_execution_start", toolName: "search_faq", toolCallId: "unfinished", args: { query: "退款" } });
+capture.receive({ type: "tool_execution_start", toolName: "search_faq", toolCallId: "unfinished", parentToolCallId: "parent-merchant", args: { query: "退款" } });
 const collected = capture.finish();
 assert.equal(collected.steps[0]?.usage, null);
 assert.equal(collected.steps[1]?.expectedDenial, true);
 assert.equal(collected.steps[2]?.expectedDenial, false);
 assert.equal(collected.steps[3]?.isError, true);
+assert.equal(collected.steps[3]?.toolCallId, "unfinished");
+assert.equal(collected.steps[3]?.parentToolCallId, "parent-merchant");
+assert.equal(collected.steps[1]?.parentToolCallId, undefined);
 assert.equal(collected.failed, false);
 const reported = captureEvaluationTurn("test");
 const withUsage = { ...message, usage: { ...message.usage, input: 10, output: 5, cacheRead: 2, totalTokens: 17,

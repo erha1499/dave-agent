@@ -1,13 +1,16 @@
 {
   "version": 1,
-  "createdAt": "2026-10-09T19:24:44.914782+00:00",
+  "createdAt": "2026-10-10T04:08:53.474080+00:00",
   "publicationStatus": "local-drafts-not-published",
-  "baseGitCommit": "03b75ea6ea9fe9e588b527f72370774055d1a09a",
+  "authorization": "Publish after the requested repairs and their required validation; local draft checks do not confirm publication.",
+  "baseGitCommit": "d6a54dce41264da58d58db9a7a28e6fcf941b78a",
   "plannedDelivery": {
-    "existingLessonsExpanded": 8,
+    "existingLessonsExpanded": 9,
     "newLessons": 3,
     "navigationUpdated": 1,
-    "instructions": 1
+    "instructions": 1,
+    "publicationDocuments": 13,
+    "markdownFiles": 14
   },
   "historicalOnlineSourceAudit": {
     "auditedAt": "2026-10-09T17:54:04.066051+00:00",
@@ -19,37 +22,44 @@
   "validation": {
     "relativeLinks": "passed",
     "sourceExcerpts": "passed after stripping outer indentation; explicitly combined schema lines permit trailing commas",
-    "sourceBlockCount": 32,
-    "imageCount": 24,
-    "newVisuals": "6 PNG exports visually inspected; SVG originals retained",
-    "remoteImages": "18 references match prior verified source archive; no fresh image-network check in local-draft delivery",
+    "sourceBlockCount": 65,
+    "imageCount": 26,
+    "newVisuals": "6 PNG exports and 6 SVG originals present; this build records file hashes and PNG dimensions, not a fresh visual review.",
+    "remoteImages": "20 references match the prior verified source archive; no fresh image-network check in this local build.",
     "limitations": [
       "Codex-assisted answer review is not human acceptance",
       "M1 real-model frozen version predates M4; its 20/26 unadmitted outcome is not overwritten",
+      "Current source excerpts explain implementation, not acceptance of the new repair batch; report its actual result separately when available",
       "Import and reload every actual Yuque reading page before claiming publication"
     ]
   },
   "sourceFileHashes": {
     "scripts/c1-model-support-comparison.ts": "843fd47102666cff7f32fcb48717e4a4f6076f2ee831d8e81ff2b16c671736f2",
-    "src/agent.ts": "8d998f02508208d2b267d2530d51a890e3f6532255cde8f8038bae141578a26f",
+    "scripts/stable-joint-contract.ts": "76fe37ed4ff8874ec91359195031d1a26f5be5ea1ba07830781272f19ede35b4",
+    "scripts/stable-joint-run.ts": "598a03cbe90708ef4be2c829e91aa359f259e496338081021affd81940cd26ef",
+    "scripts/web-evidence-live-check.ts": "87057bdb3c66615fbffbb066c8e209695546120e6aa795d9252a6e5c6f9bf1e8",
+    "src/agent.ts": "0a0ec2e4a45488fcbda57b8cb052d835875ded94d36be9cc28e62d084e73641c",
+    "src/cli.ts": "aa11840be389b53f9b9b5b26e2cefa496f5d352479c0a3001a2a562344ff6439",
     "src/conversation-state.ts": "5dc215be064b59657a53cdf66e2ccf67ccf39d2f9f0a0a8affb5353d4ea9ea79",
     "src/eval-analysis.ts": "8e7f23098e84eb841a445c90e91c84f1d12647aa3d453c7041c1dd4f533281b9",
-    "src/eval-capture.ts": "d6ea50d72fdabc6dae1c815f5a5dfbae5415b8bf5ecc436079294e1e44f38a30",
+    "src/eval-capture.ts": "180fa2da5f8ebc88224ffb28f3f3397595476dc9a057e88ec31fa1403de7f72c",
     "src/model-request-budget.ts": "d676cdd0817aa7364dec06ecd400dd4cde4c4faa5951a43ff1eb8165ce393159",
-    "src/qq-agent.ts": "fe1f998c54cfd4057189ed36b732b0f88238e46fec3294043910d35b08feb9b2",
+    "src/model-selection.ts": "e9b1eedd0d6a22d1a67164a07bed9bc425e7c85c0e575d2c1dca3bd7e0a21631",
+    "src/qq-agent.ts": "41f95c7499b45df2c30c176c9f70cd06e93cd9e4207997988ff736a32476f780",
     "src/refund-entry.ts": "ee0047a29cb45b13325ef98b886b6d5aa704b61369a97aa19128940f8d133e7f",
     "src/refunds.ts": "a00872bf5e20114752fd2fe001b3f9ab3bc3b94895b95fa22b44c64bb047df3d",
+    "src/reply-from-tools.ts": "2f46b593dca86c000cc0213ad7042dfa541ababa301543d4ba5d3d12d87a6451",
     "src/support-action.ts": "4d8449d054b730a6d2e0ea32f752ff5f227166b689a7e6e96d955c8d9caec291",
     "src/support-context-action.ts": "8fbf6e09b699e5542f11c0cc0ffb7b59c900c69dd7fe121180fbc6725b0194c6",
     "src/support-context.ts": "6d7e251dab36f6d12bf0365d0ab90f6cc41f5318f36f84b4b1777fd97c2d7bfb",
     "src/support-controller.ts": "42e02738efe2243ebf72bff199eda0b405308bb9891bab1b1e9265f69f3a4f42",
     "src/web-chat-history.ts": "ec62b8724b13e3d095abb75da12ea319eea9c0bf71d11c02292c2722b359c98e",
-    "src/web-chat.ts": "ed559303208cb3ade0cc7050c0eace671306de6a450056b50ff75bcda42e1af2"
+    "src/web-chat.ts": "b4d10b65f3aa0790e7a730c08efec15cce1ae2e272720dddf200fce983d48f80"
   },
   "documents": [
     {
       "file": "00-navigation.md",
-      "sha256": "2f3c4aa61e83e02075891425ba79cea477689a18dca6b5b79722b94ce16113c8",
+      "sha256": "f46a88bfd370da4229149c4e6736ca90e6b5e7a4df0bea116e9d4994eaa4224f",
       "images": [
         {
           "alt": "售后业务主线",
@@ -74,7 +84,7 @@
     },
     {
       "file": "01.00-host.md",
-      "sha256": "4a2285228bb887d5374f983ac9f69b80b349a4fb534eec23e55583a56bd6284a",
+      "sha256": "b1ac87abd47f2e8d3e9336fffed53beec06116973f3d475edbd892f6b3fb8e64",
       "images": [
         {
           "alt": "Pi 循环与业务宿主分工",
@@ -127,6 +137,18 @@
           "sources": [
             "src/support-controller.ts"
           ]
+        },
+        {
+          "index": 8,
+          "sources": [
+            "src/reply-from-tools.ts"
+          ]
+        },
+        {
+          "index": 9,
+          "sources": [
+            "src/reply-from-tools.ts"
+          ]
         }
       ],
       "delivery": "replace-existing",
@@ -142,7 +164,7 @@
     },
     {
       "file": "02.20-tools-skills.md",
-      "sha256": "cef53fba73ef8ec115cf8ecaff423296c0da1db5df4b56a5f3708680c15dd7f0",
+      "sha256": "7f7381278d1dea78c91460e0d61c6dbc92eeb2fd359d0832977eed6dbabd289f",
       "images": [
         {
           "alt": "身份、确认与事务保护",
@@ -177,6 +199,24 @@
           "sources": [
             "src/agent.ts"
           ]
+        },
+        {
+          "index": 5,
+          "sources": [
+            "src/agent.ts"
+          ]
+        },
+        {
+          "index": 6,
+          "sources": [
+            "src/agent.ts"
+          ]
+        },
+        {
+          "index": 7,
+          "sources": [
+            "src/agent.ts"
+          ]
         }
       ],
       "delivery": "replace-existing",
@@ -192,7 +232,7 @@
     },
     {
       "file": "03.30-refund.md",
-      "sha256": "acc62925028b14f81038cbaa76276d7feeec9baba778851cd14c5e60313aa382",
+      "sha256": "aec6298f157061a2f08246443bf60bc11bde02c975a10f50f2faac3af65a4138",
       "images": [
         {
           "alt": "身份、确认与事务保护",
@@ -207,23 +247,35 @@
         {
           "index": 1,
           "sources": [
-            "src/refunds.ts"
+            "src/agent.ts"
           ]
         },
         {
           "index": 2,
           "sources": [
-            "src/refund-entry.ts"
+            "src/refunds.ts"
           ]
         },
         {
           "index": 3,
           "sources": [
-            "src/refunds.ts"
+            "src/refund-entry.ts"
           ]
         },
         {
           "index": 4,
+          "sources": [
+            "src/refunds.ts"
+          ]
+        },
+        {
+          "index": 5,
+          "sources": [
+            "src/refunds.ts"
+          ]
+        },
+        {
+          "index": 6,
           "sources": [
             "src/refunds.ts"
           ]
@@ -242,7 +294,7 @@
     },
     {
       "file": "03.50-failures.md",
-      "sha256": "bf68a3f72f4e61e44687e7a406efac9dda43644b6f5a5e0280c9acb99a38b20a",
+      "sha256": "4af497735c54c2c04d22946f0612ee762c42a25a7404933d6fcdd5b678c9a6d6",
       "images": [
         {
           "alt": "业务状态与通知投递分离",
@@ -275,7 +327,25 @@
         {
           "index": 4,
           "sources": [
+            "src/agent.ts"
+          ]
+        },
+        {
+          "index": 5,
+          "sources": [
             "src/support-controller.ts"
+          ]
+        },
+        {
+          "index": 6,
+          "sources": [
+            "src/model-request-budget.ts"
+          ]
+        },
+        {
+          "index": 7,
+          "sources": [
+            "src/model-request-budget.ts"
           ]
         }
       ],
@@ -292,7 +362,7 @@
     },
     {
       "file": "04.20-memory.md",
-      "sha256": "e1d77fabfb5723229f72968a9e687937bd68fa23a3dcd1d7b22ceee14a66ff82",
+      "sha256": "7ecbc6ddd391e65771bd1aa01d114ce985973bb56d836b2eaabe46c089a3a258",
       "images": [
         {
           "alt": "引用定位与重新查证",
@@ -319,13 +389,13 @@
         {
           "index": 3,
           "sources": [
-            "src/conversation-state.ts"
+            "src/cli.ts"
           ]
         },
         {
           "index": 4,
           "sources": [
-            "src/web-chat-history.ts"
+            "src/reply-from-tools.ts"
           ]
         },
         {
@@ -337,11 +407,29 @@
         {
           "index": 6,
           "sources": [
-            "src/support-context.ts"
+            "src/web-chat-history.ts"
           ]
         },
         {
           "index": 7,
+          "sources": [
+            "src/model-request-budget.ts"
+          ]
+        },
+        {
+          "index": 8,
+          "sources": [
+            "src/conversation-state.ts"
+          ]
+        },
+        {
+          "index": 9,
+          "sources": [
+            "src/support-context.ts"
+          ]
+        },
+        {
+          "index": 10,
           "sources": [
             "src/conversation-state.ts"
           ]
@@ -360,10 +448,10 @@
     },
     {
       "file": "04.30-context-budget.md",
-      "sha256": "df0a17002e71b24303c3f2238fc9e521222ac2ed937bdff3827f849bec8c15ed",
+      "sha256": "6206a401d68806004b3825ee92836fc6f5af8f21a533805f891c217d415538f0",
       "images": [
         {
-          "alt": "三种上下文测量",
+          "alt": "四种上下文测量",
           "url": "./assets/context-measures.png"
         },
         {
@@ -371,15 +459,114 @@
           "url": "./assets/context-recovery.png"
         }
       ],
-      "sourceBlocks": [],
+      "sourceBlocks": [
+        {
+          "index": 1,
+          "sources": [
+            "src/model-request-budget.ts"
+          ]
+        },
+        {
+          "index": 2,
+          "sources": [
+            "src/model-request-budget.ts"
+          ]
+        },
+        {
+          "index": 3,
+          "sources": [
+            "src/cli.ts"
+          ]
+        }
+      ],
       "delivery": "create-new",
       "targetUrl": null,
       "source": null,
       "remoteImagesMatchPriorArchive": null
     },
     {
+      "file": "06.20-web-replay.md",
+      "sha256": "5d26b5be24fa7310429327ae90c7046b02719c0dfc791287df259894c5a296ea",
+      "images": [
+        {
+          "alt": "请求回放与新旧会话隔离",
+          "url": "https://cdn.nlark.com/yuque/0/2026/png/67086517/1791472329741-05a8b2bd-220d-406f-a778-97bf4b30f1a1.png"
+        },
+        {
+          "alt": "业务状态与通知投递分离",
+          "url": "https://cdn.nlark.com/yuque/0/2026/png/67086517/1791438796562-ea4c4ad8-ee3f-4667-9cd7-9502cdf40f89.png"
+        }
+      ],
+      "sourceBlocks": [
+        {
+          "index": 1,
+          "sources": [
+            "src/web-chat.ts"
+          ]
+        },
+        {
+          "index": 2,
+          "sources": [
+            "src/web-chat-history.ts"
+          ]
+        },
+        {
+          "index": 3,
+          "sources": [
+            "src/web-chat.ts"
+          ]
+        },
+        {
+          "index": 4,
+          "sources": [
+            "src/reply-from-tools.ts"
+          ]
+        },
+        {
+          "index": 5,
+          "sources": [
+            "src/web-chat.ts"
+          ]
+        },
+        {
+          "index": 6,
+          "sources": [
+            "src/reply-from-tools.ts"
+          ]
+        },
+        {
+          "index": 7,
+          "sources": [
+            "src/reply-from-tools.ts"
+          ]
+        },
+        {
+          "index": 8,
+          "sources": [
+            "src/reply-from-tools.ts"
+          ]
+        },
+        {
+          "index": 9,
+          "sources": [
+            "src/reply-from-tools.ts"
+          ]
+        }
+      ],
+      "delivery": "replace-existing",
+      "targetUrl": "https://www.yuque.com/erha-vrnso/repg3o/tu9dm4a5wev2otqf",
+      "source": {
+        "slug": "tu9dm4a5wev2otqf",
+        "title": "06.20｜网页重试：请求回放与旧会话隔离",
+        "onlineVerifiedAt": "2026-10-09T17:47:45.231Z",
+        "snapshotSha256": "db8f1845613232aefbdac977d998b0663a98d099b3c44391fe3ba754f3ef95cc",
+        "draftSha256": "a2d4039e2dbd824a034cafef56e11663d028987e4e834e67108121acd323ede0"
+      },
+      "remoteImagesMatchPriorArchive": true
+    },
+    {
       "file": "07.10-evaluation-cost.md",
-      "sha256": "67c4207e3f2f807508a06e8de923a2f08a6245b1df1d8676e91013aa97b6280f",
+      "sha256": "0ceb5d7bbb2318a8fbcc25b006fdc8a73a1049222802d58d66694a50630a7a37",
       "images": [
         {
           "alt": "售后业务主线",
@@ -429,7 +616,7 @@
     },
     {
       "file": "07.15-joint-acceptance.md",
-      "sha256": "c26125c7bd7c2bc71a6f506c1b16f0bc0a39fa83108ceff16eaeee3e3d4af5f1",
+      "sha256": "b74666ea27658a2d51a63ad0d9117f547dc738d37d6913b3770b6e70ee34a54c",
       "images": [
         {
           "alt": "联合验收四份证据",
@@ -440,7 +627,38 @@
           "url": "./assets/joint-gates.png"
         }
       ],
-      "sourceBlocks": [],
+      "sourceBlocks": [
+        {
+          "index": 1,
+          "sources": [
+            "scripts/stable-joint-contract.ts"
+          ]
+        },
+        {
+          "index": 2,
+          "sources": [
+            "scripts/stable-joint-run.ts"
+          ]
+        },
+        {
+          "index": 3,
+          "sources": [
+            "scripts/stable-joint-contract.ts"
+          ]
+        },
+        {
+          "index": 4,
+          "sources": [
+            "src/reply-from-tools.ts"
+          ]
+        },
+        {
+          "index": 5,
+          "sources": [
+            "scripts/web-evidence-live-check.ts"
+          ]
+        }
+      ],
       "delivery": "create-new",
       "targetUrl": null,
       "source": null,
@@ -448,7 +666,7 @@
     },
     {
       "file": "07.20-model-selection.md",
-      "sha256": "d97ea3c2689de438ee79a7a88fabf5856a35b494d814029de94160289e4bcc02",
+      "sha256": "ef8455a9c88788c8f73bd991b6ea2a4ad81a31e2710072745d283e60ac752205",
       "images": [
         {
           "alt": "完整评测计划与代价",
@@ -465,6 +683,12 @@
           "sources": [
             "scripts/c1-model-support-comparison.ts"
           ]
+        },
+        {
+          "index": 2,
+          "sources": [
+            "src/model-selection.ts"
+          ]
         }
       ],
       "delivery": "replace-existing",
@@ -480,7 +704,7 @@
     },
     {
       "file": "07.30-interview.md",
-      "sha256": "c2309af313c845fe92ee253f257ba5923c8f5d3b5f56baae329e3d3f0b3ec9a3",
+      "sha256": "ca8c97ea3afb968729b9883f6e4e58613ce893a44ec3e4f925ee8f2749fa55d5",
       "images": [
         {
           "alt": "引用定位与重新查证",
@@ -512,7 +736,7 @@
     },
     {
       "file": "08.10-coding-agent.md",
-      "sha256": "2c9445f68a24c450ef2c27885a195527fac80721977f8110b81d9404e13d79f9",
+      "sha256": "9536a4bfc34d9609393cdd94f6610c699ac22d922cd04a6f4013a6477e11061c",
       "images": [
         {
           "alt": "从问题到代码证据",
@@ -523,7 +747,20 @@
           "url": "./assets/harness-boundaries.png"
         }
       ],
-      "sourceBlocks": [],
+      "sourceBlocks": [
+        {
+          "index": 1,
+          "sources": [
+            "src/refunds.ts"
+          ]
+        },
+        {
+          "index": 2,
+          "sources": [
+            "src/refunds.ts"
+          ]
+        }
+      ],
       "delivery": "create-new",
       "targetUrl": null,
       "source": null,
@@ -531,7 +768,7 @@
     },
     {
       "file": "README.md",
-      "sha256": "4efded1f542ca3f223973ebdcc101f4a6f46529dcd739d2fb7d36afcd80d7051",
+      "sha256": "c6e1a01854a74d76afdcd9b92c0f9d2c18084fdf6ba9285bfce33b1f09597f72",
       "images": [],
       "sourceBlocks": [],
       "delivery": "instructions",
@@ -555,27 +792,27 @@
     },
     {
       "path": "assets/context-measures.png",
-      "sha256": "004d942b58e1dcc77a94c8b2511eb3890ab68f006c43caf988be9ee51a6283d4",
-      "bytes": 150493,
+      "sha256": "fd2e85d176e611ece3e8ec72d6af93cc5ecea672716dd0c3af4650f69d87af0b",
+      "bytes": 149699,
       "width": 2200,
       "height": 840
     },
     {
       "path": "assets/context-measures.svg",
-      "sha256": "47edcda557aa9661e09f4b6b1aa97359e864dd7631a060aaccdc5d29366e8c08",
-      "bytes": 2044
+      "sha256": "27ee7571cb85498fbcc7855b1b0e2055558126296533b23c7f4a2fd7d3c33bcd",
+      "bytes": 2039
     },
     {
       "path": "assets/context-recovery.png",
-      "sha256": "35f9671de0c6d0165d86a2389d59d1e2022f95f2f40fe8ec866e586d653a57ec",
-      "bytes": 148617,
+      "sha256": "48e3bd87480b041f4c16347c7ff5561949b5700c5be52c5a803243f318fd8fb8",
+      "bytes": 152250,
       "width": 2200,
       "height": 840
     },
     {
       "path": "assets/context-recovery.svg",
-      "sha256": "3f746e3503fc0c4099122fca00665319fe1dcc1226b9960eb1086f9424acfb58",
-      "bytes": 2023
+      "sha256": "0f67222e007954947e6a8975290226936e049315031ed51a6c74c03a4d1e5e35",
+      "bytes": 2034
     },
     {
       "path": "assets/harness-boundaries.png",
@@ -613,5 +850,13 @@
       "sha256": "81a4d586db783f63b4ee47b2e1db3d119c64fe54b7bfdefcd29a70102b5b137a",
       "bytes": 1965
     }
-  ]
+  ],
+  "publicationGate": {
+    "runtimeChecks": "passed for final source; npm run validate exit 0",
+    "deterministicHostFix": "passed; no paid rerun or historical score rewrite",
+    "realModelBatch": "closed: engineering 7/7; answer and joint 6/7; not admitted",
+    "verification": "data/web-repair-verification-20261010.json",
+    "onlinePublication": "pending Yuque sign-in and 26-page plus directory reload",
+    "scope": "Teaching current mechanisms and evidence boundaries, not promotion of historical merchant or entire Web batch quality."
+  }
 }
