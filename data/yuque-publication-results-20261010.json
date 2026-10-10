@@ -63,14 +63,17 @@
     "imageStatus": "passed",
     "nativeDiagrams": 5,
     "diagramScreenshots": 8,
-    "diagramStatus": "passed",
+    "diagramStatus": "passed-with-readability-limitation",
     "basis": "Actual CUA screenshots read with view_image by root and delegated reviewers; distinct from automatic resource loading checks",
     "notes": [
       "Each course retains two different teaching images; themes may reuse an image across courses.",
-      "05.00 decorative edge text and 07.30 first horizontal diagram labels are small; principal teaching content remains available.",
+      "05.00 decorative edge text is small. The first horizontal diagram in 07.30 renders completely, but its default 748-pixel body width makes labels too small for reliable word-by-word visual review; its actual native source was separately verified.",
       "Diagrams taller than viewport are covered by overlapping top/bottom screenshots.",
-      "Visual scope is images, diagrams and key reading-page/directory layouts; not an exhaustive line-by-line typography audit."
-    ]
+      "Visual scope is images, diagrams and key reading-page/directory layouts; not an exhaustive line-by-line typography audit.",
+      "Opening the observed diagram data URL at original size was blocked by browser URL security policy; no workaround or readable-original-size screenshot was recorded."
+    ],
+    "readableDiagramPreviews": 4,
+    "defaultSizeLimitedDiagramPreviews": 1
   },
   "localEvidence": {
     "base": ".runtime/minimax-delivery/publication-final",

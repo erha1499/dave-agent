@@ -17,7 +17,7 @@
     "plannedDocuments": 23,
     "passedDocuments": 23,
     "auditSha256": "02b8222d5061c6a9e1bcaf3d9bb151cb773e63594c4b27c64053b34ea71d590b",
-    "scope": "Historical live-page snapshots and original drafts; this package was checked locally and has not been imported or reverified online."
+    "scope": "Historical source audit at package creation; current publication and reading-page acceptance are recorded in publicationResult."
   },
   "validation": {
     "relativeLinks": "passed",
