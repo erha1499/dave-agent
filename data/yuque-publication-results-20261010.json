@@ -1,0 +1,449 @@
+{
+  "schema": "yuque-publication-results-v1",
+  "recordedAt": "2026-10-10T11:01:46.753075+00:00",
+  "status": "passed",
+  "scope": "MiniMax interview teaching publication and actual reading-page audit; no new business acceptance",
+  "runtimeCommit": "c0c170fcd746c13d701aa0ff29286a9f8913ea50",
+  "publishedTeachingCommit": "fe13c020cf1192de26cf03892df231e356be569d",
+  "publication": {
+    "updatedExistingPages": 16,
+    "createdPages": 3,
+    "publishedPages": 19,
+    "readingPages": 26,
+    "navigationUrl": "https://www.yuque.com/erha-vrnso/repg3o/vb4ua7gq7zdpthhn"
+  },
+  "captureSessionId": "63d0b6f4-8000-4ba5-be99-46eaa4bb649e",
+  "captureStartedAt": "2026-10-10T10:42:17.527549+00:00",
+  "auditedAt": "2026-10-10T10:49:30.644812+00:00",
+  "navigationTiming": {
+    "method": "cua-action-start",
+    "note": "Actual CUA goto/reload start timestamps; read-only DOM API did not expose performance.timeOrigin. Not browser performance timing."
+  },
+  "readingPageAudit": {
+    "status": "passed",
+    "plannedDocuments": 26,
+    "updatedDocuments": 19,
+    "unchangedDocuments": 7,
+    "checkedDocuments": 26,
+    "passedDocuments": 26,
+    "failedDocuments": 0,
+    "pendingDocuments": 0,
+    "expectedImageReferences": 52,
+    "expectedCodeBlocks": 118,
+    "expectedMermaidCards": 5,
+    "navigation": {
+      "status": "passed",
+      "distinctOtherPages": 25
+    },
+    "changedDuringAudit": [],
+    "unlistedSnapshots": []
+  },
+  "checks": [
+    {
+      "command": "python3 .runtime/minimax-delivery/publication-final/audit-live.py --self-check",
+      "exitCode": 0,
+      "scope": "Local parser negative controls only"
+    },
+    {
+      "command": "python3 .runtime/minimax-delivery/publication-final/audit-live.py",
+      "exitCode": 0,
+      "scope": "26 actual reading-page captures; exact ordered content, links, complete code, image loading and native Mermaid source/render checks"
+    },
+    {
+      "scope": "Actual reloaded sidebar DOM: 26 unique targets, new course sibling depth and order, no assets group",
+      "result": "passed"
+    },
+    {
+      "scope": "Runtime hashes against final required verification",
+      "result": "unchanged"
+    }
+  ],
+  "visualReview": {
+    "imagePreviews": 52,
+    "imageStatus": "passed",
+    "nativeDiagrams": 5,
+    "diagramScreenshots": 8,
+    "diagramStatus": "passed",
+    "basis": "Actual CUA screenshots read with view_image by root and delegated reviewers; distinct from automatic resource loading checks",
+    "notes": [
+      "Each course retains two different teaching images; themes may reuse an image across courses.",
+      "05.00 decorative edge text and 07.30 first horizontal diagram labels are small; principal teaching content remains available.",
+      "Diagrams taller than viewport are covered by overlapping top/bottom screenshots.",
+      "Visual scope is images, diagrams and key reading-page/directory layouts; not an exhaustive line-by-line typography audit."
+    ]
+  },
+  "localEvidence": {
+    "base": ".runtime/minimax-delivery/publication-final",
+    "report": {
+      "file": "audit-live-report.json",
+      "sha256": "ed04b637a52060bf7c35cc9d75558bb35d4de6f945b060136d1d9b9ad24a7865"
+    },
+    "directory": {
+      "file": "directory-final.json",
+      "sha256": "0724504e82a0103eb20fb9a2a7a11a12f71fe06a635a685933a66745f1e3d2b1"
+    },
+    "snapshots": "live-snapshots/",
+    "imageScreenshots": "visual-final/index.json",
+    "diagramScreenshots": "visual-final/diagrams.json",
+    "proof": "visual-final/publication-interview-directory.png"
+  },
+  "documents": [
+    {
+      "slug": "vb4ua7gq7zdpthhn",
+      "title": "00｜学习导航：阅读路线与面试地图",
+      "kind": "updated",
+      "status": "passed",
+      "url": "https://www.yuque.com/erha-vrnso/repg3o/vb4ua7gq7zdpthhn",
+      "snapshotSha256": "5b1b3d709f985b7e0e386c8c5a3fb6cef4b60cb55922ff51011b24787ea0571a",
+      "capturedAt": "2026-10-10T10:43:40.377Z",
+      "orderedBlocks": 37,
+      "images": 2,
+      "codeBlocks": 0,
+      "mermaidCards": 0
+    },
+    {
+      "slug": "3c7971f2134157e0f179aff6c7b0fd30",
+      "title": "01.00｜Agent 宿主总览：从一句诉求到可靠执行",
+      "kind": "updated",
+      "status": "passed",
+      "url": "https://www.yuque.com/erha-vrnso/repg3o/3c7971f2134157e0f179aff6c7b0fd30",
+      "snapshotSha256": "9db7f9ab144c40e82352af65a78c554759f6ab91c7139c110211ff04c9d44545",
+      "capturedAt": "2026-10-10T10:45:24.450Z",
+      "orderedBlocks": 98,
+      "images": 2,
+      "codeBlocks": 10,
+      "mermaidCards": 1
+    },
+    {
+      "slug": "piqm37taos3w4v96",
+      "title": "01.10｜启动配置：让参数真正决定运行路径",
+      "kind": "updated",
+      "status": "passed",
+      "url": "https://www.yuque.com/erha-vrnso/repg3o/piqm37taos3w4v96",
+      "snapshotSha256": "965038321922a0a3ca2773aa984ee54d8387334746acc99b15a2a9b98bfcdde9",
+      "capturedAt": "2026-10-10T10:44:37.151Z",
+      "orderedBlocks": 51,
+      "images": 2,
+      "codeBlocks": 5,
+      "mermaidCards": 0
+    },
+    {
+      "slug": "hkarf7z7sp68lw1p",
+      "title": "02.10｜可信身份：订单授权与旧上下文失效",
+      "kind": "updated",
+      "status": "passed",
+      "url": "https://www.yuque.com/erha-vrnso/repg3o/hkarf7z7sp68lw1p",
+      "snapshotSha256": "c6b23444b965db7c38b9ba47467b722b9a2871aecffd9305d47a766ad4ec8fed",
+      "capturedAt": "2026-10-10T10:44:43.206Z",
+      "orderedBlocks": 47,
+      "images": 2,
+      "codeBlocks": 3,
+      "mermaidCards": 0
+    },
+    {
+      "slug": "zggy63v4e66fov5d",
+      "title": "02.20｜受限工具：能力白名单与执行边界",
+      "kind": "updated",
+      "status": "passed",
+      "url": "https://www.yuque.com/erha-vrnso/repg3o/zggy63v4e66fov5d",
+      "snapshotSha256": "929713e6395704ca6d6c5c64298fef68f0e44c3d1db18734d08457a071385e37",
+      "capturedAt": "2026-10-10T10:44:50.993Z",
+      "orderedBlocks": 88,
+      "images": 2,
+      "codeBlocks": 7,
+      "mermaidCards": 0
+    },
+    {
+      "slug": "zoyw530bwvxw0q5m",
+      "title": "03.30｜退款执行：展示确认与事务幂等",
+      "kind": "updated",
+      "status": "passed",
+      "url": "https://www.yuque.com/erha-vrnso/repg3o/zoyw530bwvxw0q5m",
+      "snapshotSha256": "f923b88d0b9a1d6c630d40888e064f1d57023253e1918275289ab6d0c3771323",
+      "capturedAt": "2026-10-10T10:45:46.618Z",
+      "orderedBlocks": 77,
+      "images": 2,
+      "codeBlocks": 6,
+      "mermaidCards": 1
+    },
+    {
+      "slug": "us8q9ourkbvuzaaq",
+      "title": "03.40｜结果通知：原路由、领取与查询恢复",
+      "kind": "updated",
+      "status": "passed",
+      "url": "https://www.yuque.com/erha-vrnso/repg3o/us8q9ourkbvuzaaq",
+      "snapshotSha256": "0863f0aa9400809e322d18afd9094a9ae39eb522f3a065aa43d75d0f56b1ae86",
+      "capturedAt": "2026-10-10T10:45:53.652Z",
+      "orderedBlocks": 56,
+      "images": 2,
+      "codeBlocks": 5,
+      "mermaidCards": 0
+    },
+    {
+      "slug": "xe4459ywuihdnres",
+      "title": "03.50｜会话排队：超时取消与下一轮接待",
+      "kind": "updated",
+      "status": "passed",
+      "url": "https://www.yuque.com/erha-vrnso/repg3o/xe4459ywuihdnres",
+      "snapshotSha256": "d5f14146eb65509d68be26bd2bf77a754a8e4552d9c43ec7de7a121a3aa38aad",
+      "capturedAt": "2026-10-10T10:47:17.639Z",
+      "orderedBlocks": 98,
+      "images": 2,
+      "codeBlocks": 7,
+      "mermaidCards": 1
+    },
+    {
+      "slug": "scb40rh02au61uo6",
+      "title": "04.10｜会话重建：恢复定位，重新授权",
+      "kind": "updated",
+      "status": "passed",
+      "url": "https://www.yuque.com/erha-vrnso/repg3o/scb40rh02au61uo6",
+      "snapshotSha256": "18720dfd7035b8f9694b07a53afe121d1f73f8a1b547b2d1c449545c15e5e7f8",
+      "capturedAt": "2026-10-10T10:47:24.632Z",
+      "orderedBlocks": 53,
+      "images": 2,
+      "codeBlocks": 3,
+      "mermaidCards": 0
+    },
+    {
+      "slug": "gkntytcceaz6yw3l",
+      "title": "04.20｜长期记忆取舍：先分清要记住什么",
+      "kind": "updated",
+      "status": "passed",
+      "url": "https://www.yuque.com/erha-vrnso/repg3o/gkntytcceaz6yw3l",
+      "snapshotSha256": "3dd544c0e3196927cfb07dac714d2d5a7f8b40b3887281beeceba7bdec2f1a63",
+      "capturedAt": "2026-10-10T10:47:33.316Z",
+      "orderedBlocks": 99,
+      "images": 2,
+      "codeBlocks": 10,
+      "mermaidCards": 0
+    },
+    {
+      "slug": "4bad6d05de0ac4c326a04f5785e4b7aa",
+      "title": "04.30｜长对话与上下文预算：测量、拒发和重新说明",
+      "kind": "updated",
+      "status": "passed",
+      "url": "https://www.yuque.com/erha-vrnso/repg3o/4bad6d05de0ac4c326a04f5785e4b7aa",
+      "snapshotSha256": "0c01b11c3133526aa1594dfb7a266a8100cfcf146f25584ea4a59cda5d63e7e9",
+      "capturedAt": "2026-10-10T10:47:40.144Z",
+      "orderedBlocks": 54,
+      "images": 2,
+      "codeBlocks": 4,
+      "mermaidCards": 0
+    },
+    {
+      "slug": "gfgtkqz4ov2yy0kf",
+      "title": "05.10｜规则来源：范围、内容变化与适用性",
+      "kind": "updated",
+      "status": "passed",
+      "url": "https://www.yuque.com/erha-vrnso/repg3o/gfgtkqz4ov2yy0kf",
+      "snapshotSha256": "f56243debe7254ee6c284a515b802a66170db17f1e523cd8a622a6e9768ec78b",
+      "capturedAt": "2026-10-10T10:47:50.255Z",
+      "orderedBlocks": 50,
+      "images": 2,
+      "codeBlocks": 5,
+      "mermaidCards": 0
+    },
+    {
+      "slug": "bgk7n1zx4we3gcvn",
+      "title": "05.20｜订单取证：事实、依据与回答",
+      "kind": "updated",
+      "status": "passed",
+      "url": "https://www.yuque.com/erha-vrnso/repg3o/bgk7n1zx4we3gcvn",
+      "snapshotSha256": "bf2d55b5010b16a87a9348533b7ff600714775514ef1d212e37568f26270f010",
+      "capturedAt": "2026-10-10T10:47:57.822Z",
+      "orderedBlocks": 55,
+      "images": 2,
+      "codeBlocks": 7,
+      "mermaidCards": 0
+    },
+    {
+      "slug": "tu9dm4a5wev2otqf",
+      "title": "06.20｜网页重试：请求回放与旧会话隔离",
+      "kind": "updated",
+      "status": "passed",
+      "url": "https://www.yuque.com/erha-vrnso/repg3o/tu9dm4a5wev2otqf",
+      "snapshotSha256": "65871899d92e6854d506cb7eeffa87a8737d760c8347e4304581731f6295b234",
+      "capturedAt": "2026-10-10T10:48:06.302Z",
+      "orderedBlocks": 83,
+      "images": 2,
+      "codeBlocks": 9,
+      "mermaidCards": 0
+    },
+    {
+      "slug": "ylctono5n6gx1kc3",
+      "title": "07.10｜客观评测：失败、分母与成本",
+      "kind": "updated",
+      "status": "passed",
+      "url": "https://www.yuque.com/erha-vrnso/repg3o/ylctono5n6gx1kc3",
+      "snapshotSha256": "cd0ef34e276892a008857b1fbf2b0b36dee14e274e7bbf6d4af5f7aa02dceb82",
+      "capturedAt": "2026-10-10T10:48:17.671Z",
+      "orderedBlocks": 71,
+      "images": 2,
+      "codeBlocks": 5,
+      "mermaidCards": 0
+    },
+    {
+      "slug": "5bb102e88426b8d894179cf8dbf8c610",
+      "title": "07.15｜联合验收：做对、说对和付出多少代价",
+      "kind": "updated",
+      "status": "passed",
+      "url": "https://www.yuque.com/erha-vrnso/repg3o/5bb102e88426b8d894179cf8dbf8c610",
+      "snapshotSha256": "457fef8aab69ab3987777fd767fa6c02455e411bc03e92a74232e7483018f251",
+      "capturedAt": "2026-10-10T10:48:25.557Z",
+      "orderedBlocks": 95,
+      "images": 2,
+      "codeBlocks": 7,
+      "mermaidCards": 0
+    },
+    {
+      "slug": "xyafwngxm605xte2",
+      "title": "07.20｜模型选型：对照、收益与停止",
+      "kind": "updated",
+      "status": "passed",
+      "url": "https://www.yuque.com/erha-vrnso/repg3o/xyafwngxm605xte2",
+      "snapshotSha256": "9b50684da950ff0ec7b77e059e2d786fbba6692f20600613dead71d97e2b0829",
+      "capturedAt": "2026-10-10T10:48:28.671Z",
+      "orderedBlocks": 61,
+      "images": 2,
+      "codeBlocks": 2,
+      "mermaidCards": 0
+    },
+    {
+      "slug": "ba571017e1270654ce01c930f34673c0",
+      "title": "07.30｜项目表达与面试问答",
+      "kind": "updated",
+      "status": "passed",
+      "url": "https://www.yuque.com/erha-vrnso/repg3o/ba571017e1270654ce01c930f34673c0",
+      "snapshotSha256": "f1091f7f3e767ae6a73eedc1a7c455d76e059f6ced6a8546214b19d2cd3b0120",
+      "capturedAt": "2026-10-10T10:48:39.059Z",
+      "orderedBlocks": 110,
+      "images": 2,
+      "codeBlocks": 1,
+      "mermaidCards": 2
+    },
+    {
+      "slug": "b32aa6c3928922f6a28535ea59684b82",
+      "title": "08.10｜选修：Coding Agent 怎样找代码、执行并验证",
+      "kind": "updated",
+      "status": "passed",
+      "url": "https://www.yuque.com/erha-vrnso/repg3o/b32aa6c3928922f6a28535ea59684b82",
+      "snapshotSha256": "b5a778e1078e53b2c355089342a1dd497b34b89114636a0c41df11c1f08ef714",
+      "capturedAt": "2026-10-10T10:48:45.013Z",
+      "orderedBlocks": 45,
+      "images": 2,
+      "codeBlocks": 3,
+      "mermaidCards": 0
+    },
+    {
+      "slug": "vl5ed2mnp6n4yddh",
+      "title": "03.10｜商家协商：原文确认与持久任务",
+      "kind": "unchanged",
+      "status": "passed",
+      "url": "https://www.yuque.com/erha-vrnso/repg3o/vl5ed2mnp6n4yddh",
+      "snapshotSha256": "fff1aef7c3cac4dfdb8def48937f5fc8024ccd693ab42958fc1ab1c3c6183e51",
+      "capturedAt": "2026-10-10T10:48:47.733Z",
+      "orderedBlocks": 46,
+      "images": 2,
+      "codeBlocks": 2,
+      "mermaidCards": 0
+    },
+    {
+      "slug": "ke73n9g4wl0pgqxf",
+      "title": "03.20｜结果截止：锁等待后的时间复核",
+      "kind": "unchanged",
+      "status": "passed",
+      "url": "https://www.yuque.com/erha-vrnso/repg3o/ke73n9g4wl0pgqxf",
+      "snapshotSha256": "d7bfaf8e374b35b4a5d42d00e094cf91b4e29d9fe3a6fb022d3f21673e9ed102",
+      "capturedAt": "2026-10-10T10:48:55.669Z",
+      "orderedBlocks": 52,
+      "images": 2,
+      "codeBlocks": 3,
+      "mermaidCards": 0
+    },
+    {
+      "slug": "gudinkahr1hknxmf",
+      "title": "业务案例｜到账咨询：规则时效与双重授权",
+      "kind": "unchanged",
+      "status": "passed",
+      "url": "https://www.yuque.com/erha-vrnso/repg3o/gudinkahr1hknxmf",
+      "snapshotSha256": "39fd8eeae4a3650ed2bb64dbbf00b610d5790dfd9d249dd2a853d147f235341b",
+      "capturedAt": "2026-10-10T10:49:02.160Z",
+      "orderedBlocks": 49,
+      "images": 2,
+      "codeBlocks": 3,
+      "mermaidCards": 0
+    },
+    {
+      "slug": "rixwimb2cfm7fexc",
+      "title": "业务案例｜部分核销：剩余实付与可退权限",
+      "kind": "unchanged",
+      "status": "passed",
+      "url": "https://www.yuque.com/erha-vrnso/repg3o/rixwimb2cfm7fexc",
+      "snapshotSha256": "f0160859c691165ef6cb07f8c379eec730ba935e3e0df4b7fcf83ed36e32518d",
+      "capturedAt": "2026-10-10T10:49:05.733Z",
+      "orderedBlocks": 50,
+      "images": 2,
+      "codeBlocks": 3,
+      "mermaidCards": 0
+    },
+    {
+      "slug": "23c67bb990333948bfb6bea9a60a2e69",
+      "title": "05.00｜RAG选型：词项、向量、重排与事实支持",
+      "kind": "unchanged",
+      "status": "passed",
+      "url": "https://www.yuque.com/erha-vrnso/repg3o/23c67bb990333948bfb6bea9a60a2e69",
+      "snapshotSha256": "5927d5dea5aca7b3eb3f1a67b052be94a34757120bf597d489bf009d02b074a9",
+      "capturedAt": "2026-10-10T10:49:16.804Z",
+      "orderedBlocks": 41,
+      "images": 2,
+      "codeBlocks": 2,
+      "mermaidCards": 0
+    },
+    {
+      "slug": "pkpmew1sxmf99o2e",
+      "title": "05.30｜原问恢复：澄清、省略与证据接收",
+      "kind": "unchanged",
+      "status": "passed",
+      "url": "https://www.yuque.com/erha-vrnso/repg3o/pkpmew1sxmf99o2e",
+      "snapshotSha256": "2cfeff4e96a38320b363f09b6ddc7cbb6e69d6ce92fd56acc39abf2b04ed7300",
+      "capturedAt": "2026-10-10T10:49:20.570Z",
+      "orderedBlocks": 44,
+      "images": 2,
+      "codeBlocks": 3,
+      "mermaidCards": 0
+    },
+    {
+      "slug": "hk0gwwgm4rqk4ncu",
+      "title": "06.10｜网页配置：从表单到 Pi 请求",
+      "kind": "unchanged",
+      "status": "passed",
+      "url": "https://www.yuque.com/erha-vrnso/repg3o/hk0gwwgm4rqk4ncu",
+      "snapshotSha256": "fd03c59670d2903626fdb4f3a3440e638a7bef2ca746c7ced6dd1904bcbe3fa3",
+      "capturedAt": "2026-10-10T10:49:27.270Z",
+      "orderedBlocks": 51,
+      "images": 2,
+      "codeBlocks": 3,
+      "mermaidCards": 0
+    }
+  ],
+  "retainedBusinessBoundaries": {
+    "historicalJoint": "20/26, unadmitted",
+    "repairBatches": [
+      "9/11, unadmitted",
+      "5/6, unadmitted"
+    ],
+    "webBatch": {
+      "engineering": "7/7",
+      "answerAndJoint": "6/7",
+      "admitted": false,
+      "paidRerun": false
+    },
+    "laterHostWording": "Deterministic checks only; does not rewrite original real-model batch",
+    "newModelCalls": 0,
+    "newDatabaseAcceptance": false,
+    "realQQAcceptance": false,
+    "commercialPayments": false,
+    "authorReproductionAndSignoff": "Requires author; not filled in by Codex"
+  }
+}

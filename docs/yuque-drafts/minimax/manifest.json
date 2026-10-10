@@ -1,7 +1,7 @@
 {
   "version": 1,
   "createdAt": "2026-10-10T04:29:30.686247+00:00",
-  "publicationStatus": "local-drafts-not-published",
+  "publicationStatus": "published-and-reading-pages-audited",
   "authorization": "Publish after the requested repairs and their required validation; local draft checks do not confirm publication.",
   "baseGitCommit": "c0c170fcd746c13d701aa0ff29286a9f8913ea50",
   "plannedDelivery": {
@@ -679,7 +679,7 @@
         }
       ],
       "delivery": "create-new",
-      "targetUrl": null,
+      "targetUrl": "https://www.yuque.com/erha-vrnso/repg3o/4bad6d05de0ac4c326a04f5785e4b7aa",
       "source": null,
       "remoteImagesMatchPriorArchive": null
     },
@@ -983,7 +983,7 @@
         }
       ],
       "delivery": "create-new",
-      "targetUrl": null,
+      "targetUrl": "https://www.yuque.com/erha-vrnso/repg3o/5bb102e88426b8d894179cf8dbf8c610",
       "source": null,
       "remoteImagesMatchPriorArchive": null
     },
@@ -1085,13 +1085,13 @@
         }
       ],
       "delivery": "create-new",
-      "targetUrl": null,
+      "targetUrl": "https://www.yuque.com/erha-vrnso/repg3o/b32aa6c3928922f6a28535ea59684b82",
       "source": null,
       "remoteImagesMatchPriorArchive": null
     },
     {
       "file": "README.md",
-      "sha256": "5943f697cec6025a5d14ca80379a4b63eabd4c0c2b82de8743a904c876b2f624",
+      "sha256": "57dd2a3fbc2a518f1cf9b4af2b7770a57845987cbb711181df5386d47fd41598",
       "images": [],
       "sourceBlocks": [],
       "delivery": "instructions",
@@ -1179,7 +1179,9 @@
     "deterministicHostFix": "passed; no paid rerun or historical score rewrite",
     "realModelBatch": "closed: engineering 7/7; answer and joint 6/7; not admitted",
     "verification": "data/web-repair-verification-20261010.json",
-    "onlinePublication": "Native Chrome Yuque sign-in found; 19-page publication and all 26 reading pages plus directory reload remain pending.",
+    "onlinePublication": "Passed: 19 pages published; all26 actual reading pages and sidebar directory reloaded and audited; 52 images,118 code blocks,5 native Mermaid cards.",
     "scope": "Teaching current mechanisms and evidence boundaries, not promotion of historical merchant or entire Web batch quality."
-  }
+  },
+  "publishedAt": "2026-10-10T11:01:46.753075+00:00",
+  "publicationResult": "data/yuque-publication-results-20261010.json"
 }
