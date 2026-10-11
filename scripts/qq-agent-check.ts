@@ -495,3 +495,31 @@ try {
 }
 console.log("QQ→Pi 离线检查通过：工具循环、专用上下文、隔离/队列、宿主确认串行与回执上下文、真实 SDK 清洗后确认边界、初始化期间过期拒绝、可控失败、发送不重试、超时恢复和安全关闭。");
 await (await import("./qq-binding-check.ts")).checkQQBinding();
+
+// A caught host/delivery error must remain distinct from a provider failure in the final ledger.
+for (const failure of ["session", "host", "send", "receipt"] as const) {
+  const diagnostics: string[] = [];
+  let sendCount = 0;
+  const privateDetail = "synthetic-private-credential-and-message";
+  const checked = new QQAgent(async () => {
+    if (failure === "session") throw new Error(privateDetail);
+    return create();
+  }, async () => { sendCount++; if (failure === "send") throw new Error(privateDetail); }, text => diagnostics.push(text), 1000,
+  async () => { if (failure === "host") throw new Error(privateDetail); return "当前业务状态已查询，请按订单继续。"; },
+  async () => { if (failure === "receipt") throw new Error(privateDetail); });
+  try {
+    const callsBefore = faux.state.callCount;
+    await checked.handle(message(`phase-${failure}`, privateDetail));
+    assert.equal(faux.state.callCount, callsBefore, "host handling and its failures need no model call");
+    assert.equal(sendCount, 1, "ambiguous delivery must not be retried");
+    const summaries = diagnostics.filter(line => line.startsWith("[model-task] ")).map(line => JSON.parse(line.slice(13)));
+    assert.equal(summaries.length, 1, "one final redacted ledger per accepted queue item");
+    assert.equal(summaries[0].failurePhase, failure);
+    assert.equal(summaries[0].failureReason, failure === "send" ? "send_unknown" : failure === "receipt" ? "receipt_unknown" : `${failure}_failed`);
+    assert.equal(summaries[0].httpRequests, 0);
+    assert.ok(summaries[0].queueMs >= 0);
+    assert.doesNotMatch(JSON.stringify(summaries), /synthetic-private|user_one|group_one|phase-session|phase-host/);
+    assert.doesNotMatch(diagnostics.join("\n"), /synthetic-private/);
+  } finally { await checked.close(); }
+}
+console.log("QQ 请求记录检查通过：宿主/会话/发送未知/回执未知独立归因，零模型请求与脱敏边界保持。");

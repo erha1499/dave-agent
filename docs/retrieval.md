@@ -28,18 +28,22 @@ node scripts/retrieval-baseline.ts
 
 业务端仍先执行原 SQL 门店/套餐范围校验，最多 200 个候选，再排序返回前 5 条。同义词只帮助召回，不能确定订单状态或退款资格。离线参考集按显式 `shopId` 过滤店铺文档；行业及 hard 的 `ctx` 保留但不参与改写或排序，也不使用相关标签推断范围。`ctx.verified` 是核销状态，不是身份认证。未知店铺在线会被数据库入口拒绝，离线过滤仅保证不返回别店文档，不能替代真实权限检查。
 
+当前 atomic 工具还在 SQL 读取前检查本轮订单范围：带 `shopId` 或 `productId` 的 `search_faq` 必须匹配本轮成功 `get_order` 返回的本人订单；不带范围仍可咨询通用公开规则。此限制属于 Agent 工具边界，`CouponStore.searchKnowledge/readKnowledgeDocuments` 本身不接收用户身份或订单，不能把底层范围过滤单独称为订单授权。
+
 ## 稳定只读咨询调用链审计（2026-10-08）
 
 本轮仅核验默认 atomic 的“本人订单 → 公开规则 → 回复”链，补清其已实现保护与模型责任。业务约束是身份来自入口、订单不可越权、规则须适用当前套餐、未知事实不能承诺；面试追问是“订单卡和依据ID都真实，为什么仍不能保证整段回答正确”。个人实现为工具闭包、CouponStore授权/范围与回复选择，复用Pi循环、MySQL和Intl.Segmenter；Controller证据接收另属未准入候选。预算30分钟，既有reply检查与下列边界例子各一次，0远程模型/QQ/数据库请求；核对调用方、源码和结果后收尾，不扩大能力或重跑历史题集。
+
+本节保留2026-10-08审计背景，下面的当前合同及示例已按2026-10-10新增的工具前置与本轮证据门槛更新。原审计成绩不作为更新后版本的新验收；Web真实批次及后续固定提示修复见[Web取证收尾](./stable-joint-acceptance.md#web-取证与固定答复收尾2026-10-10)。
 
 | 环节 | 实际保护与边界 |
 | --- | --- |
 | 入口和工具 | [`qq.ts`](../src/qq.ts) 从可信SDK事件构造AppID/发送者，[`cli.ts`](../src/cli.ts) 使用合成绑定；两者选择atomic时调用 [`createCouponSession`](../src/agent.ts)。[`网页工厂`](../src/web-chat-settings.ts)也复用该函数，当前仅提供 `list_orders`、`get_order`、`search_faq` 三项只读工具；历史审计时为两项，新增列表证据见[本人订单与选单](./after-sales.md#未知订单号时的入口与连续选择2026-10-09)。身份在宿主闭包内，`list_orders` 无参数、`get_order` 只有订单号；模型声明客户ID不能覆盖身份。 |
 | 重新授权和快照 | [`CouponStore.getOrder`](../src/coupon-store.ts) 每次按订单＋当前身份绑定联查，同一只读REPEATABLE READ事务读取订单项、券、付款和退款。首次SELECT建立一致快照；下一次调用才读取后续提交，不能把`asOf`或聊天历史视作持续有效的授权。失败回滚，初始化/回滚不确定时丢弃连接。 |
-| 规则召回 | `searchKnowledge → readKnowledgeDocuments →` [`rankKnowledge`](../src/knowledge-retrieval.ts)。SQL校验活跃门店/套餐关联，过滤通用及显式范围的活跃规则，最多200候选，词项排序后取前5条。FAQ是公开规则，未绑定用户也能咨询；此入口不接收身份/订单，也不在宿主证明模型所传范围来自该用户刚查的订单。按订单范围查规则的调用次序仍由Prompt/Skill约束，不能冒称确定性授权链。 |
-| 回复与依据 | CLI/QQ只向 [`replyFromTools`](../src/reply-from-tools.ts) 传本轮工具结果；成功`get_order`的整数金额/状态生成订单卡，失败或旧轮结果不生成卡，格式异常返回notice。`search_faq`的合法sourceId加入依据列表，证明本轮召回过该ID；并未验证模型每句话由正文支持。订单卡后的`text`与普通answer仍保留模型话术，Markdown转义和限长仅约束展示。 |
+| 规则召回 | [`createCouponSession`](../src/agent.ts)先检查模型所传门店/套餐匹配本轮本人订单范围；新轮清空，订单读取失败或取消使相关取证失效。无范围的通用规则查询不要求本人订单。通过工具检查后，`searchKnowledge → readKnowledgeDocuments →` [`rankKnowledge`](../src/knowledge-retrieval.ts)校验活跃门店/套餐关联、过滤通用及指定范围规则，最多200候选，再取前5条。底层Store只检查规则范围，不接收身份或订单；工具前置也不保证模型在任意问法下选择正确入口，或召回内容足以回答问题。 |
+| 回复与依据 | CLI/QQ/Web从本轮实际`tool_execution_end`收集证据，包括宿主嵌套调用；[`replyFromTools`](../src/reply-from-tools.ts)用合法金额/状态生成订单卡，新订单读取使旧规则及业务卡失效。没有当前完整范围证据时改用固定提示，仅FAQ时展示规则原文和边界；只读订单与适用范围规则齐全后才保留模型附文，Web才放行原生文本增量。启用商家工具但缺当前任务时，附文改为继续核对协商状态的提示。门槛只检查证据存在、结构与范围，仍不证明每句话由原文支持；已发送的增量也不能因后续失败撤回。 |
 
-可在仓库根目录复现“可信字段不等于整段话术已验证”；这是主动注入矛盾文本的确定性例子，不是一次真实模型失败或发生率统计：
+可在当前仓库根目录复现“完整取证门槛不等于整段话术已验证”：只有订单时拦住自由文字，补齐本轮范围匹配的规则后仍可能保留矛盾附文。这是主动注入的确定性例子，不是一次真实模型失败或发生率统计：
 
 ```sh
 node --input-type=module <<'NODE'
@@ -47,8 +51,12 @@ import assert from 'node:assert/strict';
 import { replyFromTools } from './src/reply-from-tools.ts';
 import { renderReply } from './src/reply.ts';
 const text = '示例模型话术：实付999.99元。';
-const facts = { source: 'demo-database', id: 'COUPON-1001', status: 'paid', amounts: { paidCents: 7980, refundedCents: 0 }, coupons: [{ status: 'unused' }] };
-const reply = replyFromTools(text, [{ toolName: 'get_order', isError: false, content: [{ type: 'text', text: JSON.stringify(facts) }] }]);
+const facts = { source: 'demo-database', id: 'COUPON-1001', status: 'paid', amounts: { paidCents: 7980, refundedCents: 0 }, coupons: [{ status: 'unused' }], shop: { id: 'SHOP-CHECK' }, items: [{ productId: 'PRODUCT-CHECK' }] };
+const tool = (toolName, value) => ({ toolName, isError: false, content: [{ type: 'text', text: JSON.stringify(value) }] });
+const order = tool('get_order', facts);
+assert.doesNotMatch(renderReply(replyFromTools(text, [order])).text, /实付999.99元/);
+const rules = tool('search_faq', [{ source: 'demo-knowledge', sourceId: 'KB-CHECK', title: '查询规则', body: '实际付款金额须查询本人订单。', scope: { shopId: 'SHOP-CHECK', productId: 'PRODUCT-CHECK' } }]);
+const reply = replyFromTools(text, [order, rules]);
 assert.equal(reply.kind, 'order');
 assert.equal(reply.orders[0].paidCents, 7980);
 assert.equal(reply.text, text);
@@ -58,7 +66,7 @@ console.log('PASS：订单字段可信，附带模型话术仍可能矛盾。');
 NODE
 ```
 
-**验收与取舍：** 源码基线`70274b5`；`node scripts/reply-check.ts`及上面的例子各一次、均退出0。前者核验字段/模板与失败结果，后者核验可信金额和矛盾话术可以同时显示；均为直接调用本地回复函数，不是Pi/真实模型或数据库验收。仅补本文和计划，默认配置不切，C1/O4/O5状态不变。稳定演示仍沿[已验证配置与路径](./after-sales.md#启动)，真实模型只读历史保留[首次13/14、21/22、200/205及后续14/14、22/22、205/205](./evaluation.md#p1-第三轮核心业务收尾)：漏取套餐范围由提示修复，不能证明所有问法受宿主强制约束；[快照MySQL证据](./database.md#表关系与约束)亦为历史，本轮不重验。复用小语料词项召回与既有模板避免额外解析成本，代价是查询选择及自由话术仍需独立模型验收；扩大到自然语言政策承诺前，应按C1已有合同验证宿主范围/证据接收，不能把召回分数、卡片字段或依据ID当成该能力已准入。
+**历史验收与当前取舍：** 2026-10-08源码基线`70274b5`，`node scripts/reply-check.ts`及当时仅查订单的注入例子各一次、均退出0；它们只核验本地回复函数，不是Pi/真实模型或数据库验收。当前示例增加规则前置，不沿用旧例子的运行成绩。旧真实模型只读记录仍保留[首次13/14、21/22、200/205及后续14/14、22/22、205/205](./evaluation.md#p1-第三轮核心业务收尾)，[快照MySQL证据](./database.md#表关系与约束)也按历史解释。当前工具范围门槛有[确定性前置检查](../scripts/atomic-tool-prerequisite-check.ts)，回复及流式证据边界有[本轮证据检查](../scripts/atomic-evidence-check.ts)；Web新批7/7执行、6/7联合通过，修后固定文案不回填，详见上述收尾记录。默认仍为atomic + lexical，C1/O4/O5未准入状态不变。复用小语料词项召回与既有模板避免额外解析成本，代价是查询选择及自由话术仍需独立模型验收；不能把工具前置、召回分数、卡片字段或依据ID当作整段回答正确的证明。
 
 ## P0 / P1 同题集结果
 

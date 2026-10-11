@@ -11,9 +11,14 @@
 | 稳定主线 | CLI / QQ 本人订单与规则查询，D1 持久协商、D2 精确确认与幂等模拟退款、D3 原会话通知已实现。 |
 | 网页客服 | 本机只读问答、本人最近订单与选单续问、真实文本流、SQLite 会话记录、会话模型设置及评测导航已实现；使用两个合成客户，不执行协商或退款。 |
 | 评测工作台 | 保存运行、逐轮检查、工具轨迹、配置与用量，支持对比和显式实验入口。 |
+| 请求与上下文预算 | 正式 CLI / QQ / Web 入口已接入单轮实际 HTTP 上限、脱敏用量记录和完整请求的本地预算；不做自动摘要。 |
 | 实验候选 | Controller / 知识接收（C1）、有界会话恢复（O4）有实现和对照记录；C1、完整 O4 与最终选型 O5 仍未完成准入。 |
 
-默认为 `atomic + lexical + memory`，模型为 `deepseek/deepseek-flash`，未因候选实验切换。真实 QQ 验收记录来自 2026-10-02～03，稳定主线真实模型核心回归来自 2026-10-05；后续工程修复与历史验收分列，历史通过不代表当前环境已重验。最新进度见 [plan.md](./plan.md)。
+默认为 `atomic + lexical + memory`，模型为 `deepseek/deepseek-flash`，未因候选实验切换。真实 QQ 验收记录来自 2026-10-02～03，稳定主线真实模型核心回归来自 2026-10-05；后续工程修复与历史验收分列，历史通过不代表当前环境已重验。2026-10-10 的[联合验收](./docs/stable-joint-acceptance.md)原批为 20/26、修复新批为 9/11、商家重查批为 5/6，均未准入；后续 Web 批工程 7/7、答复与联合 6/7，最终固定提示已由确定性检查修复，原真实批不补分。最新进度见 [plan.md](./plan.md)。
+
+2026-10-11 已完成交付分支整合验证与 Web 演示冻结；专项、完整 `validate`、必要 MySQL 检查和四个宿主浏览器场景均通过，复现配置、四个演示场景及收尾证据统一见 [Web 演示冻结入口](./docs/web-chat.md#web-demo-freeze-20261011)。本轮不新增功能或模型批次，不进行真实 QQ、商家或支付验收。
+
+请求预算默认每条消息或事件最多 **12 次实际供应商 HTTP**，失败与重试计数；上下文预算默认 **65536 本地预算单位**，按完整请求 UTF-8 字节、输出预留与固定余量计算，不能称为精确 Token 数。上下文历史真实批使用 **30000** 验收限额，不能把其拒发结果直接套用到默认值。配置与证据见 [请求预算](./docs/model-request-budget.md)及[上下文预算](./docs/context-budget-contract.md)。
 
 ## 稳定业务闭环
 
@@ -106,3 +111,5 @@ npm run qq:bind -- <12位identity代号> <对应演示客户ID>
 | [网页](./docs/web-chat.md) / [QQ](./docs/qq-integration.md) / [数据库](./docs/database.md) | 启动、契约与各入口验收。 |
 | [评测](./docs/evaluation.md) / [检索](./docs/retrieval.md) | 固定分母、数据、实际结果、失败与局限。 |
 | [优化取舍](./docs/optimization-plan.md) / [实验复现](./docs/experiment-controls.md) / [会话恢复](./docs/conversation-recovery.md) | 候选假设、配置、成本与准入边界。 |
+| [MiniMax 面试覆盖](./docs/minimax-interview-coverage.md) / [语雀本地稿](./docs/yuque-drafts/minimax/README.md) | 已完成课程修订与新增，19篇发布及全26页阅读页核验见[发布记录](./data/yuque-publication-results-20261010.json)；教学验收不增加业务成绩。 |
+| [联合验收](./docs/stable-joint-acceptance.md) / [请求预算](./docs/model-request-budget.md) / [上下文预算](./docs/context-budget-contract.md) / [退款故障窗口](./docs/refund-crash-window-validation.md) | 同轮答复、工具、状态与费用，超限恢复及实际DB崩溃证据；失败与未准入保留。 |

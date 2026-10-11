@@ -61,8 +61,10 @@ async function toolRound(
 ) {
   const before = session.messages.length;
   const requests: Array<{ context: TranscriptContext; maxTokens: number }> = [];
+  const scoped = tool === "search_faq" && !!(args.shopId || args.productId);
   const reply = "工程检查：已读取工具结果；没有执行退款。";
   faux.setResponses([
+    ...(scoped ? [(context: TranscriptContext) => fauxAssistantMessage(fauxToolCall("get_order", { orderId: /COUPON-\d{4}/u.exec(prompt)?.[0] ?? "COUPON-1001" }), { stopReason: "toolUse" })] : []),
     (context, _options, _state, model) => {
       requests.push({ context, maxTokens: model.maxTokens });
       return fauxAssistantMessage(fauxToolCall(tool, args), { stopReason: "toolUse" });
@@ -80,7 +82,9 @@ async function toolRound(
     assert.equal(inputs(request.context).at(-1), prompt);
   }
   // Assertions run outside the provider: Pi catches provider exceptions as model failures.
-  const results = session.messages.slice(before).filter(message => message.role === "toolResult");
+  const allResults = session.messages.slice(before).filter(message => message.role === "toolResult");
+  if (scoped) { assert.equal(allResults[0]?.toolName, "get_order"); assert.equal(allResults[0]?.isError, false); }
+  const results = scoped ? allResults.slice(1) : allResults;
   assert.equal(results.length, 1);
   const result = results[0];
   assert.ok(result && result.role === "toolResult");

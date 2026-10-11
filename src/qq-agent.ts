@@ -2,11 +2,12 @@ import { createHash } from "node:crypto";
 import type { AgentSession } from "@earendil-works/pi-coding-agent";
 import type { QQBotInboundMessage, ReplyTarget } from "@tencent-connect/qqbot-nodejs";
 import { renderReply, type Reply, type RenderedReply } from "./reply.ts";
-import { replyFromTools } from "./reply-from-tools.ts";
+import { replyFromTools, toolEvidenceFromEvent, type Evidence } from "./reply-from-tools.ts";
 import type { MerchantTask } from "./after-sales.ts";
 import { cancelSupportTurn, getSupportHostReceipt, isSupportSession, prepareSupportPrompt, supportReply } from "./support-session.ts";
 import { prepareOrderDiscoveryPrompt, presentOrderDiscoveryReply } from "./order-discovery.ts";
 import type { QQIdentityBinding } from "./coupon-store.ts";
+import { withModelTask, readModelTaskLimits, currentModelTask, type ModelTaskPhase } from "./model-request-budget.ts";
 
 export type ContinuationOutcome = "busy" | "sent" | "deferred" | "unknown";
 
@@ -32,6 +33,7 @@ type Conversation = { session?: AgentSession; binding?: QQIdentityBinding; tail:
 export class QQAgent {
   private conversations = new Map<string, Conversation>();
   private closed = false;
+  private taskLimits = readModelTaskLimits();
   private sweep = setInterval(() => this.prune(), 5 * 60_000).unref();
   private createSession: (msg: QQBotInboundMessage) => Promise<AgentSession>;
   private send: (target: ReplyTarget, text: string, reply: RenderedReply, requesterId: string) => Promise<unknown>;
@@ -102,9 +104,18 @@ export class QQAgent {
     entry.pending++;
     const conversation = entry;
     let outcome: ContinuationOutcome = "deferred";
-    const task = entry.tail.then(async () => {
-      if (this.closed || !validQQMessage(msg)) return;
+    const queuedAt = Date.now();
+    let queueMs = 0;
+    const task = entry.tail.then(() => withModelTask({
+      requestId: msg.messageId, entrypoint: "qq", trigger: resolve ? "event" : "user", limits: this.taskLimits,
+      onComplete: summary => this.log(`[model-task] ${JSON.stringify({ ...summary, queueMs, delivery: outcome })}`),
+    }, async modelTask => {
+      queueMs = Date.now() - queuedAt;
+      if (this.closed || !validQQMessage(msg)) { modelTask.cancel(); return; }
       const started = Date.now();
+      let phase: ModelTaskPhase = "authorization";
+      const setPhase = (value: ModelTaskPhase) => { phase = value; modelTask.setPhase(value); };
+      setPhase("authorization");
       const tag = createHash("sha256").update(key).digest("hex").slice(0, 12);
       let timer: ReturnType<typeof setTimeout> | undefined;
       let aborting: Promise<void> | undefined;
@@ -112,20 +123,24 @@ export class QQAgent {
       let failed = false;
       let merchant: MerchantTask | undefined;
       let activeTools: string[] | undefined;
+      let stopEvidence: (() => void) | undefined;
       let supportRun = false;
       let binding: QQIdentityBinding | undefined;
       let bindingReady = false;
       const deliverBound = async (reply: string | Reply): Promise<ContinuationOutcome> => {
+        setPhase("authorization");
         if (this.resolveBinding) {
           try {
             const current = await this.resolveBinding(msg);
             if (!bindingReady || !sameBinding(binding, current)) {
               failed = true;
+              modelTask.fail("authorization_failed");
               this.log("[agent] 身份绑定已变化；未发送旧会话回复。");
               return "deferred";
             }
           } catch {
             failed = true;
+            modelTask.fail("authorization_failed");
             this.log("[agent] 回复发送前身份读取失败；未发送。");
             return "deferred";
           }
@@ -134,13 +149,16 @@ export class QQAgent {
         return await this.deliver(msg, reply) ? "sent" : "unknown";
       };
       const deliverMerchant = async (): Promise<ContinuationOutcome> => {
+        setPhase("authorization");
         let current: MerchantTask | undefined;
         try { current = await resolve!(); } catch {
+          modelTask.fail("authorization_failed");
           this.log("[agent] 通知发送前授权读取失败；未发送。");
         }
         if (!merchant || !current || current.status === "pending" || current.taskId !== merchant.taskId
           || current.orderId !== merchant.orderId || this.closed || !validQQMessage(msg)) {
           failed = true;
+          modelTask.fail("authorization_failed");
           return "deferred";
         }
         merchant = current;
@@ -154,6 +172,7 @@ export class QQAgent {
             bindingReady = true;
           } catch {
             failed = true;
+            modelTask.fail("authorization_failed");
             this.log("[agent] 会话身份读取失败；本轮尚未处理业务。");
             return;
           }
@@ -175,6 +194,7 @@ export class QQAgent {
           conversation.session = undefined;
           conversation.turns = 0;
         }
+        setPhase("session");
         conversation.session ??= await this.createSession(msg);
         if (this.closed || !validQQMessage(msg)) return;
         const session = conversation.session;
@@ -190,6 +210,7 @@ export class QQAgent {
           return;
         }
         // Only trusted ingress text reaches this host action. Tools cannot invent consent.
+        setPhase("host");
         const consultation = resolve ? undefined : await this.beforePrompt?.(msg);
         const discovery: { prompt: string; reply?: Reply } = !resolve && consultation === undefined ? await prepareOrderDiscoveryPrompt(session, msg.content) : { prompt: msg.content };
         const hostReply = consultation ?? discovery.reply;
@@ -209,11 +230,12 @@ export class QQAgent {
           this.log(`[agent] session=${tag} host_reply sent=${delivered} duration_ms=${Date.now() - started}`);
           return;
         }
-        const previousMessageCount = session.messages.length;
+        const results: Evidence[] = [];
+        stopEvidence = session.subscribe(event => { const evidence = toolEvidenceFromEvent(event); if (evidence) results.push(evidence); });
         if (merchant) {
           // A result notification can read its task, but cannot prepare another action from conversation history.
           activeTools = session.getActiveToolNames();
-          session.setActiveToolsByName(activeTools.filter(name => name === "get_merchant_request"));
+          session.setActiveToolsByName(activeTools.filter(name => ["get_order", "search_faq", "get_merchant_request"].includes(name)));
         }
         const prompt = merchant
           ? `宿主业务事件：模拟商家任务 ${merchant.taskId}（订单 ${merchant.orderId}）已结束。这不是用户消息，也不是用户授权。请调用 get_merchant_request 查询该订单的当前结果，只通知这一任务的结果，说明下一步需用户提出请求并确认。不得确认、创建协商或准备/执行退款，不得用对话中的其他订单替代。`
@@ -222,11 +244,12 @@ export class QQAgent {
         if (supportRun) prepareSupportPrompt(session, {
           requestId: msg.messageId, groupOpenid: msg.groupOpenid!, messageId: msg.messageId,
         });
+        setPhase("model");
         prompting = session.prompt(prompt, { expandPromptTemplates: false });
         await Promise.race([
           prompting,
           new Promise<never>((_resolve, reject) => {
-            timer = setTimeout(() => reject(new Error("模型处理超时")), this.timeoutMs);
+            timer = setTimeout(() => { modelTask.cancel(); reject(new Error("模型处理超时")); }, this.timeoutMs);
           }),
         ]);
         clearTimeout(timer);
@@ -234,12 +257,11 @@ export class QQAgent {
         const text = session.getLastAssistantText()?.trim();
         if (!text && !supportRun) throw new Error("模型未生成回复");
         conversation.turns++;
-        const results = session.messages.slice(previousMessageCount).flatMap(message =>
-          message.role === "toolResult" && session.getActiveToolNames().includes(message.toolName) ? [message] : []);
         if (!validQQMessage(msg) || this.closed) return;
         // Reauthorize after the model wait; the model cannot redirect the fixed task or restore consent.
+        setPhase("render");
         const reply: Reply = merchant ? { kind: "merchant_status", task: merchant }
-          : supportReply(session, text) ?? replyFromTools(text!, results);
+          : supportReply(session, text) ?? replyFromTools(text!, results, session.getActiveToolNames());
         outcome = merchant ? await deliverMerchant() : await deliverBound(reply);
         if (outcome === "deferred") return;
         const delivered = outcome === "sent";
@@ -256,16 +278,22 @@ export class QQAgent {
         if (conversation.session) cancelSupportTurn(conversation.session);
         // Signal cancellation before waiting on QQ's network send.
         aborting = conversation.session?.abort();
-        this.log(`[agent] session=${tag} model_failed duration_ms=${Date.now() - started}`);
+        phase = modelTask.snapshot().phase;
+        modelTask.fail(phase === "send" ? "send_unknown" : phase === "receipt" ? "receipt_unknown" : `${phase}_failed`);
+        this.log(`[agent] session=${tag} failure_phase=${phase} duration_ms=${Date.now() - started}`);
         if (!resolve || merchant) {
           // Known durable business facts remain usable when the model fails. Never retry an attempted send.
           if (outcome === "deferred" && validQQMessage(msg) && !this.closed) {
             outcome = merchant ? await deliverMerchant() : await deliverBound(
               supportRun && conversation.session ? supportReply(conversation.session)!
-              : "客服暂时无法处理这条消息，请稍后重试。");
+              : modelTask.snapshot().failureReason === "context_limit"
+                ? "本次对话内容已超过当前处理范围。请在下一条消息中重新写明订单号及完整问题；已有业务结果可按订单查询。"
+                : "客服暂时无法处理这条消息，请稍后重试。");
           }
         }
       } finally {
+        stopEvidence?.();
+        if (this.closed) modelTask.cancel();
         clearTimeout(timer);
         if (activeTools && conversation.session && !failed) conversation.session.setActiveToolsByName(activeTools);
         if (failed && conversation.session) {
@@ -284,7 +312,7 @@ export class QQAgent {
           }
         }
       }
-    }).finally(() => {
+    })).finally(() => {
       conversation.pending--;
       conversation.touched = Date.now();
     });
@@ -296,14 +324,20 @@ export class QQAgent {
 
   private async deliver(msg: QQBotInboundMessage, reply: string | Reply): Promise<boolean> {
     if (this.closed || !validQQMessage(msg)) return false;
+    const task = currentModelTask();
+    let phase: "render" | "send" | "receipt" = "render";
     try {
+      task?.setPhase(phase);
       const structured: Reply = typeof reply === "string" ? { kind: "notice", text: reply } : reply;
       const rendered = renderReply(structured);
+      phase = "send"; task?.setPhase(phase);
       await this.send(msg.replyTarget, rendered.text, rendered, msg.senderId);
       // A refund proposal becomes confirmable only after the platform accepts this exact summary.
+      phase = "receipt"; task?.setPhase(phase);
       await this.afterDeliver?.(msg, structured);
       return true;
     } catch {
+      task?.fail(phase === "render" ? "render_failed" : phase === "send" ? "send_unknown" : "receipt_unknown");
       // Do not blindly retry an ambiguous send: QQ may already have accepted it.
       this.log("[qq] 回复发送或确认登记失败，请查询状态后重试；未自动重发。");
       return false;

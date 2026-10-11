@@ -1,0 +1,154 @@
+{
+  "schema": "web-repair-verification-v1",
+  "recordedAt": "2026-10-10T04:08:36.381894+00:00",
+  "baseGitCommit": "d6a54dce41264da58d58db9a7a28e6fcf941b78a",
+  "scope": "Final deterministic host fixes and required local checks; actual-model batch remains 6/7 and unadmitted. Yuque not yet published.",
+  "sourceHashes": {
+    "package.json": "17961e968ec4a063743af7b90fcca13ef35c8e95d36cb65ceda24576f19b5225",
+    "prompts/customer-service.md": "6a9c742deef7b88a363885c7c4f3646a949484f6bc49193a27880388882bad5a",
+    "scripts/atomic-evidence-check.ts": "29898de4d62bbc62a3312890b67d281b3835d990983ba5c8b241031e3aa41a7f",
+    "scripts/atomic-tool-prerequisite-check.ts": "1850514e0f50fdab50f8cfa53361ffbf87e33870273317bad3b6c3b0f83ca2ee",
+    "scripts/check.ts": "ef89c4e5dc6b2d8c96b4ade42f3dfd79f656c1dd5f56c4da521c71f29f68c432",
+    "scripts/coupon-agent-check.ts": "0e5b711bac726a2288123ade64724c186a72f53ddb8dbed27ef99397fc6211a0",
+    "scripts/eval-check.ts": "5c210d4b5ce62f4b46227c9f50e902d37536ef774c7f08c75c8f321b3ef49fc6",
+    "scripts/merchant-agent-check.ts": "28370f227d1c6ee7bcd916cdb7d2501a4230ef757da381b484923f01f9b8f372",
+    "scripts/merchant-notification-agent-check.ts": "4fb243223eec5bf68194ef14abdada3b64033e6d078c8abb9505c9c37f4ac728",
+    "scripts/merchant-reply-boundary-check.ts": "fb0b47164f16a978aeb59c52fa3271526a89908452d08a6ff13490ff13063cda",
+    "scripts/order-discovery-check.ts": "7160cc06a33f517f32488c2d3ba022f14555eafc9f703f106d1444e8fd1e7f64",
+    "scripts/qq-binding-check.ts": "ee976f5b358435e924d18ee642e0df45320b14f98e53770a52d6d151b5436fec",
+    "scripts/refund-agent-check.ts": "d344f47399deb9402a24d17613edfb92217ad79d66b7020d0631e9ed92bdd722",
+    "scripts/reply-check.ts": "74068a408271a6220550e15fe3e976e6614ed15c4740bc13a5386d9845a0be11",
+    "scripts/stable-joint-contract.ts": "76fe37ed4ff8874ec91359195031d1a26f5be5ea1ba07830781272f19ede35b4",
+    "scripts/stable-joint-run.ts": "598a03cbe90708ef4be2c829e91aa359f259e496338081021affd81940cd26ef",
+    "scripts/web-chat-check.ts": "cafabc3d09f2879be6b37870a9fc130b1a3ba3831a1bbbff9f85a4c89b2f093c",
+    "scripts/web-chat-stream-check.ts": "160bce4d325ca6fd851e3098f6f4cba8db97fe05f8fc512096ab84f6ebc71b84",
+    "scripts/web-evidence-live-check.ts": "87057bdb3c66615fbffbb066c8e209695546120e6aa795d9252a6e5c6f9bf1e8",
+    "skills/shop-support/SKILL.md": "c6ef992a70215e5a02ad0216ae3996d5c6f2f5f3b38e7c3b1c3c3055c95db56b",
+    "src/agent.ts": "0a0ec2e4a45488fcbda57b8cb052d835875ded94d36be9cc28e62d084e73641c",
+    "src/cli.ts": "aa11840be389b53f9b9b5b26e2cefa496f5d352479c0a3001a2a562344ff6439",
+    "src/eval-capture.ts": "180fa2da5f8ebc88224ffb28f3f3397595476dc9a057e88ec31fa1403de7f72c",
+    "src/evaluation.ts": "8e216db07b0628813857cb6ee980512bb5c3d0539b1a5e10316bc6a1d0a28199",
+    "src/qq-agent.ts": "41f95c7499b45df2c30c176c9f70cd06e93cd9e4207997988ff736a32476f780",
+    "src/reply-from-tools.ts": "2f46b593dca86c000cc0213ad7042dfa541ababa301543d4ba5d3d12d87a6451",
+    "src/reply.ts": "3cdb75a75e3fddd9837fa715fc0a2227a449473f0a57b7a09744bb8826644623",
+    "src/web-chat.ts": "b4d10b65f3aa0790e7a730c08efec15cce1ae2e272720dddf200fce983d48f80"
+  },
+  "checks": [
+    {
+      "command": "npm run validate",
+      "exitCode": 0,
+      "localLog": ".runtime/minimax-delivery/web-final-validate-v5.log",
+      "logSha256": "482b767652d01abc061a3d814fcf0cd49ddd8d01a147243eb6fd7580983498d5",
+      "scope": "final source, includes all offline affected checks",
+      "evidence": "Direct process completion exit code observed; log retained locally."
+    },
+    {
+      "command": "node --env-file-if-exists=.env scripts/coupon-agent-check.ts",
+      "exitCode": 0,
+      "localLog": ".runtime/minimax-delivery/web-final-coupon-db-v2.log",
+      "logSha256": "153f6db9989558451a1137e1f51695bf587a3e66e135d53132fc026a3e6a2e9f",
+      "scope": "current host order/FAQ prerequisite contract; final later change is fixed reply wording only",
+      "evidence": "Direct process completion exit code observed; log retained locally."
+    },
+    {
+      "command": "node --env-file-if-exists=.env scripts/merchant-agent-check.ts",
+      "exitCode": 0,
+      "localLog": ".runtime/minimax-delivery/web-final-merchant-db-v1.log",
+      "logSha256": "b3e8e2c5f8f950a47b927e69b268fedc456d638dc755977a251ed098114c6ad5",
+      "scope": "current nested host prerequisites with real local MySQL; later fixed reply wording does not change storage contract",
+      "evidence": "Direct process completion exit code observed; log retained locally."
+    },
+    {
+      "command": "node --env-file-if-exists=.env scripts/web-evidence-live-check.ts --live",
+      "exitCode": 0,
+      "localLog": ".runtime/minimax-delivery/web-live-v1.log",
+      "logSha256": "1a58e8dffb95ccd9482a3fe83305d67ff0bb891ea5c9c9ea1805847918a877a5",
+      "scope": "single closed real-model batch before the two fixed host notices changed; engineering only exit0",
+      "evidence": "Direct process completion exit code observed; log retained locally."
+    }
+  ],
+  "postLiveRuntimeDelta": {
+    "src/reply-from-tools.ts": {
+      "liveSha256": "984680925574d68ff757cb35c773247ba48daa1c531dd26fbc99348bb1b3f34c",
+      "finalSha256": "2f46b593dca86c000cc0213ad7042dfa541ababa301543d4ba5d3d12d87a6451"
+    }
+  },
+  "fixedHostReplies": {
+    "scope": "Deterministic final host rendering only; zero model and database requests.",
+    "denied": {
+      "kind": "notice",
+      "text": "本轮订单读取未能完成，无法继续展示该轮办理信息。仅支持当前客户本人订单，不能代查他人订单或披露其券状态、金额。请核对本人订单号或联系人工核实；不能据此判断操作是否执行。",
+      "markdown": "## 服务提示\n\n本轮订单读取未能完成，无法继续展示该轮办理信息。仅支持当前客户本人订单，不能代查他人订单或披露其券状态、金额。请核对本人订单号或联系人工核实；不能据此判断操作是否执行。"
+    },
+    "databaseError": {
+      "kind": "notice",
+      "text": "本轮订单读取未能完成，无法继续展示该轮办理信息。仅支持当前客户本人订单，不能代查他人订单或披露其券状态、金额。请核对本人订单号或联系人工核实；不能据此判断操作是否执行。",
+      "markdown": "## 服务提示\n\n本轮订单读取未能完成，无法继续展示该轮办理信息。仅支持当前客户本人订单，不能代查他人订单或披露其券状态、金额。请核对本人订单号或联系人工核实；不能据此判断操作是否执行。"
+    },
+    "readOnly": {
+      "kind": "notice",
+      "text": "你好，请写明要咨询的问题；涉及具体订单时请提供订单号。本轮尚未取得最新订单或适用规则依据，不能确认办理条件或结果。",
+      "markdown": "## 服务提示\n\n你好，请写明要咨询的问题；涉及具体订单时请提供订单号。本轮尚未取得最新订单或适用规则依据，不能确认办理条件或结果。"
+    },
+    "afterSales": {
+      "kind": "notice",
+      "text": "你好，请写明要咨询的问题；涉及具体订单时请提供订单号。本轮尚未取得最新订单或适用规则依据，不能确认办理条件或结果。涉及业务办理时，仍须本人发送对应的完整确认，普通同意不构成授权。",
+      "markdown": "## 服务提示\n\n你好，请写明要咨询的问题；涉及具体订单时请提供订单号。本轮尚未取得最新订单或适用规则依据，不能确认办理条件或结果。涉及业务办理时，仍须本人发送对应的完整确认，普通同意不构成授权。"
+    }
+  },
+  "browser": {
+    "version": "web-browser-evidence-v1",
+    "recordedAt": "2026-10-10T03:58:25.498694+00:00",
+    "url": "http://127.0.0.1:3002/",
+    "browser": "Codex in-app browser",
+    "sourceHashes": {
+      "src/web-chat.ts": "b4d10b65f3aa0790e7a730c08efec15cce1ae2e272720dddf200fce983d48f80",
+      "src/web-chat-server.ts": "14d6616e1aa202b291be7e0f9ec1021743b0f77336c852852830534752fbfcb4",
+      "src/web-chat-history.ts": "ec62b8724b13e3d095abb75da12ea319eea9c0bf71d11c02292c2722b359c98e",
+      "src/reply-from-tools.ts": "984680925574d68ff757cb35c773247ba48daa1c531dd26fbc99348bb1b3f34c",
+      "src/agent.ts": "0a0ec2e4a45488fcbda57b8cb052d835875ded94d36be9cc28e62d084e73641c"
+    },
+    "checks": {
+      "standardServerHostOrderQuery": true,
+      "restartHistoryReopen": true,
+      "replayRequiresRequery": true,
+      "profileSwitchClearsVisiblePriorConversation": true,
+      "profileBOnlyCoupon1002": true,
+      "narrowViewport": {
+        "width": 390,
+        "height": 844,
+        "documentWidth": 390
+      }
+    },
+    "screenshots": [
+      "web-wide-20261010.png",
+      "web-narrow-20261010.png"
+    ],
+    "providerRequests": 0,
+    "scope": "Host-only browser flows and local SQLite persistence. Real-model and SSE content are a separate fixed batch. No real QQ or payments.",
+    "initialFailure": "First browser send returned session-invalid before diagnostic capture. Later same-host alternate-port test changed shared cookies; root cause of original failure not established. Disk-backed diagnostic and standard-server restart/replay/requery succeeded; no auth protection was disabled.",
+    "finalSourceRecheck": {
+      "standardServerRestart": true,
+      "hostOwnOrderQuery": true,
+      "providerRequests": 0,
+      "screenshot": ".runtime/minimax-delivery/web-final-wide-20261010.png",
+      "replySourceSha256": "2f46b593dca86c000cc0213ad7042dfa541ababa301543d4ba5d3d12d87a6451"
+    }
+  },
+  "realModelSummary": {
+    "file": "data/web-evidence-results-20261010.json",
+    "planned": 7,
+    "engineeringPassed": 7,
+    "answerPassed": 6,
+    "jointPassed": 6,
+    "admitted": false,
+    "humanAcceptance": false
+  },
+  "releaseBoundaries": [
+    "Fixed host wording verified deterministically with zero remote model calls; original real-model answers unchanged.",
+    "Only this Web/shared-output scope is repaired; historical merchant batches remain unadmitted.",
+    "No QQ transmission or commercial payment validation.",
+    "Teaching publication and 26-page live audit pending login."
+  ],
+  "publicationStatus": "not-published"
+}

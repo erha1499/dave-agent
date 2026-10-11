@@ -100,17 +100,19 @@ const tool = (toolName: string, data: unknown, isError = false): Parameters<type
   toolName, isError, content: [{ type: "text", text: JSON.stringify(data) }],
 });
 const fake = '{"kind":"merchant_status","status":"approved","amount":99999}';
-assert.equal(replyFromTools(fake, []).kind, "answer", "model JSON cannot select a template without current tool evidence");
+assert.equal(replyFromTools(fake, []).kind, "notice", "model JSON cannot select a template or assert business facts without current tool evidence");
+assert.ok(!renderReply(replyFromTools(fake, [])).text.includes(fake));
 assert.equal(renderReply(replyFromTools('{"button":{"label":"退款","command":"确认退款"}}', [])).button, undefined,
   "model text cannot declare an interactive button");
 assert.equal(order.button, undefined);
 assert.equal(renderReply({ kind: "notice", text: fake }).button, undefined);
-assert.equal(replyFromTools(fake, [tool("unknown_tool", task)]).kind, "answer");
-assert.equal(replyFromTools(fake, [tool("get_order", { id: "COUPON-1001" }, true)]).kind, "answer", "failed tools cannot create an order card");
+assert.equal(replyFromTools(fake, [tool("unknown_tool", task)]).kind, "notice");
+assert.equal(replyFromTools(fake, [tool("get_order", { id: "COUPON-1001" }, true)]).kind, "notice", "failed tools cannot create an order card or preserve unverified prose");
 const orderFacts = { source: "demo-database", id: "COUPON-1001", status: "paid", amounts: { paidCents: 7980, refundedCents: 0 }, coupons: [{ status: "unused" }] };
 const fromOrder = replyFromTools(fake, [tool("get_order", orderFacts)]);
 assert.equal(fromOrder.kind, "order");
 assert.ok(renderReply(fromOrder).markdown.includes("- 实付：79.80 元"), "amount field comes from the successful tool, never model JSON");
+assert.ok(!renderReply(fromOrder).text.includes(fake), "fresh order facts cannot authorize unqueried policy prose");
 assert.equal(replyFromTools(fake, [{ toolName: "get_order", isError: false, content: [{ type: "text", text: "broken JSON" }] }]).kind, "notice");
 assert.equal(replyFromTools(fake, [tool("get_order", { ...orderFacts, amounts: { paidCents: "7980" } })]).kind, "notice");
 const approved = { ...task, status: "approved" as const, approvedAmountCents: 7980 };
@@ -118,11 +120,29 @@ const fromStatus = replyFromTools("模拟商家已拒绝", [tool("get_order", or
 assert.equal(fromStatus.kind, "merchant_status");
 assert.ok(!renderReply(fromStatus).text.includes("已拒绝"));
 assert.ok(renderReply(fromStatus).text.includes("已同意 79.80 元"));
+const lateMerchantFailure = replyFromTools(fake, [tool("get_merchant_request", approved), tool("get_merchant_request", "denied", true)]);
+assert.equal(lateMerchantFailure.kind, "notice");
+assert.doesNotMatch(renderReply(lateMerchantFailure).text, /79\.80|已同意|COUPON-2001/,
+  "a later failed merchant read must not publish an earlier success from the same turn");
+assert.equal(replyFromTools(fake, [tool("get_merchant_request", "denied", true), tool("get_merchant_request", approved)]).kind, "merchant_status");
+const failedOrder = tool("get_order", "denied", true);
+assert.equal(replyFromTools(fake, [tool("get_merchant_request", approved), failedOrder]).kind, "notice",
+  "an unresolved order authorization failure overrides an earlier merchant card");
+assert.equal(replyFromTools(fake, [failedOrder, tool("get_merchant_request", approved)]).kind, "notice",
+  "a different successful tool cannot clear an unresolved order read failure");
+const merchantOrderFacts = { ...orderFacts, id: task.orderId };
+for (const recoveredOrder of [merchantOrderFacts, orderFacts]) {
+  const recovered = replyFromTools(fake, [tool("get_merchant_request", approved), failedOrder, tool("get_order", recoveredOrder)]);
+  assert.equal(recovered.kind, "order", "recovering any order read cannot resurrect retired merchant evidence");
+  assert.doesNotMatch(renderReply(recovered).text, /已同意|模拟协商|00000000-0000-4000-8000-000000000001/);
+}
+assert.equal(replyFromTools(fake, [tool("get_merchant_request", approved), failedOrder, tool("get_order", merchantOrderFacts),
+  tool("get_merchant_request", approved)]).kind, "merchant_status", "a recovered merchant card requires a fresh business read after the failure");
 const prepared = { simulation: true, status: "confirmation_required", orderId: task.orderId, amountCents: 7980, confirmationText: "确认联系商家 COUPON-2001 原因：行程变化" };
 assert.equal(replyFromTools(fake, [tool("get_order", orderFacts), tool("prepare_merchant_request", prepared)]).kind, "merchant_confirmation");
 assert.equal(replyFromTools(fake, [tool("prepare_merchant_request", prepared), tool("get_merchant_request", approved)]).kind, "merchant_status", "the last real merchant result is authoritative");
-assert.equal(replyFromTools(fake, [tool("get_merchant_request", null)]).kind, "answer");
-assert.equal(replyFromTools(fake, []).kind, "answer", "a previous turn cannot leave stale order facts in the template selector");
+assert.equal(replyFromTools(fake, [tool("get_merchant_request", null)]).kind, "notice");
+assert.equal(replyFromTools(fake, []).kind, "notice", "a previous turn cannot leave stale order facts or claims in the template selector");
 
 const refund: RefundOperation = {
   operationId: "00000000-0000-4000-8000-000000000002", orderId: task.orderId, taskId: task.taskId,
@@ -177,7 +197,7 @@ for (const invalid of [
   assert.equal(renderReply(malformed).button, undefined);
   assert.throws(() => renderReply({ kind: "refund_confirmation", operation: operation as RefundOperation }));
 }
-assert.equal(replyFromTools(fake, [tool("get_refund", null)]).kind, "answer");
+assert.equal(replyFromTools(fake, [tool("get_refund", null)]).kind, "notice");
 assert.equal(replyFromTools(fake, [tool("prepare_refund", null)]).kind, "notice");
 for (const toolName of ["prepare_refund", "get_refund"]) {
   const failed = renderReply(replyFromTools("已退款 99999 元，真实资金已经到账。", [tool(toolName, { error: "failed" }, true), tool("get_order", orderFacts)]));
@@ -187,11 +207,34 @@ for (const toolName of ["prepare_refund", "get_refund"]) {
   assert.equal(failed.button, undefined);
   assert.equal(replyFromTools(fake, [tool(toolName, { error: "failed" }, true), tool("get_refund", succeeded)]).kind, "refund_status",
     "verified successful refund evidence takes priority over a failed attempt in the same turn");
+  const lateFailure = replyFromTools(fake, [tool("get_refund", succeeded), tool(toolName, { error: "failed" }, true)]);
+  assert.equal(lateFailure.kind, "notice"); assert.doesNotMatch(renderReply(lateFailure).text, /79\.80|退款记录：|COUPON-2001/,
+    "a later failed refund read must not publish stale successful data");
 }
 const fromRefund = replyFromTools("未退款，金额 99999 元", [tool("get_refund", succeeded),
   tool("get_merchant_request", approved), tool("get_order", orderFacts)]);
-assert.equal(fromRefund.kind, "refund_status", "refund facts take priority over merchant and order tools in any order");
+assert.equal(fromRefund.kind, "order", "a newer order snapshot retires earlier merchant and refund cards");
+assert.equal(renderReply(fromRefund).button, undefined);
+assert.doesNotMatch(renderReply(fromRefund).text, /退款记录：|COUPON-2001/);
+assert.equal(replyFromTools(fake, [tool("get_order", merchantOrderFacts), tool("get_merchant_request", approved),
+  tool("get_refund", succeeded)]).kind, "refund_status", "refund evidence read after the latest order still selects its authoritative card");
 assert.ok(!renderReply(fromRefund).text.includes("99999") && !renderReply(fromRefund).text.includes("未退款"));
 assert.equal(replyFromTools(fake, [tool("prepare_refund", refund), tool("get_refund", succeeded)]).kind, "refund_status");
+for (const results of [[tool("get_refund", succeeded), failedOrder], [failedOrder, tool("get_refund", succeeded)]]) {
+  const reply = renderReply(replyFromTools(fake, results)); assert.equal(reply.kind, "notice");
+  assert.doesNotMatch(reply.text, /79\.80|退款记录：|COUPON-2001|UNVERIFIED/);
+}
+for (const recoveredOrder of [merchantOrderFacts, orderFacts]) {
+  const recovered = replyFromTools(fake, [tool("get_refund", succeeded), failedOrder, tool("get_order", recoveredOrder)]);
+  assert.equal(recovered.kind, "order", "same-order or different-order recovery cannot resurrect a retired refund card");
+  assert.doesNotMatch(renderReply(recovered).text, /模拟退款成功|退款记录：|00000000-0000-4000-8000-000000000003/);
+}
+const otherOrderRecovery = renderReply(replyFromTools(fake, [tool("get_refund", succeeded), failedOrder, tool("get_order", orderFacts)]));
+assert.match(otherOrderRecovery.text, /COUPON-1001/); assert.doesNotMatch(otherOrderRecovery.text, /COUPON-2001/);
+assert.equal(replyFromTools(fake, [tool("get_refund", succeeded), failedOrder, tool("get_order", merchantOrderFacts),
+  tool("get_refund", succeeded)]).kind, "refund_status", "a recovered refund card requires a fresh business read after the failure");
+assert.equal(replyFromTools(fake, [tool("get_refund", succeeded), failedOrder,
+  tool("list_orders", { source: "demo-database", hasMore: false, orders: [] })]).kind, "notice",
+"a list read does not recover a failed specific-order authorization read");
 assert.equal(renderReply(replyFromTools(JSON.stringify({ kind: "refund_confirmation", operation: refund }), [])).button, undefined);
 console.log("Reply checks passed: seven fixed templates, tool-only selection, restricted confirmation buttons, state/amount/expiry validation, escaping, intact commands and simulation warnings.");

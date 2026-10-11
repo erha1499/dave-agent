@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
+import { createModelRequestFetch } from "./model-request-budget.ts";
 
 export const embeddingModel = "text-embedding-v4";
 export const embeddingDimensions = 1024;
@@ -65,6 +66,10 @@ export function createBailianClient(options: { env?: NodeJS.ProcessEnv; fetch?: 
   }
   async function request<T>(kind: Kind, body: Record<string, unknown>, parse: (value: unknown) => T, controls: BailianRequestControls = {}): Promise<BailianResult<T>> {
     const attempts: BailianAttempt[] = [], requestHash = contentHash({ endpoint: endpoints[kind], body });
+    const origin = new URL(endpoints.origin).hostname;
+    const requestFetch = createModelRequestFetch({ phase: kind, provider: "bailian", model: String(body.model), format: "bailian-json",
+      ...(kind === "rerank" && (origin === "dashscope.aliyuncs.com" || origin.endsWith(".cn-beijing.maas.aliyuncs.com"))
+        ? { pricing: { currency: "CNY", source: "Alibaba Cloud Model Studio", ratePerMillionTokens: .5 } } : {}) }, fetcher);
     for (let attempt = 1; attempt <= retries + 1; attempt++) {
       if (controls.beforeAttempt && !controls.beforeAttempt()) throw new BailianBudgetStop(attempts);
       const started = performance.now(), controller = new AbortController();
@@ -74,7 +79,7 @@ export function createBailianClient(options: { env?: NodeJS.ProcessEnv; fetch?: 
       const timeout = new Promise<never>((_resolve, reject) => { timer = setTimeout(() => { timedOut = true; controller.abort(); reject(new Error("timeout")); }, timeoutMs); });
       try {
         const value = await Promise.race([(async () => {
-          const response = await fetcher(endpoints[kind], { method: "POST", headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+          const response = await requestFetch(endpoints[kind], { method: "POST", headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
             body: JSON.stringify(body), redirect: "error", signal: controller.signal });
           if (timedOut) throw new Error("timeout");
           entry.httpStatus = response.status;

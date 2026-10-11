@@ -49,7 +49,8 @@ export function captureEvaluationTurn(modelName: string, expectedDeniedOrder?: s
       } else if (event.type === "tool_execution_start") {
         const step: EvalStep = {
           index: steps.length + 1, type: "tool", name: event.toolName,
-          durationMs: null, input: event.args, isError: false,
+          durationMs: null, input: event.args, isError: false, toolCallId: event.toolCallId,
+          ...(event.parentToolCallId ? { parentToolCallId: event.parentToolCallId } : {}),
         };
         steps.push(step);
         pendingTools.set(event.toolCallId, { step, started: performance.now() });

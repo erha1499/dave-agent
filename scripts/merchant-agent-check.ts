@@ -98,7 +98,7 @@ try {
   assert.ok(changedReason?.includes(`登记原因：${reason}`), "an existing task must retain its original request facts");
   assert.ok(!changedReason?.includes("登记原因：另一原因"));
   assert.equal((await merchant.getTask(identity, sourceKey, orderId))!.taskId, task.taskId);
-  assert.equal(JSON.parse(await toolRound(denied, "get_merchant_request", { orderId }, false)), null);
+  assert.match(await toolRound(denied, "get_merchant_request", { orderId }, true), /必要取证|未找到当前客户/);
   await new Promise(resolve => setTimeout(resolve, 120));
   await merchant.processDue();
   const completed = JSON.parse(await toolRound(session, "get_merchant_request", { orderId }, false));

@@ -30,7 +30,7 @@
     "check": "node scripts/check.ts",
     "check:qq": "node scripts/qq-check.ts",
     "check:qq-agent": "node scripts/qq-agent-check.ts",
-    "check:reply": "node scripts/reply-check.ts && node scripts/qq-reply-check.ts",
+    "check:reply": "node scripts/reply-check.ts && node scripts/merchant-reply-boundary-check.ts && node scripts/atomic-evidence-check.ts && node scripts/atomic-tool-prerequisite-check.ts && node scripts/qq-reply-check.ts",
     "typecheck": "tsc --noEmit",
     "validate": "npm run typecheck && npm run check && npm run check:qq && npm run check:qq-agent && npm run check:reply && npm run check:eval && node scripts/refund-agent-check.ts && node scripts/merchant-notification-agent-check.ts"
   },

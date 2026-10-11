@@ -1,6 +1,7 @@
 import type { AssistantMessage, Context, ModelCost } from "@earendil-works/pi-ai";
 import { isDeepStrictEqual } from "node:util";
 import { createConfiguredModelRuntime } from "./agent.ts";
+import { createModelRequestFetch } from "./model-request-budget.ts";
 import { estimateModelUsage, modelPricing, normalizeBailianGenerationBaseUrl, resolveModelSelection, type ModelSelection, type ModelPricing } from "./model-selection.ts";
 import { contentHash } from "./bailian.ts";
 import { acceptEvidence, type EvidenceAcceptanceResult, type EvidenceSupportCandidate } from "./evidence-acceptance.ts";
@@ -214,9 +215,9 @@ export class EvidenceSupportError extends Error {
   }
 }
 
-type CompletionOptions = { signal: AbortSignal; timeoutMs: number; temperature: 0; maxTokens: number; maxRetries: 0;
+type CompletionOptions = { signal: AbortSignal; timeoutMs: number; temperature: 0; maxTokens: number; maxRetries: 0; fetch: typeof globalThis.fetch;
   samplingParams: { response_format: { type: "json_object" } }; onPayload: (value: unknown) => unknown };
-export async function createEvidenceSupportClient(options: { env?: NodeJS.ProcessEnv; timeoutMs?: number; profile?: EvidenceSupportProfile; modelSelection?: EvidenceSupportModel;
+export async function createEvidenceSupportClient(options: { env?: NodeJS.ProcessEnv; timeoutMs?: number; profile?: EvidenceSupportProfile; modelSelection?: EvidenceSupportModel; fetch?: typeof globalThis.fetch;
   // Internal replay/development selection; default stays v5, independently of the parser.
   typedPromptVersion?: typeof evidenceSupportTypedV3PromptVersion | typeof evidenceSupportTypedV4PromptVersion | typeof evidenceSupportTypedPromptVersion | typeof evidenceSupportTypedV6PromptVersion | typeof evidenceSupportTypedV7PromptVersion;
   // Internal historical replay only; no user-facing parser toggle. Legacy typed settings omit validationVersion.
@@ -224,7 +225,7 @@ export async function createEvidenceSupportClient(options: { env?: NodeJS.Proces
   // Synthetic diagnostics only: no query or reasoning blocks, bounded text; production does not install an observer.
   observeResponseForTest?: (response: { text: string; stopReason: AssistantMessage["stopReason"]; outputHash: string; truncated: boolean }) => void;
   // Injection keeps transport checks deterministic; production always uses the configured Pi runtime.
-  runtime?: { model: { provider: string; id: string; api: string; baseUrl: string; maxTokens: number; cost: ModelCost };
+  runtime?: { model: { provider: string; id: string; api: string; baseUrl: string; maxTokens: number; contextWindow?: number; cost: ModelCost };
     complete: (context: Context, options: CompletionOptions) => Promise<AssistantMessage> } } = {}): Promise<EvidenceSupportClient> {
   const timeoutMs = options.timeoutMs ?? 60_000;
   const profile = options.profile ?? "binary";
@@ -272,6 +273,9 @@ export async function createEvidenceSupportClient(options: { env?: NodeJS.Proces
       const response = await Promise.race([configured.complete({ systemPrompt: prompt,
         messages: [{ role: "user", content: JSON.stringify(payload(query, candidates)), timestamp: 0 }], tools: [] },
       { signal: controller.signal, timeoutMs, temperature: 0, maxTokens: settings.maxTokens, maxRetries: 0,
+        fetch: createModelRequestFetch({ phase: "support", provider: model.provider, model: model.id, format: "openai-sse", pricing: settings.pricing,
+          context: { contextWindow: model.contextWindow, maxOutputTokens: settings.maxTokens,
+            outputTokenField: model.provider === "bailian" ? "max_completion_tokens" : "max_tokens" } }, options.fetch),
         samplingParams: { response_format: { type: "json_object" } }, onPayload: value => {
           if (!plain(value)) throw new Error("支持性判别请求无效。");
           // Set explicit wire values so a catalog reasoning default cannot turn this judge into a hidden agent loop.

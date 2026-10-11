@@ -34,7 +34,7 @@ export async function checkWebChatStream() {
         shop: { id: "shop-1", name: "合成门店" }, items: [{ productId: "product-1", productName: "合成套餐" }],
         coupons: [{ status: "unused" }], payments: [], refunds: [] };
     },
-    async searchKnowledge() { return []; },
+    async searchKnowledge() { return [{ source: "demo-knowledge", sourceId: "KB-STREAM", title: "测试规则", body: "本入口仅提供只读咨询。", scope: { shopId: null, productId: null } }]; },
   } as unknown as CouponStore;
   const factory = (identity: QQIdentity) => createCouponSession(identity, store, runtime, faux.getModel());
   const catalog = createWebChatSettingsCatalog({ DEEPSEEK_API_KEY: "synthetic-stream-key" });
@@ -96,17 +96,19 @@ export async function checkWebChatStream() {
     faux.setResponses([
       fauxAssistantMessage([fauxThinking("PRIVATE_REASONING_SENTINEL"), fauxText("先核对订单。"),
         fauxToolCall("get_order", { orderId: "COUPON-1001" }, { id: "PRIVATE_TOOL_ID" })], { stopReason: "toolUse" }),
+      fauxAssistantMessage(fauxToolCall("search_faq", { query: "只读咨询规则", shopId: "shop-1", productId: "product-1" }), { stopReason: "toolUse" }),
       fauxAssistantMessage(finalText),
     ]);
     const streaming = http("/api/chat/messages/stream", body, client.cookie, frame => {
+      if (frame.event === "delta") assert.ok(!streaming.frames.some(item => item.event === "result"), "eligible native deltas arrive before the final result");
       if (frame.event === "step" && frame.data.label === "查询订单详情" && frame.data.status === "running") reached();
     });
     await deadline(reachedTool);
     assert.equal((await streaming.headers).status, 200);
     assert.equal(streaming.frames[0]!.event, "start"); assert.equal(streaming.frames[0]!.data.replayed, false);
-    assert.ok(streaming.frames.some(frame => frame.event === "delta"));
-    assert.ok(!streaming.frames.some(frame => frame.event === "result"), "real text arrives while the actual tool is still blocked");
-    assert.equal(streaming.frames.filter(frame => frame.event === "delta").map(frame => frame.data.text).join(""), "先核对订单。");
+    assert.ok(!streaming.frames.some(frame => frame.event === "delta"), "unverified pre-tool text must never stream");
+    assert.ok(!streaming.frames.some(frame => frame.event === "result"), "progress is visible while the actual tool is blocked");
+    assert.equal(streaming.frames.filter(frame => frame.event === "delta").map(frame => frame.data.text).join(""), "");
     assert.doesNotMatch(JSON.stringify(streaming.frames), /PRIVATE_|get_order|COUPON-1001|args|thinking/);
     const busy = await http("/api/chat/messages/stream", body, client.cookie).finished;
     assert.equal(busy.status, 409); assert.match(String(busy.headers["content-type"]), /application\/json/);
@@ -119,8 +121,8 @@ export async function checkWebChatStream() {
       assert.equal(frame.data.sessionId, client.sessionId); assert.equal(frame.data.requestId, body.requestId);
     }
     const deltas = streaming.frames.filter(frame => frame.event === "delta");
-    assert.deepEqual([...new Set(deltas.map(frame => frame.data.messageId))], ["assistant-1", "assistant-2"]);
-    assert.equal(deltas.filter(frame => frame.data.messageId === "assistant-2").map(frame => frame.data.text).join(""), finalText);
+    assert.deepEqual([...new Set(deltas.map(frame => frame.data.messageId))], ["assistant-3"]);
+    assert.equal(deltas.filter(frame => frame.data.messageId === "assistant-3").map(frame => frame.data.text).join(""), finalText);
     const result = streaming.frames.at(-1)!.data;
     assert.equal(result.reply.kind, "order"); assert.equal(result.reply.text, finalText); assert.equal(result.reply.orders[0].paidCents, 7980);
     assert.ok(result.steps.some((row: any) => row.label === "查询订单详情" && row.status === "done"));
@@ -141,6 +143,31 @@ export async function checkWebChatStream() {
     await host.finished; assert.equal(host.frames.at(-1)!.data.origin, "host");
     assert.ok(!host.frames.some(frame => frame.event === "delta"), "host receipts never invent text deltas");
     assert.equal(faux.state.callCount, count);
+
+    // Prior FAQ/order history must not unlock this turn's unverified prose.
+    for (const evidence of ["none", "order", "faq", "reread"] as const) {
+      const poison = "本轮核实已退款99999元；已核销政策允许直接退款。";
+      faux.setResponses([
+        ...(["order", "reread"].includes(evidence) ? [fauxAssistantMessage(fauxToolCall("get_order", { orderId: "COUPON-1001" }), { stopReason: "toolUse" })] : []),
+        ...(["faq", "reread"].includes(evidence) ? [fauxAssistantMessage(fauxToolCall("search_faq", { query: "只读咨询规则" }), { stopReason: "toolUse" })] : []),
+        ...(evidence === "reread" ? [fauxAssistantMessage(fauxToolCall("get_order", { orderId: "COUPON-1001" }), { stopReason: "toolUse" })] : []),
+        fauxAssistantMessage(poison),
+      ]);
+      const ungrounded = http("/api/chat/messages/stream", message(client.sessionId,
+        evidence === "faq" ? "讲一下通用只读咨询规则" : "只看COUPON-1001当前状态，不需要解释政策"), client.cookie);
+      await ungrounded.finished;
+      assert.equal(ungrounded.frames.at(-1)!.event, "result");
+      assert.ok(!ungrounded.frames.some(frame => frame.event === "delta"), "history, FAQ-only, order-only and rules before a new order cannot unlock free prose");
+      assert.doesNotMatch(JSON.stringify(ungrounded.frames), /99999|政策允许|本轮核实已退款/);
+      const reply = ungrounded.frames.at(-1)!.data.reply;
+      if (["order", "reread"].includes(evidence)) assert.equal(reply.orders[0].paidCents, 7980);
+      if (evidence === "faq") {
+        assert.equal(reply.kind, "answer"); assert.match(reply.text, /尚未核对具体订单/);
+        assert.match(reply.text, /测试规则（KB-STREAM）\n本入口仅提供只读咨询。/);
+      }
+      const history = await http("/api/chat/session", undefined, client.cookie).finished;
+      assert.doesNotMatch(history.data.messages.at(-1).text, /99999|政策允许|本轮核实已退款/);
+    }
 
     const droppedBody = message(client.sessionId, "合成断流问题 COUPON-1001");
     blocked = new Promise<void>(resolve => { release = resolve; });

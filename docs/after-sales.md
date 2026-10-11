@@ -257,7 +257,7 @@ QQ 就绪后启动原有商家 worker：先更新到期任务，再扫描当前 
 | 保存原路由 | [`qq.ts`](../src/qq.ts) 的用户确认 hook → [`confirmMerchantReply`](../src/after-sales-entry.ts) → [`AfterSalesStore.request`](../src/after-sales.ts)。任务和通知路由同事务创建；仅首次任务插入保存消息ID/时间，重复确认不刷新窗口，CLI不补造路由。 |
 | 到期与通知分开推进 | `qq.ts` 的 ready → `startMockMerchant → store.processDue → afterProcess` → [`dispatchMerchantNotifications`](../src/merchant-notifications.ts)。worker分别限制一个在途轮询和一个通知批次，慢Pi请求不阻塞商家期限推进；`listNotifications` 只选当前App的终态任务及pending通知，按创建时身份绑定代次和订单归属联查，批次上限20。 |
 | 排队后才领取 | dispatcher → [`QQAgent.resumeMerchant → enqueue`](../src/qq-agent.ts)。与用户共用“群＋发送者”队列；满队列返回busy且不领取。出队再次检查原消息窗口后才调用 `claimNotification`，条件UPDATE重新校验绑定/归属和pending状态，只有一个竞争者能领取；随后 `getTask(referenceTaskId)` 再读原任务。应用队列不替代数据库原子领取。 |
-| 通知不能变成确认 | 默认atomic只开放 `get_merchant_request`，跳过用户确认hook；即使模型查另一单或输出退款成功，发送仍使用出队后核验的原任务构造固定 `merchant_status`。终态卡没有退款确认按钮。Pi结果事件以不触发新轮的custom message写入内存，不能据此声称持久焦点或重启后聊天恢复。 |
+| 通知不能变成确认 | 当前atomic只开放 `get_order`、`search_faq`、`get_merchant_request`；查询任务时由宿主嵌套完成本人订单及适用规则取证，不开放协商或退款准备工具，仍跳过用户确认hook。即使模型查另一单或输出退款成功，发送仍使用宿主重新核验的原任务构造固定 `merchant_status`。终态卡没有退款确认按钮。Pi结果事件以不触发新轮的custom message写入内存，不能据此声称持久焦点或重启后聊天恢复；原审计及历史QQ成绩不自动覆盖新增嵌套取证。 |
 | 发送与登记有间隙 | `QQAgent.deliver → sendQQReply` 接受后，dispatcher才 `finishNotification`。窗口失效/禁用群/无有效任务为deferred；发送或交付后hook异常为unknown；落库失败则可能留在claimed并报状态不明。`qq.ts` 停机先停止worker新调度，再关闭/取消Agent并等候收尾；已开始的网络发送可能完成。 |
 
 例如QQ已经接受卡片、但写sent前进程退出，存储仍为claimed；重启扫描不会领取它，也不会用客户后来发的消息续原窗口。unknown同样不自动重发，尚未领取的pending仍可在有效窗口内尝试。由此保证的是本应用至多一次主动发送尝试，代价是可能漏通知；它不保证平台恰好一次送达或用户已读。客户可在原会话明确查询 `COUPON-2001` 协商进度，再重新读取订单/规则/批准并请求退款；通知状态本身不授权资金操作。改成超时重领会引入重复发送，只有业务明确要求送达重试且能处理重复时才考虑。

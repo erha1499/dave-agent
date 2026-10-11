@@ -1,6 +1,34 @@
 # 网页客服问答
 
-文档核对：2026-10-10；最近验收：2026-10-09。会话产品与持久记录、客户与多页原稿恢复、能力简介、响应式与键盘阅读、评测草稿保护和工作台编辑保持已完成相应验收。第33轮持续监测于北京时间10:00结束；用户随后另授权第34轮导航与文案修复、截图检查和自动commit/push。第34轮最终专项与完整 validate 均通过，另有该轮版本只读MySQL与临时SQLite联调；运行版本、结果及局限见末节。第23—34轮由 Codex 实现，不使用 Kimi。首版Kimi来源、旧进程内历史和逐轮结果保留在历史章节，不能替代当前合同或算作本次新增验收。
+文档核对与整合验收：2026-10-11，见下方冻结记录。以下第23—34轮为历史验收。会话产品与持久记录、客户与多页原稿恢复、能力简介、响应式与键盘阅读、评测草稿保护和工作台编辑保持已完成相应验收。第33轮持续监测于北京时间10:00结束；用户随后另授权第34轮导航与文案修复、截图检查和自动commit/push。第34轮最终专项与完整 validate 均通过，另有该轮版本只读MySQL与临时SQLite联调；运行版本、结果及局限见末节。第23—34轮由 Codex 实现，不使用 Kimi。首版Kimi来源、旧进程内历史和逐轮结果保留在历史章节，不能替代当前合同或算作本次新增验收。
+
+<a id="web-demo-freeze-20261011"></a>
+
+## Web 演示冻结（2026-10-11）
+
+整合基线为 main `967424c` 与 MiniMax 交付 `eb1345f`；运行源码与交付分支一致，仅合并版本和同步当前文档。冻结凭据见 [结果清单](../data/web-demo-freeze-20261011.json)：记录源码哈希、锁文件、环境、实际退出码与日志哈希。Node `v26.10.0`、npm `11.19.1`、Pi SDK `1.0.0`；独立工作区按已提交锁文件 `npm ci --ignore-scripts` 安装。原工作区未提交的 `playwright-core` 依赖与教学改动保留，不纳入冻结依赖。
+
+固定演示配置为 `deepseek/deepseek-flash`、`configured/off/2048`、每轮最多12次实际供应商HTTP和65536本地上下文预算单位；atomic只读工具与lexical检索沿现有默认，不启用候选Controller或自动压缩。需要模型时保留本机原有有效密钥，按以下方式启动，并在页面新建对话使用上述设置：
+
+```sh
+npm ci
+MODEL_PROVIDER=deepseek MODEL_ID=deepseek-flash MODEL_TASK_HTTP_LIMIT=12 MODEL_CONTEXT_BUDGET_UNITS=65536 CHAT_PORT=3002 EVAL_PORT=3001 node --env-file-if-exists=.env src/web-chat-server.ts
+```
+
+演示地址 `http://127.0.0.1:3002/`。本轮浏览器验收在隔离工作区使用真实MySQL只读账号、独立SQLite和空模型密钥覆盖，四次咨询均为宿主路径，实际供应商HTTP为0；页面因此显示模型不可用，这是该次无模型验收配置，不代表已验证远程模型认证或答复。复现无模型路径时在启动命令前增加 `MODEL_API_KEY= DEEPSEEK_API_KEY= DASHSCOPE_API_KEY=`；不修改 `.env`。
+
+| 四个固定演示场景 | 本轮观察与验收边界 |
+| --- | --- |
+| 客户A发送“查询本人最近订单” | 显示本人最近三单、金额、券状态和选择入口；不提交售后操作 |
+| 新对话发送“我想退款” | 先列本人订单并要求选择，未进入退款执行 |
+| 切客户B发送“查询到账 COUPON-1001 银行卡” | 安全拒绝，未暴露对方金额/状态、未承诺到账；这是宿主到账路径的归属检查 |
+| 重启服务后回访客户A第一条历史，再点“重新查询最近订单” | 已保存原文与回复仍在；旧订单卡无选择按钮，新查询重新授权后生成可选订单卡；不恢复旧权限 |
+
+桌面实际页面与390×844窄屏检查通过，窄屏document宽390，无横向溢出；这不是完整手机设备验收。请求预算、上下文预算及入口、回复取证专项全部退出0；最终完整 `npm run validate` 退出0。`coupon-agent-check.ts`、`merchant-agent-check.ts` 使用真实本机MySQL与Pi/faux均退出0；前后确认无pending任务、待发终态通知或运行中评测，检查后临时商家夹具为0，只读账号仍仅USAGE/SELECT。退款SQL未改动，保留原进程中止实库结果，不把 `--check` 当作重跑故障窗口。
+
+复现命令为 `node scripts/model-request-budget-check.ts`、`node scripts/model-task-entry-check.ts`、`node scripts/context-budget-check.ts`、`node scripts/context-entry-check.ts`、`npm run check:reply`、`npm run validate`；必要实库使用 `node --env-file-if-exists=.env scripts/coupon-agent-check.ts` 与 `node --env-file-if-exists=.env scripts/merchant-agent-check.ts`，后者须遵守[专用环境准备条件](./after-sales.md#启动)。本机原始记录留在忽略目录 `.runtime/web-demo-freeze-20261011/`，不提交原始日志、SQLite或密钥。
+
+当前取证要求：带范围FAQ先成功读取本轮本人订单，工具的嵌套执行事件参与取证；新订单会使旧规则及业务卡失效。Web流式正文经过当前订单/范围规则和只读能力门槛，最终Reply仍重新生成；门槛不等于逐句自然语言正确性。历史联合20/26、修复9/11、商家5/6及Web联合6/7保持未准入；本轮4/4宿主浏览器场景不能覆盖这些失败。作者独立讲解、当前真实模型/QQ和商业验收仍不代填。
 
 <a id="current-history"></a>
 

@@ -6,6 +6,7 @@ import { pathToFileURL } from "node:url";
 import { fauxAssistantMessage, fauxProvider, fauxToolCall, getCurrentTools } from "@earendil-works/pi-ai";
 import { createCouponSession, createModelRuntime } from "../src/agent.ts";
 import type { CouponStore, QQIdentity } from "../src/coupon-store.ts";
+import { renderReply } from "../src/reply.ts";
 import { WebChatSessions } from "../src/web-chat.ts";
 import { createWebChatServer } from "../src/web-chat-server.ts";
 import { createWebChatAgentFactory, createWebChatSettingsCatalog, validateWebChatSettings, type WebChatSettings } from "../src/web-chat-settings.ts";
@@ -176,7 +177,11 @@ export async function checkWebChat() {
     assert.equal(reads.at(-1)!.identity.senderId, "TEST_USER1"); assert.deepEqual(declarations, ["get_order", "list_orders", "search_faq"]);
     assert.match(hostHistory, /假设/); assert.doesNotMatch(userTexts.join(" "), /COUPON-1002/);
     const xss = "<img src=x onerror=alert(1)> & <script>alert(2)</script>";
-    faux.setResponses([() => { requests++; return fauxAssistantMessage(xss); }]);
+    faux.setResponses([
+      fauxAssistantMessage(fauxToolCall("get_order", { orderId: "COUPON-1001" }), { stopReason: "toolUse" }),
+      fauxAssistantMessage(fauxToolCall("search_faq", { query: "只读咨询规则" }), { stopReason: "toolUse" }),
+      () => { requests++; return fauxAssistantMessage(xss); },
+    ]);
     const untrusted = await send(a.cookie, "文字显示测试"); assert.equal(untrusted.data.reply.text, xss);
     assert.match(String(untrusted.headers["content-type"]), /application\/json/); assert.equal(untrusted.headers["x-content-type-options"], "nosniff");
     const beforeForbiddenTool = reads.length;
@@ -254,7 +259,8 @@ export async function checkWebChat() {
       () => { requests++; return fauxAssistantMessage("未找到当前客户可查询的订单，未执行退款。"); },
     ]);
     const denied = await send(switchToB.cookie, "查询他人订单 COUPON-1001"); assert.equal(denied.status, 200);
-    assert.equal(denied.data.reply.kind, "answer"); assert.doesNotMatch(JSON.stringify(denied.data.reply), /7980|79\.80|paidCents/);
+    assert.equal(denied.data.reply.kind, "notice");
+    assert.match(denied.data.reply.text, /本轮订单读取未能完成/); assert.doesNotMatch(JSON.stringify(denied.data.reply), /7980|79\.80|paidCents/);
     assert.equal(reads.at(-1)!.identity.senderId, "TEST_USER2"); assert.deepEqual(userTexts, ["查询他人订单 COUPON-1001"]);
     assert.doesNotMatch(hostHistory, /web-consultation-history|文字显示测试|3–7个工作日|查询到账 COUPON-1001 银行卡/);
 
@@ -324,11 +330,14 @@ export async function checkWebChat() {
     await factoryEntered;
     await assert.rejects(lateFactoryTurn, error => error instanceof Error && Reflect.get(error, "status") === 503);
     const newFactorySession = await factoryChat.create(undefined, "demo-b");
-    faux.setResponses([() => { requests++; return fauxAssistantMessage("新身份的独立回复"); }]);
-    assert.equal((await factoryChat.send(newFactorySession.token, randomUUID(), "新身份正常问题", newFactorySession.session.id)).reply.text, "新身份的独立回复");
+    faux.setResponses([fauxAssistantMessage(fauxToolCall("search_faq", { query: "只读咨询规则" }), { stopReason: "toolUse" }),
+      () => { requests++; return fauxAssistantMessage("新身份的独立回复"); }]);
+    const freshFactoryReply = (await factoryChat.send(newFactorySession.token, randomUUID(), "新身份正常问题", newFactorySession.session.id)).reply;
+    assert.match(freshFactoryReply.text, /仅展示本轮查到的规则原文/);
+    assert.doesNotMatch(freshFactoryReply.text, /旧身份|迟到|新身份的独立回复/);
     releaseFactory(); await new Promise<void>(resolve => setTimeout(resolve, 10));
     assert.equal(lateDisposals, 1); assert.equal((await factoryChat.get(lateFactorySession.token)).session, null);
-    assert.deepEqual((await factoryChat.get(newFactorySession.token)).messages.map(row => row.text), ["新身份正常问题", "新身份的独立回复"]);
+    assert.deepEqual((await factoryChat.get(newFactorySession.token)).messages.map(row => row.text), ["新身份正常问题", renderReply(freshFactoryReply).text]);
     factoryChat.close();
 
     // An already-running native Pi prompt is aborted/disposed; even an ignored provider signal cannot publish its late answer.
@@ -354,11 +363,14 @@ export async function checkWebChat() {
     await assert.rejects(latePromptTurn, error => error instanceof Error && Reflect.get(error, "status") === 503);
     assert.ok(abortedNative >= 1); assert.equal(disposedNative, 1); assert.equal(providerSignal?.aborted, true);
     const newPromptSession = await promptChat.create(undefined, "demo-b");
-    faux.setResponses([() => { requests++; return fauxAssistantMessage("当前身份的回复"); }]);
-    assert.equal((await promptChat.send(newPromptSession.token, randomUUID(), "当前身份的问题", newPromptSession.session.id)).reply.text, "当前身份的回复");
+    faux.setResponses([fauxAssistantMessage(fauxToolCall("search_faq", { query: "只读咨询规则" }), { stopReason: "toolUse" }),
+      () => { requests++; return fauxAssistantMessage("当前身份的回复"); }]);
+    const freshPromptReply = (await promptChat.send(newPromptSession.token, randomUUID(), "当前身份的问题", newPromptSession.session.id)).reply;
+    assert.match(freshPromptReply.text, /仅展示本轮查到的规则原文/);
+    assert.doesNotMatch(freshPromptReply.text, /旧身份|迟到|当前身份的回复/);
     releaseProvider(); await new Promise<void>(resolve => setTimeout(resolve, 10));
     assert.equal((await promptChat.get(latePromptSession.token)).session, null);
-    assert.deepEqual((await promptChat.get(newPromptSession.token)).messages.map(row => row.text), ["当前身份的问题", "当前身份的回复"]);
+    assert.deepEqual((await promptChat.get(newPromptSession.token)).messages.map(row => row.text), ["当前身份的问题", renderReply(freshPromptReply).text]);
     promptChat.close();
 
     for (let turn = 0; turn < 20; turn++) assert.equal((await send(reset.cookie, "查询到账 银行卡")).status, 200);

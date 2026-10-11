@@ -192,12 +192,19 @@ export async function checkOrderDiscovery() {
   try {
     const calls = faux.state.callCount;
     await qq.handle(message("我有哪些订单")); assert.equal(faux.state.callCount, calls); assert.match(sent.at(-1)!, /选择订单 COUPON-1001/);
-    faux.setResponses([() => fauxAssistantMessage("正在查询所选订单。")]);
-    await qq.handle(message("选择订单 COUPON-1001")); assert.equal(faux.state.callCount, calls + 1); assert.match(sent.at(-1)!, /所选订单/);
+    let continuedPrompt = "";
+    faux.setResponses([context => {
+      const user = context.messages.findLast(message => message.role === "user");
+      continuedPrompt = !user ? "" : typeof user.content === "string" ? user.content : user.content.map(part => part.type === "text" ? part.text : "").join("");
+      return fauxAssistantMessage(fauxToolCall("get_order", { orderId: "COUPON-1001" }), { stopReason: "toolUse" });
+    }, () => fauxAssistantMessage("已查询所选订单。")]);
+    await qq.handle(message("选择订单 COUPON-1001")); assert.equal(faux.state.callCount, calls + 2);
+    assert.equal(continuedPrompt, "查询订单 COUPON-1001 的详细信息");
+    assert.match(sent.at(-1)!, /订单：COUPON-1001/); assert.match(sent.at(-1)!, /实付：79\.80 元/);
     await qq.handle(message("我的订单"));
     await qq.handle(message("查询到账 银行卡"));
     await qq.handle(message("选择订单 COUPON-1001"));
-    assert.equal(faux.state.callCount, calls + 1, "QQ string host receipts retire old choices without a provider request");
+    assert.equal(faux.state.callCount, calls + 2, "QQ string host receipts retire old choices without a provider request");
     assert.match(sent.at(-1)!, /选择已失效/);
   } finally { await qq.close(); }
   const chat = new WebChatSessions(store, who => createCouponSession(who, store, runtime, faux.getModel()), 2000,

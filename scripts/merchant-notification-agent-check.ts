@@ -21,6 +21,7 @@ const task: MerchantTask = {
   reason: "行程变化", amountCents: 7980, approvedAmountCents: 7980, simulation: true,
   createdAt: "2026-01-01T00:00:00.000Z", dueAt: "2026-01-01T00:00:01.000Z", completedAt: "2026-01-01T00:00:01.000Z",
 };
+const notificationTools = ["get_merchant_request", "get_order", "search_faq"];
 const allTools = ["get_merchant_request", "get_order", "get_refund", "list_orders", "prepare_merchant_request", "prepare_refund", "search_faq"];
 const [prompt, skill] = await Promise.all([
   readFile(new URL("../prompts/customer-service.md", import.meta.url), "utf8"),
@@ -53,7 +54,17 @@ function inputs(context: TranscriptContext, tools: string[]) {
 function agent(merchantEvents: "model" | "host" = "model", afterCreate?: () => void) {
   return new QQAgent(async msg => {
     assert.equal(msg.senderId, identity.senderId); assert.equal(msg.groupOpenid, group);
-    const session = await createCouponSession(identity, {} as CouponStore, runtime, faux.getModel(), {
+    const queryStore = {
+      async getOrder(actual: QQIdentity, orderId: string) {
+        assert.deepEqual(actual, identity);
+        return { source: "demo-database", id: orderId, status: "paid", asOf: "2026-10-10T00:00:00.000Z",
+          amounts: { paidCents: 7980, refundedCents: 0 }, coupons: [{ status: "unused", expiresAt: null }],
+          shop: { id: "notify-check-shop" }, items: [{ productId: "notify-check-product" }] };
+      },
+      async searchKnowledge() { return [{ source: "demo-knowledge", sourceId: "KB-NOTIFY-CHECK", title: "协商规则",
+        body: "批准不是退款，仍须展示方案并由本人确认。", scope: { shopId: "notify-check-shop", productId: "notify-check-product" } }]; },
+    } as unknown as CouponStore;
+    const session = await createCouponSession(identity, queryStore, runtime, faux.getModel(), {
       sourceKey,
       store: {
         async getTask(actual: QQIdentity, key: string, orderId: string) {
@@ -115,16 +126,16 @@ try {
   faux.setResponses([
     async context => { inputs(context, allTools); started.resolve(); await release.promise; return fauxAssistantMessage("第一条完成"); },
     context => {
-      inputs(context, ["get_merchant_request"]);
+      inputs(context, notificationTools);
       return fauxAssistantMessage(fauxToolCall("prepare_refund", { orderId: task.orderId }), { stopReason: "toolUse" });
     },
     context => {
-      inputs(context, ["get_merchant_request"]);
+      inputs(context, notificationTools);
       const denied = context.messages.findLast(item => item.role === "toolResult");
       assert.ok(denied?.role === "toolResult" && denied.toolName === "prepare_refund" && denied.isError);
       return fauxAssistantMessage(fauxToolCall("get_merchant_request", { orderId: "COUPON-2002" }), { stopReason: "toolUse" });
     },
-    context => { inputs(context, ["get_merchant_request"]); return fauxAssistantMessage("COUPON-2002 模拟退款成功 99999 元，真实资金已经到账。"); },
+    context => { inputs(context, notificationTools); return fauxAssistantMessage("COUPON-2002 模拟退款成功 99999 元，真实资金已经到账。"); },
     context => {
       inputs(context, allTools);
       assert.ok(JSON.stringify(context.messages).includes("模拟商家已同意 79.80 元"), "next user turn sees the durable host result");
@@ -173,7 +184,7 @@ for (const path of ["model", "fallback", "host", "read-error", "wrong-task", "pe
   qq = agent(path === "host" ? "host" : "model", path === "host" ? () => { test.state.current = undefined; } : undefined);
   try {
     if (path !== "host") faux.setResponses([async context => {
-      inputs(context, ["get_merchant_request"]); inFlight.resolve(); await continueEvent.promise;
+      inputs(context, notificationTools); inFlight.resolve(); await continueEvent.promise;
       return fauxAssistantMessage(path === "fallback" ? "" : "商家结果已完成");
     }]);
     const tick = dispatchMerchantNotifications(test.store, qq, identity.appId, [group]);
@@ -223,7 +234,7 @@ try {
   const test = persistence(), before = attempts.length;
   let aborted = false;
   faux.setResponses([async (context, options) => {
-    inputs(context, ["get_merchant_request"]);
+    inputs(context, notificationTools);
     const signal = options?.signal;
     assert.ok(signal, "the real Pi request must have an abort signal");
     signal.addEventListener("abort", () => { aborted = true; closingRelease.resolve(); }, { once: true });
@@ -249,7 +260,7 @@ try {
 qq = agent();
 try {
   const test = persistence(), before = attempts.length;
-  faux.setResponses([context => { inputs(context, ["get_merchant_request"]); return fauxAssistantMessage("商家已经同意"); }]);
+  faux.setResponses([context => { inputs(context, notificationTools); return fauxAssistantMessage("商家已经同意"); }]);
   await Promise.all([1, 2].map(() => dispatchMerchantNotifications(test.store, qq, identity.appId, [group])));
   assert.equal(test.state.status, "sent"); assert.equal(test.state.finishes, 1);
   assert.equal(attempts.length, before + 1); assertCard(before, test.item.messageId);

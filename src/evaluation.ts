@@ -54,6 +54,8 @@ export type EvalStep = {
   output?: unknown;
   isError: boolean;
   expectedDenial?: boolean;
+  toolCallId?: string;
+  parentToolCallId?: string;
   usage?: EvalUsage | null;
 };
 export type EvalTurn = {

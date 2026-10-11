@@ -64,14 +64,29 @@ const refunds = {
     return { ...operation };
   },
 } as unknown as RefundStore;
+const queryStore = {
+  async getOrder(actual: QQIdentity, orderId: string) {
+    trusted(actual, sourceKey); assert.equal(orderId, initial.orderId);
+    return { source: "demo-database", id: orderId, status: "paid", asOf: "2026-10-10T00:00:00.000Z",
+      amounts: { paidCents: 7980, refundedCents: 0 }, coupons: [{ status: "unused", expiresAt: null }],
+      shop: { id: "refund-check-shop" }, items: [{ productId: "refund-check-product" }] };
+  },
+  async searchKnowledge() { return [{ source: "demo-knowledge", sourceId: "KB-REFUND-CHECK", title: "退款规则",
+    body: "符合条件后仍须展示方案并由本人确认。", scope: { shopId: "refund-check-shop", productId: "refund-check-product" } }]; },
+} as unknown as CouponStore;
 const runtime = await createModelRuntime();
 const faux = fauxProvider();
 runtime.registerNativeProvider(faux.provider);
 const tools = ["get_merchant_request", "get_order", "get_refund", "list_orders", "prepare_merchant_request", "prepare_refund", "search_faq"];
 async function create(msg: QQBotInboundMessage) {
   assert.equal(msg.senderId, identity.senderId); assert.equal(msg.groupOpenid, group);
-  const session = await createCouponSession(identity, {} as CouponStore, runtime, faux.getModel(), {
-    store: {} as AfterSalesStore, sourceKey, refunds,
+  const session = await createCouponSession(identity, queryStore, runtime, faux.getModel(), {
+    store: { async getTask(actual: QQIdentity, key: string, orderId: string) {
+      trusted(actual, key); assert.equal(orderId, initial.orderId);
+      return { taskId: initial.taskId, orderId, status: "approved", simulation: true, reason: "行程变化",
+        amountCents: 7980, approvedAmountCents: 7980, createdAt: "2026-10-10T00:00:00.000Z",
+        dueAt: "2026-10-10T00:01:00.000Z", completedAt: "2026-10-10T00:00:01.000Z" };
+    } } as unknown as AfterSalesStore, sourceKey, refunds,
   });
   assert.deepEqual(session.getActiveToolNames().sort(), tools);
   return session;
