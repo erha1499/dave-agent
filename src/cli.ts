@@ -21,6 +21,7 @@ import { createSupportQuestionClient } from "./support-question-client.ts";
 import { createArrivalConsultation } from "./arrival-consultation.ts";
 import { prepareOrderDiscoveryPrompt, presentOrderDiscoveryReply } from "./order-discovery.ts";
 import { withModelTask, readModelTaskLimits, ContextBudgetError } from "./model-request-budget.ts";
+import { summarizeModelFailure } from "./model-failure-detail.ts";
 
 export function readCliQuestionOptions(architecture: "atomic" | "controller", env: NodeJS.ProcessEnv = process.env):
   { questionContract: "v2" } | { questionContract: "v3"; modelSelection: ModelSelection; timeoutMs: number } {
@@ -85,9 +86,11 @@ export async function runCliPrompt(
       await session.prompt(discovery.prompt, { expandPromptTemplates: false });
       if (task.snapshot().failureReason === "context_limit") throw new ContextBudgetError();
       if (!getSupportHostReceipt(session) && session.agent.state.errorMessage) throw new Error("模型请求失败。");
-    } catch {
+    } catch (error) {
       modelFailed = true;
-      task.fail("model_failed");
+      // Pi stores the provider/stream error on the Agent; the thrown value is only a fallback.
+      const providerError = session.agent.state.errorMessage;
+      task.fail("model_failed", providerError ? summarizeModelFailure("assistant_error", providerError) : summarizeModelFailure("prompt_error", error));
       cancelSupportTurn(session);
       await session.abort();
       if (task.snapshot().failureReason === "context_limit") throw new ContextBudgetError();

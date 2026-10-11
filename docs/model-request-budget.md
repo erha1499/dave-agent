@@ -61,7 +61,17 @@ Pi 的 `before_provider_request` 扩展不能作为硬拒发边界：当前 SDK 
 
 完成摘要包含 requestId 的 SHA-256、入口、触发类型、阶段、首次失败阶段/固定原因、时长、实际预算、logical/local/HTTP 数量，以及脱敏 attempt。attempt 保存配置的 provider/model、`agent/question/support/rerank/embedding` 调用来源、序号、HTTP 状态、完成状态和有依据的用量。
 
-不保存请求正文、用户文本、工具参数和结果、完整 URL、header、API key 或自由文本错误。`onComplete` 抛异常不会触发业务重试。这里只输出结构化摘要，没有新增监控平台或数据库表。
+不保存请求正文、用户文本、工具参数和结果、完整 URL、header、API key 或未截断的错误原文。`onComplete` 抛异常不会触发业务重试。
+
+失败轮另有两处有界错误摘要（2026-10-11 起，[`src/model-failure-detail.ts`](../src/model-failure-detail.ts)），形状均为 `{ source, errorName, message }`：
+
+| 位置 | 来源 `source` | 何时写入 |
+| --- | --- | --- |
+| `attempts[].failure` | `stream_read_error` | HTTP 已返回、读取响应流时出错（例如连接被重置）。外层消费者只看到预算错误，原始原因只在这里保留 |
+| `attempts[].failure` | `transport_error` | 发送阶段的网络错误（非本任务主动中止） |
+| `failureDetail` | `assistant_error` / `prompt_error` | CLI/Web 驱动的模型轮失败时，优先取 Pi 写在 Agent 上的 `errorMessage`，没有时取抛出的异常 |
+
+脱敏规则：只取第一行；`{` 之后的 JSON 正文只保留 `error.type/code/message` 三个短字段，解析不了就记 `[body omitted]`；`sk-…`、`Bearer …`、`api_key=…` 一类及 32 位以上的连续令牌替换为 `[redacted]`；最长 160 字符；类名不合规则时记 null。调用方自建的摘要写入账本前会再过一遍同样的规则。消费者主动取消（例如 SSE 里带 `error`，SDK 抛错后取消读取）不是读取错误，`attempts[].failure` 保持 null，原因由 `failureDetail` 记录。QQ 入口的模型失败尚未接入 `failureDetail`。这里只输出结构化摘要，没有新增监控平台或数据库表。
 
 用量从实际响应单消费路径读取，不使用无界 `response.clone()` 后台读取。SSE 缓冲最多 64 KiB，JSON 缓冲最多 1 MiB；超过观察上限仍把原响应交给原消费者，但该 attempt 的用量保持未知。OpenAI SSE 需要正常协议结束、finish 标记、匹配模型和合法 wire usage；SDK 收到 `[DONE]` 后正常取消 reader 也属于协议完成。显式 abort、半流、缺少 usage、非法计数或模型不匹配均不补零。
 
@@ -85,7 +95,7 @@ Pi 的 `before_provider_request` 扩展不能作为硬拒发边界：当前 SDK 
 4. question/support/rerank 真实调用点归因、人民币与美元分列、日志不包含合成敏感正文。
 5. 批次 guard 明确拒发与真实网络错误的不同计数。
 
-入口故障与嵌套作用域另由 `node scripts/model-task-entry-check.ts` 检查；本轮 M2 专项和冻结前完整 `validate` 已通过。工程检查不能证明实际模型语义效果、远端收到取消后立即停止或供应商不再计费。
+入口故障与嵌套作用域另由 `node scripts/model-task-entry-check.ts` 检查；失败摘要由 `node scripts/model-failure-detail-check.ts` 检查（本机 HTTP 服务回 200 后重置连接或发送 SSE `error`，经真实 `runCliPrompt` 与已安装 Pi，断言摘要内容、长度与脱敏，并确认不含合成用户文本和密钥；该检查在加摘要前的实现上失败）；本轮 M2 专项和冻结前完整 `validate` 已通过。工程检查不能证明实际模型语义效果、远端收到取消后立即停止或供应商不再计费。
 
 2026-10-10 的 [M1 冻结批次](stable-joint-acceptance.md) 已实际接入本模块：正式单轮账本与实验 transport 记录均为 40 次 HTTP，已执行请求的用量和费用估算均可核对，没有未知项。该批**联合通过 20/26、未准入**；记账完整不等于答复和业务任务全部通过，也不代表所有正式入口均做过远程模型验收。其他运行缺失的用量仍保留未知。
 

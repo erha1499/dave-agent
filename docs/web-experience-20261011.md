@@ -63,6 +63,15 @@
 
 收尾：按冻结计划只跑这一次，不重跑 A1、不补跑 A2。后续若要补门店规定选单的证据或修第 1 条，需回到 P0 选题检查另立有界合同；A1 根因排查（先让失败轮记录供应商错误摘要）可作为独立小项。
 
+### A1 失败的可观测性补丁（2026-10-11，已完成工程验证，未重跑）
+
+A1 的原因**仍然未知**：原始运行没有记下错误内容，事后无法补回；冻结计划禁止重跑，本次也没有调用真实模型。本次只做到“下次出现同样失败时，日志里有原因”。
+
+- **信息在哪里丢的**：用本机 HTTP 服务模拟“回 200、发一段 SSE 后断开连接”，经已安装 Pi 能复现 A1 的全部可见特征（HTTP 200、`interrupted`、只有 1 次请求、`model_failed`、用量未知）。读流时 Node 抛出 `TypeError: terminated`（原因 `SocketError: other side closed`），预算包装层把它换成了自己的“本轮模型请求已停止”错误交给 Pi，Pi 的 `errorMessage` 只剩这句，真实原因在此丢失；`src/cli.ts` 随后只记 `model_failed`。另一种可能是供应商在 200 流里发 SSE `error`，同样表现为 200 + `interrupted` + 1 次请求，此时原因在 Pi 的 `errorMessage` 里，但同样没进日志。两种情况都只是与现象相符的假设，不能认定哪一种是 A1。
+- **改了什么**：`model-task` 记录新增 `attempts[].failure`（读流或发送错误的原始类名与消息）和 `failureDetail`（模型轮失败时 Pi 的 `errorMessage` 或抛出的异常），都经过截断与脱敏，规则见 [模型请求预算](model-request-budget.md#记录什么保留哪些未知)。Web 经 `runCliPrompt` 调模型，因此 Web 和 CLI 都覆盖；QQ 未接入。
+- **验证**：`node scripts/model-failure-detail-check.ts` 覆盖上述两种情况，断言 `attempts[0].failure` 为 `stream_read_error / TypeError / terminated; cause SocketError: other side closed`，SSE `error` 情况下 `failureDetail.message` 中的合成密钥已替换为 `[redacted]`，记录里不含合成用户原文。把 `src/cli.ts` 和 `src/model-request-budget.ts` 换回改动前版本时该检查失败，改动后通过；已接入 `npm run check`。`model-request-budget-check`、`model-task-entry-check` 与 `TZ=Asia/Shanghai npm run validate` 退出码均为 0；不设时区时 `experiment-ui-check` 因已知的时区依赖失败（见第 4 件），与本次文件无关。
+- **另一个发现（未处理）**：Pi 本会对 `terminated` 这类错误自动重试，但包装层替换后的错误不在 Pi 的可重试名单里，因此连接中断时不会重试。是否改为把原始错误交给 Pi，会影响重试次数和 HTTP 计数，需要另立合同，本次没有改。
+
 ## 第 4 件：只读渠道不主动提出做不到的操作
 
 起因：第 3 件 B1 的答复结尾写“如需我帮您发起模拟商家协商，请告诉我具体原因，我再为您准备”。Web 只开放 list_orders、get_order、search_faq 三个只读工具，没有协商或退款工具。Prompt 已写明“未实际提供的能力不能向用户承诺或主动邀约办理”，模型仍然违反，说明只靠 Prompt 约束不住。

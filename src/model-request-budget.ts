@@ -1,6 +1,7 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import { createHash } from "node:crypto";
 import type { ModelPricing } from "./model-selection.ts";
+import { normalizeModelFailureDetail, summarizeModelFailure, type ModelFailureDetail } from "./model-failure-detail.ts";
 
 export type ModelTaskPhase = "authorization" | "session" | "host" | "model" | "render" | "send" | "receipt";
 export type ModelTaskFailure = "authorization_failed" | "session_failed" | "host_failed" | "model_failed" | "render_failed"
@@ -22,13 +23,13 @@ export type ModelRequestAttempt = {
   observedAt: string; durationMs: number | null; httpStatus: number | null;
   outcome: "pending" | "completed" | "http_error" | "network_error" | "interrupted";
   usage: Usage | null; currency: "USD" | "CNY" | null; pricingSource: string | null;
-  estimatedCostUsd: number | null; estimatedCostCny: number | null;
+  estimatedCostUsd: number | null; estimatedCostCny: number | null; failure: ModelFailureDetail | null;
 };
 export type ModelTaskSummary = {
   version: "model-task-v1"; requestIdHash: string; entrypoint: "cli" | "qq" | "web" | "check";
   trigger: "user" | "event" | "confirmation"; limits: Required<ModelTaskLimits>; startedAt: string; durationMs: number;
   status: ModelTaskStatus; phase: ModelTaskPhase; failurePhase: ModelTaskPhase | null; failureReason: ModelTaskFailure | null;
-  logicalCalls: number; localCalls: number; httpRequests: number; blockedRequests: number;
+  failureDetail: ModelFailureDetail | null; logicalCalls: number; localCalls: number; httpRequests: number; blockedRequests: number;
   knownTokens: number; unknownUsageAttempts: number; totalTokens: number | null;
   knownCostUsd: number; knownCostCny: number; unknownCostAttempts: number; attempts: ModelRequestAttempt[]; contextChecks: ModelContextCheck[];
 };
@@ -36,7 +37,7 @@ export type ModelTask = {
   readonly signal: AbortSignal;
   snapshot(): ModelTaskSummary;
   setPhase(phase: ModelTaskPhase): void;
-  fail(reason: ModelTaskFailure): void;
+  fail(reason: ModelTaskFailure, detail?: ModelFailureDetail): void;
   cancel(): void;
 };
 type State = { task: ModelTask; controller: AbortController; summary: ModelTaskSummary; started: number; closed: boolean };
@@ -59,9 +60,10 @@ function validateLimits(value: ModelTaskLimits): Required<ModelTaskLimits> {
   if (!Number.isSafeInteger(contextBudgetUnits) || contextBudgetUnits < 4096 || contextBudgetUnits > 262144) throw new Error("本地上下文预算必须为 4096..262144 的整数。");
   return { httpRequests: value.httpRequests, contextBudgetUnits };
 }
-function fail(state: State, reason: ModelTaskFailure) {
+function fail(state: State, reason: ModelTaskFailure, detail?: ModelFailureDetail) {
   if (!failures.includes(reason)) throw new Error("模型任务失败类型无效。");
   if (state.closed) return;
+  if (detail && !state.summary.failureDetail) state.summary.failureDetail = normalizeModelFailureDetail(detail);
   if (!state.summary.failureReason) {
     state.summary.failureReason = reason;
     state.summary.failurePhase = state.summary.phase;
@@ -108,13 +110,13 @@ export async function withModelTask<T>(options: {
     version: "model-task-v1", requestIdHash: createHash("sha256").update(options.requestId).digest("hex"),
     entrypoint: options.entrypoint, trigger: options.trigger ?? "user", limits: validateLimits(options.limits ?? readModelTaskLimits()),
     startedAt: new Date().toISOString(), durationMs: 0, status: "completed", phase: "authorization", failurePhase: null, failureReason: null,
-    logicalCalls: 0, localCalls: 0, httpRequests: 0, blockedRequests: 0, knownTokens: 0, unknownUsageAttempts: 0, totalTokens: 0,
+    failureDetail: null, logicalCalls: 0, localCalls: 0, httpRequests: 0, blockedRequests: 0, knownTokens: 0, unknownUsageAttempts: 0, totalTokens: 0,
     knownCostUsd: 0, knownCostCny: 0, unknownCostAttempts: 0, attempts: [], contextChecks: [],
   } } as Omit<State, "task"> as State;
   state.task = {
     signal: controller.signal, snapshot: () => snapshot(state),
     setPhase(phase) { if (!phases.includes(phase)) throw new Error("模型任务阶段无效。"); if (!state.closed) state.summary.phase = phase; },
-    fail: reason => fail(state, reason), cancel: () => stop(state, "canceled", "canceled"),
+    fail: (reason, detail) => fail(state, reason, detail), cancel: () => stop(state, "canceled", "canceled"),
   };
   const aborted = () => state.task.cancel();
   options.signal?.addEventListener("abort", aborted, { once: true });
@@ -254,11 +256,11 @@ export function createModelRequestFetch(info: ModelRequestInfo, transport: typeo
     const started = performance.now();
     const row: ModelRequestAttempt = { logicalCall, attempt: ++attempts, phase: info.phase, provider: info.provider, model: info.model,
       observedAt: new Date().toISOString(), durationMs: null, httpStatus: null, outcome: "pending", usage: null,
-      currency: info.pricing?.currency ?? null, pricingSource: info.pricing?.source ?? null, estimatedCostUsd: null, estimatedCostCny: null };
+      currency: info.pricing?.currency ?? null, pricingSource: info.pricing?.source ?? null, estimatedCostUsd: null, estimatedCostCny: null, failure: null };
     state.summary.httpRequests++; state.summary.attempts.push(row);
-    const finish = (outcome: ModelRequestAttempt["outcome"], usage: Usage | null = null) => {
+    const finish = (outcome: ModelRequestAttempt["outcome"], usage: Usage | null = null, failure: ModelFailureDetail | null = null) => {
       if (state.closed || row.outcome !== "pending") return;
-      row.durationMs = Math.max(0, Math.round(performance.now() - started)); row.outcome = outcome;
+      row.durationMs = Math.max(0, Math.round(performance.now() - started)); row.outcome = outcome; row.failure = failure;
       if (outcome === "completed") { row.usage = usage; estimate(row, info.pricing); }
     };
     try {
@@ -306,7 +308,9 @@ export function createModelRequestFetch(info: ModelRequestInfo, transport: typeo
               finish(response.ok ? "completed" : "http_error", response.ok && !invalid ? observed : null); controller.close(); reader.releaseLock(); return;
             }
             parse(decoder.decode(chunk.value, { stream: true })); controller.enqueue(chunk.value);
-          } catch { ended = true; cleanup(); finish("interrupted"); void reader.cancel().catch(() => {}); controller.error(new ModelRequestBudgetError()); }
+          } catch (error) {
+            // Keep the actual read failure (e.g. a reset socket); consumers only see the budget error.
+            ended = true; cleanup(); finish("interrupted", null, summarizeModelFailure("stream_read_error", error)); void reader.cancel().catch(() => {}); controller.error(new ModelRequestBudgetError()); }
         },
         async cancel() {
           ended = true; cleanup();
@@ -323,7 +327,7 @@ export function createModelRequestFetch(info: ModelRequestInfo, transport: typeo
         state.summary.attempts.splice(state.summary.attempts.indexOf(row), 1);
         state.summary.httpRequests--; state.summary.blockedRequests++;
         fail(state, "external_limit"); state.controller.abort();
-      } else finish(signal.aborted ? "interrupted" : "network_error");
+      } else finish(signal.aborted ? "interrupted" : "network_error", null, signal.aborted ? null : summarizeModelFailure("transport_error", error));
       throw error;
     }
   };
