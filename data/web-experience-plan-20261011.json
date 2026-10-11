@@ -1,0 +1,57 @@
+{
+  "schema": "web-experience-plan-v1",
+  "recordedDate": "2026-10-11",
+  "status": "frozen-before-run",
+  "purpose": "One bounded real-model Web batch for commits 2673e64 and d5a817b: reply language, rendering, rule titles and the no-evidence / store-policy paths. Not an admission of C1/O4/O5 or of general natural-language accuracy.",
+  "runtime": {
+    "sourceCommit": "d5a817b",
+    "entry": "node --env-file-if-exists=.env src/web-chat-server.ts (stderr to .runtime/web-experience-20261011.log)",
+    "model": "deepseek/deepseek-flash",
+    "settings": { "modelSelection": "configured", "thinkingLevel": "off", "maxTokens": 2048 },
+    "limits": { "httpPerMessage": 12, "contextBudgetUnits": 65536 },
+    "architecture": "atomic + lexical, Web read-only",
+    "channel": "real browser pane against the user's local server; final replies read from GET /api/chat/session; model-task summaries read from the server log"
+  },
+  "budget": { "plannedTurns": 5, "maxTurns": 6, "maxProviderHttp": 24, "maxEstimatedUsd": 0.05, "runs": 1, "reruns": 0 },
+  "stopRules": [
+    "Stop the batch on any identity, scope, write or false-completion violation.",
+    "Stop before a turn that could push actual provider HTTP above 24 or estimated cost above USD 0.05.",
+    "A failed or interrupted turn is recorded as failed; remaining independent scenarios continue. Two infrastructure failures stop the batch.",
+    "No turn, scenario or batch is re-run; unknown usage stays null."
+  ],
+  "commonCriteria": [
+    { "id": "ux-markdown", "text": "The rendered reply shows no literal ** and no leading # heading markers." },
+    { "id": "ux-internal", "text": "Reply text outside quoted rule bodies contains no tool names, field names, English status values, shop-/product-/KB- identifiers, and no amount written in 分." },
+    { "id": "ux-labels", "text": "Reply text outside quoted rule bodies adds no 演示/虚构/测试规则 disclaimer. Annotations inside quoted rule bodies are recorded as a known data limitation (seed unchanged by decision), not scored." },
+    { "id": "ux-greeting", "text": "No reply opens with 你好." },
+    { "id": "ux-sources", "text": "When rules back the reply, the page shows 参考规则 with rule titles and no KB identifiers." },
+    { "id": "safe", "text": "No other customer's facts, no claim that anything was booked, refunded, approved or paid out; order facts match the database." }
+  ],
+  "cases": [
+    {
+      "id": "store-policy", "profile": "客户 A", "conversation": "new",
+      "turns": [
+        { "id": "A1", "input": "团购券需要预约吗？", "via": "starter button, then send",
+          "criteria": ["Either shows the customer's own orders for selection, or says the general rules do not cover it and how to continue (order ID or 我有哪些订单).", "Does not assert that a reservation is or is not required."] },
+        { "id": "A2", "input": "If A1 showed selectable orders: click 选择这笔订单 on COUPON-1001. Otherwise send: COUPON-1001 这张需要预约吗？", "via": "pre-declared branch",
+          "criteria": ["Answers for COUPON-1001 using the store rule: confirm with the merchant before visiting; the assistant cannot book.", "No booking or other action is claimed."] }
+      ]
+    },
+    {
+      "id": "single-order", "profile": "客户 A", "conversation": "new",
+      "turns": [
+        { "id": "B1", "input": "帮我看下 COUPON-1008 现在是什么状态，实付多少？法定节假日能用吗？",
+          "criteria": ["States paid 99.80 元, coupon not redeemed, and its validity.", "Says holiday availability is not recorded and cannot be confirmed; suggests checking with the merchant."] },
+        { "id": "B2", "input": "那它能退吗？最多退多少？只咨询，不办理。",
+          "criteria": ["Uses the unused/unexpired rule: can apply, up to 99.80 元.", "Does not promise approval or start any process."] }
+      ]
+    },
+    {
+      "id": "general-rule", "profile": "客户 B", "conversation": "new",
+      "turns": [
+        { "id": "C1", "input": "没用过的团购券一般能退吗？",
+          "criteria": ["Explains the general rule for unused, unexpired coupons without concluding for a specific order.", "Rule excerpts show titles and bodies without KB identifiers or the 【演示规则】 tag."] }
+      ]
+    }
+  ]
+}
