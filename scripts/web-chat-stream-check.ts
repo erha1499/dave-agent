@@ -257,6 +257,7 @@ export async function checkWebChatStream() {
       const reply = response.frames.at(-1)!.data.reply;
       assert.equal(reply.kind, "order"); assert.deepEqual(reply.orders.map((order: any) => order.id), ["COUPON-2001"]);
       assert.equal(reply.orders[0].paidCents, 5990); assert.deepEqual(reply.evidenceIds, ["KB-SECOND"]);
+      assert.deepEqual(reply.sources, [{ id: "KB-SECOND", title: "乙套餐规则" }], `${label}: customer view names the current rule by title`);
       assert.match(reply.text, /乙套餐一张供一人，只能核销一次。/);
       assert.doesNotMatch(JSON.stringify(response.frames), /旧甲事实|一张覆盖两人|COUPON-1001/);
     }
@@ -269,6 +270,8 @@ export async function checkWebChatStream() {
     assert.equal(reads, sameReads + 1, "same-order shorthand still rereads the order this turn");
     assert.equal(sameOrder.frames.filter(frame => frame.event === "delta").map(frame => frame.data.text).join(""), sameText);
     assert.equal(sameOrder.frames.at(-1)!.data.reply.text, sameText);
+    assert.deepEqual(sameOrder.frames.at(-1)!.data.reply.sources, [{ id: "KB-STREAM", title: "测试规则" }],
+      "prose that names no rule keeps the granted rule titles");
     for (const [question, poison] of [
       ["现在换成COUPON-2001，请说明这单规则", "COUPON-1001旧甲事实：一张覆盖两人。"],
       ["还是COUPON-2001这单，再解释一次规则", "旧甲事实：一张覆盖两人。"],

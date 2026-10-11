@@ -313,6 +313,7 @@ async function checkRestoredOrderScope(directory: string) {
     assert.equal(result.reply.kind, "order"); if (result.reply.kind !== "order") throw new Error("Expected current order card");
     assert.deepEqual(result.reply.orders.map(order => order.id), ["COUPON-2001"]);
     assert.deepEqual(result.reply.evidenceIds, ["KB-RESTORED-B"]); assert.match(result.reply.text, /乙套餐一张供一人。/);
+    assert.deepEqual(result.reply.sources, [{ id: "KB-RESTORED-B", title: "恢复规则" }]);
     assert.doesNotMatch(result.reply.text, /旧甲事实|COUPON-1001/);
     console.log(`多订单持久历史恢复范围检查通过：${faux.state.callCount} 次本地Pi/faux，0远程/业务DB/QQ。`);
   } finally { chat.close(); }

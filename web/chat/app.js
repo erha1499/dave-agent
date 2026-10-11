@@ -112,6 +112,7 @@ function validateReply(r){
   if(typeof r.text!=='string')return false;
   if(r.evidenceIds!==undefined&&(!Array.isArray(r.evidenceIds)||!r.evidenceIds.every(x=>typeof x==='string')))return false;
   if(r.hasMore!==undefined&&typeof r.hasMore!=='boolean')return false;
+  if(r.sources!==undefined&&(!Array.isArray(r.sources)||r.sources.length>5||!r.sources.every(s=>s&&typeof s.id==='string'&&typeof s.title==='string'&&s.title.length>0&&s.title.length<=120)))return false;
   if(r.kind==='order'){
     if(!Array.isArray(r.orders))return false;
     if(!r.orders.every(o=>o&&typeof o.id==='string'&&typeof o.status==='string'&&Array.isArray(o.couponStatuses)&&o.couponStatuses.every(x=>typeof x==='string')&&['productName','shopName','selectionText'].every(k=>o[k]===undefined||typeof o[k]==='string')&&(o.createdAt===undefined||o.createdAt===null||typeof o.createdAt==='string')))return false;
@@ -262,6 +263,35 @@ function money(cents){
 }
 
 
+// Model prose may contain a small Markdown subset. Render it with DOM nodes only:
+// **bold**, "#" heading lines and "-"/"*" bullets; everything else stays literal text.
+const RICH_TEXT=/\*\*[^*\n]+\*\*|^[ \t]{0,3}(?:#{1,6}|[-*•])[ \t]+\S/m;
+function appendInline(parent,line){
+  let last=0;
+  for(const match of line.matchAll(/\*\*([^*\n]+?)\*\*/g)){
+    if(match.index>last)parent.append(document.createTextNode(line.slice(last,match.index)));
+    parent.append(element('strong',match[1]));last=match.index+match[0].length;
+  }
+  if(last<line.length)parent.append(document.createTextNode(line.slice(last)));
+}
+function renderRichText(container,text){
+  if(!RICH_TEXT.test(text)){container.textContent=text;return;}
+  container.replaceChildren();
+  text.split('\n').forEach((line,index)=>{
+    if(index)container.append(document.createTextNode('\n'));
+    const heading=/^[ \t]{0,3}#{1,6}[ \t]+(.*)$/.exec(line);
+    if(heading){const strong=element('strong');appendInline(strong,heading[1]);container.append(strong);return;}
+    const bullet=/^([ \t]*)[-*•][ \t]+(.*)$/.exec(line);
+    if(bullet){container.append(document.createTextNode(bullet[1]+'• '));appendInline(container,bullet[2]);return;}
+    appendInline(container,line);
+  });
+}
+// Streaming drafts stay append-only text; "**" markers are dropped, holding back a
+// trailing odd "*" that may become a marker when the next fragment arrives.
+function draftDisplayText(draft){
+  const run=/\*+$/.exec(draft)?.[0].length??0;
+  return draft.slice(0,draft.length-(run%2)).replace(/\*\*/g,'');
+}
 function renderSteps(steps,container,pending=false,details){
   if(!steps||!steps.length){details?.remove();return;}
   if(!details){
@@ -304,9 +334,14 @@ function renderMessage(m,row){
   if(m.role==='assistant')renderSteps(m.steps,body,Boolean(m.pending),body.querySelector('.processing-steps'));
   let text=body.querySelector('.message-text');
   if(!text){text=element('p',null,'message-text');body.append(text);}
-  text.textContent=reply?reply.text:m.text;text.hidden=Boolean(m.pending&&!m.text);
+  if(reply)renderRichText(text,reply.text);else text.textContent=m.text;
+  text.hidden=Boolean(m.pending&&!m.text);
   if(reply?.kind==='order')renderOrderCards(reply,body,hydratedMessageIds.has(m.id));
-  if(reply?.evidenceIds?.length){
+  if(reply?.sources?.length){
+    // Rule titles the answer relied on; internal knowledge IDs stay out of customer view.
+    const details=element('details',null,'evidence');details.append(element('summary','参考规则'));
+    const list=element('ul');for(const source of reply.sources)list.append(element('li',source.title));details.append(list);body.append(details);
+  }else if(reply?.evidenceIds?.length){
     const details=element('details',null,'evidence');details.append(element('summary','依据'));
     const list=element('ul');for(const id of reply.evidenceIds)list.append(element('li',id));details.append(list);body.append(details);
   }
@@ -347,8 +382,9 @@ function renderMessages(scrollToLatest=false){
     if(status.textContent!==label)status.textContent=label;
     status.className='turn-status'+(pending.error?' error':'');
     if(pending.displayedMessageId!==pending.messageId){text.replaceChildren();pending.displayedMessageId=pending.messageId;pending.displayedLength=0;}
-    if(pending.draft.length>pending.displayedLength){text.append(document.createTextNode(pending.draft.slice(pending.displayedLength)));pending.displayedLength=pending.draft.length;}
-    text.hidden=!pending.draft;
+    const shown=draftDisplayText(pending.draft);
+    if(shown.length>pending.displayedLength){text.append(document.createTextNode(shown.slice(pending.displayedLength)));pending.displayedLength=shown.length;}
+    text.hidden=!shown;
   }
   els.chatMessages.scrollTop=followLatest?els.chatMessages.scrollHeight:scrollTop;
 }

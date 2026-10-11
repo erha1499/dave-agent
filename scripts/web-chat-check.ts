@@ -7,11 +7,29 @@ import { fauxAssistantMessage, fauxProvider, fauxToolCall, getCurrentTools } fro
 import { createCouponSession, createModelRuntime } from "../src/agent.ts";
 import type { CouponStore, QQIdentity } from "../src/coupon-store.ts";
 import { renderReply } from "../src/reply.ts";
-import { WebChatSessions } from "../src/web-chat.ts";
+import { WebChatSessions, webReplySources } from "../src/web-chat.ts";
+import type { Evidence } from "../src/reply-from-tools.ts";
+
+function checkWebReplySources() {
+  const docs = [
+    { source: "demo-knowledge", sourceId: "KB-A", title: "甲规则", body: "甲", scope: { shopId: null, productId: null } },
+    { source: "demo-knowledge", sourceId: "KB-B", title: "乙规则", body: "乙", scope: { shopId: null, productId: null } },
+  ];
+  const faq = (value: unknown, isError = false) => ({ toolName: "search_faq", isError, content: [{ type: "text", text: JSON.stringify(value) }] }) as Evidence;
+  assert.deepEqual(webReplySources({ kind: "answer", text: "按《乙规则》说明。", evidenceIds: ["KB-A", "KB-B"] }, [faq(docs)]),
+    [{ id: "KB-B", title: "乙规则" }], "named rules narrow the customer-facing list");
+  assert.deepEqual(webReplySources({ kind: "answer", text: "未点名规则。", evidenceIds: ["KB-A", "KB-B"] }, [faq(docs)]),
+    [{ id: "KB-A", title: "甲规则" }, { id: "KB-B", title: "乙规则" }], "unnamed prose keeps every granted rule");
+  assert.equal(webReplySources({ kind: "answer", text: "KB-C", evidenceIds: ["KB-C"] }, [faq(docs)]), undefined, "IDs not returned this turn get no title");
+  assert.equal(webReplySources({ kind: "answer", text: "乙规则", evidenceIds: ["KB-B"] }, [faq(docs, true)]), undefined, "failed searches give no title");
+  assert.equal(webReplySources({ kind: "notice", text: "乙规则" }, [faq(docs)]), undefined);
+  assert.equal(webReplySources({ kind: "answer", text: "乙规则", evidenceIds: ["KB-B"] }, [faq("not-json-array")]), undefined);
+}
 import { createWebChatServer } from "../src/web-chat-server.ts";
 import { createWebChatAgentFactory, createWebChatSettingsCatalog, validateWebChatSettings, type WebChatSettings } from "../src/web-chat-settings.ts";
 
 export async function checkWebChat() {
+  checkWebReplySources();
   const runtime = await createModelRuntime(), faux = fauxProvider({ models: [{ id: "web-faux", reasoning: true }] }); runtime.registerNativeProvider(faux.provider);
   let factories = 0, requests = 0, block: Promise<void> | undefined, onRead: (() => void) | undefined;
   const reads: Array<{ identity: QQIdentity; orderId: string }> = [];

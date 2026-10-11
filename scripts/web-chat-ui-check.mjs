@@ -1632,6 +1632,32 @@ export async function checkWebChatUI() {
   assert.equal(posts().length,consentSends,'confirmed customer switching never submits the discarded question');
   select.value=originProfile;select.fire('change');await tick();historyButton(historyCID).fire('click');await tick();
   assert.equal(input.value,'','explicit customer-switch consent clears drafts in other conversations');assert.deepEqual(serverMessages,consentHistory,'discarding drafts preserves all accepted history messages');
+  // Final model prose renders a bounded Markdown subset with DOM nodes only.
+  const renderRich=runInContext('renderRichText',context),rich=document.createElement('p');
+  renderRich(rich,'**覆盖人数**：两人\n- 到店前确认\n## 结论\n<img src=x onerror=alert(1)> **未闭合');
+  assert.equal(rich.textContent,'覆盖人数：两人\n• 到店前确认\n结论\n<img src=x onerror=alert(1)> **未闭合');
+  assert.deepEqual(walk(rich).filter(node=>node.tagName==='STRONG').map(node=>node.textContent),['覆盖人数','结论']);
+  assert.ok(walk(rich).every(node=>['P','STRONG','#TEXT'].includes(node.tagName)),'rich prose creates only text and strong nodes');
+  const plainRich=document.createElement('p');renderRich(plainRich,'1. 普通文本\n不含标记');
+  assert.equal(plainRich.children.length,0);assert.equal(plainRich.textContent,'1. 普通文本\n不含标记');
+  // Live drafts hide "**" markers while staying append-only across arbitrary fragment boundaries.
+  const draftText=runInContext('draftDisplayText',context);
+  for(const full of ['**覆盖人数**：两人\n- **到店**前确认 ***x*','a*b**c***d****e*','*','**']){
+    const final=draftText(full);assert.ok(!final.includes('**'));
+    for(let i=0;i<=full.length;i++)assert.ok(final.startsWith(draftText(full.slice(0,i))),`draft prefix ${i} of ${JSON.stringify(full)} stays stable`);
+  }
+  assert.equal(draftText('**覆盖人数*'),'覆盖人数');assert.equal(draftText('**覆盖人数**：两人'),'覆盖人数：两人');
+  // Rule titles replace internal IDs when the server provides them; malformed lists are rejected.
+  const validate=runInContext('validateReply',context);
+  assert.equal(validate({kind:'answer',text:'x',evidenceIds:['KB-A'],sources:[{id:'KB-A',title:'甲规则'}]}),true);
+  assert.equal(validate({kind:'answer',text:'x',sources:[{id:'KB-A',title:''}]}),false);
+  assert.equal(validate({kind:'answer',text:'x',sources:'甲规则'}),false);
+  const titledRow=runInContext('renderMessage',context)({id:'titled:assistant',role:'assistant',text:'x',reply:{kind:'answer',text:'按**甲规则**说明',evidenceIds:['KB-A'],sources:[{id:'KB-A',title:'甲规则'}]}});
+  const titledEvidence=titledRow.querySelector('.evidence');
+  assert.equal(titledEvidence.querySelector('summary').textContent,'参考规则');
+  assert.deepEqual(titledEvidence.querySelectorAll('li').map(node=>node.textContent),['甲规则']);
+  assert.ok(!titledRow.textContent.includes('KB-A')&&!titledRow.textContent.includes('**'),'customer view hides knowledge IDs and Markdown markers');
+  titledRow.remove();
   console.log('PASS web chat UI: actual app + synthetic SSE; stable history/pending DOM, trusted Reply, raw drafts/UUID retry, IME/scroll/focus/selection/generation guards; native customer/history/settings dialogs, failed mobile history recovery, controlled capacity429, exact settings/customer contracts; durable history/open/accepted-start/20th EOF/read recovery; multitab same/cross-profile draft restoration, fresh UUID CAS, strict GET/list failure and busy zero-mutation, monotonic uncertain acceptance/no-create fallback, explicit open/reset/settings/profile intent versus third-page changes/unavailable requested settings; all-conversation draft consent on evaluation navigation and customer switching; 0 business model/DB/QQ.');
 }
 

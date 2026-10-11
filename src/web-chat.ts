@@ -21,12 +21,36 @@ const identities: Record<string, QQIdentity> = {
 };
 const uuidPattern = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/iu;
 type ReadReply = Extract<Reply, { kind: "answer" | "notice" | "order" }>;
+export type WebReplySource = { id: string; title: string };
+// sources is display metadata only: rule titles for the customer; evidenceIds keep their meaning.
+export type WebReply = ReadReply & { sources?: WebReplySource[] };
 export type WebChatStep = { id: string; label: string; status: "running" | "done" | "error" };
-export type WebChatMessage = { id: string; role: "user" | "assistant"; text: string; reply?: ReadReply; steps?: WebChatStep[];
+export type WebChatMessage = { id: string; role: "user" | "assistant"; text: string; reply?: WebReply; steps?: WebChatStep[];
   status?: "pending" | "interrupted"; createdAt?: string };
 type PublicSession = { id: string; conversationId: string; turns: number; busy: boolean; modelAvailable: boolean; modelUnavailableReason?: string;
   profileId: string; label: string; settings: WebChatSettings; model: { provider: string; id: string } };
-export type WebChatResult = { sessionId: string; requestId: string; reply: ReadReply; durationMs: number; origin: "host" | "agent"; steps: WebChatStep[] };
+export type WebChatResult = { sessionId: string; requestId: string; reply: WebReply; durationMs: number; origin: "host" | "agent"; steps: WebChatStep[] };
+
+// Titles come only from this turn's successful search_faq results that the Reply already
+// lists as evidence. Prefer the documents the final text names; otherwise keep them all.
+export function webReplySources(reply: ReadReply, evidence: readonly Evidence[]): WebReplySource[] | undefined {
+  if (reply.kind === "notice" || !reply.evidenceIds?.length) return undefined;
+  const titles = new Map<string, string>();
+  for (const item of evidence) {
+    if (item.toolName !== "search_faq" || item.isError || !Array.isArray(item.content)) continue;
+    let value: unknown;
+    try { value = JSON.parse(item.content.map(part => part.type === "text" ? part.text : "").join("")); } catch { continue; }
+    if (!Array.isArray(value)) continue;
+    for (const document of value) {
+      if (document && typeof document === "object" && typeof document.sourceId === "string"
+        && typeof document.title === "string" && document.title.trim()) titles.set(document.sourceId, [...document.title.trim()].slice(0, 120).join(""));
+    }
+  }
+  const sources = [...new Set(reply.evidenceIds)].filter(id => titles.has(id)).map(id => ({ id, title: titles.get(id)! }));
+  const cited = sources.filter(source => reply.text.includes(source.title) || reply.text.includes(source.id));
+  const chosen = (cited.length ? cited : sources).slice(0, 5);
+  return chosen.length ? chosen : undefined;
+}
 type Progress = { type: "start"; replayed: boolean }
   | { type: "step" } & WebChatStep
   | { type: "delta"; messageId: string; text: string };
@@ -239,6 +263,7 @@ export class WebChatSessions {
         if (hostReply?.kind === "order") step("orders", "查询最近订单", "done");
         step("request", "受理咨询", "done");
         let reply: Reply;
+        const currentEvidence: Evidence[] = [];
         if (hostReply !== undefined) {
           step("reply", "整理答复", "running");
           reply = hostReply;
@@ -257,7 +282,6 @@ export class WebChatSessions {
           }
           assertActive();
           let messageId = "", messages = 0, calls = 0, streamAllowed = false;
-          const currentEvidence: Evidence[] = [];
           const pendingTools = new Map<string, { id: string; label: string }>();
           unsubscribe = entry.agent.subscribe(event => {
             if (!entry.active || abort.signal.aborted) return;
@@ -290,7 +314,8 @@ export class WebChatSessions {
         assertActive();
         task.setPhase("render");
         if (!["answer", "notice", "order"].includes(reply.kind)) throw new Error("网页仅支持只读回复");
-        const actual = reply as ReadReply;
+        const sources = hostReply === undefined ? webReplySources(reply as ReadReply, currentEvidence) : undefined;
+        const actual: WebReply = sources ? { ...(reply as ReadReply), sources } : reply as ReadReply;
         if (actual.kind === "order") for (const order of actual.orders) entry.knownOrderIds.add(order.id);
         const result: WebChatResult = { sessionId: entry.public.id, requestId, reply: actual,
           durationMs: Date.now() - started, origin: hostReply === undefined ? "agent" : "host", steps: structuredClone(steps) };
