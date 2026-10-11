@@ -38,7 +38,8 @@
     "@earendil-works/pi-ai": "1.0.0",
     "@earendil-works/pi-coding-agent": "1.0.0",
     "@tencent-connect/qqbot-nodejs": "1.0.4",
-    "mysql2": "3.24.5"
+    "mysql2": "3.24.5",
+    "playwright-core": "^1.63.0"
   },
   "devDependencies": {
     "@types/node": "26.6.4",

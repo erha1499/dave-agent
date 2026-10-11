@@ -2,7 +2,7 @@
 
 本项解决一个具体问题：一条用户消息可能触发多次模型调用、工具循环和连接重试，仅记录最后一段回复的 Token，无法解释这一轮实际发送了多少请求；无限继续调用也缺少明确停止点。
 
-当前在每次受理的 CLI、QQ、网页消息或宿主事件外建立 `withModelTask` 作用域。同一轮的主 Agent、候选 question 解析、support 判断和 rerank 共用 HTTP 预算。**一轮是一条入口消息或事件，不是跨多轮的完整退款业务。** 原默认 atomic + lexical 不变；候选未因此升级为默认。
+当前在每次受理的 CLI、QQ、网页消息或 Harness 事件外建立 `withModelTask` 作用域。同一轮的主 Agent、候选 question 解析、support 判断和 rerank 共用 HTTP 预算。**一轮是一条入口消息或事件，不是跨多轮的完整退款业务。** 原默认 atomic + lexical 不变；候选未因此升级为默认。
 
 ## 范围、配置与复用边界
 
@@ -39,7 +39,7 @@ await withModelTask({
   onComplete: summary => log(JSON.stringify(summary)),
 }, async task => {
   task.setPhase("authorization");
-  // 验权、会话、宿主回执、模型、渲染、发送和展示登记仍由原入口执行。
+  // 验权、会话、Harness 回执、模型、渲染、发送和展示登记仍由原入口执行。
   task.setPhase("model");
   await session.prompt(text);
 });
@@ -79,7 +79,7 @@ Pi 的 `before_provider_request` 扩展不能作为硬拒发边界：当前 SDK 
 | --- | --- |
 | `knownTokens` | 有明确 wire 用量的已知部分之和 |
 | `unknownUsageAttempts` | 未知用量的实际 HTTP 数量 |
-| `totalTokens` | 存在未知 attempt 就为 null；纯宿主路径无调用时可为 0 |
+| `totalTokens` | 存在未知 attempt 就为 null；纯 Harness 路径无调用时可为 0 |
 | `knownCostUsd` / `knownCostCny` | 各币种已知估算部分，分别求和，不混币种 |
 | `unknownCostAttempts` | 无法估算费用的 HTTP 数量 |
 
@@ -89,7 +89,7 @@ Pi 的 `before_provider_request` 扩展不能作为硬拒发边界：当前 SDK 
 
 执行 `node scripts/model-request-budget-check.ts`，使用假 transport、本机 HTTP 服务和已安装 Pi 原生 provider；不调用远程模型、MySQL 或 QQ。专项覆盖：
 
-1. 默认及非法配置、宿主零调用、嵌套复用、并发隔离、首次失败与清理取消。
+1. 默认及非法配置、Harness 零调用、嵌套复用、并发隔离、首次失败与清理取消。
 2. 实际 429/重试、工具循环、第 N+1 次和结束后晚调用拒发，已完成工具不为补答复重复执行。
 3. 正常原生 SSE 的 `[DONE]` 消费方式、缺用量、半流、显式取消、非法 usage 与模型不匹配。
 4. question/support/rerank 真实调用点归因、人民币与美元分列、日志不包含合成敏感正文。

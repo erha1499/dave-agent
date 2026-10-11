@@ -23,7 +23,11 @@
 `data/acceptance-source.json` 固定三份数据文件的 SHA256 和字节数，同时记录 seed SHA256、参考来源 manifest SHA256、分层数量和测试副本定义。`scripts/acceptance-data.ts` 导出：
 
 ```ts
-loadAcceptanceDataset("development" | "validation" | "support-validation"): Promise<V2Dataset>
+// scripts/acceptance-data.ts：加载指定题集，返回带题目和标注的数据对象。
+// 开发时用 development；策略冻结后再使用对应验证集。
+declare function loadAcceptanceDataset(
+  split: "development" | "validation" | "support-validation",
+): Promise<V2Dataset>;
 ```
 
 每题保留 `goldRationale`、`expectedBehavior` 和精确的 `evidence[{docId,quote}]`。无答案题另外标注 `relatedButInsufficient`，便于核对“相关政策并不包含答案”，例如到账时效不能支持等待赔偿金额。范围题标注 `scopeCategory` 与禁止引用的文档 ID。不能因为知识库有“联系商家”的泛化建议，就把未录入的精确营养数值、收费标准或赔偿政策判定为已获证据支持。
@@ -50,7 +54,7 @@ node scripts/acceptance-data-check.ts
 
 `data/support-v2-validation.json` 已准备 **24 个对话、79 轮**：只读 8、售后 8、身份/群隔离 4、恢复 4。`data/support-v2-validation-source.json` 单独冻结题集 SHA256、字节数、总轮数及 seed/动作/确认/退款合同源码哈希。与检索集一样，这是共享工作区中的原创合成固定验证，**不是盲测**。
 
-每个对话定义订单模板、独立 fixture、可信 actor/session、逐轮输入、服务依赖、回执类型及路由、证据 ID、金额事实和数据库增量不变量。模板保留 seed 的支付/核销/退款状态；未来 runner 必须新建带 nonce 的订单并映射运行时 ID，不能修改 seed 订单。`{{orders.primary}}`、`{{tasks.primary}}`、`{{operations.primary}}` 等符号只能引用已创建的 fixture 或前轮成功回执捕获值。前置批准/已展示方案也必须通过真实服务和成功本地回执构造，不能直接伪造金额或授权状态。
+每个对话定义订单模板、独立 fixture、可信 actor/session、逐轮输入、服务依赖、回复类型及路由、证据 ID、金额事实和数据库增量不变量。模板保留 seed 的支付/核销/退款状态；未来 runner 必须新建带 nonce 的订单并映射运行时 ID，不能修改 seed 订单。`{{orders.primary}}`、`{{tasks.primary}}`、`{{operations.primary}}` 等符号只能引用已创建的 fixture 或前轮成功回复捕获值。前置批准/已展示方案也必须通过真实服务和成功本地回复构造，不能直接伪造金额或授权状态。
 
 商家任务的生产期限只有 8 秒，不能假定模型对话会在期限内结束。业务 fixture 合同明确：每次创建任务后、每轮执行前，对本批 nonce-owned 的 pending 任务调用既有 `createMerchantFixture.holdMerchant(orderId, 180000)`，按固定 180 秒测试窗口同时顺延 `due_at` 和 `deadline_at`，准备耗时不计入本轮延迟。显式超时轮再调用 fixture 的 `expire` 和 `AfterSalesStore.processDue`。这项测试控制不修改生产期限或其他任务；若准备阶段发现意外超时，应记为 fixture 失败，不可悄悄重放成功路径。
 
@@ -62,4 +66,4 @@ node scripts/acceptance-data-check.ts
 node scripts/support-validation-data-check.ts
 ```
 
-检查使用项目已有 TypeBox/Pi 参数校验，禁止字段/类型自动转换，并检查分层数量、稳定 ID、逐轮结构、动态 ID 定义顺序、可信身份和会话范围、只能宿主精确确认产生退款、金额约束、已知政策引用和 O4 延期状态。检查不连接数据库，不调用模型，不发送 QQ 消息。
+检查使用项目已有 TypeBox/Pi 参数校验，禁止字段/类型自动转换，并检查分层数量、稳定 ID、逐轮结构、动态 ID 定义顺序、可信身份和会话范围、只能 Harness 精确确认产生退款、金额约束、已知政策引用和 O4 延期状态。检查不连接数据库，不调用模型，不发送 QQ 消息。

@@ -1,8 +1,12 @@
 # 客观评测 API 合同
 
-本机工作台继续使用四张 `eval_*` JSON 表，本文的历史与分析接口保持只读。原 `/api/runs?kind=model&limit=50` 和 `/api/runs/<UUID>` 响应不变；新增字段均为可选。独立的实验配置与启动接口见 [实验调试合同](./experiment-controls.md)，不改变既有历史记录。新接口不评回答质量、不使用 LLM judge，也不把历史措辞检查转换为客观检查。
+工作台需要回答三个问题：这次运行完成了哪些检查，两次结果能不能比较，同一配置多跑几次是否稳定。本文按这个顺序说明分析接口。得分来自固定的工具、状态和协议检查；模型最终回答是否正确，需要另行评审。
 
-## 计划与批次元数据
+数据仍保存在四张 `eval_*` JSON 表中，以下接口只读。`/api/runs?kind=model&limit=50` 和 `/api/runs/<UUID>` 保持兼容，新字段可选。实验的配置与启动见 [实验调试合同](./experiment-controls.md)。
+
+<a id="计划与批次元数据"></a>
+
+## 先固定要检查哪些场景
 
 新客观运行将如下对象写入 `run.snapshot.content.evaluation`，执行前固定并计入 dataset 哈希：
 
@@ -10,13 +14,13 @@
 type EvalObjectivePlan = {
   version: 1 | 2;
   scope: "objective";
-  answerQuality: "not_evaluated";
+  answerQuality: "not_evaluated"; // 这里检查工具、状态和协议，答复质量另行评审。
   cases: Array<{
     id: string;
-    tags: string[];
+    tags: string[]; // 当前题集覆盖的场景标签。
     turns: Array<{
       index: number;
-      source: "user" | "host" | "event" | "engineering";
+      source: "user" | "host" | "event" | "engineering"; // 谁触发了这一轮。
       checks: Array<{
         id: string;
         category: "business" | "safety" | "evidence" | "execution";
@@ -26,157 +30,290 @@ type EvalObjectivePlan = {
   }>;
 };
 // 可选，存入 run（而非 snapshot）
-type EvalBatch = { id: string; repetition: number; plannedRepetitions: number };
+type EvalBatch = {
+  id: string;
+  repetition: number;
+  plannedRepetitions: number
+};
 ```
 
 案例 ID、轮次索引、当轮检查 ID 必须唯一。计划案例/轮次总数必须与 `plannedCases/plannedTurns` 一致。tags 是本题集定义的覆盖范围，不代表业务全集。批次 UUID、重复序号从 1 起、计划重复数为 1–20；相同批次只能包含同套件同配置。未创建的运行也保留在批次计划分母中。
 
 原详情中的 `EvalTurn` 可带 `observations?: { before?: unknown; after?: unknown; protocol?: unknown }`，保存工作流检查的精简真实状态与固定卡片协议证据。前端可原样展开这些合成诊断数据。通过与否仍由确定性 oracle 生成的计划 checks 决定，分析 API 不根据 observations 猜测得分，也不评模型回复质量；旧记录没有此字段时无需补造。
 
-## 单次运行分析
+<a id="单次运行分析"></a>
+
+## 一次运行完成后，怎样读结果
 
 `GET /api/runs/<UUID>/analysis`
 
 ```ts
 type Counts = {
-  planned: number; passed: number; failed: number; skipped: number; missing: number;
+  // 计划数固定；失败、跳过和缺失各自保留。
+  planned: number;
+  passed: number;
+  failed: number;
+  skipped: number;
+  missing: number;
   passRate: number | null; // passed / planned，0–1；分母为 0 则 null
 };
 type Usage = {
-  modelRequests: number; reportedRequests: number; missingRequests: number;
+  // known 汇总已知部分；已采集步骤缺用量或费用时，对应 complete 为 null。
+  modelRequests: number;
+  reportedRequests: number;
+  missingRequests: number;
   coverage: number | null; // 无模型请求为 null，不是缺失 usage
-  knownTokens: number | null; completeTokens: number | null;
-  knownCostUsd: number | null; completeCostUsd: number | null;
+  knownTokens: number | null;
+  completeTokens: number | null;
+  knownCostUsd: number | null;
+  completeCostUsd: number | null;
 };
-type CaseAnalysis = { id: string; tags: string[]; status: "passed" | "failed" | "skipped" | "missing"; turns: Counts; checks: Counts };
+type CaseAnalysis = {
+  id: string;
+  tags: string[];
+  status: "passed" | "failed" | "skipped" | "missing";
+  turns: Counts;
+  checks: Counts
+};
 type RunAnalysis = {
+  // 把得分、执行轨迹、耗时和用量分开，避免把工具成功当作回答正确。
   runId: string;
   scope: "objective" | "legacy" | "invalid";
-  answerQuality: "not_evaluated";
+  answerQuality: "not_evaluated"; // 这里检查工具、状态和协议，答复质量另行评审。
   issues: string[];
-  counts: { cases: Counts; turns: Counts; checks: Counts } | null;
-  categories: Array<{ category: string; checks: Counts }>;
-  coverage: Array<{ tag: string; cases: Counts }>;
+  counts: {
+    cases: Counts;
+    turns: Counts;
+    checks: Counts
+  } | null;
+  categories: Array<{
+    category: string;
+    checks: Counts
+  }>;
+  coverage: Array<{
+    tag: string;
+    cases: Counts
+  }>;
   cases: CaseAnalysis[];
   usage: Usage;
-  execution: { toolCalls: number; toolErrors: number; expectedDenials: number; modelErrors: number };
-  timing: { samples: number; durationP50Ms: number | null; durationP95Ms: number | null; measurement: string | null };
+  execution: {
+    toolCalls: number;
+    toolErrors: number;
+    expectedDenials: number;
+    modelErrors: number
+  };
+  timing: {
+    samples: number;
+    durationP50Ms: number | null;
+    durationP95Ms: number | null;
+    measurement: string | null
+  };
   retrieval: RetrievalAnalysis | null;
   attribution: SupportTraceAnalysis | null;
 };
-
 // 仅 engineering + retrieval-objective-v1 + 有效客观计划提供
 type RetrievalAnalysis = {
   groups: Array<{
-    corpus: "selected" | "full"; suite: "standard" | "hard"; samples: number;
-    recallAt1: number; recallAt5: number; mrr: number; mrrAt5: number;
+    corpus: "selected" | "full";
+    suite: "standard" | "hard";
+    samples: number;
+    recallAt1: number;
+    recallAt5: number;
+    mrr: number;
+    mrrAt5: number;
   }>;
-  noAnswer: { samples: number; empty: number; nonempty: number };
-  scope: { samples: number; passed: number; failed: number };
+  noAnswer: {
+    samples: number;
+    empty: number;
+    nonempty: number
+  };
+  scope: {
+    samples: number;
+    passed: number;
+    failed: number
+  };
 };
 ```
 
-## v2 执行归因（增量字段）
+<a id="v2-执行归因增量字段"></a>
+
+## 沿调用关系找到耗时和费用
 
 `support-business-v2` 使用 version 2 的共同业务计划。评分仍取 `analysis.counts`，`turn.steps` 仍保留模型与工具记录。新增 `turn.spans` 和 `analysis.attribution` 是同一次执行的另一视角，**不能与 steps 的调用量、Tokens、费用重复相加**。旧记录返回 `attribution:null` 或省略字段时显示未采集，不能补成 0。
 
 ```ts
 type EvalSpan = {
-  id: string; parentSpanId: string | null;
+  // 一次实际执行的记录；parentSpanId 连接它所属的父调用。
+  id: string;
+  parentSpanId: string | null;
   actor: "agent" | "host";
   trigger: "user" | "event" | "confirmation";
-  component: string; name: string; observedAt: string; durationMs: number | null;
+  component: string;
+  name: string;
+  observedAt: string;
+  durationMs: number | null;
   outcome: "ok" | "denied" | "error";
-  input?: unknown; output?: unknown;
-  knowledge?: { context: SupportKnowledgeContext; trace: KnowledgeTrace };
+  input?: unknown;
+  output?: unknown;
+  knowledge?: {
+    context: SupportKnowledgeContext;
+    trace: KnowledgeTrace
+  };
   usage?: {
-    provider: string; model: string; kind: "llm" | "embedding" | "rerank";
+    provider: string;
+    model: string;
+    kind: "llm" | "embedding" | "rerank";
     currency?: "USD" | "CNY";
-    inputTokens: number | null; outputTokens: number | null; totalTokens: number | null;
-    cost: { currency: "USD" | "CNY"; amount: number; source: "sdk_estimate" | "provider" | "price_estimate" } | null;
+    inputTokens: number | null;
+    outputTokens: number | null;
+    totalTokens: number | null;
+    cost: {
+      currency: "USD" | "CNY";
+      amount: number;
+      source: "sdk_estimate" | "provider" | "price_estimate"
+    } | null;
   };
 };
 type SupportTraceAnalysis = {
+  // 同一执行按角色、组件、提供商分析，不能与 steps 重复加总。
   spans: number;
-  groups: Array<{ actor: string; trigger: string; component: string;
-    calls: number; denied: number; errors: number }>;
-  providers: Array<{ provider: string; model: string; kind: string;
-    requests: number; usageReported: number; knownTokens: number | null;
-    costs: Array<{ currency: string; source: string; reportedRequests: number; knownAmount: number }> }>;
-  providerUsage: Array<ProviderUsageSummary & { role: "agent" | "question" | "rerank" | "support" | "other" }>;
+  groups: Array<{
+    actor: string;
+    trigger: string;
+    component: string;
+    calls: number;
+    denied: number;
+    errors: number
+  }>;
+  providers: Array<{
+    provider: string;
+    model: string;
+    kind: string;
+    requests: number;
+    usageReported: number;
+    knownTokens: number | null;
+    costs: Array<{
+      currency: string;
+      source: string;
+      reportedRequests: number;
+      knownAmount: number
+    }>
+  }>;
+  providerUsage: Array<ProviderUsageSummary & {
+    role: "agent" | "question" | "rerank" | "support" | "other"
+  }>;
   providerTotals: ProviderUsageSummary;
   issues: string[];
 };
 type ProviderUsageSummary = {
-  requests: number; knownTokenRequests: number; unknownTokenRequests: number;
-  knownTokens: number | null; completeTokens: number | null; unknownCurrencyRequests: number;
-  currencies: Array<{ currency: "USD" | "CNY"; requests: number; knownRequests: number; unknownRequests: number;
-    knownAmount: number | null; completeAmount: number | null }>;
+  // 按币种分别汇总，并保留不知道用量或费用的请求数。
+  requests: number;
+  knownTokenRequests: number;
+  unknownTokenRequests: number;
+  knownTokens: number | null;
+  completeTokens: number | null;
+  unknownCurrencyRequests: number;
+  currencies: Array<{
+    currency: "USD" | "CNY";
+    requests: number;
+    knownRequests: number;
+    unknownRequests: number;
+    knownAmount: number | null;
+    completeAmount: number | null
+  }>;
 };
 ```
 
-当前组件为 `qq-ingress`（入口）、`model`（模型）、`agent-tool`（模型选择的工具）、`business-service`（宿主业务服务）、`confirmation-service`（宿主确认/展示登记），C1 增加 `knowledge-rerank`、`knowledge-support`（知识服务的提供商调用）。`groups.calls` 包括入口和嵌套服务，不是可相加的“总工具数”。旧 `parentSpanId` 只有轮级归属；C1 知识提供商调用才明确以所属 `search_faq` 为父节点，不能替历史记录补造嵌套关系。
+当前组件为 `qq-ingress`（入口）、`model`（模型）、`agent-tool`（模型选择的工具）、`business-service`（Harness 业务服务）、`confirmation-service`（Harness 确认/展示登记），C1 增加 `knowledge-rerank`、`knowledge-support`（知识服务的提供商调用）。`groups.calls` 包括入口和嵌套服务，不是可相加的“总工具数”。旧 `parentSpanId` 只有轮级归属；C1 知识提供商调用才明确以所属 `search_faq` 为父节点，不能替历史记录补造嵌套关系。
 
-C1 的 `business-service/search_faq` 保留 `output: documents[]`，附加 `knowledge`：`context` 记录用户原始问题、模型建议问题、宿主实际检索问题、订单来源、重新授权后的范围和事实，以及可用的可信话题/对象引用；模型建议问题只用于审计，不构成业务身份或范围。`trace` 记录实际模式、阈值、范围、原始排名、接收/拒收原文及版本、语料前后哈希、失败原因、配置、阶段时间与用量。完整类型以 `src/support-controller.ts`、`src/knowledge-service.ts` 为准。
+C1 的 `business-service/search_faq` 保留 `output: documents[]`，附加 `knowledge`：`context` 记录用户原始问题、模型建议问题、Harness 实际检索问题、订单来源、重新授权后的范围和事实，以及可用的可信话题/对象引用；模型建议问题只用于审计，不构成业务身份或范围。`trace` 记录实际模式、阈值、范围、原始排名、接收/拒收原文及版本、语料前后哈希、失败原因、配置、阶段时间与用量。完整类型以 `src/support-controller.ts`、`src/knowledge-service.ts` 为准。
 
-`trace.supportProfile` 记录 binary / typed；`settings.support.promptVersion` 标识实际判别 Prompt 版本。成功返回的 `supportVerification.value[]` 包含 `id/supported/quote/reason`，typed 另有 `category`：`direct_fact`（事实或适用规则）、`boundary_answer`（明确边界问题的答案）、`limitation_only`（仅说明信息缺失或需核实）、`unrelated`（无关）。宿主只接收前两类，并校验实际原文引文。没有发请求、失败或旧记录没有字段均不等于 `supported:false`；不能从历史 binary 判断反推 typed 分类。接收规则证据也不代表本单已批准、退款已执行或资金已到账。
+`trace.supportProfile` 记录 binary / typed；`settings.support.promptVersion` 标识实际判别 Prompt 版本。成功返回的 `supportVerification.value[]` 包含 `id/supported/quote/reason`，typed 另有 `category`：`direct_fact`（事实或适用规则）、`boundary_answer`（明确边界问题的答案）、`limitation_only`（仅说明信息缺失或需核实）、`unrelated`（无关）。Harness 只接收前两类，并校验实际原文引文。没有发请求、失败或旧记录没有字段均不等于 `supported:false`；不能从历史 binary 判断反推 typed 分类。接收规则证据也不代表本单已批准、退款已执行或资金已到账。
 
 `trace.status` 的 `accepted`、`rejected`、`unavailable` 分别表示接收到证据、未接收到证据、服务未完成；拒收本身不能证明案例通过。`stages` 可选，旧记录缺少时显示未采集。`sources` 记录本次实际接受文档的 sourceId 和规范文档 SHA-256，不能以历史话题中的同 ID 版本替代；拒收或不可用时为空。`supportVerification` 仅在真实判别完成时保存输入/请求绑定及 supported/quote/reason，失败或未调用不补造；若随后原文变化，该旧输入判别仍可审计，但最终 sources 为空且状态不可用。工作台按逐次查询展示来源与原文、实际 scope 和 original/effective query；金额事实与退款授权仍分别检查。
 
 `trace.supportModel` 是配置选择（configured / deepseek-v4-pro），`trace.settings.support.provider/model` 才是判别客户端实际配置；没有真实请求时不得用所选项补造模型调用。`trace.supportFailure` 可包含失败枚举 `code` 与 `outputHash`，不包含原始模型文本。类别/引文的成功记录仍在 `supportVerification.value` 数组中。v2.2 `paid_amount_compare` 只读取授权订单和金额引用，正常没有知识 trace，不应显示为检索失败。
 
-typed 的 `settings.support.validationVersion: "typed-candidate-isolation-v1"` 表示逐候选校验。`supportVerification.validation` 保存 `status: complete | partial | unavailable`、`outputHash` 和 `invalidDecisions: [{id, code}]`；code 为 `invalid_quote | invalid_reason | invalid_category`。`value[]` 只含有效判断，与 invalid ID 不重叠且合起来恰好覆盖本次候选。整体 JSON/结构、未知/重复/遗漏 ID 仍整批拒绝；invalid 不等于 `supported:false`，不计正确拒收。全项无效、或仅有有效负例而其他项无效时，取证为 unavailable；仍有有效正例时可返回 accepted，并明确保留 partial。候选原文及范围复检不变。请求和已发生用量完整保留，partial 的 provider span 标为 error，不能当完整判别成功；业务是否完成另行评分。旧记录没有 validation 字段时不补造完整性结论，异常状态组合保留原始 trace 并显示记录异常。
+typed 的 `settings.support.validationVersion: "typed-candidate-isolation-v1"` 表示逐候选校验。`supportVerification.validation` 保存 `status: complete | partial | unavailable`、`outputHash` 和 `invalidDecisions: [{id, code}]`；code 为 `invalid_quote | invalid_reason | invalid_category`。`value[]` 只含有效判断，与 invalid ID 不重叠且合起来恰好覆盖本次候选。整体 JSON/结构、未知/重复/遗漏 ID 仍整批拒绝；invalid 不等于 `supported:false`，不计正确拒收。全项无效、或仅有有效负例而其他项无效时，证据查询结果为 unavailable；仍有有效正例时可返回 accepted，并明确保留 partial。候选原文及范围复检不变。请求和已发生用量完整保留，partial 的 provider span 标为 error，不能当完整判别成功；业务是否完成另行评分。旧记录没有 validation 字段时不补造完整性结论，异常状态组合保留原始 trace 并显示记录异常。
 
 v2.2 的 `context.facts.couponCounts` 来自本轮授权订单的券状态字段，含 total/unused/redeemed/expired/refunded。资格及业务前提检索附带该数量，帮助判断多券或核销规则的适用性；普通政策咨询不额外扩展 query。此字段不把有效期推断成新的券状态，也不代表退款批准；旧协议回放不增加该字段。
 
 知识提供商请求只在相应子 span 填 `usage`，其父 `search_faq` 不重复填，且不加入 Agent 的 `steps`。人民币 `price_estimate` 按适用区域与版本价目估算，美元 `sdk_estimate` 按 Pi 模型目录估算；超时未回传的用量保留 null。旧 `analysis.usage` 继续只代表 Agent 模型步骤，业务总成本比较应使用带知识调用的归因明细，按币种分别报告。
 
-轮次类型优先依据可信入口 span 的 `trigger`：`event` 是商家事件，`confirmation` 是用户精确确认经宿主执行，`user` 是普通用户请求。v2 的事件和确认回执应标为宿主；其他轮不因含 host 服务 span 就改标宿主。这里标的是最终回执生成方：atomic 商家事件仍可能调用模型，但发送的是宿主固定状态卡，模型步骤仍保留展示。旧轮无 spans 时保留原展示。spans 为空表示显式没有归因记录，不等于模型调用必为零；零模型需依据该轮实际 `steps`。无效归因记录应保留原始文本与诊断，不能让页面崩溃或显示为正常执行。
+轮次类型优先依据可信入口 span 的 `trigger`：`event` 是商家事件，`confirmation` 是用户精确确认经 Harness 执行，`user` 是普通用户请求。v2 的事件和确认回复应标为 Harness；其他轮不因含 host 服务 span 就改标 Harness。这里标的是最终回复生成方：atomic 商家事件仍可能调用模型，但发送的是 Harness 固定状态卡，模型步骤仍保留展示。旧轮无 spans 时保留原展示。spans 为空表示显式没有归因记录，不等于模型调用必为零；零模型需依据该轮实际 `steps`。无效归因记录应保留原始文本与诊断，不能让页面崩溃或显示为正常执行。
 
 `denied` 是服务的已知业务拒绝，`error` 是执行错误；两者不决定案例得分。Controller 的正常 `blocked` 不一定产生 denied，不要将 denied 数当全部拦截数。provider 的 requests 只覆盖带有效 usage 对象的 span，缺整个 usage 的 span 不在该分母；宜标“归因中已记录请求”，不可据此声称所有请求用量完整。Tokens 与 costs 都是已知部分，USD/CNY 及 `sdk_estimate`/`provider` 分别显示、不换汇合计，缺价格显示未知。首屏继续使用原 `analysis.usage` 口径，归因明细默认折叠。
 
-本轮新增`support-question`（宿主咨询解析）及上述四角色账本；旧`providers`保留。新`providerTotals`仅汇总归因中已采集的提供商请求，不能与Agent-only的`analysis.usage`相加，也不替代原始HTTP审计。缺整个span或usage不会被反推为零；没有请求时known/complete值为null。`usage.currency`来自实际选型价格合同，费用缺失时仍保留币种；旧记录无币种且无有效cost时计入unknownCurrencyRequests，两币种完整费用均为null。某币种部分缺费时展示该桶已知部分和缺失请求，其completeAmount为null。父服务与提供商后代重复带usage时拒绝父项、保留子项并列issues，不显示完整合计；币种冲突或无效归因同样不生成完整值。失败、取消但已发出的请求仍在账本，没有发HTTP的preflight解析不增加请求。界面只展示有实际请求的角色，不补造历史解析或重排；已知0费用和未知费用明确区分。
+本轮新增`support-question`（Harness 咨询解析）及上述四角色账本；旧`providers`保留。新`providerTotals`仅汇总归因中已采集的提供商请求，不能与Agent-only的`analysis.usage`相加，也不替代原始HTTP审计。缺整个span或usage不会被反推为零；没有请求时known/complete值为null。`usage.currency`来自实际选型价格合同，费用缺失时仍保留币种；旧记录无币种且无有效cost时计入unknownCurrencyRequests，两币种完整费用均为null。某币种部分缺费时展示该桶已知部分和缺失请求，其completeAmount为null。父服务与提供商后代重复带usage时拒绝父项、保留子项并列issues，不显示完整合计；币种冲突或无效归因同样不生成完整值。失败、取消但已发出的请求仍在账本，没有发HTTP的preflight解析不增加请求。界面只展示有实际请求的角色，不补造历史解析或重排；已知0费用和未知费用明确区分。
 
 M0–M6 的完整百炼检索报告位于 `.runtime/retrieval-v2/`，未导入旧历史运行 API。新实验入口仅在任务结果中提供其关联报告的实际摘要；不扫描导入旧离线报告，不凭开发报告写死 Recall/MRR，也不暗示在线业务已使用 rerank。
 
 `missing` 是计划存在但没有记录，`skipped` 是明确跳过。两者均不通过。只统计计划中的检查；额外、重复、错类别或不完整计划会返回 `scope: invalid`、`counts: null` 和原因。没有计划的旧记录返回 `legacy`，不生成客观通过率。模型请求/用量/执行耗时是步骤遥测，可在 legacy 页面显示。
 
-只报告部分 usage 时保留 known 值，complete 值为 null；全部 usage 已知但部分价格缺失时完整费用仍为 null。没有模型请求的宿主轮不算漏报。时延按原采集范围显示，不代表 QQ 平台端到端送达。
+只报告部分 usage 时保留 known 值，complete 值为 null；全部 usage 已知但部分价格缺失时完整费用仍为 null。没有模型请求的 Harness 轮不算漏报。时延按原采集范围显示，不代表 QQ 平台端到端送达。
 
 检索由工程执行的 `retrieval_rank` 步骤记录全正分排名、相关文档标签和首条相关文档位置，后端复核排名与指标公式后，按 `corpus/suite` 四组分别算均值，不合并成一个召回率。单题 Recall@K 为相关标签中进入前 K 位的比例（多相关文档时不能用“命中任一条”替代），MRR 取首条相关文档倒数。`retrieval_no_answer` 仅统计空/非空召回，不认定最终回答错误；`retrieval_scope` 单独统计范围隔离。检索记录格式错误时 `retrieval:null` 并在 issues 说明，不静默丢弃后继续给分；样本为空的分组不返回。检索指标评的是检索器，不是回答质量。
 
 示例：计划 3 个检查，1 通过、1 失败、1 没有结果，返回 `{planned:3,passed:1,failed:1,skipped:0,missing:1,passRate:0.3333333333333333}`。
 
-## 两次运行对比
+<a id="两次运行对比"></a>
+
+## 两次运行能不能直接比较
 
 `GET /api/compare?baseline=<UUID>&candidate=<UUID>`，两个 ID 必须不同。
 
 ```ts
-type Condition = { key: string; status: "equal" | "different" | "unknown" };
+type Condition = {
+  key: string;
+  status: "equal" | "different" | "unknown"
+};
 type Comparison = {
-  baseline: string; candidate: string;
-  comparable: boolean; repeatCompatible: boolean;
-  conditions: Condition[]; configuration: Condition[];
+  baseline: string;
+  candidate: string;
+  comparable: boolean; // 题集和检查口径相同，才能比较结果。
+  repeatCompatible: boolean; // 运行配置也相同，才能分析重复运行的稳定性。
+  conditions: Condition[];
+  configuration: Condition[];
   issues: string[];
-  analyses: { baseline: RunAnalysis; candidate: RunAnalysis };
-  cases: Array<{ id: string; baseline: string; candidate: string; change: "same" | "improved" | "regressed" | "incomplete" }>;
+  analyses: {
+    baseline: RunAnalysis;
+    candidate: RunAnalysis
+  };
+  cases: Array<{
+    id: string;
+    baseline: string;
+    candidate: string;
+    change: "same" | "improved" | "regressed" | "incomplete"
+  }>;
 };
 ```
 
 `conditions` 核对 scope、suite、kind、dataset、checker、business、manifest、measurement；全部明确相等才 `comparable: true`。`configuration` 核对 model、prompt、skill、tools、implementation.files、runtime、settings；两组都相等才 `repeatCompatible: true`。settings 必须是明确保存的对象，不适用时使用 `{}`；超时、重试、compaction 等真实运行设置由 runner 固定。缺失元数据一律 unknown。git commit/dirty 不替代实际源码快照。只有可比且两侧案例均有明确 passed/failed 结果时才标 improved/regressed；跨题集或未执行时标 incomplete。
 
-## 同配置批次稳定性
+<a id="同配置批次稳定性"></a>
+
+## 同一配置多跑几次，结果是否稳定
 
 `GET /api/batches/<UUID>`
 
 ```ts
 type BatchAnalysis = {
-  batchId: string; compatible: boolean; issues: string[];
+  // 批次按原计划计算；缺一次运行也不能算作完整通过。
+  batchId: string;
+  compatible: boolean;
+  issues: string[];
   plannedRepetitions: number | null;
-  startedRuns: number; completedRuns: number; missingRuns: number | null;
+  startedRuns: number;
+  completedRuns: number;
+  missingRuns: number | null;
   runIds: string[];
   cases: Array<{
-    id: string; planned: number; passed: number; failed: number; skipped: number; missing: number;
+    id: string;
+    planned: number;
+    passed: number;
+    failed: number;
+    skipped: number;
+    missing: number;
     status: "always_passed" | "always_failed" | "mixed" | "incomplete";
   }>;
   usage: Usage;

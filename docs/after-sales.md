@@ -1,4 +1,8 @@
-# D1 / D2 / D3 模拟售后
+<a id="d1--d2--d3-模拟售后"></a>
+
+# 从查券到退款：售后流程如何安全完成？
+
+D1、D2、D3 是历史阶段代号，分别对应商家协商、退款确认与执行、异步结果通知。下文的 Harness 指把可信入口、Pi 会话、工具和业务服务连起来的应用代码；实际订单授权和事务由各个 Store 执行。
 
 已实现“准备协商 → 用户精确确认 → 持久任务 → 模拟结果 → 原 QQ 会话通知或查询 → 用户请求退款 → 固定退款方案 → 用户精确确认 → 幂等模拟退款 → 重启查询”。复用 QQ/CLI、Pi SDK 和同一 MySQL，不改 Pi 核心；商家与退款均为演示，不连接真实商家或支付渠道。D2/D3 已完成联合真实模型与真实 QQ 同意退款链路验收；三终态通知另有历史验收。
 
@@ -46,11 +50,11 @@ npm start
 
 1. 发送“帮我联系商家协商 COUPON-2001，原因是行程变化”。QQ 每条消息都需在白名单群中 `@机器人`。
 2. Agent 查询订单、规则，调用 `prepare_merchant_request` 返回只读建议与确认文字，此时未创建任务。
-3. 用户本人完整发送 `确认联系商家 COUPON-2001 原因：行程变化`，宿主直接返回任务号与实际状态，不调用模型代为确认。
+3. 用户本人完整发送 `确认联系商家 COUPON-2001 原因：行程变化`，Harness 直接返回任务号与实际状态，不调用模型代为确认。
 4. 等待期间可继续咨询；QQ 在原确认消息有效窗口内尝试通知同意、拒绝或超时结果。未收到通知也可按订单号查询。收到同意通知后，在原会话发送“那就帮我退款”，Agent 根据上下文确定订单并重新查询订单、规则及审批，再准备方案；结果通知本身不会生成或提交退款。拒绝或超时后追问也不会生成方案；同意只表示商家审批通过，不代表退款。
-5. Agent 调用 `prepare_refund`，固定模板展示订单、79.80 元金额、操作编号与有效期。QQ API 明确接受这条方案后，宿主调用 `markPresented` 开放确认；发送失败或结果未知时不开启确认，也不盲目重发。API 接受不等于用户已阅读。
-6. 核对方案后，点击“确认模拟退款”按钮并发送，或完整发送 `确认退款 <操作编号>`。只有这条实际用户消息能进入宿主退款入口，模型没有执行退款工具。
-7. 宿主事务内校验并保存模拟退款结果；重复发送同一确认返回同一退款记录。重启后提供订单号，Agent 可用 `get_refund` / `get_order` 查询持久结果。
+5. Agent 调用 `prepare_refund`，固定模板展示订单、79.80 元金额、操作编号与有效期。QQ API 明确接受这条方案后，Harness 调用 `markPresented` 开放确认；发送失败或结果未知时不开启确认，也不盲目重发。API 接受不等于用户已阅读。
+6. 核对方案后，点击“确认模拟退款”按钮并发送，或完整发送 `确认退款 <操作编号>`。只有这条实际用户消息能进入 Harness 退款入口，模型没有执行退款工具。
+7. RefundStore 在事务内校验并保存模拟退款结果；重复发送同一确认返回同一退款记录。重启后提供订单号，Agent 可用 `get_refund` / `get_order` 查询持久结果。
 
 默认 atomic 启用 D1/D2 后最多有七项模型工具：`list_orders`、`get_order`、`search_faq`、`prepare_merchant_request`、`get_merchant_request`、`prepare_refund`、`get_refund`。最近订单列表只用于定位，选择后仍重新查询订单及适用规则；`prepare_refund` 只登记方案，不执行退款。确认解析仅容忍指令首尾的 ASCII 空格和制表符；换行、协商禁用字符名单中的控制/格式字符、退款UUID后附加文本均拒绝。协商原因是确认指令的一部分，不与先前建议逐字比较，详见[协商确认授权链](#协商确认授权链审计2026-10-08)；单独“确认”“同意”、引用/JSON 中的确认、模型生成的确认均不授权。
 
@@ -62,17 +66,17 @@ npm start
 
 | 顺序与业务问题 | 演示输入或可复现命令 | 检查点与证据层级 |
 | --- | --- | --- |
-| 1. 对象不明，先定位或澄清 | 新会话先说“我想退款”，按最近订单列表选择；多单可问“COUPON-2001 和 COUPON-2002，我想退一笔”。 | 无明确订单的简单退款请求由宿主列出最近三笔本人订单，发送成功后才登记有界选择；选择后重新取证，不替用户猜单或提交退款。复杂歧义仍依赖模型澄清，历史[多轮业务回归](./evaluation.md#p1-第二轮多轮业务回归)保留成功与失败；新增入口证据见[本人订单与选单续轮](#未知订单号时的入口与连续选择2026-10-09)，不回填历史成绩。C1 的候选恢复另见[引用演示](./c1-reference-selection.md#已实现与可复现演示)。 |
+| 1. 对象不明，先定位或澄清 | 新会话先说“我想退款”，按最近订单列表选择；多单可问“COUPON-2001 和 COUPON-2002，我想退一笔”。 | 无明确订单的简单退款请求由 Harness 列出最近三笔本人订单，发送成功后才登记有界选择；选择后重新查询并核对依据，不替用户猜单或提交退款。复杂歧义仍依赖模型澄清，历史[多轮业务回归](./evaluation.md#p1-第二轮多轮业务回归)保留成功与失败；新增入口证据见[本人订单与选单续轮](#未知订单号时的入口与连续选择2026-10-09)，不回填历史成绩。C1 的候选恢复另见[引用演示](./c1-reference-selection.md#已实现与可复现演示)。 |
 | 2. 等待商家仍能接待 | 按[演示一单](#演示一单)完成准备和精确确认，等待时问套餐问题，再查 `COUPON-2001` 协商进度。 | 准备不创建任务，完整用户确认才返回任务；通知仍绑定原任务且不自动退款。历史真实模型联合套件包含等待期间咨询，真实 QQ 已验证原会话通知；[验证记录](#验证记录)分别列出。 |
 | 3. 同意后仍需展示、确认、幂等 | 取得 approved 后请求退款；复制本轮实际方案的 `确认退款 <操作编号>`，成功后再发送同一条。 | 方案成功展示后才开放确认；普通“同意”不执行。重复精确确认返回同一退款记录，不增加金额。真实事务可运行 `npm run check:refund`；真实模型套件可运行 `npm run check:refund-model -- --label "面试售后演示"`，后者调用模型并写入隔离的临时合成数据。 |
 | 4. 相同入口下拒绝他人订单 | 独立终端先执行[同一完整export清单](#启动)，再运行 `CLI_DEMO_USER=TEST_USER2 npm start`，查询客户一的 `COUPON-2001`。 | 应拒绝读取他人订单；不能因为知道订单号或复制确认文字就获得权限。`node --env-file-if-exists=.env scripts/qq-isolation-check.ts` 用真实 MySQL、Pi 脚本模型和本地发送检查双用户交叉确认后数据库不变；[真实双用户 QQ 记录](./qq-integration.md#双用户隔离与异额退款)另行提供客户端证据。 |
-| 5. 失败后恢复，不盲目重做 | 收不到回执时在原入口询问“查询 COUPON-2001 的退款状态”；重启后也明确提供该订单号。查看拒绝/超时可沿主线使用 `COUPON-2002` / `COUPON-2003`。 | 查询持久结果，不把发送未知解释为未退款；拒绝/超时不生成退款方案。`node scripts/refund-agent-check.ts` 演示发送后登记、失败不重发、过期卡只读和丢失回执后查询；`node scripts/merchant-notification-agent-check.ts` 演示通知 unknown/claimed 后不重发。这两条为真实 Pi/faux、合成服务及本地发送，0 远程模型、0 数据库，不能替代平台验收。 |
+| 5. 失败后恢复，不盲目重做 | 收不到结果回复时在原入口询问“查询 COUPON-2001 的退款状态”；重启后也明确提供该订单号。查看拒绝/超时可沿主线使用 `COUPON-2002` / `COUPON-2003`。 | 查询持久结果，不把发送未知解释为未退款；拒绝/超时不生成退款方案。`node scripts/refund-agent-check.ts` 演示发送后登记、失败不重发、过期卡只读和丢失结果回复后查询；`node scripts/merchant-notification-agent-check.ts` 演示通知 unknown/claimed 后不重发。这两条为真实 Pi/faux、合成服务及本地发送，0 远程模型、0 数据库，不能替代平台验收。 |
 
 需要重跑完整联合真实模型路径时，先按[评测准备](./evaluation.md#d1d2-模拟售后评测)初始化评测表，再运行 `npm run check:notification-model -- --label "面试异步售后复现"`。当前脚本是 3 场景 / 21 处理轮的版本；它调用真实模型和 MySQL，QQ 发送仍由本地函数替代。逐轮结果、失败与用量会进入现有工作台，不能把它称为真实 QQ 重验；不要并行运行修改同一演示库的售后套件。
 
 ## 面试讲解的源码入口
 
-实际默认调用链为 `QQ 可信事件 → QQAgent 群/用户串行队列及绑定快照 → 用户确认 hook / 宿主选单 / Pi Session → 最多七项受限工具 → Store → 发送前复核`；模拟 worker 的 `processDue → dispatchMerchantNotifications → resumeMerchant` 复用同一队列，出队和发送前再次读取原任务。源码入口分别为 [`qq.ts`](../src/qq.ts)、[`QQAgent.enqueue`](../src/qq-agent.ts)、[`createCouponSession`](../src/agent.ts)、[`order-discovery.ts`](../src/order-discovery.ts)、[`startMockMerchant`](../src/after-sales.ts)、[`dispatchMerchantNotifications`](../src/merchant-notifications.ts)。当前正式 QQ 的[绑定变化门禁](./qq-integration.md#绑定变化后的历史失效与出站门禁2026-10-09)覆盖默认 atomic 与 Controller，末次读取到网络发送之间仍不是原子授权。Controller 候选将模型工具收敛为 `support_action`，不改确认与事务服务，不能沿用默认架构的真实 QQ 验收结论。
+实际默认调用链为 `QQ 可信事件 → QQAgent 群/用户串行队列及绑定快照 → 用户确认 hook / Harness 选单 / Pi Session → 最多七项受限工具 → Store → 发送前复核`；模拟 worker 的 `processDue → dispatchMerchantNotifications → resumeMerchant` 复用同一队列，出队和发送前再次读取原任务。源码入口分别为 [`qq.ts`](../src/qq.ts)、[`QQAgent.enqueue`](../src/qq-agent.ts)、[`createCouponSession`](../src/agent.ts)、[`order-discovery.ts`](../src/order-discovery.ts)、[`startMockMerchant`](../src/after-sales.ts)、[`dispatchMerchantNotifications`](../src/merchant-notifications.ts)。当前正式 QQ 的[绑定变化检查](./qq-integration.md#绑定变化后的历史失效与出站门禁2026-10-09)覆盖默认 atomic 与 Controller，末次读取到网络发送之间仍不是原子授权。Controller 候选将模型工具收敛为 `support_action`，不改确认与事务服务，不能沿用默认架构的真实 QQ 验收结论。
 
 | 面试追问 | 个人实现、复用边界与取舍 | 可定位证据 |
 | --- | --- | --- |
@@ -81,7 +85,7 @@ npm start
 | 为什么不用消息中间件或无限重试？ | 当前小规模演示采用同库任务/通知和同进程 worker，复用服务与队列。通知至多一次主动尝试，付出的是可能漏通知；保留订单查询作为恢复途径。 | [D3 原会话通知](#d3-原会话通知)、[`merchant-notification-db-check.ts`](../scripts/merchant-notification-db-check.ts)、[`merchant-notification-agent-check.ts`](../scripts/merchant-notification-agent-check.ts)。 |
 | 重启恢复了什么？ | 默认 QQ/CLI atomic/memory 路径可查询持久订单、商家任务和退款结果，并恢复尚未领取的通知；其 Pi 聊天和订单选择仍在内存。网页 SQLite 历史另按浏览器 owner 与当前绑定恢复，不等于 QQ/CLI 会话持久化。明确订单号查询成功不等于 O4 的省略续问恢复。 | [历史平台记录](./qq-integration.md)、[核心业务收尾](./evaluation.md#p1-第三轮核心业务收尾)、[上下文恢复边界](./conversation-recovery.md)、[网页历史](./web-chat.md#current-history)。 |
 
-可引用的历史数字是 D1/D2 **3/3 场景、12/12 用户轮、67/67 检查**，以及 2026-10-05 联合最终 run `513fe193-53e7-4452-91cf-fc6804c7cf82` 的 **3/3 场景、21/21 处理轮、140/140 检查**；后者 6 个宿主确认轮不调用模型，40/40 模型请求报告 usage。分数来自[实际评测记录](./evaluation.md#p1-第三轮核心业务收尾)，QQ 发送本地替代，不是生产成功率。本次未重新计时或核算费用，缺少统一成本的历史结果不补零；当前成本取舍示例可看 [C1 同批模型对照](./c1-agent-model-ablation.md#实际结果与选型)。
+可引用的历史数字是 D1/D2 **3/3 场景、12/12 用户轮、67/67 检查**，以及 2026-10-05 联合最终 run `513fe193-53e7-4452-91cf-fc6804c7cf82` 的 **3/3 场景、21/21 处理轮、140/140 检查**；后者 6 个 Harness 确认轮不调用模型，40/40 模型请求报告 usage。分数来自[实际评测记录](./evaluation.md#p1-第三轮核心业务收尾)，QQ 发送本地替代，不是生产成功率。本次未重新计时或核算费用，缺少统一成本的历史结果不补零；当前成本取舍示例可看 [C1 同批模型对照](./c1-agent-model-ablation.md#实际结果与选型)。
 
 [O4-8 新问法对照](./o4-recovery-validation.md#当前任务引用新问法真实对照合同2026-10-06已执行未准入)保留了 `current` 78/80、`id` 79/80 与总计 USD 0.1388397 的结果；未确认 `current` 的整体收益，候选未准入，也未改变本页默认演示路径。
 
@@ -91,12 +95,12 @@ npm start
 
 | 命令/路径 | 本轮实际证据 |
 | --- | --- |
-| `node scripts/support-host-entry-check.ts` | 旧预处理断言失败（确认次数1而期望0），修复后通过；保留模型错误后的固定宿主回执回归。 |
+| `node scripts/support-host-entry-check.ts` | 旧预处理断言失败（确认次数1而期望0），修复后通过；保留模型错误后的 Harness 固定格式回复回归。 |
 | 默认CLI启动后输入 `/exit` | 显式atomic/lexical/memory，实际启动并退出0；只验证初始化和退出，不评价自然语言咨询。 |
 | `node --env-file-if-exists=.env scripts/qq-isolation-check.ts` | 双用户原路通知、异额方案、交叉确认拒绝、各自确认/重复幂等及新Session查询通过。 |
 | `npm run check:refund` | 真实事务与一致快照、发送门槛、金额/批准/期限复核、并发幂等及离线发送故障通过。 |
 | `npm run check:merchant-notifications` | 路由/并发领取/持久状态及Pi通知失败不重发通过；此套件仍是同进程对象/连接重建。 |
-| `node --env-file-if-exists=.env scripts/atomic-refund-recovery-db-check.ts --db` | 首个子进程完成实际展示、宿主确认和重复幂等后退出；第二个不同PID用全新连接、Pi atomic Session及工具重新查库。 |
+| `node --env-file-if-exists=.env scripts/atomic-refund-recovery-db-check.ts --db` | 首个子进程完成实际展示、Harness 确认和重复幂等后退出；第二个不同PID用全新连接、Pi atomic Session及工具重新查库。 |
 | `npm run validate` | 最终退出0；包含新进程检查的纯合同反例，DB部分仍需显式 `--db`。 |
 
 新[进程检查](../scripts/atomic-refund-recovery-db-check.ts)的实际PID为 **35380 → 35432**，同一模拟退款 `53890118-b7e2-4663-9896-ab0f714fdf7b`、**7980分**。第二进程仅接收可信合成身份、群和订单定位，不接收首进程答案；返回事实来自真实 `get_order` / `get_refund` toolResult。父进程独立核对任务批准、金额、退款UUID及单笔记录；查询前后九张fixture表的hash一致，清理后九表均为0。它证明明确订单号的持久结果查询，不证明聊天历史或省略指代恢复。
@@ -109,50 +113,50 @@ npm start
 
 ### 退款确认调用链审计（2026-10-08）
 
-本轮只核验默认 atomic 主线的确认入口、展示门槛和事务，不扩展能力。真实约束是本人在原会话确认已展示的有效方案，金额来自存储，重复消息最多完成一笔模拟退款；面试追问是“模型输出确认文字、发送结果未知或两个进程同时确认，谁能决定执行”。个人实现为入口解析、固定回执和 RefundStore 授权/事务，复用 Pi 循环、QQ SDK 与 MySQL。预算为30分钟、既有两条离线检查各一次，0远程模型/QQ/数据库请求；源码和定向结果核对后收尾，不重跑历史实验。
+本轮只核验默认 atomic 主线的确认入口、展示门槛和事务，不扩展能力。真实约束是本人在原会话确认已展示的有效方案，金额来自存储，重复消息最多完成一笔模拟退款；面试追问是“模型输出确认文字、发送结果未知或两个进程同时确认，谁能决定执行”。个人实现为入口解析、固定格式回复和 RefundStore 授权/事务，复用 Pi 循环、QQ SDK 与 MySQL。预算为30分钟、既有两条离线检查各一次，0远程模型/QQ/数据库请求；源码和定向结果核对后收尾，不重跑历史实验。
 
 以已展示的79.80元方案及其实际操作编号为例，逐层跟踪：
 
 | 环节 | 实际调用与检查 |
 | --- | --- |
-| 原文进入宿主 | [`cli.ts`](../src/cli.ts) 的 `parseCliInput → confirmRefundReply` 保留业务原文；[`qq.ts`](../src/qq.ts) 只去掉开头的传输 @，在 [`QQAgent.enqueue`](../src/qq-agent.ts) 队列内调用确认 hook。[`refund-entry.ts`](../src/refund-entry.ts) 仅容忍首尾ASCII空格/tab，完整单行UUID才调用 Store；模型输出或通知事件不能进入此入口。 |
-| 方案开放确认 | [`agent.ts`](../src/agent.ts) 的 `prepare_refund` 只有订单参数，身份/会话由宿主闭包提供，金额由 Store 计算。`replyFromTools → renderReply → QQAgent.deliver` 展示当前工具结果的固定方案；`send → markRefundReplyPresented → markPresented` 成功后才开放确认。API接受不代表用户已读；首次方案发送/登记未成功时不开放确认，过期卡不尝试重新登记，两种失败均不自动重发。 |
+| 原文进入 Harness | [`cli.ts`](../src/cli.ts) 的 `parseCliInput → confirmRefundReply` 保留业务原文；[`qq.ts`](../src/qq.ts) 只去掉开头的传输 @，在 [`QQAgent.enqueue`](../src/qq-agent.ts) 队列内调用确认 hook。[`refund-entry.ts`](../src/refund-entry.ts) 仅容忍首尾ASCII空格/tab，完整单行UUID才调用 Store；模型输出或通知事件不能进入此入口。 |
+| 方案开放确认 | [`agent.ts`](../src/agent.ts) 的 `prepare_refund` 只有订单参数，身份/会话由工具注册时的闭包提供，金额由 Store 计算。`replyFromTools → renderReply → QQAgent.deliver` 展示当前工具结果的固定方案；`send → markRefundReplyPresented → markPresented` 成功后才开放确认。API接受不代表用户已读；首次方案发送/登记未成功时不开放确认，过期卡不尝试重新登记，两种失败均不自动重发。 |
 | 确认事务 | [`RefundStore.withOperation`](../src/refunds.ts) 先从编号定位订单，再 `lockOrder → current` 重新校验当前身份绑定、客户和原会话；UUID不是权限凭证。`confirm → eligible → decisionTime` 在锁内复核批准、金额、单券、付款及等待锁后的有效期，才写退款、订单、券和操作结果。同订单行锁让并发请求串行，后者读到 succeeded 后返回同一结果；[`refund_operations`](../db/06-refunds.sql) 每单唯一约束配合这一流程。应用内消息去重无法替代跨进程事务，也没有为此增加分布式锁。 |
 | 结果未知时恢复 | `confirmRefundReply` 捕获提交异常后提示在原会话按订单查询，不断言“未退款”；成功结果的发送失败不自动重发。明确订单查询读取持久结果，不能据此声称恢复了聊天历史、省略指代或真实银行到账。 |
 
-**本轮结果：** 基于源码基线 `4509d36` 审阅完整调用方，未发现需要修改生产代码的有证据缺陷。`node scripts/support-host-entry-check.ts` 与 `node scripts/refund-agent-check.ts` 各执行一次，均退出0；前者核验CLI原文与确认解析，后者用实际Pi/faux和本地发送核验当轮六工具合同、排队确认、发送/登记失败不重发、过期卡、宿主重复幂等及丢失回执后查询。Store在该离线检查中由合成实现替代，不能把通过结果说成当前MySQL并发验收；真实事务、身份/群隔离与进程退出证据仍引用[2026-10-06工程复核](#本轮稳定主线工程复核2026-10-06)，本轮未重跑数据库、模型或QQ。仅补材料与计划状态，默认配置和C1/O4/O5准入状态不变。
+**本轮结果：** 基于源码基线 `4509d36` 审阅完整调用方，未发现需要修改生产代码的有证据缺陷。`node scripts/support-host-entry-check.ts` 与 `node scripts/refund-agent-check.ts` 各执行一次，均退出0；前者核验CLI原文与确认解析，后者用实际Pi/faux和本地发送核验当轮六工具合同、排队确认、发送/登记失败不重发、过期卡、Harness 重复幂等及丢失结果回复后查询。Store在该离线检查中由合成实现替代，不能把通过结果说成当前MySQL并发验收；真实事务、身份/群隔离与进程退出证据仍引用[2026-10-06工程复核](#本轮稳定主线工程复核2026-10-06)，本轮未重跑数据库、模型或QQ。仅补材料与计划状态，默认配置和C1/O4/O5准入状态不变。
 
 ### 协商确认授权链审计（2026-10-08）
 
-**本轮合同：** 客户提出联系商家的明确诉求，只创建本人的协商任务，不因模型建议、商家批准或重复消息执行退款。面试追问是“准备、展示和用户确认各证明什么，为什么协商没有退款的展示门槛”。个人实现为可信入口、单行解析、当前订单校验、任务唯一约束与固定回执；复用Pi循环、QQ传输和MySQL事务。预算30分钟、0新增远程模型/数据库/真实QQ请求，只审阅固定源码及既有断言、补文档并核对链接后收尾，不重跑已审计的入口检查或扩展业务。
+**本轮合同：** 客户提出联系商家的明确诉求，只创建本人的协商任务，不因模型建议、商家批准或重复消息执行退款。面试追问是“准备、展示和用户确认各证明什么，为什么协商没有退款的展示门槛”。个人实现为可信入口、单行解析、当前订单校验、任务唯一约束与固定格式回复；复用Pi循环、QQ传输和MySQL事务。预算30分钟、0新增远程模型/数据库/真实QQ请求，只审阅固定源码及既有断言、补文档并核对链接后收尾，不重跑已审计的入口检查或扩展业务。
 
-默认atomic的完整路径为：`QQ可信消息 / CLI原文 → confirmMerchantReply → AfterSalesStore.request → eligible → 任务及原通知路由同事务保存 → merchant_status固定回执`；普通咨询则经Pi调用`prepare_merchant_request → prepare → replyFromTools → renderReply`，返回建议。
+默认atomic的完整路径为：`QQ可信消息 / CLI原文 → confirmMerchantReply → AfterSalesStore.request → eligible → 任务及原通知路由同事务保存 → merchant_status固定格式回复`；普通咨询则经Pi调用`prepare_merchant_request → prepare → replyFromTools → renderReply`，返回建议。
 
 | 环节 | 实际行为与证据边界 |
 | --- | --- |
-| 准备建议 | [`agent.ts`](../src/agent.ts)约109行定义只读`prepare_merchant_request`，身份和sourceKey来自宿主闭包。先查订单/FAQ、原因来自用户是工具描述中的流程要求；[`AfterSalesStore.prepare`](../src/after-sales.ts)约111行只重新校验当前订单并返回确认文字，不写准备记录，也不验证此前是否查FAQ或原因是否逐字来自原问。模型生成建议不构成创建权限。 |
-| 实际用户确认 | [`QQ确认hook`](../src/qq.ts)约137行由原消息提供身份、群和通知路由；[`CLI`](../src/cli.ts)约127行保留业务原文。QQ在[`QQAgent.enqueue`](../src/qq-agent.ts)约146行进入宿主hook，CLI直接调用；命中后返回业务回执，不启动新模型轮。QQ仍先创建Session，不能将“不调用模型确认”扩大为不依赖Session初始化。 |
+| 准备建议 | [`agent.ts`](../src/agent.ts)约109行定义只读`prepare_merchant_request`，身份和 sourceKey 来自工具注册时的闭包。先查订单/FAQ、原因来自用户是工具描述中的流程要求；[`AfterSalesStore.prepare`](../src/after-sales.ts)约111行只重新校验当前订单并返回确认文字，不写准备记录，也不验证此前是否查FAQ或原因是否逐字来自原问。模型生成建议不构成创建权限。 |
+| 实际用户确认 | [`QQ确认hook`](../src/qq.ts)约137行由原消息提供身份、群和通知路由；[`CLI`](../src/cli.ts)约127行保留业务原文。QQ在[`QQAgent.enqueue`](../src/qq-agent.ts)约146行进入 Harness hook，CLI直接调用；命中后返回业务回复，不启动新模型轮。QQ仍先创建Session，不能将“不调用模型确认”扩大为不依赖Session初始化。 |
 | 指令本身授权协商 | [`confirmMerchantReply`](../src/after-sales-entry.ts)约15行要求完整单行`确认联系商家 COUPON-2001 原因：行程变化`，只去首尾ASCII空格/tab；原因1–200个Unicode码点、禁止`merchantReasonControls`所列控制/格式字符且不能有首尾空白，该名单不覆盖所有不可见字符。没有先前prepare、展示成功或原建议逐字一致的前置检查；本人可以直接发送完整指令，首次创建使用该条指令的原因。未有专门的当轮DB复现，结论来自调用路径。 |
 | 当前事实决定申请 | `request → eligible`约123/77行在同一事务用`FOR SHARE`读取当前绑定、订单、场景、明细、券、支付和退款，要求本人、全额支付、单张未核销且未过期、未退款；申请额取当前`paid_cents`，用户/模型不能传金额。确认文字不包含金额，也不绑定前次建议的金额或FAQ版本。按[`init-after-sales.ts`](../scripts/init-after-sales.ts)配置的D1账户只读订单/支付/退款，本轮未查实际grants；不能将此合同当成对已展示退款方案的确认，D2另需编号、有效方案和实际展示登记。 |
 | 重复与来源 | [`merchant_requests.order_id唯一键`](../db/05-merchant.sql)及`ON DUPLICATE KEY UPDATE task_id=task_id`保留首任务、原因、金额和期限；重新读取后校验当前customer/source，换会话不能接管。首次QQ任务才在同事务保存通知路由，重复确认不改路由。`request`先检查当前资格才返回旧任务，因此退款后、券过期或归属变化时可能拒绝，不能承诺任意时点重复确认都返回任务；结果恢复走重新授权的查询。 |
-| 提交与回执分开 | `confirmMerchantReply`捕获创建异常只说结果暂不能确认，不断言任务不存在；任务提交后QQ发送或回执入Pi失败不回滚任务，也不自动重发。首次路由保存不等于商家外部收到或QQ用户已读；后续通知与退款沿各自边界执行。 |
+| 提交与回复分开 | `confirmMerchantReply`捕获创建异常只说结果暂不能确认，不断言任务不存在；任务提交后QQ发送或回复入Pi失败不回滚任务，也不自动重发。首次路由保存不等于商家外部收到或QQ用户已读；后续通知与退款沿各自边界执行。 |
 
-**例子与取舍：** 在[启动条件](#启动)就绪且本人的COUPON-2001仍满足资格时，直接发完整协商指令会进入`request`；“同意”或模型输出相同文字不会进入该宿主创建入口。首次发送“原因：行程变化”后，再发“原因：另一原因”，资格仍有效且来源相同时只回读原任务，不修改原原因。相较仅Prompt约束，宿主解析和存储校验保证实际写入边界；相较增加协商准备令牌/展示表，当前方案少存一份状态，代价是不能证明用户确认了此前展示的金额或资料。若将来业务要求这种绑定，须另定合同，不能从现有界面按钮推导已实现。事务含多次读取和共享锁，仍有等待/死锁成本；本轮无新延迟或费用测量，未知不补零。
+**例子与取舍：** 在[启动条件](#启动)就绪且本人的COUPON-2001仍满足资格时，直接发完整协商指令会进入`request`；“同意”或模型输出相同文字不会进入该 Harness 创建入口。首次发送“原因：行程变化”后，再发“原因：另一原因”，资格仍有效且来源相同时只回读原任务，不修改原原因。相较仅Prompt约束，Harness 解析和存储校验保证实际写入边界；相较增加协商准备令牌/展示表，当前方案少存一份状态，代价是不能证明用户确认了此前展示的金额或资料。若将来业务要求这种绑定，须另定合同，不能从现有界面按钮推导已实现。事务含多次读取和共享锁，仍有等待/死锁成本；本轮无新延迟或费用测量，未知不补零。
 
 **审阅结果与复现入口：** 固定`abf37a774caa156e33fcd59d2353758b95cb1dbb`的14份相关源码/SQL/检查文件与本机逐字节一致，已核对全部正式`request`调用方和独立审阅；未发现需要修改生产代码的有证据缺陷。仅补本文/计划并检查差异与链接，没有运行Pi、SQL、模型或QQ验收。既有[`support-host-entry-check.ts`](../scripts/support-host-entry-check.ts)覆盖原文包装，已在[稳定工程复核](#本轮稳定主线工程复核2026-10-06)运行，不计本轮新样本。`node --env-file-if-exists=.env scripts/merchant-agent-check.ts`使用Pi/faux与真实MySQL检查准备零写入、工具白名单、模型不能确认、来源隔离及原原因保留；[`merchant-db-check.ts`](../scripts/merchant-db-check.ts)约80行有五次并发请求同任务断言。两项DB入口需先满足全库扫描准备条件，本轮只读断言而未执行；[历史真实模型与QQ记录](#验证记录)保持历史层级，不能用静态审计补认并发/真实传输或商业验收。默认atomic/lexical/memory/id及C1/O4/O5未准入状态不变。
 
 ### 剩余实付与整笔退款边界审计（2026-10-08）
 
-**本轮合同：** 一单两券、已经使用一券时，客户想知道剩余券的实付和能否退款。业务约束是逐券事实、支付金额、申请资格、商家批准与执行权限分别取证；面试追问是“剩余实付59.90元为何不能直接成为退款金额”。个人实现为订单快照、固定金额字段及D1/D2执行边界，复用Pi循环和MySQL；Controller的历史金额引用/只读比较是另一路候选能力。预算30分钟、0新增模型/数据库/真实QQ请求，只核对固定源码与既有断言、补材料及检查链接后收尾，不扩建部分退款或优惠分摊。
+**本轮合同：** 一单两券、已经使用一券时，客户想知道剩余券的实付和能否退款。业务约束是逐券事实、支付金额、申请资格、商家批准与执行权限分别核对依据；面试追问是“剩余实付59.90元为何不能直接成为退款金额”。个人实现为订单快照、固定金额字段及D1/D2执行边界，复用Pi循环和MySQL；Controller的历史金额引用/只读比较是另一路候选能力。预算30分钟、0新增模型/数据库/真实QQ请求，只核对固定源码与既有断言、补材料及检查链接后收尾，不扩建部分退款或优惠分摊。
 
 沿合成`COUPON-1005`追踪，不能把以下层次合并：
 
 | 环节 | 实际金额、权限与源码 |
 | --- | --- |
 | 本人订单事实 | [`02-seed.sql`](../db/02-seed.sql)约24–60行：整单实付11980分，一项明细`quantity=2 / unit_price_cents=5990 / total_cents=11980`，两券分别`redeemed/unused`，成功支付11980分。[`get_order → CouponStore.getOrder`](../src/coupon-store.ts)约67–123行在同一只读快照重新校验身份并返回这些字段；`unitPriceCents`来自明细单价，数据库没有逐券优惠分摊记录，不能推广为任意订单的每券净实付。 |
-| 固定卡与模型说明 | [`replyFromTools`](../src/reply-from-tools.ts)约34–40行只抽取整单实付、已退和券状态，[`renderReply`](../src/reply.ts)约81–99行固定显示119.80元及两券状态，没有计算“可退59.90元”。这份无优惠、两券等价的合成数据可解释5990分，但atomic附带的自然语言金额/资格说明仍由模型生成，不是宿主逐券金额证明。[`KB-REFUND-PARTIAL`](../db/02-seed.sql)仅是咨询规则，不创建批准或写入权限。 |
+| 固定卡与模型说明 | [`replyFromTools`](../src/reply-from-tools.ts)约34–40行只抽取整单实付、已退和券状态，[`renderReply`](../src/reply.ts)约81–99行固定显示119.80元及两券状态，没有计算“可退59.90元”。这份无优惠、两券等价的合成数据可解释5990分，但atomic附带的自然语言金额/资格说明仍由模型生成，不是 Harness 逐券金额证明。[`KB-REFUND-PARTIAL`](../db/02-seed.sql)仅是咨询规则，不创建批准或写入权限。 |
 | 协商与退款执行 | [`validate → AfterSalesStore.eligible`](../src/after-sales.ts)约43/77行先限制2xxx订单及已配置场景，再检查已全额支付、单项数量1、单张有效未核销券、支付与订单金额一致、无历史退款。[`RefundStore.eligible`](../src/refunds.ts)约79行另查原会话批准、整笔金额和当前券事实；未完成操作在`prepare/markPresented/confirm`检查资格，确认写同一笔退款/订单/券/操作，已成功操作走幂等回读。金额取存储的整单实付。1005首先在范围校验被拒；即使另建2xxx合成场景，多券或部分核销仍不满足资格。不能拿1005范围拒绝冒称已测到多券校验。 |
-| 已实现候选的只读比较 | [`paidUnits → createAmountReference → compareRemainingAmount`](../src/support-context.ts)约105–132行仅在全额支付、行金额等于数量×单价、明细合计与成功支付合计一致、券数匹配时使用单价；不按比例分摊优惠。比较还要求同单/同来源历史基准、唯一有效未核销券、已有已核销券及已退金额0，返回`refundApproved=false`；[`SupportController`](../src/support-controller.ts)约628–645行生成固定比较回执，不调用退款准备。该路径不在稳定atomic中，整体C1/O4/O5仍未准入。 |
+| 已实现候选的只读比较 | [`paidUnits → createAmountReference → compareRemainingAmount`](../src/support-context.ts)约105–132行仅在全额支付、行金额等于数量×单价、明细合计与成功支付合计一致、券数匹配时使用单价；不按比例分摊优惠。比较还要求同单/同来源历史基准、唯一有效未核销券、已有已核销券及已退金额0，返回`refundApproved=false`；[`SupportController`](../src/support-controller.ts)约628–645行生成固定比较回复，不调用退款准备。该路径不在稳定atomic中，整体C1/O4/O5仍未准入。 |
 
 **例子与取舍：** 整单119.80元、无优惠两券各59.90元，是可解释的合成事实；若实付变成109.80元却没有分摊记录，既不能直接用标价59.90元，也不能自行除以二得54.90元并承诺退款。当前执行边界选择拒绝这类写入，付出的是多券/优惠订单无法自动退款；只在明确新的逐券分摊、已退余额、批准和幂等合同后扩展。金额用整数分保存，渲染时校验安全整数；这不补出缺失的分摊事实，也没有本轮新增时延/费用收益数据。
 
@@ -174,7 +178,7 @@ D1 账户可读写协商任务、D3 通知及 `conversation_state`（SELECT/INSE
 
 ### 协商终态与截止时间调用链审计（2026-10-08）
 
-**本轮唯一目标与合同：** 客户等待商家结果时，重复、迟到或乱序结果不能覆盖已落库终态，商家批准也不能直接写退款。面试追问是“500毫秒轮询如何与8秒截止配合，停机和并发时以什么作为接受时点”。个人实现为宿主确认、持久任务、条件状态迁移及同进程worker；复用Pi工具循环、MySQL和既有D2校验，不接真实商家。预算30分钟、0远程模型/真实QQ/数据库请求，仅追踪正式调用方、既有断言及官方时间函数语义，核对文档差异/链接后收尾；不增加调度系统或重跑历史模型题。
+**本轮唯一目标与合同：** 客户等待商家结果时，重复、迟到或乱序结果不能覆盖已落库终态，商家批准也不能直接写退款。面试追问是“500毫秒轮询如何与8秒截止配合，停机和并发时以什么作为接受时点”。个人实现为 Harness 确认、持久任务、条件状态迁移及同进程worker；复用Pi工具循环、MySQL和既有D2校验，不接真实商家。预算30分钟、0远程模型/真实QQ/数据库请求，仅追踪正式调用方、既有断言及官方时间函数语义，核对文档差异/链接后收尾；不增加调度系统或重跑历史模型题。
 
 | 环节 | 源码、实际行为与取舍 |
 | --- | --- |
@@ -236,9 +240,9 @@ D1 账户可读写协商任务、D3 通知及 `conversation_state`（SELECT/INSE
 
 ## D3 原会话通知
 
-新建 QQ 协商任务时，宿主在同一事务中保存原确认消息的 AppID、发送者、群 OpenID、消息 ID 和时间；不保存用户正文。`task_id` 唯一，重复确认不会改向、刷新时间或重新开启已处理通知。CLI 和迁移前没有路由的任务继续由用户查询，不补造通知目标。
+新建 QQ 协商任务时，AfterSalesStore 在同一事务中保存原确认消息的 AppID、发送者、群 OpenID、消息 ID 和时间；不保存用户正文。`task_id` 唯一，重复确认不会改向、刷新时间或重新开启已处理通知。CLI 和迁移前没有路由的任务继续由用户查询，不补造通知目标。
 
-QQ 就绪后启动原有商家 worker：先更新到期任务，再扫描当前 AppID 已终态且通知为 `pending` 的记录。业务事件与用户消息进入同一个“群＋发送者”串行队列，队列满时暂留 `pending`。出队后原子领取通知、重新检查任务归属与终态；默认 atomic 通过 Pi 的普通 `prompt` 路径续接客服上下文，事件处理期间仅开放 `get_merchant_request`，不进入用户确认入口，也不开放退款准备或执行。模型回复、失败兜底和 Controller 的零模型通知均在发送前再次核验原任务及当前绑定，失效或读取失败时拒发并清理旧 Session；详见[通知发送前身份复核](#通知发送前身份复核2026-10-08)和[绑定变化门禁](./qq-integration.md#绑定变化后的历史失效与出站门禁2026-10-09)。最终使用对应任务的固定状态卡，不能由模型改换订单或宣称已退款。
+QQ 就绪后启动原有商家 worker：先更新到期任务，再扫描当前 AppID 已终态且通知为 `pending` 的记录。业务事件与用户消息进入同一个“群＋发送者”串行队列，队列满时暂留 `pending`。出队后原子领取通知、重新检查任务归属与终态；默认 atomic 通过 Pi 的普通 `prompt` 路径续接客服上下文，事件处理期间仅开放 `get_merchant_request`，不进入用户确认入口，也不开放退款准备或执行。模型回复、失败兜底和 Controller 的零模型通知均在发送前再次核验原任务及当前绑定，失效或读取失败时拒发并清理旧 Session；详见[通知发送前身份复核](#通知发送前身份复核2026-10-08)和[绑定变化检查](./qq-integration.md#绑定变化后的历史失效与出站门禁2026-10-09)。最终使用对应任务的固定状态卡，不能由模型改换订单或宣称已退款。
 
 通知只回复原确认消息，保留其消息 ID 和时间，不借用后来其他问题的消息延长窗口。应用在排队和发送前检查原消息是否仍在 **4 分 30 秒**内，这是本项目留出余量的本地限制。过期或当前群不在白名单时记为 `deferred`，不再主动发送，业务结果仍可查询。
 
@@ -246,7 +250,7 @@ QQ 就绪后启动原有商家 worker：先更新到期任务，再扫描当前 
 
 ### 通知领取与失败恢复调用链审计（2026-10-08）
 
-本节保留 `72e9f7d` 的当轮调用链与结论；随后新增的发送前授权复核见[下一节](#通知发送前身份复核2026-10-08)，当前 QQ 的绑定变化保护另见[正式入口门禁](./qq-integration.md#绑定变化后的历史失效与出站门禁2026-10-09)。
+本节保留 `72e9f7d` 的当轮调用链与结论；随后新增的发送前授权复核见[下一节](#通知发送前身份复核2026-10-08)，当前 QQ 的绑定变化保护另见[正式入口检查](./qq-integration.md#绑定变化后的历史失效与出站门禁2026-10-09)。
 
 本轮核验默认 atomic 的 D3 通知链。业务约束是原客户、原会话、原任务和原回复窗口不能被后续消息替换，商家批准不等于退款授权；面试追问是“为什么先排队再领取，发送成功但登记失败后如何恢复”。个人实现为路由保存、串行调度、领取状态和固定卡，复用 Pi 请求/取消、QQ SDK 和 MySQL；Controller 的零模型通知另作候选，不混用验收。预算30分钟，既有 `node scripts/merchant-notification-agent-check.ts` 离线检查一次，0远程模型/QQ/数据库请求；核对源码、检查和链接后收尾，不加消息中间件或重跑历史题集。
 
@@ -257,7 +261,7 @@ QQ 就绪后启动原有商家 worker：先更新到期任务，再扫描当前 
 | 保存原路由 | [`qq.ts`](../src/qq.ts) 的用户确认 hook → [`confirmMerchantReply`](../src/after-sales-entry.ts) → [`AfterSalesStore.request`](../src/after-sales.ts)。任务和通知路由同事务创建；仅首次任务插入保存消息ID/时间，重复确认不刷新窗口，CLI不补造路由。 |
 | 到期与通知分开推进 | `qq.ts` 的 ready → `startMockMerchant → store.processDue → afterProcess` → [`dispatchMerchantNotifications`](../src/merchant-notifications.ts)。worker分别限制一个在途轮询和一个通知批次，慢Pi请求不阻塞商家期限推进；`listNotifications` 只选当前App的终态任务及pending通知，按创建时身份绑定代次和订单归属联查，批次上限20。 |
 | 排队后才领取 | dispatcher → [`QQAgent.resumeMerchant → enqueue`](../src/qq-agent.ts)。与用户共用“群＋发送者”队列；满队列返回busy且不领取。出队再次检查原消息窗口后才调用 `claimNotification`，条件UPDATE重新校验绑定/归属和pending状态，只有一个竞争者能领取；随后 `getTask(referenceTaskId)` 再读原任务。应用队列不替代数据库原子领取。 |
-| 通知不能变成确认 | 当前atomic只开放 `get_order`、`search_faq`、`get_merchant_request`；查询任务时由宿主嵌套完成本人订单及适用规则取证，不开放协商或退款准备工具，仍跳过用户确认hook。即使模型查另一单或输出退款成功，发送仍使用宿主重新核验的原任务构造固定 `merchant_status`。终态卡没有退款确认按钮。Pi结果事件以不触发新轮的custom message写入内存，不能据此声称持久焦点或重启后聊天恢复；原审计及历史QQ成绩不自动覆盖新增嵌套取证。 |
+| 通知不能变成确认 | 当前atomic只开放 `get_order`、`search_faq`、`get_merchant_request`；查询任务时由 Harness 嵌套完成本人订单及适用规则取证，不开放协商或退款准备工具，仍跳过用户确认hook。即使模型查另一单或输出退款成功，发送仍使用 Harness 重新核验的原任务构造固定 `merchant_status`。终态卡没有退款确认按钮。Pi结果事件以不触发新轮的custom message写入内存，不能据此声称持久焦点或重启后聊天恢复；原审计及历史QQ成绩不自动覆盖新增嵌套取证。 |
 | 发送与登记有间隙 | `QQAgent.deliver → sendQQReply` 接受后，dispatcher才 `finishNotification`。窗口失效/禁用群/无有效任务为deferred；发送或交付后hook异常为unknown；落库失败则可能留在claimed并报状态不明。`qq.ts` 停机先停止worker新调度，再关闭/取消Agent并等候收尾；已开始的网络发送可能完成。 |
 
 例如QQ已经接受卡片、但写sent前进程退出，存储仍为claimed；重启扫描不会领取它，也不会用客户后来发的消息续原窗口。unknown同样不自动重发，尚未领取的pending仍可在有效窗口内尝试。由此保证的是本应用至多一次主动发送尝试，代价是可能漏通知；它不保证平台恰好一次送达或用户已读。客户可在原会话明确查询 `COUPON-2001` 协商进度，再重新读取订单/规则/批准并请求退款；通知状态本身不授权资金操作。改成超时重领会引入重复发送，只有业务明确要求送达重试且能处理重复时才考虑。
@@ -268,12 +272,12 @@ QQ 就绪后启动原有商家 worker：先更新到期任务，再扫描当前 
 
 业务约束：创建任务时绑定的身份代次与订单归属在通知发送前仍须有效，出队读取不能授权随后整段模型等待。面试追问是“商家通知已经领取，模型等待期间解绑或重绑，旧客户结果会不会发出”。本轮先以实际 Pi/faux、dispatcher 和 QQAgent 的受控等待复现，再只在现有发送路径复用 `getTask(referenceTaskId)` 复核；个人贡献是复核时点与拒发边界，复用 Pi 生命周期、现有身份联查和领取状态，不增加数据库表或模型角色。
 
-验收覆盖正常模型结果、模型失败兜底和零模型宿主通知；在首次授权读取后改变合成授权结果，断言不发送、不重复领取、不执行资金操作。身份读取异常也须拒发；正常通知仍使用原任务和原路由。预算30分钟、0远程模型/真实QQ/数据库请求：一次修复前定向复现、一次修复后定向回归及项目要求的最终 `validate`；失败只修受影响代码，不重跑模型题集。复核时点定义为发送前最后一次授权读取的快照；数据库读取与QQ网络发送不在同一事务，不能承诺发送已开始后撤销立即生效。
+验收覆盖正常模型结果、模型失败兜底和零模型 Harness 通知；在首次授权读取后改变合成授权结果，断言不发送、不重复领取、不执行资金操作。身份读取异常也须拒发；正常通知仍使用原任务和原路由。预算30分钟、0远程模型/真实QQ/数据库请求：一次修复前定向复现、一次修复后定向回归及项目要求的最终 `validate`；失败只修受影响代码，不重跑模型题集。复核时点定义为发送前最后一次授权读取的快照；数据库读取与QQ网络发送不在同一事务，不能承诺发送已开始后撤销立即生效。
 
 
-**实现与取舍：** [`QQAgent.enqueue`](../src/qq-agent.ts) 的局部 `deliverMerchant` 覆盖普通模型、模型失败兜底和零模型宿主通知；[`dispatchMerchantNotifications`](../src/merchant-notifications.ts) 的同一 resolver 仅首次领取，第二次只复用 [`AfterSalesStore.getTask`](../src/after-sales.ts) 的精确任务/创建时身份代次/当前订单归属联查。复核拒收、异常、错任务或非终态都返回 deferred；渲染使用第二次读取的任务，拒发时丢弃当前 Pi Session，避免保留本轮旧事实。未改变确认/退款边界、状态表或默认 atomic + lexical + memory + id。相对原路径，每次走到发送边界增加1条授权 SELECT（任务读取1→2），并增加数据库不可用时的漏通知概率；查询延迟未测量。不持有数据库锁等待QQ网络，最后读取快照之后的解绑仍不能原子撤回已开始发送。
+**实现与取舍：** [`QQAgent.enqueue`](../src/qq-agent.ts) 的局部 `deliverMerchant` 覆盖普通模型、模型失败兜底和零模型 Harness 通知；[`dispatchMerchantNotifications`](../src/merchant-notifications.ts) 的同一 resolver 仅首次领取，第二次只复用 [`AfterSalesStore.getTask`](../src/after-sales.ts) 的精确任务/创建时身份代次/当前订单归属联查。复核拒收、异常、错任务或非终态都返回 deferred；渲染使用第二次读取的任务，拒发时丢弃当前 Pi Session，避免保留本轮旧事实。未改变确认/退款边界、状态表或默认 atomic + lexical + memory + id。相对原路径，每次走到发送边界增加1条授权 SELECT（任务读取1→2），并增加数据库不可用时的漏通知概率；查询延迟未测量。不持有数据库锁等待QQ网络，最后读取快照之后的解绑仍不能原子撤回已开始发送。
 
-**实际证据：** 源码基线 `fc0fe64`；Node v26.10.0，复用 Pi 1.0.0。修复前 `node scripts/merchant-notification-agent-check.ts` 单次在首个 model 场景断言失败：已领取、首次读取后受控等待，合成授权失效却仍 sent；退出1、外层0.702秒，后五项未执行，不能算六项失败。修复后同入口一次退出0、外层0.375秒，新增6/6拒发场景覆盖正常模型、空回复兜底、Session创建后host通知、读取异常、错任务及pending；均读取两次、仅领取一次、无发送/准备，deferred再次调度不重试。正常发送及并发领取、unknown/claimed不重发等原断言仍通过。前置typecheck发现新增测试变量的TS7022推断错误，显式类型修正后最终 `npm run validate` 退出0，包含宿主通知回归；聚合重复同一用例不算独立样本。独立只读审阅无阻断。
+**实际证据：** 源码基线 `fc0fe64`；Node v26.10.0，复用 Pi 1.0.0。修复前 `node scripts/merchant-notification-agent-check.ts` 单次在首个 model 场景断言失败：已领取、首次读取后受控等待，合成授权失效却仍 sent；退出1、外层0.702秒，后五项未执行，不能算六项失败。修复后同入口一次退出0、外层0.375秒，新增6/6拒发场景覆盖正常模型、空回复兜底、Session创建后host通知、读取异常、错任务及pending；均读取两次、仅领取一次、无发送/准备，deferred再次调度不重试。正常发送及并发领取、unknown/claimed不重发等原断言仍通过。前置typecheck发现新增测试变量的TS7022推断错误，显式类型修正后最终 `npm run validate` 退出0，包含 Harness 通知回归；聚合重复同一用例不算独立样本。独立只读审阅无阻断。
 
 源码SHA256：`src/qq-agent.ts=febde3ea659e30ecc21f289fe1df734ea4cee309268de32dd3bd42513e0ac225`；`src/merchant-notifications.ts=63fa4fea4ba027b883e48ac4ce8b90822b729a59bac0c0b8666f01f93b62eb1b`。检查入口：[merchant-notification-agent-check.ts](../scripts/merchant-notification-agent-check.ts)（SHA256 `29d46b5ba648dd68e355301cf66afc4f23fa4404fa2b46f8ff352c741c0fae21`）；[support-notification-check.ts](../scripts/support-notification-check.ts)（`e8a971875f056193fabe261a465dc151663638fd21d803464f578e83b2317259`）。
 
@@ -286,28 +290,28 @@ QQ 就绪后启动原有商家 worker：先更新到期任务，再扫描当前 
 - `npm run check:merchant`：真实 MySQL＋Pi/faux，覆盖协商归属、精确确认、重复申请/回调、同意/拒绝/超时、同进程重建 Store/连接后查询及 D1 不写退款。
 - `npm run check:refund`：真实 MySQL 与离线 Pi/QQ handler，覆盖发送门槛、未确认/越权/跨群、15 分钟有效期、金额或审批变化、并发幂等、事务结果和同进程重建 Store/连接后查询。工程检查不计作真实模型成绩。
 - `node --env-file-if-exists=.env scripts/qq-isolation-check.ts`：真实 MySQL＋Pi 脚本模型＋单个 QQAgent，复用正式通知 dispatcher 和确认/发送成功 hook，QQ 发送由本地记录替代。同群两客户分别使用 79.80/59.90 元临时订单，验证一人阻塞时另一人完成、上下文标记隔离、互查拒绝、原路通知、并发方案、交换确认后数据库不变、各自合法及重复确认仅一笔退款、新 Agent 查询；这是工程集成，不计为真实模型或 QQ 客户端验收。
-- `npm run check:merchant-model`：独立 D1 真实模型检查，验证准备、宿主确认、等待期间继续 FAQ、原任务查询；QQ 发送在本地替代。
+- `npm run check:merchant-model`：独立 D1 真实模型检查，验证准备、Harness 确认、等待期间继续 FAQ、原任务查询；QQ 发送在本地替代。
 - `npm run check:refund-model`：真实 DeepSeek＋MySQL＋QQAgent，QQ 发送在本地替代；保存独立 `after-sales-refund-v1` 套件到评测工作台。运行前执行 `npm run eval:init`，需要模型凭据，可能产生费用。
 - `node --env-file-if-exists=.env scripts/merchant-notification-db-check.ts` 的历史工程记录已通过：原确认路由、重复确认不改向、CLI 不补路由、身份/来源检查、三种商家终态、并发唯一领取、同进程重建 Store 后 pending 恢复与 claimed 不重发、worker 串行收尾和数据库权限。创建并清理带随机标记的临时订单，订单与退款事实未改变；执行仍须满足[启动](#启动)中的全库扫描前提。
 - `npm run check:merchant-notifications` 运行 D3 数据库与离线 Agent 检查；`npm run check:notification-model` 现运行联合套件 `merchant-notification-v2`。历史 15 轮版本 run `2ba8c394-395e-421d-83eb-c48dcc2aa6ff` 为 3/3 场景、15/15 处理轮（12 用户 + 3 事件）、100/100 检查，31 次模型请求均报告 usage、24 次工具调用、0 工具错误。批准场景共 7 轮，覆盖通知后原会话省略订单请求退款、方案、精确确认、重复确认及重建 Agent/数据库连接查询；拒绝、超时各 4 轮，通知后追问仍不生成退款。当前 21 轮版本及失败历史见[核心业务收尾](./evaluation.md#p1-第三轮核心业务收尾)；不同题集分母不混算。QQ 发送在本地替代，历史 v1 与 D1/D2 分别保留。
 
-D1/D2 已记录的本地端到端通过记录为 `6349a275-946c-44bc-aac2-a8b9987f55d4`：**3/3 场景、12/12 用户轮次、67/67 检查通过**。覆盖批准后的方案/精确确认/重复确认/同进程重建后查询，以及拒绝和超时不生成方案；5 个宿主确认轮不调用模型，usage 不补零。数据库权限错误、漏查 FAQ 的失败及修复后通过记录均保留。
+D1/D2 已记录的本地端到端通过记录为 `6349a275-946c-44bc-aac2-a8b9987f55d4`：**3/3 场景、12/12 用户轮次、67/67 检查通过**。覆盖批准后的方案/精确确认/重复确认/同进程重建后查询，以及拒绝和超时不生成方案；5 个 Harness 确认轮不调用模型，usage 不补零。数据库权限错误、漏查 FAQ 的失败及修复后通过记录均保留。
 
 2026-10-02 至 10-03 的历史真实 QQ 群验收使用带随机标记的临时合成订单，另行验证了以下结果；当时未消耗 100x 或 2001–2003 演示单，不能据此推定当前库仍未使用这些订单：
 
-- 联合同意路径：准备协商、用户精确确认、自动同意通知，原会话不带订单请求退款后收到固定 79.80 元方案。普通“同意”后数据库仍无退款；按钮填字并由用户发送完整指令后才执行，API 200 与 `host_reply` 证明确认由宿主处理。
+- 联合同意路径：准备协商、用户精确确认、自动同意通知，原会话不带订单请求退款后收到固定 79.80 元方案。普通“同意”后数据库仍无退款；按钮填字并由用户发送完整指令后才执行，API 200 与 `host_reply` 证明确认由 Harness 处理。
 - 幂等与持久化：重复确认返回同一退款 UUID；数据库仅一笔 7980 分退款，订单与券均为 `refunded`。机器人真正重启后，`get_order` / `get_refund` 仍读取同一结果。
 - 拒绝与超时：真实群分别显示固定终态卡；数据库退款方案为 NULL、退款记录为 0、已退金额为 0，券仍为 `unused`。
 
-客户端显示、平台响应与数据库核对分别记录在 [QQ 接入记录](./qq-integration.md)。D3 真实 QQ 同意、拒绝、超时均无需追问自动送达，通知记录为 sent，未生成退款方案/退款记录。2026-10-03 同群两个真实账户各自完成 79.80/59.90 元通知、方案与幂等退款，互换退款指令被宿主拒绝，第二账户点击第一账户协商/退款按钮被 QQ 拦截。实际重启后第二账户查询到原退款；第一账户本轮为重启后首次退款，未计作退款后的重启查询。临时订单已清理，公开 2001–2003 状态与已退金额未变；完整手机样式/`modal` 和公网 Webhook 仍待验收。
+客户端显示、平台响应与数据库核对分别记录在 [QQ 接入记录](./qq-integration.md)。D3 真实 QQ 同意、拒绝、超时均无需追问自动送达，通知记录为 sent，未生成退款方案/退款记录。2026-10-03 同群两个真实账户各自完成 79.80/59.90 元通知、方案与幂等退款，互换退款指令被 Harness 拒绝，第二账户点击第一账户协商/退款按钮被 QQ 拦截。实际重启后第二账户查询到原退款；第一账户本轮为重启后首次退款，未计作退款后的重启查询。临时订单已清理，公开 2001–2003 状态与已退金额未变；完整手机样式/`modal` 和公网 Webhook 仍待验收。
 
 2026-10-02 Prompt/Skill 的只读回归 `19cffcc5-c734-47b2-8098-5c4a0cd89869` 为 9/9 场景、10/10 轮、88/88 检查；检查器已校准且哈希改变，与历史分数不能作同条件改善比较。该轮联合链路复用已有运行时，仅调整 Prompt/Skill 与评测脚本，未增加生产 TypeScript 逻辑、API 或表；失败记录与检查器变更见 [评测说明](./evaluation.md)。真实商家外呼、网络商家回调和真实资金操作尚未实现。
 
 ## 未知订单号时的入口与连续选择（2026-10-09）
 
-本轮从作者能独立演示的缺口开始：用户直接说“我有哪些订单 / 我要退款”，旧 atomic 工具只有 `get_order`，只能要求先报订单号。现在宿主按可信入口身份列出最近三笔本人订单；同一合成规则由真实 SQL 关联、排序和只读工具执行，订单 ID、产品、金额和状态不从话术或测试 ID 分支生成。有更多订单时明确范围，其他订单继续按明确订单号查询。
+本轮从作者能独立演示的缺口开始：用户直接说“我有哪些订单 / 我要退款”，旧 atomic 工具只有 `get_order`，只能要求先报订单号。现在 Harness 按可信入口身份列出最近三笔本人订单；同一合成规则由真实 SQL 关联、排序和只读工具执行，订单 ID、产品、金额和状态不从话术或测试 ID 分支生成。有更多订单时明确范围，其他订单继续按明确订单号查询。
 
-[`CouponStore.listOrders`](../src/coupon-store.ts) 用一条参数化 SQL 将当前身份、订单和列表事实放在同一读取快照，复用已有 `customer_id,created_at` 索引；`list_orders` 不接收身份/客户参数。空列表需区分有效客户无订单和身份未绑定。原生 Pi 仍负责模型工具循环，项目新增的是业务工具与 [`order-discovery.ts`](../src/order-discovery.ts) 的有界宿主选择状态。
+[`CouponStore.listOrders`](../src/coupon-store.ts) 用一条参数化 SQL 将当前身份、订单和列表事实放在同一读取快照，复用已有 `customer_id,created_at` 索引；`list_orders` 不接收身份/客户参数。空列表需区分有效客户无订单和身份未绑定。原生 Pi 仍负责模型工具循环，项目新增的是业务工具与 [`order-discovery.ts`](../src/order-discovery.ts) 的有界 Harness 选择状态。
 
 CLI、QQ 与网页共享选择规则：仅当前会话返回的候选、十五分钟有效期，选择时 fresh `getOrder`；收到新问题清除旧候选。选择后恢复原问题并在同一轮继续查询，用户无需再补发“刚才的问题”。当前待选择时可直接输入订单号；Controller 旧 UUID 选择协议继续透传，不将新入口的进程内选择状态认领为 O4 持久恢复。
 

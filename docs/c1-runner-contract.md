@@ -1,6 +1,6 @@
 # C1 v2.2 开发适配与评分合同
 
-本页记录 `c1-context-runner-v3.1-adapter` / `c1-supplied-action-scoring-v2`。它修复评测适配，配合新的 v2.2 宿主动作协议；**不是新验证集，也不证明模型理解自然语言**。旧题、gold、来源 manifest、原始 artifact 和[首次结果报告](c1-context-results.md)均未改动。
+本页记录 `c1-context-runner-v3.1-adapter` / `c1-supplied-action-scoring-v2`。它修复评测适配，配合新的 v2.2 Harness 动作协议；**不是新验证集，也不证明模型理解自然语言**。旧题、gold、来源 manifest、原始 artifact 和[首次结果报告](c1-context-results.md)均未改动。
 
 ## 输入与动作分开冻结
 
@@ -15,13 +15,13 @@
 - `fixturePreparation` 记录声明、尝试、建立的 topic 数及是否选择了唯一 topic。声明成功的前序未取得证据时作为错误保留，不能静默略去。
 - fresh 授权用当前 result 中成功的 `get_order`、正确 parent requestId、输入 orderId 和 `evidence.order` 一致性验证。顶层 `verifiedOrderId` 只是状态续接输出，不再作为所有成功分支必返的授权凭据。
 - online 和隔离 reference 都使用真实 Controller 入口。reference 只注入参考 corpus，不导入业务数据库。
-- 缺失 / 多义前序和金额引用会提交不存在的 requestId，由宿主拒绝；有有效引用的行还增加一次无效 ID 探针。拒绝必须无知识请求、无规则、无副作用，不是通过一律预填 clarify 得到高分。单纯金额上限超范围案例例外：它明确提供 clarify 并保留旧能力合同失败。
+- 缺失 / 多义前序和金额引用会提交不存在的 requestId，由 Harness 拒绝；有有效引用的行还增加一次无效 ID 探针。拒绝必须无知识请求、无规则、无副作用，不是通过一律预填 clarify 得到高分。单纯金额上限超范围案例例外：它明确提供 clarify 并保留旧能力合同失败。
 
 ## 新旧评分分开
 
 原 `effectiveQueryMustInclude` 完整保留，但只输出 `legacyDiagnostics.missingEffectivePhrases`。例如“实际付款金额”不因没出现“实付”两字被判语义错误。硬检查改为原问保留、实际 fresh 事实、订单 / 商品范围、被使用的前序 requestId、金额来源与数值。原始严格分数留在旧 artifact，不重新计算覆盖。
 
-v2.2 的 `paid_amount_compare` 是纯数据库金额比较：当前必须重新读授权订单，核对宿主展示来源，产生实际 `amountComparison` 和 `refundApproved=false`，当前 `knowledge.length=0`、`rules.length=0`。旧 fixture 声明的历史咨询仍按输入重放并独立计入 warmup；这不代表当前金额动作需要检索。金额的新指标在 `amountFactsContract` 单列。**旧 PARTIAL gold 不改，也不能宣称已通过该旧检索合同**；`originalPositiveContractsNotPassedByAdapter` 和逐行诊断明确记录此变化。
+v2.2 的 `paid_amount_compare` 是纯数据库金额比较：当前必须重新读授权订单，核对 Harness 展示来源，产生实际 `amountComparison` 和 `refundApproved=false`，当前 `knowledge.length=0`、`rules.length=0`。旧 fixture 声明的历史咨询仍按输入重放并独立计入 warmup；这不代表当前金额动作需要检索。金额的新指标在 `amountFactsContract` 单列。**旧 PARTIAL gold 不改，也不能宣称已通过该旧检索合同**；`originalPositiveContractsNotPassedByAdapter` 和逐行诊断明确记录此变化。
 
 `dev-002` 要求退款申请上限，仍未支持。适配表提供澄清，但保留“旧 resolved 上限合同未通过”的诊断，不能把澄清替换旧 gold 或将它称作上限能力成功。
 

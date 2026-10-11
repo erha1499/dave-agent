@@ -10,7 +10,7 @@
 | --- | --- |
 | 真实业务问题 | 客户已经发出退款确认，但进程退出、客户端没有收到结果。再次查询或重复确认必须面对实际持久状态，不能凭“没收到回执”断言没有退款。 |
 | 面试追问 | 提交前中止与提交后丢回执分别发生什么？如何证明没有部分更新？新进程如何恢复？旧操作编号能否重复扣款？错误客户、错误会话能否借恢复绕过授权？ |
-| 个人实现与复用 | 个人代码提供业务事务、可信身份及来源校验、确认入口、数据库约束和检查协调；复用 MySQL/InnoDB 的事务与连接断开回滚、mysql2 驱动和已有 nonce 所有权夹具。本检查直接调用正式存储与宿主确认入口，不运行 Pi 循环，不声称实现了 Agent 通用 checkpoint。 |
+| 个人实现与复用 | 个人代码提供业务事务、可信身份及来源校验、确认入口、数据库约束和检查协调；复用 MySQL/InnoDB 的事务与连接断开回滚、mysql2 驱动和已有 nonce 所有权夹具。本检查直接调用正式存储与 Harness 确认入口，不运行 Pi 循环，不声称实现了 Agent 通用 checkpoint。 |
 | 预算 | 固定两个独立临时订单、两个故障窗口，各执行一次。真实模型请求 0、QQ 请求 0；只允许本机 `localhost`/`127.0.0.1:13306` 的 `dave_agent` 库。 |
 | 验收 | 逐表状态与关联一致；明确观察到所拥有子进程的 `SIGKILL` 退出；新的进程查询不写、错误授权不写、原确认及重复确认最多形成一笔退款；清理后九张夹具相关表均无该订单数据。 |
 | 收尾 | 保留 2 个窗口的完整分母和失败阶段；异常不伪装为通过。无需追加模型轮次，不引入生产故障开关、通用恢复框架、支付网关或通知补发平台。实库前置条件不满足就记录未执行。 |
@@ -33,7 +33,7 @@ sequenceDiagram
     R->>D: 正式查询仍待确认；原确认提交一笔退款
   else 提交后回执前窗口
     C->>D: 原始 commit()，等待返回
-    C-->>P: after-commit 屏障（尚未返回宿主回执）
+    C-->>P: after-commit 屏障（尚未返回 Harness 回执）
     P->>D: 独立一致性快照已含完整成功状态
     P->>C: 精确 SIGKILL 并等待 exit
     R->>D: 正式查询已成功；原确认返回原退款编号
@@ -97,7 +97,7 @@ flowchart TD
 
 - [检查脚本](../scripts/refund-crash-window-check.ts)：`commitBarrier`、`databaseChild`、`Children.run`、`checkRefundCrashWindowsDatabase`、`checkRefundCrashWindows`。屏障、进程所有权、真实状态与纯协调测试均在这一个新脚本中。
 - [退款事务](../src/refunds.ts)：`transaction` 的真实提交位置；`withOperation` 先授权再判断已成功；`confirm` 的四处写入；`get` 的持久状态授权查询。
-- [宿主确认入口](../src/refund-entry.ts)：`confirmRefundReply` 只接受字面确认命令；失败回复把结果表述为未知，提示回原会话查询；`markRefundReplyPresented` 在固定方案成功交付后登记可确认状态。
+- [Harness 确认入口](../src/refund-entry.ts)：`confirmRefundReply` 只接受字面确认命令；失败回复把结果表述为未知，提示回原会话查询；`markRefundReplyPresented` 在固定方案成功交付后登记可确认状态。
 - [订单读取](../src/coupon-store.ts)：`getOrder` 读取当前绑定与订单归属并返回业务状态。
 - [随机夹具](../scripts/merchant-test-fixture.ts)：`createMerchantFixture` 创建新的合成订单；`cleanup` 先按随机付款 marker 固定所属订单集合，再按依赖顺序删除。不得按 `COUPON-2xxx` 范围清库。
 - [已有正常恢复检查](../scripts/atomic-refund-recovery-db-check.ts)：已有检查是正常完成后由新进程查询；本轮保留该入口，补充两个真正被终止的事务窗口。

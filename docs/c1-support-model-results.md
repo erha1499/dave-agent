@@ -10,7 +10,7 @@
 
 typed v3 明确了文档覆盖的否定回答，保留 typed v2 的规则前提合同；binary v1、typed v1/v2/v3 的完整 Prompt 和 hash 仍保存在 `src/evidence-support.ts`。这次两模型对照固定输入和 Prompt，仅比较本地 Pi 目录中实际存在的两个模型；后续版本另行记录，不归入该对照。
 
-两模型均使用现有 Pi `openai-completions`、同一 DeepSeek endpoint、非思考模式、temperature 0、JSON 输出、maxTokens 2048、timeout 60000 ms、maxRetries 0。每问一篇原文、一次请求；判别输入只有 query 与文档，不含 gold。宿主继续校验完整 ID、精确引文、类别和输入绑定。直接支持单元中的 rank/score 固定为 1，仅满足接口，不构成检索或阈值实验。
+两模型均使用现有 Pi `openai-completions`、同一 DeepSeek endpoint、非思考模式、temperature 0、JSON 输出、maxTokens 2048、timeout 60000 ms、maxRetries 0。每问一篇原文、一次请求；判别输入只有 query 与文档，不含 gold。Harness 继续校验完整 ID、精确引文、类别和输入绑定。直接支持单元中的 rank/score 固定为 1，仅满足接口，不构成检索或阈值实验。
 
 ## 冻结与复现
 
@@ -91,7 +91,7 @@ Pro run：`5eff2af6-08d3-4bdd-b9df-d143d842410a`。
 
 这说明单篇开发分类的 10/10 不能保证多篇引文格式稳定。当时选定的后续方案为**逐候选故障隔离**：整体 JSON/结构及未知、缺失、重复 ID 继续整批拒绝；可明确归属候选的引文、类别、理由错误单项标为 invalid，不能接收或算正确拒收。其余项仍需通过精确引文、语义判断和原文版本复检；全项无效仍 unavailable。以下记录其后续实现与执行证据。
 
-备选的“模型选择原文片段 ID、宿主还原原文”可避免自由抄写标点，但需要分段、版本绑定及跨片段条件覆盖，还不能替代语义判别。当前先采用错误隔离，按收益决定是否增加分段协议。两种方案都不能追改原成绩。
+备选的“模型选择原文片段 ID、Harness 还原原文”可避免自由抄写标点，但需要分段、版本绑定及跨片段条件覆盖，还不能替代语义判别。当前先采用错误隔离，按收益决定是否增加分段协议。两种方案都不能追改原成绩。
 
 ## 隔离实现、零请求回放与后续边界
 

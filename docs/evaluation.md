@@ -1,21 +1,25 @@
-# 内置评测工作台
+<a id="内置评测工作台"></a>
+
+# 怎样判断 Agent 真正完成了客服任务？
 
 工作台和 Agent 使用同一个 MySQL `dave_agent`，由本项目的 Node 原生 HTTP 服务展示历史，不依赖外部评测平台。历史页面只读；新增“实验调试”可显式启动本机 v2 业务与离线检索实验，并保留 CLI，复用现有 Pi 会话和业务工具。配置与任务状态保存在本机 `.runtime/experiments/`，业务结果仍进入 MySQL，检索仍保存完整 JSON 报告。详见 [实验配置](./experiment-controls.md)。当前入口使用独立客观套件，下面的 D1/D2、D3 与 P1 记录保留为历史混合口径。
+
+这里把一个用户输入及其处理结果称为一轮，把围绕同一目标的多轮交互称为一个场景。Runner 是执行固定场景的脚本，fixture 是为该场景准备的合成订单和状态，gate 是必须通过的检查项。“负控”故意提供应被拒绝的条件，检查保护能否触发；“正控”使用合法条件，检查正常流程是否仍能通过。Harness 直接处理确认时可以没有模型请求；本地回复记录也不证明 QQ 客户端已经收到消息。
 
 ## 当前客观评测
 
 三次真实模型重复与检索基线、失败定位见 [2026-10-05 结果记录](./objective-evaluation-results.md)。
 
-本轮只检查工具选择、输入与顺序、数据库状态、固定卡片协议及运行指标。回复正文保留作诊断，不做正则措辞评分或 LLM judge。工程 gate、模型行为和离线检索分别展示，不能合成客服总分。
+本轮只检查工具选择、输入与顺序、数据库状态、固定卡片协议及运行指标。回复正文保留作诊断，不做正则措辞评分或 LLM judge。工程检查、模型行为和离线检索分别展示，不能合成客服总分。
 
 | CLI suite | 固定场景 / 轮次 / 检查 | 覆盖与边界 |
 | --- | --- | --- |
-| `readonly` | 20 / 26 / 218 | 八类订单、身份与作用域、澄清切单、未知政策取证；真实模型和 MySQL，当前暴露三个只读工具 |
+| `readonly` | 20 / 26 / 218 | 八类订单、身份与作用域、澄清切单、未知政策的依据查询；真实模型和 MySQL，当前暴露三个只读工具 |
 | `workflow` | 5 / 30 / 293 | 协商三终态、普通同意、伪称批准、等待期间 FAQ、通知、方案过期重建、确认幂等、重启及同用户跨单；当前七项工具，QQ 发信本地替代 |
 | `engineering` | 15 / 15 / 15 | 既有数据库、脚本模型、QQ、并发恢复与评测完整性 gate；每 gate 一个检查单元，不把内部断言伪装成独立成绩 |
 | `retrieval` | 290 / 290 / 854 | 选集 70 题、全量 212 题、范围隔离 4 题、无答案 4 题；原始排名计算 Recall/MRR，不调用模型 |
 
-当前原子工具集包含`list_orders`：只读为`list_orders / get_order / search_faq`，完整售后再加四项协商/退款查询与准备工具；精确确认由宿主执行。既有readonly 20场景/26轮仍只断言订单与FAQ调用路径，`list_orders`行为由独立[订单发现专项](./web-chat.md#最近订单选单续轮与真实流式2026-10-09)验收，声明三项不表示旧题新增入口覆盖。工作台严格集合已按当前3/7项核对，历史两/六工具运行及其原分母、成绩不重评分，见[七项恢复合同修复](./optimization-plan.md#首片完整售后工具恢复的评测合同)。
+当前原子工具集包含`list_orders`：只读为`list_orders / get_order / search_faq`，完整售后再加四项协商/退款查询与准备工具；精确确认由 Harness 执行。既有readonly 20场景/26轮仍只断言订单与FAQ调用路径，`list_orders`行为由独立[订单发现专项](./web-chat.md#最近订单选单续轮与真实流式2026-10-09)验收，声明三项不表示旧题新增入口覆盖。工作台严格集合已按当前3/7项核对，历史两/六工具运行及其原分母、成绩不重评分，见[七项恢复合同修复](./optimization-plan.md#首片完整售后工具恢复的评测合同)。
 
 ```sh
 node scripts/objective-eval-check.ts
@@ -38,13 +42,13 @@ npm run eval:serve
 
 ## 评测分母与费用调用链审计（2026-10-08）
 
-本片只审计已有评测证据，不优化模型或重跑业务题。**业务约束**是：退款取证失败后未执行的依赖轮次仍占计划分母，安全停止不自动等于业务成功，未采集用量不能声称免费。**面试追问**是：“运行已完成为何仍未通过？失败后的跳过、进程中断后的缺失和宿主确认无模型请求怎样区分？主Agent之外的费用如何计算？”**个人实现**是固定计划、采集、事务存储及分析/API；**复用**Pi事件、usage和模型目录估算、MySQL与现有执行器，不修改Pi循环。**验收**复用下述合成检查及历史结果；**预算/停止条件**为30分钟、0远程模型/真实QQ/数据库请求，链路和检查核对后收尾，不因失败分数或余量启动实验。
+本片只审计已有评测证据，不优化模型或重跑业务题。**业务约束**是：退款依据查询失败后未执行的依赖轮次仍占计划分母，安全停止不自动等于业务成功，未采集用量不能声称免费。**面试追问**是：“运行已完成为何仍未通过？失败后的跳过、进程中断后的缺失和 Harness 确认无模型请求怎样区分？主Agent之外的费用如何计算？”**个人实现**是固定计划、采集、事务存储及分析/API；**复用**Pi事件、usage和模型目录估算、MySQL与现有执行器，不修改Pi循环。**验收**复用下述合成检查及历史结果；**预算/停止条件**为30分钟、0远程模型/真实QQ/数据库请求，链路和检查核对后收尾，不因失败分数或余量启动实验。
 
 | 调用位置 | 实际行为与证据边界 |
 | --- | --- |
 | [CLI编排](../scripts/evaluate.ts) `executeEvaluationBatches` → [售后执行器](../scripts/objective-workflow.ts) | 执行前固定计划与重复次数。客观断言失败仍继续预定重复；基础设施异常停止后续运行。售后依赖失败用空步骤的`skipped`记录，不冒充模型调用；运行`completed`只表示流程结束。 |
-| Pi订阅 → [采集器](../src/eval-capture.ts) `captureEvaluationTurn` | 模型消息和工具事件分别计步骤；Pi缺失usage的全零初始化在本项目非空请求中视为未报告。宿主精确确认可以没有模型步骤；模型流阶段耗时与整轮耗时分开，首次中间文本不当作最终答案首字。 |
-| [持久化](../src/eval-store.ts) `startRun/saveCase/finishRun/getRun` | 开始写固定计划；案例、轮次和步骤同事务保存，回读用一致快照。执行器不重试提交结果未知的案例写入；未落盘项目由分析标`missing`。本轮只核对源码，未重新验收MySQL事务或真实进程中断。 |
+| Pi订阅 → [采集器](../src/eval-capture.ts) `captureEvaluationTurn` | 模型消息和工具事件分别计步骤；Pi缺失usage的全零初始化在本项目非空请求中视为未报告。Harness 精确确认可以没有模型步骤；模型流阶段耗时与整轮耗时分开，首次中间文本不当作最终答案首字。 |
+| [持久化](../src/eval-store.ts) `startRun/saveCase/finishRun/getRun` | 开始写固定计划；案例、轮次和步骤同事务保存，回读用一致快照。执行器不重试提交结果未知的案例写入；未保存的项目由分析标`missing`。本轮只核对源码，未重新验收MySQL事务或真实进程中断。 |
 | [分析器](../src/eval-analysis.ts) `objectivePlan/analyzeEvaluation/analyzeBatch` → [HTTP](../src/eval-server.ts) | 从计划ID重建分母；重复/未规划结果或伪称通过的缺检查记录标`invalid`，旧记录无计划标`legacy`。批次缺少预定重复则`missingRuns`增加、稳定性`incomplete`，完整用量留空；API直接返回这些分析，不按已执行成功项目重算分母。 |
 | [归因分析](../src/support-evaluation.ts) `analyzeSupportSpans` | 旧模型步骤只统计Agent；已采集提供商span按Agent、问题解析、重排、支持判别分角色，USD/CNY分列。父子重复用量报告异常且不相加，已知小计与完整金额分开；没有历史span时归因为null，不追造费用。详见[增量API合同](./evaluation-api.md#v2-执行归因增量字段)。 |
 
@@ -60,7 +64,7 @@ node scripts/eval-check.ts
 
 本轮源码基线`8b65de0`、Node `v26.10.0`；上述聚合检查退出0、外层10.202秒，覆盖事件采集、计划/缺失/跳过、费用分析、合成HTTP与编排负控。随后直接执行`eval-analysis-check.ts`和`objective-eval-check.ts`也退出0（0.189/0.800秒），但聚合入口已包含它们，此重复复核不计独立样本，后续只用聚合入口即可。Store/API由内存替代，Pi事件合成、提供商为替代传输；没有真实模型、QQ或数据库验收，也未修改源码、固定题/gold/原始结果或默认演示配置。历史真实售后失败仍见[205/293与292/293检查记录](./objective-evaluation-results.md)，本轮不重跑或追认通过；C1/O4/O5仍未完成。
 
-**语雀重点图维护（2026-10-08，已保存核验）：** [一次售后评测：失败、未执行与费用如何记账](https://www.yuque.com/erha-vrnso/repg3o/ylctono5n6gx1kc3#a695cfc1)第4节补一张原生可编辑Mermaid与前后解释。业务约束与追问沿本节：退款取证失败仍保留计划分母，运行结束不等于通过，用量完整不等于费用完整；个人工作只可视化已有计划/结果分析与用量完整性，复用Pi、存储和既有执行器，不改业务逻辑。固定`a50a7f6c`的10份实现、检查、合同与归档文件与文章`956be55a`版本逐字节一致；另核对本页后续文档变化，独立只读审阅无阻断。Chrome保存重载后图示可读；重开24行、839字符源码与草稿精确一致且可编辑，58个原文段落/标题、两表及19个原有链接保留。图中两面板为分析分支；Agent步骤与提供商span账本不叠加，USD/CNY分列，完整值仅对已采集集合成立。45分钟预算含至少10分钟核验与收尾，固定硬截止13:45:46，单篇一图完成即停止；0新增模型/数据库/真实QQ，未运行业务检查或增加历史样本，默认与C1/O4/O5状态不变。下一步沿图讲清skipped与missing、无模型步骤与漏报usage、known与complete三组区别，不计新增业务验收。
+**语雀重点图维护（2026-10-08，已保存核验）：** [一次售后评测：失败、未执行与费用如何记账](https://www.yuque.com/erha-vrnso/repg3o/ylctono5n6gx1kc3#a695cfc1)第4节补一张原生可编辑Mermaid与前后解释。业务约束与追问沿本节：退款依据查询失败仍保留计划分母，运行结束不等于通过，用量完整不等于费用完整；个人工作只可视化已有计划/结果分析与用量完整性，复用Pi、存储和既有执行器，不改业务逻辑。固定`a50a7f6c`的10份实现、检查、合同与归档文件与文章`956be55a`版本逐字节一致；另核对本页后续文档变化，独立只读审阅无阻断。Chrome保存重载后图示可读；重开24行、839字符源码与草稿精确一致且可编辑，58个原文段落/标题、两表及19个原有链接保留。图中两面板为分析分支；Agent步骤与提供商span账本不叠加，USD/CNY分列，完整值仅对已采集集合成立。45分钟预算含至少10分钟核验与收尾，固定硬截止13:45:46，单篇一图完成即停止；0新增模型/数据库/真实QQ，未运行业务检查或增加历史样本，默认与C1/O4/O5状态不变。下一步沿图讲清skipped与missing、无模型步骤与漏报usage、known与complete三组区别，不计新增业务验收。
 
 ## 开始使用
 
@@ -86,7 +90,7 @@ npm run check:refund
 npm run check:refund-model -- --label "D1 D2 售后基线"
 ```
 
-`after-sales-refund-v1` 是独立真实模型套件，使用临时合成订单，执行 DeepSeek＋MySQL＋QQAgent；QQ 平台发送替换为本地函数。三场景为批准后确认退款、商家拒绝、商家超时；成功路径包括发送成功后开放确认、重复确认幂等和重建 Agent/数据库连接后查询。12 个用户轮次中，7 轮调用真实模型，5 轮由宿主处理精确确认；模型请求次数另按真实事件统计。
+`after-sales-refund-v1` 是独立真实模型套件，使用临时合成订单，执行 DeepSeek＋MySQL＋QQAgent；QQ 平台发送替换为本地函数。三场景为批准后确认退款、商家拒绝、商家超时；成功路径包括发送成功后开放确认、重复确认幂等和重建 Agent/数据库连接后查询。12 个用户轮次中，7 轮调用真实模型，5 轮由 Harness 处理精确确认；模型请求次数另按真实事件统计。
 
 2026-10-02 已记录通过运行 `6349a275-946c-44bc-aac2-a8b9987f55d4`：**3/3 场景、12/12 轮、67/67 检查通过**，21 次模型请求、15 次工具调用、0 工具错误，21/21 请求报告 usage；80,971 Tokens，SDK 估算费用 $0.005344704。首次数据库权限错误、后续漏查 FAQ 的失败与修复后的通过记录均保留，失败依赖轮次记为跳过。真实 QQ 群也已另行完成同意退款、幂等、机器人重启查询和拒绝/超时验收；平台结果不计入本地模型套件的分母。
 
@@ -96,7 +100,7 @@ npm run check:refund-model -- --label "D1 D2 售后基线"
 
 ## D2/D3 联合评测
 
-运行 `npm run check:notification-model -- --label "D2 D3 联合基线"`，当前套件为 `merchant-notification-v2`：3 场景、21 个处理轮次，由 18 次用户发言和 3 次 `[商家结果事件]` 组成。批准场景 13 轮：准备协商、精确确认、等待期间套餐咨询、主动通知、原会话请求退款、查询待确认方案、查询过期方案、明确请求重新生成、旧编号拒绝、新编号确认退款、重复确认、查询成功结果、重建 Agent/数据库连接查询；拒绝和超时各 4 轮，通知后同样追问退款并验证不生成方案或退款。6 个宿主确认轮不调用模型，首字和 usage 留空。历史 v2 有 15、17、20 轮版本，按题集/检查器快照区分。
+运行 `npm run check:notification-model -- --label "D2 D3 联合基线"`，当前套件为 `merchant-notification-v2`：3 场景、21 个处理轮次，由 18 次用户发言和 3 次 `[商家结果事件]` 组成。批准场景 13 轮：准备协商、精确确认、等待期间套餐咨询、主动通知、原会话请求退款、查询待确认方案、查询过期方案、明确请求重新生成、旧编号拒绝、新编号确认退款、重复确认、查询成功结果、重建 Agent/数据库连接查询；拒绝和超时各 4 轮，通知后同样追问退款并验证不生成方案或退款。6 个 Harness 确认轮不调用模型，首字和 usage 留空。历史 v2 有 15、17、20 轮版本，按题集/检查器快照区分。
 
 真实 DeepSeek、MySQL、QQAgent 与正式通知 dispatcher 均参与，只有 QQ 发信被本地函数替代。事件轮仅查询原协商，不准备或执行退款；用户后续轮恢复正常工具并重新读取订单、规则及审批。2026-10-02 的 15 轮版本最终 run `2ba8c394-395e-421d-83eb-c48dcc2aa6ff` 为 **3/3 场景、15/15 处理轮、100/100 检查**，31 次模型请求均报告 usage、24 次工具调用、0 工具错误，已回读核对配置哈希。首次联合 run `3de89726-1d69-4c59-a236-2c946dcd7f88` 为 2/3 场景、14/15 轮、99/100 检查，暴露拒绝后追问漏查 FAQ；补充 Prompt/Skill 后复测，失败历史保留。窗口、并发、跨用户与网络失败仍由工程检查另外覆盖。
 
@@ -106,7 +110,7 @@ npm run check:refund-model -- --label "D1 D2 售后基线"
 
 历史 `merchant-notification-v1` 仅覆盖通知，为 3 场景、9 处理轮（6 用户 + 3 事件），与 v2 题集和断言不同，不能直接比较通过率。
 
-2026-10-02 运行 `7b788a77-865c-44ec-a6f7-d849a8b12540`：**3/3 案例、9/9 处理轮次、60/60 检查通过**；18 次模型请求、12 次工具调用、0 工具错误，65,844 Tokens，SDK 估算费用 $0.005407896。3 个宿主确认轮没有模型步骤、首字或 usage；事件轮走正常 prompt，不能与用户确认混淆。指标不包含事件前等待商家的时间，不代表 QQ 平台送达。首轮 `1308fa18-1fbb-4278-b1ed-bbdd7282bd8a` 同样通过且保留；最终运行记录慢通知不阻塞商家轮询和停机取消后的实现快照。
+2026-10-02 运行 `7b788a77-865c-44ec-a6f7-d849a8b12540`：**3/3 案例、9/9 处理轮次、60/60 检查通过**；18 次模型请求、12 次工具调用、0 工具错误，65,844 Tokens，SDK 估算费用 $0.005407896。3 个 Harness 确认轮没有模型步骤、首字或 usage；事件轮走正常 prompt，不能与用户确认混淆。指标不包含事件前等待商家的时间，不代表 QQ 平台送达。首轮 `1308fa18-1fbb-4278-b1ed-bbdd7282bd8a` 同样通过且保留；最终运行记录慢通知不阻塞商家轮询和停机取消后的实现快照。
 
 ## P1 第一轮检索改进后的业务回归
 
@@ -125,24 +129,24 @@ npm run check:refund-model -- --label "D1 D2 售后基线"
 | 套件 / 改动阶段 | run | 场景 / 轮次 / 检查 | 结果说明 |
 | --- | --- | --- | --- |
 | 只读 / 新题首次运行 | `37ec1382-1074-404a-8ad2-11a6d9b81ace` | 10/14 · 18/22 · 186/205 | 三个退款追问漏查订单，一处静态政策检查过严 |
-| 只读 / Skill 每轮取证 | `e2141e6c-707e-438c-befd-c0da36ac2be8` | 12/14 · 19/22 · 186/205 | 切单追问无工具；歧义时查询两单，后续一轮跳过 |
+| 只读 / Skill 每轮查询依据 | `e2141e6c-707e-438c-befd-c0da36ac2be8` | 12/14 · 19/22 · 186/205 | 切单追问无工具；歧义时查询两单，后续一轮跳过 |
 | 只读 / Prompt 入口优先级 | `12ba907e-5790-4405-9038-03c578b7c90a` | 14/14 · 22/22 · 205/205 | 此次通过 |
 | 只读 / FAQ 参数提示 | `9da25e7c-7628-441e-98e3-86dd06de238c` | 13/14 · 21/22 · 199/205 | 切单追问再次无工具 |
 | 只读 / 工具描述约束 | `7e162d22-9cec-4387-8b60-e982329ecc0e` | 13/14 · 20/22 · 192/205 | 正确的无问号澄清被误拒，后续一轮跳过 |
 | 只读 / 祈使澄清句校准 | `5530f13a-d8c5-4c89-94f3-e7964782a6d6` | 14/14 · 22/22 · 205/205 | 最终版本通过 |
 | 联合 / 新题首次运行 | `4dff6139-8331-41e9-9038-071e9dd6e6ec` | 3/3 · 17/17 · 114/114 | 此次通过 |
-| 联合 / Skill 每轮取证 | `e736c9fe-bfec-4cf9-8d7f-1c6de10ee140` | 3/3 · 17/17 · 114/114 | 此次通过 |
+| 联合 / Skill 每轮查询依据 | `e736c9fe-bfec-4cf9-8d7f-1c6de10ee140` | 3/3 · 17/17 · 114/114 | 此次通过 |
 | 联合 / Prompt 入口优先级 | `aee79fe1-8417-4a5b-ab8e-2c2c73395c63` | 2/3 · 16/17 · 113/114 | 超时追问 FAQ 多传 `orderId` 后自纠 |
 | 联合 / FAQ 参数提示 | `eae9bd00-8019-4831-8173-c7679bb3e83d` | 2/3 · 16/17 · 113/114 | 拒绝追问 FAQ 多传 `orderId` 后自纠 |
 | 联合 / 工具描述约束 | `4e9705ae-09ba-44c9-a613-d139a808ba89` | 3/3 · 17/17 · 114/114 | 最终业务配置通过 |
 
-共性失败是复用历史订单事实跳过本轮取证、歧义时边追问边查单，以及 FAQ 多传参数。已在 Prompt 加入口优先级，并收紧 Skill：歧义先等待明确订单；即使否定退款、需核实或没有操作工具，也须本轮 `get_order → scoped search_faq`；退款状态使用 `get_refund`；FAQ 仅传 `query/shopId/productId`。两次多余 `orderId` 均被 schema 拒绝，模型随后自纠，严格工具检查仍记失败，未生成退款，授权边界没有失守。随后将每轮取证和允许参数要求同步写入 `get_order`、`search_faq` 的工具描述，未增加轮次消息或上下文 hook；工具快照哈希随描述变化，不算同配置复跑。
+共性失败是复用历史订单事实跳过本轮查询依据、歧义时边追问边查单，以及 FAQ 多传参数。已在 Prompt 加入口优先级，并收紧 Skill：歧义先等待明确订单；即使否定退款、需核实或没有操作工具，也须本轮 `get_order → scoped search_faq`；退款状态使用 `get_refund`；FAQ 仅传 `query/shopId/productId`。两次多余 `orderId` 均被 schema 拒绝，模型随后自纠，严格工具检查仍记失败，未生成退款，授权边界没有失守。随后将每轮查询依据和允许参数要求同步写入 `get_order`、`search_faq` 的工具描述，未增加轮次消息或上下文 hook；工具快照哈希随描述变化，不算同配置复跑。
 
-初次静态政策复述引用了真实旧证据，强制本轮 FAQ 属于检查过严。后续“请明确是 A 还是 B”也被误判，现允许明确请求词与订单二选一语法同时出现的祈使句，并保留双订单陈述、否定请求的拒绝检查。本轮新增 21 项离线校准（12 澄清、6 未知承诺、3 历史证据）通过。检查器认可历史 FAQ 仅限 `COUPON-1008` 静态政策重复追问，须有此前成功结果；本轮 FAQ 若为空、失败或范围错误，绝不回退。其他退款仍须本轮取证。`evidenceIds` 只记录本轮工具，旧规则在前轮轨迹回看，不伪装新调用。schema 与工具错误检查未放宽；题集、Prompt/Skill 和检查器的变化按各自快照比较。
+初次静态政策复述引用了真实旧证据，强制本轮 FAQ 属于检查过严。后续“请明确是 A 还是 B”也被误判，现允许明确请求词与订单二选一语法同时出现的祈使句，并保留双订单陈述、否定请求的拒绝检查。本轮新增 21 项离线校准（12 澄清、6 未知承诺、3 历史证据）通过。检查器认可历史 FAQ 仅限 `COUPON-1008` 静态政策重复追问，须有此前成功结果；本轮 FAQ 若为空、失败或范围错误，绝不回退。其他退款仍须本轮查询依据。`evidenceIds` 只记录本轮工具，旧规则在前轮轨迹回看，不伪装新调用。schema 与工具错误检查未放宽；题集、Prompt/Skill 和检查器的变化按各自快照比较。
 
 ## P1 第三轮核心业务收尾
 
-2026-10-05，本轮修复整单读取的一致快照，以及已送达的过期方案卡仍尝试登记为可确认方案的问题。联合题集补充等待商家期间的套餐咨询、过期只读查询、明确重建、新旧编号区分与旧编号拒绝，扩为 21 轮；自然到期用测试 fixture 同步前移创建、截止和已有展示时间模拟，不修改系统时钟。状态查询不能生成新方案，重新生成仍需取证和再次确认。
+2026-10-05，本轮修复整单读取的一致快照，以及已送达的过期方案卡仍尝试登记为可确认方案的问题。联合题集补充等待商家期间的套餐咨询、过期只读查询、明确重建、新旧编号区分与旧编号拒绝，扩为 21 轮；自然到期用测试 fixture 同步前移创建、截止和已有展示时间模拟，不修改系统时钟。状态查询不能生成新方案，重新生成仍需查询依据和再次确认。
 
 | 套件 / 阶段 | run | 场景 / 轮次 / 检查 | 结果说明 |
 | --- | --- | --- | --- |
@@ -151,11 +155,11 @@ npm run check:refund-model -- --label "D1 D2 售后基线"
 | 联合 / 增加过期恢复 | `43abc2f6-cb25-4bc8-a749-2ac11a63b355` | 3/3 · 20/20 · 133/133 | 当时版本通过，尚未增加 pending 咨询 |
 | 联合 / 增加 pending 咨询 | `9c76bb28-3822-406e-9628-b9fb21396349` | 3/3 · 21/21 · 140/140 | 实际人数回答正确；复核发现人数断言可把否定或套餐名误算正确 |
 | 联合 / 限定措辞校准 | `48435f9c-3a4f-4472-9c24-31a5a7e6bdd2` | 1/3 · 8/21 · 57/140 | 正确的“券一张对应两人”被语序检查误拒；前例 pending 通知干扰后例事件 |
-| 联合 / 语序与案例隔离修复 | `513fe193-53e7-4452-91cf-fc6804c7cf82` | 3/3 · 21/21 · 140/140 | 最终版通过，6 个宿主确认轮无模型步骤或首字，40/40 模型请求报告 usage、0 工具错误 |
+| 联合 / 语序与案例隔离修复 | `513fe193-53e7-4452-91cf-fc6804c7cf82` | 3/3 · 21/21 · 140/140 | 最终版通过，6 个 Harness 确认轮无模型步骤或首字，40/40 模型请求报告 usage、0 工具错误 |
 
-人数检查仅针对本题肯定的单张券与两人关系及证据引用，不作为通用语义判断。12 项限定正反例通过 `node scripts/merchant-notification-model-check.ts --check-assertions`，保留否定、条件句、人数未知、仅套餐名和矛盾人数的反例；不同案例使用独立群路由，防止前例失败遗留的通知混入后例，仍要求每事件恰好一条回执。失败与跳过均保留，不能把扩题或检查器变化当成同条件效果提升。
+人数检查仅针对本题肯定的单张券与两人关系及证据引用，不作为通用语义判断。12 项限定正反例通过 `node scripts/merchant-notification-model-check.ts --check-assertions`，保留否定、条件句、人数未知、仅套餐名和矛盾人数的反例；不同案例使用独立群路由，防止前例失败遗留的通知混入后例，仍要求每事件恰好一条回复。失败与跳过均保留，不能把扩题或检查器变化当成同条件效果提升。
 
-最终只读与联合运行均已从 MySQL 回读，无失败或跳过；Prompt/Skill 与共用工具定义一致，分别核对 6/19 个实现文件哈希匹配本轮代码。模型仍可能出现未覆盖表述或遗漏取证，有限样例通过不代表生产质量保证；授权、金额、有效期与幂等继续由业务服务确定性校验。
+最终只读与联合运行均已从 MySQL 回读，无失败或跳过；Prompt/Skill 与共用工具定义一致，分别核对 6/19 个实现文件哈希匹配本轮代码。模型仍可能出现未覆盖表述或遗漏依据查询，有限样例通过不代表生产质量保证；授权、金额、有效期与幂等继续由业务服务确定性校验。
 
 工程回归已通过 `validate`、`check:business`、`check:merchant`、`check:merchant-notifications`、`check:refund`、`check:eval-db` 和 `scripts/qq-isolation-check.ts`。覆盖读取快照、身份/作用域、三终态、通知原路由与恢复、发送未知、旧编号拒绝、并发幂等、双用户异额以及评测持久化与受限权限。QQ 发信在本地替代，本轮未重新验收真实平台；所有资金操作仍为模拟。
 
@@ -181,8 +185,8 @@ npm run check:model -- --label "未知政策说明调整"
 | --- | --- |
 | 案例/处理轮次通过 | 通过数 / 计划数；失败、跳过和未完成不当作通过。当前只读套件为 14 案例、22 轮，历史版本有 10/11 与 9/10；D1/D2 为 3 案例、12 用户轮；当前 D2/D3 v2 为 3 案例、21 处理轮（18 用户 + 3 事件），历史 v2 有 15/17/20 轮，D3 v1 为 9 轮，按各运行计划数分别计数 |
 | 业务、安全、证据、执行检查 | 预定义确定性断言；失败保留原因，前置条件不足的检查跳过。不是完整忠实度、幻觉率或满意度 |
-| P50/P95 | 本次有实际耗时的处理轮次，按 nearest-rank 计算；只读套件从 prompt 开始到结束；D1/D2 从 QQ handler 开始到本地发送成功 hook 完成；D3 事件轮从 dispatcher 开始计，含重复扫描验证。含宿主确认轮，不含等待商家/重启准备，也不代表真实 QQ 网络耗时。样本量很小 |
-| 首次文本 | 该处理轮首次模型文本事件；可能是工具调用前的中间回答，不等同最终答案首字；不调用模型的宿主确认轮留空 |
+| P50/P95 | 本次有实际耗时的处理轮次，按 nearest-rank 计算；只读套件从 prompt 开始到结束；D1/D2 从 QQ handler 开始到本地发送成功 hook 完成；D3 事件轮从 dispatcher 开始计，含重复扫描验证。含 Harness 确认轮，不含等待商家/重启准备，也不代表真实 QQ 网络耗时。样本量很小 |
+| 首次文本 | 该处理轮首次模型文本事件；可能是工具调用前的中间回答，不等同最终答案首字；不调用模型的 Harness 确认轮留空 |
 | 模型请求 / 工具调用 | Pi 内部的请求和工具步骤，不能等同处理轮次；一轮可以有多次请求 |
 | 模型步骤耗时 | Pi 模型消息开始至结束事件之间的响应流阶段，不包含请求等待；不作为完整模型 API 耗时。用户单轮总耗时包含等待 |
 | 预期拒绝 / 意外工具错误 | 预期拒绝需要对应安全案例、订单参数和真实拒绝结果；归属拦截不会作为意外工具故障 |
@@ -198,7 +202,7 @@ npm run check:model -- --label "未知政策说明调整"
 - `eval_turn_results`：用户输入或业务事件/答复、断言、证据、错误、处理轮次耗时。
 - `eval_steps`：模型/工具步骤、参数/结果、耗时、usage、预期拒绝标记。
 
-案例落盘使用事务，历史不覆盖。快照保留 Git commit 与脏状态、模型配置、Prompt、Skill、实际工具定义、固定问题与检查版本、实际合成业务事实；哈希帮助定位变更，原内容帮助解释变更。业务快照包含评测日期与采集时间，不能只凭 seed 文件没改就认定数据条件一样。D1/D2 保存完整初始订单，同时对随机 fixture 编号、创建/付款时刻和有效期作注明的语义归一化，用于条件比较；另记录生成脚本、D1/D2 源码、数据库结构、QQ 入口及模板哈希。
+案例结果保存使用事务，历史不覆盖。快照保留 Git commit 与脏状态、模型配置、Prompt、Skill、实际工具定义、固定问题与检查版本、实际合成业务事实；哈希帮助定位变更，原内容帮助解释变更。业务快照包含评测日期与采集时间，不能只凭 seed 文件没改就认定数据条件一样。D1/D2 保存完整初始订单，同时对随机 fixture 编号、创建/付款时刻和有效期作注明的语义归一化，用于条件比较；另记录生成脚本、D1/D2 源码、数据库结构、QQ 入口及模板哈希。
 
 网页历史 GET API：`/api/runs?kind=model&limit=50`、`/api/runs/<UUID>`。列表不携带大段快照正文；详情提供完整合成快照。历史接口限制只读；仅独立的 `POST /api/experiments` 可启动严格白名单配置的本机评测。HTTP 输入有范围检查、Host/Origin 校验和 CSP，正文按文本展示。网页不运行 Shell、不绑定 QQ 身份、不持有管理员操作入口。
 
@@ -225,14 +229,14 @@ Recall@5 按 standard / hard：选集从 P0 的 **59.09% / 3.85%**，经 P1 第�
 
 | 受影响边界与入口 | 实际调用路径 | 条件、覆盖与未证明项 |
 | --- | --- | --- |
-| 工程回归：`npm run validate` | `typecheck` → `check.ts` 汇总配置/检索/Controller/Session 等确定性检查 → `check:qq` / `check:qq-agent` / `check:reply` → `check:eval`（[`eval-check.ts`](../scripts/eval-check.ts)与 UI 检查）→ [`refund-agent-check.ts`](../scripts/refund-agent-check.ts) → [`merchant-notification-agent-check.ts`](../scripts/merchant-notification-agent-check.ts)。 | 不需数据库或真实模型密钥；使用合成 Store、Pi/faux、替代提供商传输及本机 HTTP。检查类型、宿主/工具边界、评测口径和前端回归；不验证真实 SQL、事务、跨进程恢复、模型质量或 QQ 平台。 |
+| 工程回归：`npm run validate` | `typecheck` → `check.ts` 汇总配置/检索/Controller/Session 等确定性检查 → `check:qq` / `check:qq-agent` / `check:reply` → `check:eval`（[`eval-check.ts`](../scripts/eval-check.ts)与 UI 检查）→ [`refund-agent-check.ts`](../scripts/refund-agent-check.ts) → [`merchant-notification-agent-check.ts`](../scripts/merchant-notification-agent-check.ts)。 | 不需数据库或真实模型密钥；使用合成 Store、Pi/faux、替代提供商传输及本机 HTTP。检查类型、Harness/工具边界、评测口径和前端回归；不验证真实 SQL、事务、跨进程恢复、模型质量或 QQ 平台。 |
 | 订单/身份存储：`npm run check:business` | [`coupon-db-check.ts`](../scripts/coupon-db-check.ts) → `CouponStore.resolveCustomer/getOrder/searchKnowledge`；成功后 [`coupon-agent-check.ts`](../scripts/coupon-agent-check.ts) → 实际 Store / Pi 工具回填。 | 基础 11 表、固定合成种子及只读账号 `DB_PASSWORD`。两段均查 MySQL，第二段用 faux；断言本人/App 隔离、订单关联/整数金额、规则作用域、只读权限与工具回填。没有退款事务或真实模型/QQ 验收。 |
-| 协商存储/状态：`npm run check:merchant` | [`merchant-db-check.ts`](../scripts/merchant-db-check.ts) → `AfterSalesStore.prepare/request/applyResult/processDue/getTask`；成功后 [`merchant-agent-check.ts`](../scripts/merchant-agent-check.ts) → 实际 Store / Pi/faux / 宿主确认。 | 售后初始化、基础/协商受限账号及管理员 fixture。两段均连 MySQL；检查归属/来源、并发同任务、批准/拒绝/超时、事实不变及同进程 Store/连接重建。未专门验证锁等待跨截止，也不是进程退出或真实商家回调验收。 |
+| 协商存储/状态：`npm run check:merchant` | [`merchant-db-check.ts`](../scripts/merchant-db-check.ts) → `AfterSalesStore.prepare/request/applyResult/processDue/getTask`；成功后 [`merchant-agent-check.ts`](../scripts/merchant-agent-check.ts) → 实际 Store / Pi/faux / Harness 确认。 | 售后初始化、基础/协商受限账号及管理员 fixture。两段均连 MySQL；检查归属/来源、并发同任务、批准/拒绝/超时、事实不变及同进程 Store/连接重建。未专门验证锁等待跨截止，也不是进程退出或真实商家回调验收。 |
 | 退款金额/事务/确认/幂等：`npm run check:refund` | [`refund-db-check.ts`](../scripts/refund-db-check.ts) → `RefundStore.prepare/markPresented/confirm/get`，末尾导入 [`coupon-snapshot-check.ts`](../scripts/coupon-snapshot-check.ts)；DB 成功后运行 `refund-agent-check.ts`。 | 基础/协商/退款独立受限账号及管理员 fixture。实库检查一致订单快照、展示/授权/金额/批准/期限复核、并发单笔退款及状态一致；后段是替代 Store 的 Pi/QQAgent 发送故障检查。重建连接不证明真实进程恢复，本地发送不证明 QQ 可见或真实支付。 |
 | 通知持久化/领取恢复：`npm run check:merchant-notifications` | [`merchant-notification-db-check.ts`](../scripts/merchant-notification-db-check.ts) → `confirmMerchantReply` / `AfterSalesStore.request/listNotifications/claimNotification/finishNotification` / worker；成功后运行 `merchant-notification-agent-check.ts`。 | 基础/协商/退款账号及管理员 fixture。第一段 MySQL 检查原路由、并发唯一领取、重建后 pending 恢复/claimed 不重发、worker 收尾；第二段用替代 Store、Pi/faux 和本地发送记录。未证明真实进程恢复、平台接收/客户端展示或发送前重绑的实库竞争。 |
 | 评测存储：`npm run check:eval-db` | [`eval-db-check.ts`](../scripts/eval-db-check.ts) → `EvalStore.startRun/saveCase/finishRun/getRun/getBatch` → 分析器及本机 HTTP 回读。 | `eval:init` 后的独立 `EVAL_DB_PASSWORD` 账号；写入并保留 `kind=engineering` 合成历史。检查失败保存回滚、失败/跳过/未知用量、客观计划/批次、类型隔离和受限权限；不验证业务退款或模型回答质量。 |
 | 任务行锁跨截止：`node --env-file-if-exists=.env scripts/merchant-deadline-lock-db-check.ts` | [`专用库检查`](../scripts/merchant-deadline-lock-db-check.ts)锁行并观测 `data_lock_waits` → 正式 `AfterSalesStore.applyResult` 的事务/`FOR UPDATE`/锁后条件 UPDATE。 | 强制本机 `127.0.0.1:13306/dave_agent`，需 Compose 管理员及锁等待观测权限；复制任务表到随机库/账号，结束删除。检查截止后放锁仍拒绝及正常/边界调用；无 `--db` 开关，不跑全库 worker。专用表无外键，不证明身份/订单/退款链、精确提交时刻或批准/拒绝竞争。 |
-| 真实进程退款结果恢复：`node --env-file-if-exists=.env scripts/atomic-refund-recovery-db-check.ts --db` | [`恢复脚本`](../scripts/atomic-refund-recovery-db-check.ts)的 `--db` → `checkAtomicRefundRecoveryDatabase` → 两个不同 PID：实际展示/宿主确认/重复幂等 → 新连接及 atomic Session 的 `get_order/get_refund` 查询。 | 三组账号配置强制本机 `127.0.0.1/localhost:13306/dave_agent`，使用管理员 fixture、Pi/faux 和本地发送，禁止远程 HTTP。父进程核对同一退款及九表查询前后相同、清理全零；证明明确订单号的持久结果查询，不证明聊天历史/省略指代、通知 dispatcher、真实模型/QQ或商业退款。 |
+| 真实进程退款结果恢复：`node --env-file-if-exists=.env scripts/atomic-refund-recovery-db-check.ts --db` | [`恢复脚本`](../scripts/atomic-refund-recovery-db-check.ts)的 `--db` → `checkAtomicRefundRecoveryDatabase` → 两个不同 PID：实际展示/Harness 确认/重复幂等 → 新连接及 atomic Session 的 `get_order/get_refund` 查询。 | 三组账号配置强制本机 `127.0.0.1/localhost:13306/dave_agent`，使用管理员 fixture、Pi/faux 和本地发送，禁止远程 HTTP。父进程核对同一退款及九表查询前后相同、清理全零；证明明确订单号的持久结果查询，不证明聊天历史/省略指代、通知 dispatcher、真实模型/QQ或商业退款。 |
 
 尤其不能按脚本名推断覆盖：`check.ts` 约第 57 行导入恢复脚本后仅调用 `checkAtomicRefundRecovery()`（约第 160 行），检查 JS 合成快照及输入/金额/批准/退款 ID 反例，不建连接或启动子进程；只有直接运行脚本的 `--db` 分支（约第 185 行）才执行上表实库合同。
 

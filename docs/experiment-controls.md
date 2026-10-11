@@ -4,9 +4,9 @@
 
 ## 本轮工作台接线合同（2026-10-06，实施前）
 
-- **业务约束：** 咨询问题出处v3只能显式用于Controller实验，默认v2和常驻QQ保持原配置。完整原始解析审计留在宿主，不进入主Agent工具上下文；身份、fresh范围、确认、幂等与失败关闭继续生效。解析失败和缺失用量不能显示为成功或免费。
+- **业务约束：** 咨询问题出处v3只能显式用于Controller实验，默认v2和常驻QQ保持原配置。完整原始解析审计留在 Harness，不进入主Agent工具上下文；身份、fresh范围、确认、幂等与失败关闭继续生效。解析失败和缺失用量不能显示为成功或免费。
 - **面试追问：** 如何证明表单参数真的进入运行时？为什么Agent、问题解析、重排和证据判别需分角色记账？怎样避免父子span重复计费，以及历史未采集费用被补成零？
-- **个人实现与复用：** 复用现有实验校验/执行器、Pi解析客户端、questionProviderSpans和工作台分析；只补三个候选参数、实际Session接线/快照与费用分析。前端由Kimi CLI K3 Max增量接入，不新建Harness、数据库表或观测平台。
+- **个人实现与复用：** 复用现有实验校验/执行器、Pi解析客户端、questionProviderSpans和工作台分析；只补三个候选参数、实际Session接线/快照与费用分析。前端由Kimi CLI K3 Max增量接入，不新建 Harness、数据库表或观测平台。
 - **验收与演示：** `questionContract`默认v2；v2的`questionModel/questionTimeoutMs`为null且非空值拒绝，v3缺省解析模型configured、超时10000ms（1000..15000且不超过整轮），atomic+v3启动前拒绝。原生Pi替代HTTP证明显式v3实际调用、v2不调用、失败/取消不发布旧结果及费用保留；CLI/HTTP catalog/config/job透传、快照、历史兼容、四角色分币种及未知费用经工程检查。前端下载/回填、组合修复与折叠费用展示使用合成API检查，不提交远程业务实验。
 - **预算与停止：** 本片0付费业务模型、0数据库、0QQ调用；Kimi仅用于已授权的前端开发。定向检查、独审与全量validate通过后提交推送并收尾。原固定题/gold/manifest及9/12→11/12真实结果不改，不运行已关闭live预算；用户要求本轮完成后暂停目标，不启动后续实验或准入工作。
 
@@ -14,7 +14,7 @@
 
 | 参数 | 默认值与边界 | 实际作用 |
 | --- | --- | --- |
-| `questionContract` | `v2` / `v3`，默认v2；v3仅Controller | v3使用原始当前问题或合法同范围前序解析咨询，再进行中性查询和重新取证；不改常驻QQ或业务授权。 |
+| `questionContract` | `v2` / `v3`，默认v2；v3仅Controller | v3使用原始当前问题或合法同范围前序解析咨询，再进行中性查询和重新查询并核对依据；不改常驻QQ或业务授权。 |
 | `questionModel` | v2为null；v3省略键时configured，也可固定现有模型选项 | 独立选择问题解析模型，不自动跟随`agentModel`或`knowledgeSupportModel`的固定选择。configured仍取全局环境配置；v3显式null/undefined拒绝。 |
 | `questionTimeoutMs` | v2为null；v3省略键时10000；整数1000..15000且不超过整轮超时 | 解析阶段等待上限，失败关闭、无自动重试；取消不代表供应商未计费。v3显式null/undefined拒绝。 |
 
@@ -25,11 +25,11 @@
 node scripts/experiment.ts --preset support-question-contract-ab --dry-run
 ```
 
-实际解析settings和三个参数进入`snapshot.content.settings`，每轮精简提供商span和宿主解析记录用于回看；完整解析trace不进入主Agent工具上下文。Agent-only旧metrics继续保留，归因分析按Agent/解析/重排/支持判别分列，币种与未知费用见[评测API](./evaluation-api.md#v2-执行归因增量字段)。工程接线通过不等于新的真实模型效果或完整C1准入。
+实际解析settings和三个参数进入`snapshot.content.settings`，每轮精简提供商span和 Harness 解析记录用于回看；完整解析trace不进入主Agent工具上下文。Agent-only旧metrics继续保留，归因分析按Agent/解析/重排/支持判别分列，币种与未知费用见[评测API](./evaluation-api.md#v2-执行归因增量字段)。工程接线通过不等于新的真实模型效果或完整C1准入。
 
 ## 工作台接线收尾与暂停（2026-10-07）
 
-三个参数已贯通共享校验、CLI/HTTP、实验任务配置和实际Session，新增`support-question-contract-ab`预设默认不允许远程调用。v2不创建解析客户端；v3独立使用实际解析模型和等待上限，保存安全settings快照。原生Pi替代HTTP检查使用与业务执行器相同的接线，覆盖成功、无效JSON、缺用量、取消后旧轮未知费用保留和晚结果不串轮。完整解析记录留在宿主，普通Agent工具结果不携带该审计。
+三个参数已贯通共享校验、CLI/HTTP、实验任务配置和实际Session，新增`support-question-contract-ab`预设默认不允许远程调用。v2不创建解析客户端；v3独立使用实际解析模型和等待上限，保存安全settings快照。原生Pi替代HTTP检查使用与业务执行器相同的接线，覆盖成功、无效JSON、缺用量、取消后旧轮未知费用保留和晚结果不串轮。完整解析记录留在 Harness，普通Agent工具结果不携带该审计。
 
 后端提供`providerUsage/providerTotals`，按已采集提供商叶子记录区分Agent、问题解析、重排和支持判别；USD/CNY分列，已知小计与完整金额分开。未知用量或币种不补零，父子重复记账报告异常且不相加；没有历史span不重建费用。该分母是已采集提供商记录，不是所有原始HTTP或账户账单。旧Agent-only指标继续独立展示。
 
@@ -75,7 +75,7 @@ npm run validate
 
 `acceptance-report`区分可用原文和整题判别完整性：typed partial可在原报告保留有效候选，但重算证明中存在`invalid_support_decision`时，该题标failed/incomplete，不进入完整测量及有效误拒/无答案拒收分母，也不得通过准入门；完整计划与可答分母保留。冷/热回放同一口径，不撤销运行时有效原文、不重写历史报告，见[验收完整性修复](./optimization-plan.md#第十一片不完整判别的验收门核查)。
 
-业务与判别模型限于已审阅的模型白名单，embedding与rerank固定为百炼text-embedding-v4 1024维、qwen3-rerank；没有任意API URL、系统提示词、命令、文件路径或环境变量表单。通用长期记忆与“模型改写后双路召回”的C2实验暂未实现。显式`questionContract=v3`已实现受约束的咨询问题解析及原问出处校验，与宿主构造的检索查询分开记录，见[候选参数](#咨询问题出处候选参数)；整体C1仍未准入，默认v2不增加解析调用。
+业务与判别模型限于已审阅的模型白名单，embedding与rerank固定为百炼text-embedding-v4 1024维、qwen3-rerank；没有任意API URL、系统提示词、命令、文件路径或环境变量表单。通用长期记忆与“模型改写后双路召回”的C2实验暂未实现。显式`questionContract=v3`已实现受约束的咨询问题解析及原问出处校验，与 Harness 构造的检索查询分开记录，见[候选参数](#咨询问题出处候选参数)；整体C1仍未准入，默认v2不增加解析调用。
 
 ### C1 业务知识服务开关
 
@@ -88,11 +88,11 @@ npm run validate
 | `knowledgeSupportModel` | 现有模型白名单，默认 `configured` | 仅 Controller + m4-support 可固定支持判别模型；configured 独立读取全局环境配置，固定模型使用各自凭据。业务 Agent 的固定选择不因此改变；实际执行模型以 `trace.settings.support` 为准。 |
 | `knowledgeSupportPrompt` | `v5` / `v6`，默认 `v5` | v6 仅 Controller + m4-support + typed，增加先确定用户所问命题的合同；选择只影响 typed，binary 继续使用 `fact-support-v1`。实际支持调用须核对版本和内容哈希，未发生调用只记录配置。 |
 | `knowledgeApplicability` | `model_only` / `declared` / `declared-v2`，默认 `model_only` | 声明模式仅 Controller + m4-support：在原分数 / Top5 后，用本轮可信事实检查必要前提，再交模型判断。`declared` 固定 v1 数量/状态规则，`declared-v2` 追加审阅的合成商品类别目录，未知类别不按名称猜测。匹配不证明全部适用或获批，不增加模型阶段。 |
-| `knowledgeQueryMode` | `combined` / `separated`，默认 `combined` | 仅 Controller + m4-support 可启用 separated：排序使用原问、可信前文、商品与简短订单状态；支持判别仍使用完整券数、按券状态关联的日期和原问。两者均由宿主构造，不增加模型改写阶段。 |
+| `knowledgeQueryMode` | `combined` / `separated`，默认 `combined` | 仅 Controller + m4-support 可启用 separated：排序使用原问、可信前文、商品与简短订单状态；支持判别仍使用完整券数、按券状态关联的日期和原问。两者均由 Harness 构造，不增加模型改写阶段。 |
 | `knowledgeThreshold` | 0–1，默认 0.71 | 仅 m4-support 的相关性预筛；分数不是概率。变更后属于新实验配置。 |
 | `knowledgeTimeoutMs` | 1000–60000，默认 15000 毫秒 | Controller 单次知识查询的总等待上限，含读取、重排、支持判别与来源复检；零自动重试。 |
 
-旧业务配置省略新字段时仍使用 lexical。知识为空时返回未知/澄清，超时或调用失败标为不可用；不会把未经验证的 lexical 结果作为 m4-support 失败后的可信证据。当前查询在读取和异步处理后复检语料，记录原始问题、实际检索问题、可信范围、配置、原文版本、拒收原因及实际用量。超时停止宿主等待和后续阶段；已经发出的提供商请求可能继续至其请求超时，未收到的用量显示未知。
+旧业务配置省略新字段时仍使用 lexical。知识为空时返回未知/澄清，超时或调用失败标为不可用；不会把未经验证的 lexical 结果作为 m4-support 失败后的可信证据。当前查询在读取和异步处理后复检语料，记录原始问题、实际检索问题、可信范围、配置、原文版本、拒收原因及实际用量。超时停止 Harness 等待和后续阶段；已经发出的提供商请求可能继续至其请求超时，未收到的用量显示未知。
 
 ```sh
 node scripts/experiment.ts --preset support-knowledge-ab --dry-run
@@ -132,7 +132,7 @@ node --env-file-if-exists=.env scripts/support-v2-live.ts --live --architecture 
 
 每个服务实例在首次使用时加载一次不可变快照；文件变更需新建服务 / 重启进程生效。v2规范内容哈希与原始文件SHA分列，文档全文 / scope / 状态、依据引文和本轮事实分别绑定。一般 / 假设规则咨询不套用当前订单条件；当前商品需要类别而目录缺失时阻断该来源。没有声明的前提不等于已经证明，缺失事实也不等于不符合。原始排名不重排、不补位，因此第六名有效证据仍可能未被接收；这属于本候选的召回取舍。
 
-`support-knowledge-category-ab` 只比较 `declared` / `declared-v2`，共同使用 Controller、m4-support、Pro typed v6、0.5阈值及 separated。该预设是通用业务开发入口；[六场景Session开发合同](./c1-category-session-development.md)使用单独的冻结探针和总预算，不把通用预设运行当成此批成绩。当前支持模型的完整query尚未直接附审阅类别事实；门控matched不能代替语义通过，候选未准入。
+`support-knowledge-category-ab` 只比较 `declared` / `declared-v2`，共同使用 Controller、m4-support、Pro typed v6、0.5阈值及 separated。该预设是通用业务开发入口；[六场景Session开发合同](./c1-category-session-development.md)使用单独的冻结探针和总预算，不把通用预设运行当成此批成绩。当前支持模型的完整query尚未直接附审阅类别事实；前提检查的 matched不能代替语义通过，候选未准入。
 
 ```sh
 # 参数预览，不连接数据库或模型。
@@ -152,7 +152,7 @@ node --env-file-if-exists=.env scripts/support-v2-live.ts --live --architecture 
 
 运行快照记录 `knowledgeQueryMode` 和相关源码哈希。当前 trace 使用 `queries.version=knowledge-query-plan-v1`，分别记录 `queries.retrieval`（实际排序输入）和 `queries.evidence`（完整判别输入）；`trace.query` 仍表示实际排序输入。Controller 的 `search_faq.input.query` 保留完整问题，`input.retrievalQuery` 是交给服务的排序候选，combined 可以选择不用该候选。没有注入新服务的旧 lexical fallback 仍调用完整问题，并在 span 与 trace 记录实际输入。
 
-通用业务审计核对外部模式参数、上述字段与宿主 context，输出 `queryPlan` 完整性和 `queryPlanHash` 输入指纹；指纹用于区分查询方案，不能替代基于冻结原文重算的 provider 请求哈希证明。后者由独立语义证据审计完成。预期数据库读取故障仍须保留正确查询记录，并证明未调用提供商；已声明前提门控在该故障下标为未评估。旧报告缺少新字段时保持历史口径，不回填为已完成分离查询。
+通用业务审计核对外部模式参数、上述字段与 Harness context，输出 `queryPlan` 完整性和 `queryPlanHash` 输入指纹；指纹用于区分查询方案，不能替代基于冻结原文重算的 provider 请求哈希证明。后者由独立语义证据审计完成。预期数据库读取故障仍须保留正确查询记录，并证明未调用提供商；已声明前提检查在该故障下标为未评估。旧报告缺少新字段时保持历史口径，不回填为已完成分离查询。
 
 ### A1 配置 version 2
 
@@ -238,20 +238,25 @@ node --env-file-if-exists=.env scripts/experiment.ts --preset support-validation
 - `POST /api/experiments`，Content-Type application/json、`X-Experiment-Request: 1`，body 为配置本身 → 202 `ExperimentJob`。400 参数/组合/远程调用未允许，409 已有活动实验，503 启动不可用。错误响应 `{error:string}`。
 
 ```ts
+// src/experiment-jobs.ts：一个实验任务串行执行多个方案与重复轮次。
 type ExperimentJob = {
   id: string;
-  status: "running" | "completed" | "completed_with_failures" | "failed" | "interrupted";
-  createdAt: string; finishedAt: string | null;
-  config: ExperimentConfig; configHash: string;
-  plannedRuns: number;
-  current: {variantId:string; repetition:number} | null;
+  status: "running" | "completed" | "completed_with_failures"
+    | "failed" | "interrupted";
+  createdAt: string;
+  finishedAt: string | null; // 尚未结束时保留 null。
+  config: ExperimentConfig;
+  configHash: string; // 绑定本次实际使用的配置。
+  plannedRuns: number; // 执行前确定的总数，失败或中断不会缩小它。
+  current: { variantId: string; repetition: number } | null;
   error: string | null;
   results: Array<{
-    variantId: string; repetition: number;
+    variantId: string;
+    repetition: number;
     kind: "support" | "retrieval";
     status: string;
-    runId: string;
-    summary: unknown;
+    runId: string; // 业务运行指向 MySQL 记录，检索运行指向报告文件。
+    summary: unknown; // 按 kind 读取对应分析结果，不混合不同题集的分数。
   }>;
 };
 ```
@@ -274,7 +279,7 @@ node scripts/acceptance-report.ts --report .runtime/retrieval-v2/RUN_ID.json
 
 HTTP 不接受命令或密钥；仅本机 Host/Origin，严格 JSON、请求体上限 32 KiB。任务执行状态和完整配置保存在忽略的 `.runtime/experiments/`。[HTTP 的 POST/GET](https://github.com/erha1499/dave-agent/blob/63f376ed17c313edefc3aa693195ebec2eeed7b6/src/eval-server.ts#L57-L88)分别调用 `start/list/get`；[CLI 实际运行](https://github.com/erha1499/dave-agent/blob/63f376ed17c313edefc3aa693195ebec2eeed7b6/scripts/experiment.ts#L47-L56)为 `start → await close → get`，`--list` 仅列预设。互斥只覆盖使用同一实验目录的 `ExperimentJobs` 入口，不约束直接调用 runner 的脚本或其它数据库 worker。
 
-**本机实验锁审计（2026-10-08）：** 售后评测可写合成订单，不能在前一任务尚未收尾时撞入现场；面试追问是“为何只准一个实验、关闭为何等待、PID 能证明什么”。个人实现为配置快照、目录互斥、落盘和中断记录；复用 Node 标准库及现有 runner/Pi，不扩建调度器。固定源码 `63f376ed`，验收为调用链、既有断言及文档差异/链接静态核验；预算30分钟，材料补齐即停，0运行样本，不启动实验/数据库/模型/QQ或清理实际锁。
+**本机实验锁审计（2026-10-08）：** 售后评测可写合成订单，不能在前一任务尚未收尾时撞入现场；面试追问是“为何只准一个实验、关闭为何等待、PID 能证明什么”。个人实现为配置快照、目录互斥、文件保存和中断记录；复用 Node 标准库及现有 runner/Pi，不扩建调度器。固定源码 `63f376ed`，验收为调用链、既有断言及文档差异/链接静态核验；预算30分钟，材料补齐即停，0运行样本，不启动实验/数据库/模型/QQ或清理实际锁。
 
 | 调用与源码定位（固定上述版本） | 行为与既有检查定位 |
 | --- | --- |
@@ -282,13 +287,13 @@ HTTP 不接受命令或密钥；仅本机 Host/Origin，严格 JSON、请求体�
 | [`readLock/recoverLock/interrupt/get/list`](https://github.com/erha1499/dave-agent/blob/63f376ed17c313edefc3aa693195ebec2eeed7b6/src/experiment-jobs.ts#L117-L191) | `get/list/start` 也会触发恢复写入；完整锁元数据的 PID 判死后才尝试回收该代次，恢复 owner 仍活则拒绝抢占。任务另按 `ownerPid` 判断，死进程的 `running` 记录转 `interrupted`、清空 `current`，保留计划和已保存结果，不自动补跑。[检查第193–222、232–240行](https://github.com/erha1499/dave-agent/blob/63f376ed17c313edefc3aa693195ebec2eeed7b6/scripts/experiment-jobs-check.ts#L193-L240)包含死PID、缺失主元数据、活恢复owner、半写及活PID保护。 |
 | [`run/close`](https://github.com/erha1499/dave-agent/blob/63f376ed17c313edefc3aa693195ebec2eeed7b6/src/experiment-jobs.ts#L225-L251) → [工作台信号关闭](https://github.com/erha1499/dave-agent/blob/63f376ed17c313edefc3aa693195ebec2eeed7b6/src/eval-server.ts#L160-L170) | `run` 最终保存并释放自己的锁；执行异常停止后续运行，保留分母与已存结果。`close` 封闭本实例启动、经过元数据串行区后等待本实例 `active`，无取消/超时，不等待其它实例实验。工作台 `SIGINT/SIGTERM` 先关HTTP连接，再等待实验、关闭历史Store；CLI未注册该信号处理。[检查第89–101、172–183行](https://github.com/erha1499/dave-agent/blob/63f376ed17c313edefc3aa693195ebec2eeed7b6/scripts/experiment-jobs-check.ts#L89-L101)分别检查等待与失败后 `plannedRuns=4/results=1`，不代表真实数据库清理成功。 |
 
-[`alive(pid)`](https://github.com/erha1499/dave-agent/blob/63f376ed17c313edefc3aa693195ebec2eeed7b6/src/experiment-jobs.ts#L32-L35)仅以 `process.kill(pid, 0)` 探测，只有 `ESRCH` 视为死亡，其它错误保守视为存活；PID复用可能阻止恢复，不提供强进程身份或跨机器保障。正常释放指执行器的 `finally`，强杀/掉电不能保证订单清理；恢复锁也不清理遗留数据库fixture。`active` 吸收运行拒绝，`close` 返回本身不证明落盘或清理成功，仍须回读状态/结果；`completed` 不等于业务准入，也不授权重跑已关闭预算。仅在确认没有实验进程运行后，手动检查并清理 `active.json` 和 `active.lock/`；不要删除历史任务JSON，本轮不执行清理。
+[`alive(pid)`](https://github.com/erha1499/dave-agent/blob/63f376ed17c313edefc3aa693195ebec2eeed7b6/src/experiment-jobs.ts#L32-L35)仅以 `process.kill(pid, 0)` 探测，只有 `ESRCH` 视为死亡，其它错误保守视为存活；PID复用可能阻止恢复，不提供强进程身份或跨机器保障。正常释放指执行器的 `finally`，强杀/掉电不能保证订单清理；恢复锁也不清理遗留数据库fixture。`active` 吸收运行拒绝，`close` 返回本身不证明文件保存或清理成功，仍须回读状态/结果；`completed` 不等于业务准入，也不授权重跑已关闭预算。仅在确认没有实验进程运行后，手动检查并清理 `active.json` 和 `active.lock/`；不要删除历史任务JSON，本轮不执行清理。
 
 独立复现入口为 `node scripts/experiment-jobs-check.ts`（无env-file，临时目录、注入runner及人工构造dead-PID元数据，本轮未运行）。上述断言不是实际子进程终止、HTTP信号关闭、PID复用或真实fixture清理验收；本片仅静态补材料，不增加历史工程/模型/QQ样本。中断和未执行重复不能算通过，分母与准入另见[评测口径](./evaluation.md#评测分母与费用调用链审计2026-10-08)。
 
 ## 对比口径
 
-执行前解析完整配置，执行时将同一参数传入 runner 并保存实际 settings。架构、通知模式、修复预算和检索参数差异可追溯；实验 ID 单独记录，不污染重复兼容哈希。原有共同业务条件与检查器资格门控继续生效。runner 源码变化可能导致新记录与旧历史不可比，应使用当前同版代码重跑基线/候选，不放宽 checker 来制造提升。
+执行前解析完整配置，执行时将同一参数传入 runner 并保存实际 settings。架构、通知模式、修复预算和检索参数差异可追溯；实验 ID 单独记录，不污染重复兼容哈希。原有共同业务条件与检查器资格检查继续生效。runner 源码变化可能导致新记录与旧历史不可比，应使用当前同版代码重跑基线/候选，不放宽 checker 来制造提升。
 
 请求上限按每次检索运行计，不是整组实验的金额预算；重试也计请求。缓存复用可能显著减少请求，但不能据此假设某次调用免费或已取消远程授权要求。付费业务或 M2–M6 必须显式设置 allowRemote=true 才能启动。
 
@@ -296,4 +301,4 @@ HTTP 不接受命令或密钥；仅本机 Host/Origin，严格 JSON、请求体�
 
 2026-10-05，此前本地 CLI 运行 M0/M1 完成 580 项；工作台配置 A/B（BM25 b 为 0.75 / 0.25）分别完成 580 项，配置下载与载入后参数一致，远程请求均为 0。这份历史记录只证明配置与执行、展示的闭环，不声称调参提高了泛化效果。当时未调用付费业务模型或百炼服务，也未重验真实 QQ；后续事实支持实验按其独立结果记录说明。
 
-确定性检查覆盖参数实际改变排序/候选/缓存/修复预算，错误组合在凭据读取前拒绝，配置快照不可被表单修改，串行重复与失败缺项，跨进程死锁恢复的活锁保护，HTTP 同源/请求体/非法 URL 边界。前端检查覆盖懒加载、远程调用门控、任务状态竞态、连续参数编辑与统计口径；浏览器验证宽窄屏、JSON 下载、参数复现及本地 A/B。完整检查入口为 `npm run validate`。
+确定性检查覆盖参数实际改变排序/候选/缓存/修复预算，错误组合在凭据读取前拒绝，配置快照不可被表单修改，串行重复与失败缺项，跨进程死锁恢复的活锁保护，HTTP 同源/请求体/非法 URL 边界。前端检查覆盖懒加载、远程调用条件检查、任务状态竞态、连续参数编辑与统计口径；浏览器验证宽窄屏、JSON 下载、参数复现及本地 A/B。完整检查入口为 `npm run validate`。

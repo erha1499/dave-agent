@@ -8,7 +8,7 @@
 
 分数反映相关性，不能证明原文给出了用户要求的日期、金额或承诺。新步骤用现有 Pi SDK 的单次 completion，使用已配置的 `deepseek-flash`，不启动 Agent 会话、不暴露工具、不修改 Pi Harness。一个请求同时逐篇判断最多 5 篇候选，输出完整 ID、是否支持、逐字引文和短理由，不生成客服答复。明确的否定政策可回答“能不能这样做”，但“需要查询订单”不能充当用户要求的具体到期日。
 
-宿主校验 JSON、全部候选 ID、连续原文引文及 query/scope/候选/模型/Prompt 绑定。异步返回后再检查来源、范围和有效性。`pendingSupport` 不进入已接收证据；超时、无效响应和来源变化均为 unavailable，不能算正确拒收。判别器是被测组件，评分由冻结标签完成，不让模型给自己打分。引文校验只能证明出处，语义正确性仍依赖实际评测。
+Harness 校验 JSON、全部候选 ID、连续原文引文及 query/scope/候选/模型/Prompt 绑定。异步返回后再检查来源、范围和有效性。`pendingSupport` 不进入已接收证据；超时、无效响应和来源变化均为 unavailable，不能算正确拒收。判别器是被测组件，评分由冻结标签完成，不让模型给自己打分。引文校验只能证明出处，语义正确性仍依赖实际评测。
 
 主要实现：[接收门](../src/evidence-acceptance.ts)、[支持性模块](../src/evidence-support.ts)、[运行器](../scripts/retrieval-v2.ts)、[实际记录评分](../scripts/acceptance-report.ts)。缓存复用不产生新的模型用量，也不算独立重复。support 无内部重试，默认预设 60 秒上限；实际 rerank + support 共用 160 次请求预算，support 连续失败单独触发停止。
 

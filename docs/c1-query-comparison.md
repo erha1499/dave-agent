@@ -1,8 +1,10 @@
-# C1 检索查询与完整取证上下文对照
+<a id="c1-检索查询与完整取证上下文对照"></a>
+
+# C1：检索排序与事实判别需要相同的上下文吗？
 
 预声明：2026-10-06。当前 C1 未准入。本轮检验一个假设：把完整订单事实同时送入重排，可能使无关的零值状态词干扰排序；为重排保留原问、可信前文、商品及简短状态，同时让支持判别继续读取完整事实，可能改善召回。
 
-实现开关为 `knowledgeQueryMode=combined|separated`，默认 `combined`。仅 Controller + M4 支持分离；无需额外模型或依赖。两组仍使用同一知识服务、qwen3-rerank、typed v5 / Pro 支持判别、threshold=0.5、declared 前提、原 Top5 上限、原语料与 gold。`effectiveQuery` 保留完整状态、券数、有效期；`retrievalQuery` 由宿主确定构造，不让模型改写事实。
+实现开关为 `knowledgeQueryMode=combined|separated`，默认 `combined`。仅 Controller + M4 支持分离；无需额外模型或依赖。两组仍使用同一知识服务、qwen3-rerank、typed v5 / Pro 支持判别、threshold=0.5、declared 前提、原 Top5 上限、原语料与 gold。`effectiveQuery` 保留完整状态、券数、有效期；`retrievalQuery` 由 Harness 确定构造，不让模型改写事实。
 
 ## 固定输入与执行边界
 
@@ -46,11 +48,11 @@ node --env-file-if-exists=.env scripts/c1-query-development.ts --live
 | rerank 请求 / tokens / CNY 估算 | 19 / 65573 / 0.0327865 | 19 / 59184 / 0.029592 |
 | support 请求 / tokens / USD 估算 | 17 / 31138 / 0.01306536 | 17 / 30378 / 0.013275328 |
 
-改善发生在 001/2：同一已退款订单，`KB-REFUND-PAYMENT` 从第 6 名（0.501904）升到第 4 名（0.586027），进入原 Top5；完整状态取证判别正确接收“不得重复退款”。未调整阈值、补位策略、语料或 gold。该结果支持“在本样本中分离查询改善排序”的判断，不能断言所有零值状态词都会干扰排序。
+改善发生在 001/2：同一已退款订单，`KB-REFUND-PAYMENT` 从第 6 名（0.501904）升到第 4 名（0.586027），进入原 Top5；支持判别仍读取完整状态，正确接收“不得重复退款”。未调整阈值、补位策略、语料或 gold。该结果支持“在本样本中分离查询改善排序”的判断，不能断言所有零值状态词都会干扰排序。
 
 分离组重排 tokens 与 CNY 估算下降约 9.7%；support USD 估算略增，P50 也上升。本轮不能宣称整体费用或延迟下降，尤其不能将单次模型响应时间差异归因于本地字符串构造。
 
-019/1 两组仍把索取具体过敏原名称误判为 `boundary_answer`，用“未录入”作为正向支持；023/1 真正询问资料覆盖范围的正例则两组通过。引用存在、格式有效和宿主前提检查通过，均不能证明模型理解了用户所求事实。
+019/1 两组仍把索取具体过敏原名称误判为 `boundary_answer`，用“未录入”作为正向支持；023/1 真正询问资料覆盖范围的正例则两组通过。引用存在、格式有效和 Harness 前提检查通过，均不能证明模型理解了用户所求事实。
 
 **决定：保留分离开关，作为后续 Session 验证候选；当前默认继续 combined，QQ/atomic + lexical 不变。** 本次达到预声明的组件推进条件，但未解决缺事实误收和竞争引用，C1 仍未准入。随后“具体事实缺失 vs 资料覆盖边界”已有[v6组件对照](./c1-support-intent-comparison.md)，竞争引用交互及恢复也已实现；当前进入[新来源适用性诊断](./c1-support-environment-diagnostic.md)。完整Session仍须单独验证，不重跑本轮以挑选更好分数。
 

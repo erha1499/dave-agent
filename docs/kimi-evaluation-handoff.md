@@ -4,11 +4,11 @@
 
 协作使用本机 `kimi` CLI：以 `--model kimi-code/k3 --prompt` 启动，后续用 `--session <已有会话ID>` 继续同一任务。K3 的模型配置设为 `default_effort = "max"`，实际请求日志应为 `model=k3`、`thinkingEffort=max`。本机 CLI 2.1.1 的 `--prompt` 不能与 `--auto` 或 `--yolo` 合用；通过进程输出取得进度，不再操作桌面 Kimi 窗口。模型/登录配置和会话日志留在本机，不加入仓库。
 
-2026-10-05 v2 首批完成后的前端调整：保持现有灰绿风格和无框架实现，将核心结果、耗时/Tokens及场景列表前移；批次、覆盖和技术口径默认折叠，读取错误/无效口径/配置不一致仍显式可见。依据新 `attribution`/`spans` 展示执行分工，正确区分商家事件、宿主确认与 Agent 回复；归因与旧 steps/usage 不重复相加。详见 API 文档的 v2 增量合同。百炼 M0–M6 仍为离线报告，未接 API，不在页面写死实验数字。
+2026-10-05 v2 首批完成后的前端调整：保持现有灰绿风格和无框架实现，将核心结果、耗时/Tokens及场景列表前移；批次、覆盖和技术口径默认折叠，读取错误/无效口径/配置不一致仍显式可见。依据新 `attribution`/`spans` 展示执行分工，正确区分商家事件、Harness 确认与 Agent 回复；归因与旧 steps/usage 不重复相加。详见 API 文档的 v2 增量合同。百炼 M0–M6 仍为离线报告，未接 API，不在页面写死实验数字。
 
 非交互 shell 未必包含 Kimi 的 PATH，本机可直接调用 `/Users/zdl/.kimi-code/bin/kimi`。本轮使用 K3 且确认其 `default_effort=max`；不修改用户默认模型。前端文件由 Kimi 修改，Codex 补接口文档并检查实际页面、窄屏及交互。
 
-本轮验收：`npm run validate` 通过，含 15 组前端回归（新增 v2 标签/归因、无效 span 诊断、atomic 商家事件有模型步骤但回执由宿主生成）。Chrome 1440px 与 390px 检查通过，覆盖版本对比、键盘展开、逐轮执行分工及窄屏标题换行；核心指标从约 989px 前移至 325px，场景列表从约 1222px 前移至 558px（同一默认运行、1440px 视口的页面坐标）。没有新增运行时依赖或重跑付费评测。本机截图与检查日志保存在忽略的 `.runtime/` 中。
+本轮验收：`npm run validate` 通过，含 15 组前端回归（新增 v2 标签/归因、无效 span 诊断、atomic 商家事件有模型步骤但回复由 Harness 生成）。Chrome 1440px 与 390px 检查通过，覆盖版本对比、键盘展开、逐轮执行分工及窄屏标题换行；核心指标从约 989px 前移至 325px，场景列表从约 1222px 前移至 558px（同一默认运行、1440px 视口的页面坐标）。没有新增运行时依赖或重跑付费评测。本机截图与检查日志保存在忽略的 `.runtime/` 中。
 
 后续实验开关迭代新增“实验调试”页签，合同见 `docs/experiment-controls.md`，由同一 Kimi CLI K3 + Max 会话维护；方案预设与参数来自后端 catalog。历史接口继续只读，唯一 POST 启动本机实验；表单不能修改在线 QQ 或接受命令/密钥。结果取关联记录的真实摘要，缺失/失败及缓存复用需显式展示。
 
@@ -30,15 +30,17 @@ A1 增量已接入 version 2 数据集/接收策略/阈值，保持 version 1 �
 
 不要自行提交或推送；代码留在工作区，由 Codex 联调、验收并统一提交。完成后报告修改文件、已测状态以及缺失的 API 信息。合同新增字段以 `docs/evaluation-api.md` 最新内容为准。
 
-## 2026-10-06 C1 取证与调参交付
+<a id="2026-10-06-c1-取证与调参交付"></a>
 
-仍由 Kimi CLI K3 + Max 修改既有无框架页面。业务表单接入 `knowledgeMode/knowledgeSupport/knowledgeThreshold/knowledgeTimeoutMs` 及两个 A/B 预设，非法组合明确阻止提交且保留可修正控件，不暗改参数。原问、宿主查询、范围、当前证据版本、实际 Prompt 版本与逐篇分类/引文/理由默认折叠，provider 成本按币种分列，未知用量不补零。
+## 2026-10-06 C1 依据查询与调参交付
+
+仍由 Kimi CLI K3 + Max 修改既有无框架页面。业务表单接入 `knowledgeMode/knowledgeSupport/knowledgeThreshold/knowledgeTimeoutMs` 及两个 A/B 预设，非法组合明确阻止提交且保留可修正控件，不暗改参数。原问、Harness 查询、范围、当前证据版本、实际 Prompt 版本与逐篇分类/引文/理由默认折叠，provider 成本按币种分列，未知用量不补零。
 
 真实记录联调发现并修复一次前后端合同不符：后端 `supportVerification` 是含 `value[]` 的对象，首版 UI/合成夹具误用了数组，导致真实判别明细不显示。现在读取真实对象结构，并诊断坏容器；旧 binary 无类别仍正常展示，旧记录没有判别字段不补造。
 
 16 组评测 UI 检查、14 组实验 UI 检查与 typecheck 通过；完整 `npm run validate` 通过后，这次仅 UI 合同修复又重验上述三项。Codex 用真实候选 run `990dac49-10c3-46ab-a6dd-fdcb6e0c8f69` 验证 1440px / 390px 展开与判别内容、配置下载、非法组合修复及历史比较展示，页面错误与横向溢出均为 0。浏览器检查没有启动付费实验；历史参照不是同代码配对，页面可比较不等于模型效果有显著提升。本地证据 `.runtime/c1-browser-results.json` 和截图不提交。
 
-后续 Kimi K3 Max 增量显示 `supportVerification.validation` 的 partial / 全项 invalid、失败 code/hash、实际 parser 版本和逐项无效原因。无效项不显示为 supported=false 或正确拒收；status/ID/code/有效无效重叠异常时显示数据异常并保留原始 trace。16 组评测 UI、15 组实验 UI 和完整 validate 通过。Codex 使用真实 MySQL run `0082f06e-60d5-43c1-a797-488e84b461d4` 验证 1440px / 390px 取证明细及调参下载，页面错误和横向溢出为 0；该实际 DB run 没有 partial，partial/全项无效与坏记录由合成前端检查覆盖，不能混称真实服务故障验收。
+后续 Kimi K3 Max 增量显示 `supportVerification.validation` 的 partial / 全项 invalid、失败 code/hash、实际 parser 版本和逐项无效原因。无效项不显示为 supported=false 或正确拒收；status/ID/code/有效无效重叠异常时显示数据异常并保留原始 trace。16 组评测 UI、15 组实验 UI 和完整 validate 通过。Codex 使用真实 MySQL run `0082f06e-60d5-43c1-a797-488e84b461d4` 验证 1440px / 390px 依据查询明细及调参下载，页面错误和横向溢出为 0；该实际 DB run 没有 partial，partial/全项无效与坏记录由合成前端检查覆盖，不能混称真实服务故障验收。
 
 ## 2026-10-07 咨询出处与费用交付、暂停
 
@@ -48,4 +50,4 @@ A1 增量已接入 version 2 数据集/接收策略/阈值，保持 version 1 �
 
 默认与QQ不切换，旧真实结果不改。用户要求完成本轮后暂停，交付后不继续前端或其他优化；后续仅在用户恢复目标后再确定范围。
 
-2026-10-06：同一 Kimi K3 / Max 会话接入 `knowledgeApplicability` 参数及 A/B 预设，保留非法组合以便修复，不暗改配置；取证详情以简短汇总和折叠表展示“已声明必要前提”、原 rank、五类状态及版本哈希。未检查 / 未声明不显示通过，未知与模型 unsupported / parser invalid 分开。16 组实验 UI、16 组评测 UI 工程检查通过；Codex 在 1440px / 390px 检查下载配置、组合修复和实际 run `d2f23c5b-48ff-43b3-8241-c8bfe029cebb` 的门控明细，页面错误及横向溢出为 0。浏览器没有提交付费实验；真实运行整体仍有业务动作失败，界面展示成功不能替代业务准入。
+2026-10-06：同一 Kimi K3 / Max 会话接入 `knowledgeApplicability` 参数及 A/B 预设，保留非法组合以便修复，不暗改配置；依据查询详情以简短汇总和折叠表展示“已声明必要前提”、原 rank、五类状态及版本哈希。未检查 / 未声明不显示通过，未知与模型 unsupported / parser invalid 分开。16 组实验 UI、16 组评测 UI 工程检查通过；Codex 在 1440px / 390px 检查下载配置、组合修复和实际 run `d2f23c5b-48ff-43b3-8241-c8bfe029cebb` 的条件检查明细，页面错误及横向溢出为 0。浏览器没有提交付费实验；真实运行整体仍有业务动作失败，界面展示成功不能替代业务准入。
