@@ -1229,5 +1229,204 @@
     "updatedAt": "2026-10-11T23:47:23.707719+08:00",
     "rule": "Markdown 文件名采用中文；仅修改本地名称与课程内链，不改变正文或线上版本。",
     "index": "阅读索引.md"
-  }
+  },
+  "currentVersionRule": "source、syncedAt、scope、verification 及 documents 保留 2026-10-11 Lakebook 初始同步基线；已更新页面的当前正文和哈希以 publicationUpdates 中该页最新记录为准，其余页面沿用基线。",
+  "publicationUpdates": [
+    {
+      "date": "2026-10-12",
+      "timeZone": "Asia/Shanghai",
+      "scope": "仅更新并发布现有 9 篇教学文档；其余 18 篇保留 2026-10-11 导出版本。",
+      "method": "本地 Markdown 修订后，通过 Chrome 更新语雀原页；逐篇重新加载阅读页并复制 text/ne-inode 原生正文核对。",
+      "pageCount": 9,
+      "remainingBaselinePages": 18,
+      "verificationReport": "../语雀教学优化发布核验-20261012.md",
+      "evidenceRoot": ".runtime/教学优化-20261012/",
+      "verification": {
+        "stagedPassed": 9,
+        "publishedReadbackPassed": 9,
+        "loadedCodeblocks": 47,
+        "loadedMermaid": 8,
+        "loadedImages": 3,
+        "comparison": "逐段正文、标题、代码及 Mermaid、行内格式、表格单元格、列表、链接和图片语义核对；text 与 plain 仅作为纯文本语言别名。",
+        "boundaries": [
+          "本次未重新导出 Lakebook；publishedNativeSha256 是本机发布后原生正文回读文件的哈希，不是 Lakebook 或 HTML 哈希。",
+          "本轮只核验更新的 9 篇；其余 18 篇不计入本次发布验收。",
+          "外部参考链接保留，未逐一重新访问；没有新增真实模型、MySQL、QQ 或商业验收。"
+        ]
+      },
+      "documents": [
+        {
+          "title": "从哪里开始学 Dave-Agent？一张阅读路线图",
+          "file": "00-阅读路线图.md",
+          "slug": "vb4ua7gq7zdpthhn",
+          "sourceUrl": "https://www.yuque.com/erha-vrnso/repg3o/vb4ua7gq7zdpthhn",
+          "markdownSha256": "de710b42192e7fc6ef7a353f354168371bb225f73b7ce37542a295991bf85799",
+          "stagedNativeSha256": "508b6e7bf9bba217ef51782e417c028c84a171cbde66a34f31f029ff60db7059",
+          "publishedNativeSha256": "c3fd1ffbfe1ba653475152050436c033a5c38484223a55614d8fd09a1f27ed19",
+          "checks": {
+            "stagedSemanticsMatch": true,
+            "publishedSemanticsMatch": true,
+            "readingPageCardsLoaded": true
+          },
+          "counts": {
+            "codeblocks": 0,
+            "mermaid": 1,
+            "images": 0
+          }
+        },
+        {
+          "title": "1.1 从用户提问到最终回答，Agent 是怎样运行的？",
+          "file": "01.01-智能客服运行原理.md",
+          "slug": "3c7971f2134157e0f179aff6c7b0fd30",
+          "sourceUrl": "https://www.yuque.com/erha-vrnso/repg3o/3c7971f2134157e0f179aff6c7b0fd30",
+          "markdownSha256": "ecb099547c8c2bf5cbd5c8f92ed4510b401ce9438b19856dafcfa5dbf5861062",
+          "stagedNativeSha256": "7f8d7f4b613fca656862b2819f3233eb141d32ddcd516f9846ef7002aa062b1f",
+          "publishedNativeSha256": "a9b7a4a501c2ae5600502b1f73bffc4f5a6c595d647ae19f2acb04090cabd16d",
+          "checks": {
+            "stagedSemanticsMatch": true,
+            "publishedSemanticsMatch": true,
+            "readingPageCardsLoaded": true
+          },
+          "counts": {
+            "codeblocks": 10,
+            "mermaid": 2,
+            "images": 0
+          }
+        },
+        {
+          "title": "1.2 配置改了，为什么程序没有按预期运行？",
+          "file": "01.02-配置与运行路径.md",
+          "slug": "piqm37taos3w4v96",
+          "sourceUrl": "https://www.yuque.com/erha-vrnso/repg3o/piqm37taos3w4v96",
+          "markdownSha256": "c493b930f1c06eaf6d0bac26eab3c77fe1bd9e66298f66e20dbc9af352edf6ee",
+          "stagedNativeSha256": "cfe9b59e1731167a1b3391d4fd7af95af3a4f3ee211c0b28dd99c7affdd3a5e8",
+          "publishedNativeSha256": "e272839153c1c9b41dc0785b94f5a118c38a30aa49b2072cb5b13c1f38064dea",
+          "checks": {
+            "stagedSemanticsMatch": true,
+            "publishedSemanticsMatch": true,
+            "readingPageCardsLoaded": true
+          },
+          "counts": {
+            "codeblocks": 10,
+            "mermaid": 0,
+            "images": 1
+          }
+        },
+        {
+          "title": "2.2 Skill 怎么加载，工具权限又由谁控制？",
+          "file": "02.02-技能加载与工具权限.md",
+          "slug": "zggy63v4e66fov5d",
+          "sourceUrl": "https://www.yuque.com/erha-vrnso/repg3o/zggy63v4e66fov5d",
+          "markdownSha256": "e8bcc3fac39cfe4921b6df83caafe4a701daf73c09bdf3c20c4820d5f5b46206",
+          "stagedNativeSha256": "c513afcf87f19a72a5324cb59fa61a41cb973000988affdb558b64198b5659fc",
+          "publishedNativeSha256": "855adf4088d11c9c6bc2030c30fd333dbe1c259b4699cddba6c16960b272cae1",
+          "checks": {
+            "stagedSemanticsMatch": true,
+            "publishedSemanticsMatch": true,
+            "readingPageCardsLoaded": true
+          },
+          "counts": {
+            "codeblocks": 7,
+            "mermaid": 1,
+            "images": 0
+          }
+        },
+        {
+          "title": "3.4 商家晚到的回复，怎样通知到正确的人？",
+          "file": "03.04-商家回复与通知投递.md",
+          "slug": "us8q9ourkbvuzaaq",
+          "sourceUrl": "https://www.yuque.com/erha-vrnso/repg3o/us8q9ourkbvuzaaq",
+          "markdownSha256": "dc53a54f44420a67034ad08c279c82365f565a6d8af39a4d993d29a0704b2c7a",
+          "stagedNativeSha256": "46bdc53158f11c9204630713c883e531c5f82b1e6cdc355504133af77f107216",
+          "publishedNativeSha256": "b6caacd45bbfefc416ce3e1a959a49c7ad10a00b7a2a980f693de6d0b1c752ae",
+          "checks": {
+            "stagedSemanticsMatch": true,
+            "publishedSemanticsMatch": true,
+            "readingPageCardsLoaded": true
+          },
+          "counts": {
+            "codeblocks": 5,
+            "mermaid": 0,
+            "images": 2
+          }
+        },
+        {
+          "title": "5.3 订单查对了，为什么回答仍可能出错？",
+          "file": "05.03-订单证据与答复正确性.md",
+          "slug": "bgk7n1zx4we3gcvn",
+          "sourceUrl": "https://www.yuque.com/erha-vrnso/repg3o/bgk7n1zx4we3gcvn",
+          "markdownSha256": "6e542a3284ff8cfc94d49f1debadcd5f9687236659034828e3d204a52192a49a",
+          "stagedNativeSha256": "fc042c348a2f94c70763107306e079015087c1c69bcbe155c1bf8b5c9fd77c05",
+          "publishedNativeSha256": "0916cb288f6440c0e7b384b8be9b301c88199b488d4b626911a5e1314dee6404",
+          "checks": {
+            "stagedSemanticsMatch": true,
+            "publishedSemanticsMatch": true,
+            "readingPageCardsLoaded": true
+          },
+          "counts": {
+            "codeblocks": 7,
+            "mermaid": 1,
+            "images": 0
+          }
+        },
+        {
+          "title": "6.2 刷新、断线和多标签页，怎样避免丢回复与串会话？",
+          "file": "06.02-网页断线与会话恢复.md",
+          "slug": "tu9dm4a5wev2otqf",
+          "sourceUrl": "https://www.yuque.com/erha-vrnso/repg3o/tu9dm4a5wev2otqf",
+          "markdownSha256": "bda2e041309dde9e1715df5a5335aa6a294bab286170b743645476dd4ffcd32f",
+          "stagedNativeSha256": "750b23ecc892836d7f440c7dab9153ce09319939d8f6e66e27c733cd67022b6e",
+          "publishedNativeSha256": "a5b34874ca3277a68a91e9be3c732a6dddd8c8722fbc2047add78da6ff7ef752",
+          "checks": {
+            "stagedSemanticsMatch": true,
+            "publishedSemanticsMatch": true,
+            "readingPageCardsLoaded": true
+          },
+          "counts": {
+            "codeblocks": 7,
+            "mermaid": 1,
+            "images": 0
+          }
+        },
+        {
+          "title": "7.4 面试时怎样讲清自己的实现、取舍和结果？",
+          "file": "07.04-面试讲解与实现证据.md",
+          "slug": "ba571017e1270654ce01c930f34673c0",
+          "sourceUrl": "https://www.yuque.com/erha-vrnso/repg3o/ba571017e1270654ce01c930f34673c0",
+          "markdownSha256": "b052fd7c0a2bb48eb2cb0f7e4da32541339dd4360c58e69ad929a53d5171b8e4",
+          "stagedNativeSha256": "6373e6d6807688534316b232b7af6d46558652a9c9aedf82fa7e72ab2c5d2d1b",
+          "publishedNativeSha256": "0bf8b18d89bba1fff6f9ebbfd641e823981226997309356d8257d26c27ab431c",
+          "checks": {
+            "stagedSemanticsMatch": true,
+            "publishedSemanticsMatch": true,
+            "readingPageCardsLoaded": true
+          },
+          "counts": {
+            "codeblocks": 1,
+            "mermaid": 2,
+            "images": 0
+          }
+        },
+        {
+          "title": "Dave-Agent 简历项目描述与职责模板",
+          "file": "10-简历项目描述与职责模板.md",
+          "slug": "unul46mhmro4k8do",
+          "sourceUrl": "https://www.yuque.com/erha-vrnso/repg3o/unul46mhmro4k8do",
+          "markdownSha256": "4edcebe20557d939394b065993f7bbb679bf8bf524d0de9deba08a12516019d2",
+          "stagedNativeSha256": "329ddeda68046a7fac2a43c812c669054eb4ccf61fcbbd8f883d7ef0347cc241",
+          "publishedNativeSha256": "2786b1e6343944ef35237c49a4909c1d3b6985a73e9c09bee2fe25848c3a354c",
+          "checks": {
+            "stagedSemanticsMatch": true,
+            "publishedSemanticsMatch": true,
+            "readingPageCardsLoaded": true
+          },
+          "counts": {
+            "codeblocks": 0,
+            "mermaid": 0,
+            "images": 0
+          }
+        }
+      ]
+    }
+  ]
 }
