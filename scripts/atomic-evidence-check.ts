@@ -3,7 +3,7 @@ import { fauxAssistantMessage, fauxProvider, fauxToolCall, getCurrentSystemPromp
 import { createCouponSession, createModelRuntime } from "../src/agent.ts";
 import type { CouponStore } from "../src/coupon-store.ts";
 import { runCliPrompt } from "../src/cli.ts";
-import { canStreamBusinessText, replyFromTools, toolEvidenceFromEvent, type Evidence } from "../src/reply-from-tools.ts";
+import { canStreamBusinessText, readOnlyEvidenceOrderIds, replyFromTools, toolEvidenceFromEvent, type Evidence } from "../src/reply-from-tools.ts";
 import { renderReply } from "../src/reply.ts";
 import { QQAgent } from "../src/qq-agent.ts";
 import type { QQBotInboundMessage } from "@tencent-connect/qqbot-nodejs";
@@ -21,6 +21,9 @@ const rendered = (results: Evidence[]) => renderReply(replyFromTools(injected, r
 const nested = toolEvidenceFromEvent({ type: "tool_execution_end", toolName: "get_order", toolCallId: "child-order",
   parentToolCallId: "parent-faq", result: { content: fresh.content, details: {} }, isError: false });
 assert.deepEqual(nested, fresh, "real nested execution results remain current evidence without transcript fabrication");
+assert.deepEqual(readOnlyEvidenceOrderIds(fresh), [order.id]);
+assert.deepEqual(readOnlyEvidenceOrderIds(tool("get_order", order, true)), []);
+assert.deepEqual(readOnlyEvidenceOrderIds(tool("get_order", { id: order.id })), []);
 assert.equal(toolEvidenceFromEvent({ type: "agent_settled" }), undefined);
 const malformed = toolEvidenceFromEvent({ type: "tool_execution_end", toolName: "search_faq", toolCallId: "bad-rule",
   result: null, isError: false });
@@ -49,6 +52,42 @@ assert.equal(canStreamBusinessText([uncoveredProduct, productRule]), false, "one
 assert.equal(canStreamBusinessText([fresh, productRule]), true);
 assert.equal(canStreamBusinessText([rule, tool("search_faq", [])]), false, "a later empty read supersedes old rule results");
 const nextOrder = tool("get_order", { ...order, id: "COUPON-1043", shop: { id: "NEXT-SHOP" }, items: [{ productId: "NEXT-PRODUCT" }] });
+const switchedContext = { previousOrderIds: [order.id], requestedOrderIds: ["COUPON-1043"] };
+const sameOrderContext = { previousOrderIds: [order.id], requestedOrderIds: [order.id] };
+for (const poison of ["旧单 COUPON-1042 实付99999元，每张供九人。", "刚才那张实付99999元，每张供九人。"] ) {
+  const reply = replyFromTools(poison, [nextOrder, rule], ["get_order", "search_faq"], switchedContext);
+  assert.doesNotMatch(renderReply(reply).text, /COUPON-1042|99999|九人/, "Fresh new-order evidence must not release old-order prose with or without an ID");
+  assert.equal(reply.kind, "order");
+  if (reply.kind === "order") { assert.deepEqual(reply.orders.map(value => value.id), ["COUPON-1043"]); assert.deepEqual(reply.evidenceIds, [faq.sourceId]); }
+  assert.match(reply.text, /历史记录/); assert.match(reply.text, /未办理/); assert.match(reply.text, /查询范围（KB-CHECK-EVIDENCE）\n当前记录不构成退款批准。/);
+  assert.equal(canStreamBusinessText([nextOrder, rule], switchedContext), false, "A switching turn must refuse all free deltas before inspecting their words");
+}
+for (const previousOrderIds of [[], [order.id], [order.id, order.id]]) {
+  const context = { previousOrderIds, requestedOrderIds: [order.id] };
+  assert.equal(canStreamBusinessText([fresh, rule], context), true);
+  const reply = replyFromTools("当前单正常咨询", [fresh, rule], ["get_order", "search_faq"], context);
+  assert.equal(reply.kind, "order"); assert.equal(reply.text, "当前单正常咨询");
+}
+for (const context of [
+  { previousOrderIds: [order.id, "COUPON-1043"], requestedOrderIds: [order.id] },
+  { previousOrderIds: [order.id, "COUPON-1043"], requestedOrderIds: ["COUPON-1043"] },
+]) assert.equal(canStreamBusinessText([tool("get_order", { ...order, id: context.requestedOrderIds[0] }), rule], context), false,
+  "A mixed-order conversation never silently regains free prose on later same-order turns");
+for (const [results, context] of [
+  [[nextOrder, rule], sameOrderContext],
+  [[fresh, nextOrder, rule], switchedContext],
+  [[fresh, tool("get_order", "failed", true), nextOrder, rule], switchedContext],
+  [[fresh, rule], { previousOrderIds: [order.id, "COUPON-1043"], requestedOrderIds: [] }],
+  [[fresh, rule], { previousOrderIds: [], requestedOrderIds: [order.id, "COUPON-1043"] }],
+] as const) {
+  assert.equal(canStreamBusinessText(results, context), false);
+  const reply = replyFromTools(injected, results, ["get_order", "search_faq"], context);
+  assert.equal(reply.kind, "notice", "Wrong, multiple or ambiguous order evidence must ask for a clear order without exposing its card");
+  assert.doesNotMatch(renderReply(reply).text, /56\.80|paidCents|UNVERIFIED_SENTINEL/);
+}
+const switchedWithoutRules = replyFromTools(injected, [nextOrder], ["get_order", "search_faq"], switchedContext);
+assert.equal(switchedWithoutRules.kind, "order"); assert.match(switchedWithoutRules.text, /未取得完整适用规则/);
+assert.doesNotMatch(switchedWithoutRules.text, /UNVERIFIED_SENTINEL/);
 for (const results of [[rule, fresh], [fresh, rule, fresh], [fresh, rule, nextOrder]]) {
   assert.equal(canStreamBusinessText(results), false, "new order reads retire earlier rules, including a same-order reread");
   assert.doesNotMatch(rendered(results).text, /UNVERIFIED_SENTINEL/);
@@ -70,6 +109,42 @@ const list = tool("list_orders", { source: "demo-database", hasMore: false, orde
   refundedCents: 0, couponStatuses: ["redeemed"], productName: "餐饮券", shopName: "门店", createdAt: null }] });
 assert.doesNotMatch(rendered([list, rule]).text, /UNVERIFIED_SENTINEL/);
 assert.match(rendered([list]).text, /仅供选单/); assert.equal(canStreamBusinessText([list, rule]), false);
+const listedIds = [order.id, "COUPON-1043"];
+const multipleList = tool("list_orders", { source: "demo-database", hasMore: true,
+  orders: listedIds.map(id => ({ id, status: "paid", paidCents: 5680, refundedCents: 0,
+    couponStatuses: ["unused"], productName: "餐饮券", shopName: "门店", createdAt: null })) });
+for (const previousOrderIds of [[], [order.id]]) {
+  const context = { previousOrderIds, requestedOrderIds: ["COUPON-1043"] };
+  const listedReply = replyFromTools("旧单实付99999元，每张供九人。", [multipleList], ["get_order", "list_orders", "search_faq"], context);
+  assert.equal(listedReply.kind, "notice", "An explicit single-order request cannot expose other orders through a pure list");
+  assert.doesNotMatch(renderReply(listedReply).text, /COUPON-1042|COUPON-1043|56\.80|99999|九人/);
+  assert.equal(canStreamBusinessText([multipleList, rule], context), false);
+  const results = [multipleList, nextOrder, rule];
+  const reply = replyFromTools("旧单实付99999元，每张供九人。", results, ["get_order", "list_orders", "search_faq"], context);
+  assert.equal(reply.kind, "notice", "A list followed by order detail cannot bypass the single-order evidence boundary");
+  assert.doesNotMatch(renderReply(reply).text, /COUPON-1042|COUPON-1043|56\.80|99999|九人/);
+  assert.equal(canStreamBusinessText(results, context), false);
+}
+for (const context of [
+  { previousOrderIds: [], requestedOrderIds: [], allowOrderList: true },
+  { previousOrderIds: [order.id], requestedOrderIds: [order.id], allowOrderList: true },
+  { previousOrderIds: [order.id], requestedOrderIds: [], allowOrderList: true },
+]) {
+  const reply = replyFromTools(injected, [multipleList, rule], ["get_order", "list_orders", "search_faq"], context);
+  assert.equal(reply.kind, "order", "A read-only list remains a fixed selection receipt in fresh and single-order conversations");
+  assert.deepEqual(reply.orders.map(value => value.id), listedIds);
+  assert.ok(reply.orders.every(value => value.selectionText === `选择订单 ${value.id}`));
+  assert.equal(reply.hasMore, true); assert.deepEqual(reply.evidenceIds, []);
+  assert.match(reply.text, /仅供选单/); assert.doesNotMatch(renderReply(reply).text, /UNVERIFIED_SENTINEL/);
+  assert.equal(canStreamBusinessText([multipleList, rule], context), false, "Lists never unlock free prose even when a rule follows");
+}
+for (const context of [
+  { previousOrderIds: [], requestedOrderIds: listedIds },
+  { previousOrderIds: listedIds, requestedOrderIds: [] },
+]) {
+  assert.equal(replyFromTools(injected, [multipleList], ["get_order", "list_orders", "search_faq"], context).kind, "notice");
+  assert.equal(canStreamBusinessText([multipleList, rule], context), false);
+}
 const emptyList = tool("list_orders", { source: "demo-database", hasMore: false, orders: [] });
 const emptyAfterList = replyFromTools(injected, [list, emptyList]);
 assert.equal(emptyAfterList.kind, "order");

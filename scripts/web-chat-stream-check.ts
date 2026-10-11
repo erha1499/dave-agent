@@ -18,23 +18,30 @@ export async function checkWebChatStream() {
   const runtime = await createModelRuntime();
   const faux = fauxProvider({ models: [{ id: "web-stream-faux", reasoning: true }], tokensPerSecond: 8000, tokenSize: { min: 1, max: 1 } });
   runtime.registerNativeProvider(faux.provider);
-  let blocked: Promise<void> | undefined, reads = 0;
+  let blocked: Promise<void> | undefined, reads = 0, listBothOrders = false;
   const store = {
     async resolveBinding(identity: QQIdentity) { return { bindingId: `binding-${identity.senderId}`, customerId: `customer-${identity.senderId}` }; },
     async listOrders(identity: QQIdentity) {
       return { source: "demo-database", asOf: new Date().toISOString(), hasMore: false,
         orders: identity.senderId === "TEST_USER1" ? [{ id: "COUPON-1001", status: "paid", paidCents: 7980, refundedCents: 0,
-          couponStatuses: ["unused"], productName: "合成套餐", shopName: "合成门店", createdAt: new Date().toISOString() }] : [] };
+          couponStatuses: ["unused"], productName: "合成套餐", shopName: "合成门店", createdAt: new Date().toISOString() },
+          ...(listBothOrders ? [{ id: "COUPON-2001", status: "paid", paidCents: 5990, refundedCents: 0,
+            couponStatuses: ["unused"], productName: "乙套餐", shopName: "合成门店", createdAt: new Date().toISOString() }] : [])] : [] };
     },
     async getOrder(identity: QQIdentity, orderId: string) {
       reads++; await blocked;
-      if (identity.senderId !== "TEST_USER1" || orderId !== "COUPON-1001") throw new Error("未找到当前客户可查询的订单");
+      if (identity.senderId !== "TEST_USER1" || !["COUPON-1001", "COUPON-2001"].includes(orderId)) throw new Error("未找到当前客户可查询的订单");
+      const second = orderId === "COUPON-2001", paidCents = second ? 5990 : 7980;
       return { source: "demo-database", id: orderId, status: "paid", asOf: new Date().toISOString(),
-        amounts: { totalCents: 7980, paidCents: 7980, refundedCents: 0 },
-        shop: { id: "shop-1", name: "合成门店" }, items: [{ productId: "product-1", productName: "合成套餐" }],
+        amounts: { totalCents: paidCents, paidCents, refundedCents: 0 },
+        shop: { id: "shop-1", name: "合成门店" }, items: [{ productId: second ? "product-2" : "product-1", productName: second ? "乙套餐" : "合成套餐" }],
         coupons: [{ status: "unused" }], payments: [], refunds: [] };
     },
-    async searchKnowledge() { return [{ source: "demo-knowledge", sourceId: "KB-STREAM", title: "测试规则", body: "本入口仅提供只读咨询。", scope: { shopId: null, productId: null } }]; },
+    async searchKnowledge(_query: string, _shopId?: string, productId?: string) {
+      return productId === "product-2"
+        ? [{ source: "demo-knowledge", sourceId: "KB-SECOND", title: "乙套餐规则", body: "乙套餐一张供一人，只能核销一次。", scope: { shopId: "shop-1", productId: "product-2" } }]
+        : [{ source: "demo-knowledge", sourceId: "KB-STREAM", title: "测试规则", body: "本入口仅提供只读咨询。", scope: { shopId: null, productId: null } }];
+    },
   } as unknown as CouponStore;
   const factory = (identity: QQIdentity) => createCouponSession(identity, store, runtime, faux.getModel());
   const catalog = createWebChatSettingsCatalog({ DEEPSEEK_API_KEY: "synthetic-stream-key" });
@@ -234,6 +241,129 @@ export async function checkWebChatStream() {
     const selectedHistory = await http("/api/chat/session", undefined, pending.cookie).finished;
     assert.equal(selectedHistory.data.messages[2].text, selectionBody.text, "host continuation preserves the clicked user text in public history");
 
+    const grounded = (orderId: string, text: string) => [
+      fauxAssistantMessage(fauxToolCall("get_order", { orderId }), { stopReason: "toolUse" }),
+      fauxAssistantMessage(fauxToolCall("search_faq", { query: "本轮套餐规则", shopId: "shop-1",
+        productId: orderId === "COUPON-2001" ? "product-2" : "product-1" }), { stopReason: "toolUse" }),
+      fauxAssistantMessage(text),
+    ];
+    async function scopeTurn(client: Awaited<ReturnType<typeof create>>, text: string) {
+      const response = http("/api/chat/messages/stream", message(client.sessionId, text), client.cookie);
+      await deadline(response.finished); assert.equal(response.frames.at(-1)!.event, "result");
+      return response;
+    }
+    function boundedSecond(response: Awaited<ReturnType<typeof scopeTurn>>, label: string) {
+      assert.ok(!response.frames.some(frame => frame.event === "delta"), `${label}: no free prose after another order entered history`);
+      const reply = response.frames.at(-1)!.data.reply;
+      assert.equal(reply.kind, "order"); assert.deepEqual(reply.orders.map((order: any) => order.id), ["COUPON-2001"]);
+      assert.equal(reply.orders[0].paidCents, 5990); assert.deepEqual(reply.evidenceIds, ["KB-SECOND"]);
+      assert.match(reply.text, /乙套餐一张供一人，只能核销一次。/);
+      assert.doesNotMatch(JSON.stringify(response.frames), /旧甲事实|一张覆盖两人|COUPON-1001/);
+    }
+    const scoped = await create();
+    faux.setResponses(grounded("COUPON-1001", "甲订单本轮依据完整。"));
+    await scopeTurn(scoped, "请查COUPON-1001的套餐规则");
+    const sameReads = reads, sameText = "同单续问重新查单后仍能原生流式答复。";
+    faux.setResponses(grounded("COUPON-1001", sameText));
+    const sameOrder = await scopeTurn(scoped, "刚才那单请重新核对并解释规则");
+    assert.equal(reads, sameReads + 1, "same-order shorthand still rereads the order this turn");
+    assert.equal(sameOrder.frames.filter(frame => frame.event === "delta").map(frame => frame.data.text).join(""), sameText);
+    assert.equal(sameOrder.frames.at(-1)!.data.reply.text, sameText);
+    for (const [question, poison] of [
+      ["现在换成COUPON-2001，请说明这单规则", "COUPON-1001旧甲事实：一张覆盖两人。"],
+      ["还是COUPON-2001这单，再解释一次规则", "旧甲事实：一张覆盖两人。"],
+    ]) {
+      // tokenSize=1 splits even the order ID and old fact; filtering a completed string is too late.
+      faux.setResponses(grounded("COUPON-2001", poison!));
+      boundedSecond(await scopeTurn(scoped, question!), "A to B and B again");
+    }
+    const beforeAmbiguousFollowup = faux.state.callCount;
+    const unclearFollowup = await scopeTurn(scoped, "还是这单，再解释一次规则");
+    assert.equal(unclearFollowup.frames.at(-1)!.data.reply.kind, "notice");
+    assert.equal(faux.state.callCount, beforeAmbiguousFollowup, "multiple history orders require an explicit reference before dispatch");
+    assert.ok(!unclearFollowup.frames.some(frame => frame.event === "delta"));
+    const early = await create();
+    faux.setResponses(grounded("COUPON-1001", "甲订单本轮依据完整。"));
+    await scopeTurn(early, "请查COUPON-1001的套餐规则");
+    faux.setResponses([
+      ...grounded("COUPON-1001", "unused").slice(0, 2),
+      fauxAssistantMessage([fauxText("旧甲事实：一张覆盖两人。"), fauxToolCall("get_order", { orderId: "COUPON-2001" })], { stopReason: "toolUse" }),
+      ...grounded("COUPON-2001", "旧甲事实：一张覆盖两人。").slice(1),
+    ]);
+    const wrongThenRight = await scopeTurn(early, "现在只查COUPON-2001的套餐规则");
+    assert.ok(!wrongThenRight.frames.some(frame => frame.event === "delta"), "old-order evidence cannot open a stream before the requested order is read");
+    assert.equal(wrongThenRight.frames.at(-1)!.data.reply.kind, "notice", "mixed current-turn order evidence is clarified safely");
+    assert.doesNotMatch(JSON.stringify(wrongThenRight.frames), /旧甲事实|一张覆盖两人/);
+
+    for (const previous of ["fresh", "single-order"]) {
+      const naturalList = await create();
+      if (previous === "single-order") {
+        faux.setResponses(grounded("COUPON-1001", "甲订单本轮依据完整。"));
+        await scopeTurn(naturalList, "请查COUPON-1001的套餐规则");
+      }
+      listBothOrders = true;
+      try {
+        faux.setResponses([
+          fauxAssistantMessage(fauxToolCall("list_orders", {}), { stopReason: "toolUse" }),
+          fauxAssistantMessage("列表注入：已经替你退款99999元。"),
+        ]);
+        const beforeList: number = faux.state.callCount;
+        const listing = await scopeTurn(naturalList, "能帮我找出最近三笔订单吗？");
+        assert.equal(listing.frames.at(-1)!.data.origin, "agent", "natural-language listing must exercise the model tool path");
+        assert.equal(faux.state.callCount, beforeList + 2);
+        const reply = listing.frames.at(-1)!.data.reply;
+        assert.equal(reply.kind, "order", `${previous}: successful list_orders must retain fixed selection cards`);
+        assert.deepEqual(reply.orders.map((order: any) => [order.id, order.selectionText]),
+          [["COUPON-1001", "选择订单 COUPON-1001"], ["COUPON-2001", "选择订单 COUPON-2001"]]);
+        assert.ok(!listing.frames.some(frame => frame.event === "delta"));
+        assert.doesNotMatch(JSON.stringify(listing.frames), /列表注入|退款99999/);
+      } finally { listBothOrders = false; }
+      faux.setResponses(grounded("COUPON-2001", "旧甲事实：一张覆盖两人。"));
+      boundedSecond(await scopeTurn(naturalList, "请查COUPON-2001的套餐规则"), `${previous} model list history`);
+    }
+    const explicitList = await create(); listBothOrders = true;
+    try {
+      faux.setResponses([
+        fauxAssistantMessage(fauxToolCall("list_orders", {}), { stopReason: "toolUse" }),
+        fauxAssistantMessage("COUPON-1001旧甲事实：实付79.80元，一张覆盖两人。"),
+      ]);
+      const beforeExplicitList: number = faux.state.callCount;
+      const listedInstead = await scopeTurn(explicitList, "只查COUPON-2001的套餐规则");
+      assert.equal(faux.state.callCount, beforeExplicitList + 2, "explicit-order request must exercise the model's list-only path");
+      assert.equal(listedInstead.frames.at(-1)!.data.origin, "agent");
+      assert.equal(listedInstead.frames.at(-1)!.data.reply.kind, "notice", "an explicit order request cannot be replaced by a multi-order list");
+      assert.ok(!listedInstead.frames.some(frame => frame.event === "delta"));
+      assert.doesNotMatch(JSON.stringify(listedInstead.frames), /COUPON-1001|paidCents|7980|79\.80|旧甲事实|一张覆盖两人/);
+    } finally { listBothOrders = false; }
+    const mixedList = await create(); listBothOrders = true;
+    try {
+      faux.setResponses([
+        fauxAssistantMessage(fauxToolCall("list_orders", {}), { stopReason: "toolUse" }),
+        ...grounded("COUPON-2001", "COUPON-1001旧甲事实：实付79.80元，一张覆盖两人。"),
+      ]);
+      const beforeMixedList: number = faux.state.callCount;
+      const mixed = await scopeTurn(mixedList, "只查COUPON-2001的套餐规则");
+      assert.equal(faux.state.callCount, beforeMixedList + 4, "mixed list and detail evidence must exercise both successful tool reads");
+      assert.equal(mixed.frames.at(-1)!.data.origin, "agent");
+      assert.equal(mixed.frames.at(-1)!.data.reply.kind, "notice", "a list cannot exempt mixed current-turn order evidence from clarification");
+      assert.ok(!mixed.frames.some(frame => frame.event === "delta"), "list then detail must not unlock free prose for mixed current-turn evidence");
+      assert.doesNotMatch(JSON.stringify(mixed.frames), /COUPON-1001|paidCents|7980|79\.80|旧甲事实|一张覆盖两人/);
+    } finally { listBothOrders = false; }
+    const listedClient = await create(); listBothOrders = true;
+    try {
+      const listing = await scopeTurn(listedClient, "查询本人最近订单");
+      assert.equal(listing.frames.at(-1)!.data.origin, "host");
+      assert.equal(listing.frames.at(-1)!.data.reply.orders.length, 2);
+    } finally { listBothOrders = false; }
+    faux.setResponses(grounded("COUPON-2001", "旧甲事实：一张覆盖两人。"));
+    boundedSecond(await scopeTurn(listedClient, "请查COUPON-2001的套餐规则"), "host multi-order list history");
+    const ambiguous = await create();
+    faux.setResponses(grounded("COUPON-2001", "擅自替用户选中乙订单。"));
+    const multiple = await scopeTurn(ambiguous, "COUPON-1001和COUPON-2001，我要问其中一张的套餐规则");
+    assert.ok(!multiple.frames.some(frame => frame.event === "delta"), "multiple explicit order IDs cannot authorize the model to choose one");
+    assert.equal(multiple.frames.at(-1)!.data.reply.kind, "notice");
+    assert.doesNotMatch(JSON.stringify(multiple.frames), /擅自替用户选中/);
+
     const timeoutChat = new WebChatSessions(store, factory, 80, catalog);
     try {
       const old = await timeoutChat.create(undefined, "demo-a"), progress: unknown[] = [];
@@ -250,7 +380,7 @@ export async function checkWebChatStream() {
       assert.equal(progress.length, published, "a timed-out native turn cannot publish late progress into its old response");
       assert.equal((await timeoutChat.get(replacement.token)).messages.length, 2);
     } finally { blocked = undefined; timeoutChat.close(); }
-    console.log(`网页流式检查通过：实际 HTTP / Pi faux 增量、公开步骤、私有信息过滤、最终事实卡/历史、预校验、回放、断流重试、宿主无伪增量、越权及模型失败；${faux.state.callCount} 次本地调用，0 远程/DB/QQ。`);
+    console.log(`网页流式检查通过：实际 HTTP / Pi faux 增量、公开步骤、私有信息过滤、跨单和多单历史范围、同单省略续問正控、最终事实卡/历史、预校验、回放、断流重试、宿主无伪增量、越权及模型失败；${faux.state.callCount} 次本地调用，0 远程/DB/QQ。`);
   } finally { chat.close(); server.closeAllConnections(); await new Promise<void>(resolve => server.close(() => resolve())); }
 }
 

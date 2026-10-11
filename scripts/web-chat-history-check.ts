@@ -258,8 +258,64 @@ export async function checkWebChatHistory() {
     await checkHistoryLimits(directory, business.store);
     await checkUnavailableModels(directory, business.store);
     await checkReplacementCleanupLock(directory, business.store);
+    await checkRestoredOrderScope(directory);
     console.log(`网页持久历史检查通过：真实临时SQLite/跨进程提交与SIGKILL恢复、owner/profile/binding隔离、实际Pi上下文续聊与重新读订单、CAS/ABA/busy/回执、旧卡失效、原子失败/损坏与显式容量；${faux.state.callCount} 次本地faux，0远程/业务DB/QQ。`);
   } finally { if (endpoint) await endpoint.close(); chat?.close(); await rm(directory, { recursive: true, force: true }); }
+}
+
+async function checkRestoredOrderScope(directory: string) {
+  const path = join(directory, "order-scope.sqlite"), base = fixture().store;
+  const store = { ...base,
+    async getOrder(identity: QQIdentity, orderId: string) {
+      assert.ok(["COUPON-1001", "COUPON-2001"].includes(orderId));
+      const order = await base.getOrder(identity, "COUPON-1001"), second = orderId === "COUPON-2001";
+      return { ...order, id: orderId, amounts: { totalCents: second ? 5990 : 7980, paidCents: second ? 5990 : 7980, refundedCents: 0 },
+        items: [{ productId: second ? "product-2" : "product-1", productName: second ? "乙套餐" : "甲套餐" }] };
+    },
+    async searchKnowledge(_query: string, _shopId?: string, productId?: string) {
+      return [{ source: "demo-knowledge", sourceId: productId === "product-2" ? "KB-RESTORED-B" : "KB-RESTORED-A",
+        title: "恢复规则", body: productId === "product-2" ? "乙套餐一张供一人。" : "甲套餐一张供两人。",
+        scope: { shopId: "shop-1", productId } }];
+    },
+  } as unknown as CouponStore;
+  const runtime = await createModelRuntime(), faux = fauxProvider({ models: [{ id: "history-order-scope-faux" }], tokensPerSecond: 8000 });
+  runtime.registerNativeProvider(faux.provider);
+  const factory = (identity: QQIdentity) => createCouponSession(identity, store, runtime, faux.getModel());
+  const responses = (orderId: string, text: string) => [
+    fauxAssistantMessage(fauxToolCall("get_order", { orderId }), { stopReason: "toolUse" }),
+    fauxAssistantMessage(fauxToolCall("search_faq", { query: "套餐规则", shopId: "shop-1",
+      productId: orderId === "COUPON-2001" ? "product-2" : "product-1" }), { stopReason: "toolUse" }),
+    fauxAssistantMessage(text),
+  ];
+  let chat = new WebChatSessions(store, factory, 2000, catalog(), new WebChatHistory(path));
+  try {
+    const original = await chat.create(undefined, "demo-a");
+    for (const orderId of ["COUPON-1001", "COUPON-2001"]) {
+      faux.setResponses(responses(orderId, "已核对本轮订单。"));
+      await chat.send(original.token, randomUUID(), `请查询${orderId}的套餐规则`, original.session.id);
+    }
+    const before = await chat.get(original.token);
+    assert.deepEqual(before.messages.flatMap(message => message.reply?.kind === "order" ? message.reply.orders.map(order => order.id) : []), ["COUPON-1001", "COUPON-2001"]);
+    chat.close();
+    chat = new WebChatSessions(store, factory, 2000, catalog(), new WebChatHistory(path));
+    const reopened = await chat.open(undefined, original.ownerToken, original.session.conversationId, "demo-a", null);
+    assert.deepEqual(reopened.messages, before.messages);
+    let privateHistory = "";
+    faux.setResponses([
+      context => { privateHistory = JSON.stringify(context.messages); return responses("COUPON-2001", "unused")[0]!; },
+      ...responses("COUPON-2001", "旧甲事实仍是一张两人。").slice(1),
+    ]);
+    const deltas: string[] = [];
+    const result = await chat.send(reopened.token, randomUUID(), "继续只查COUPON-2001的套餐规则", reopened.session.id,
+      event => { if (event.type === "delta") deltas.push(event.text); });
+    assert.match(privateHistory, /COUPON-1001/); assert.match(privateHistory, /COUPON-2001/);
+    assert.equal(deltas.join(""), "", "restoring multiple order cards does not make the Pi transcript clean");
+    assert.equal(result.reply.kind, "order"); if (result.reply.kind !== "order") throw new Error("Expected current order card");
+    assert.deepEqual(result.reply.orders.map(order => order.id), ["COUPON-2001"]);
+    assert.deepEqual(result.reply.evidenceIds, ["KB-RESTORED-B"]); assert.match(result.reply.text, /乙套餐一张供一人。/);
+    assert.doesNotMatch(result.reply.text, /旧甲事实|COUPON-1001/);
+    console.log(`多订单持久历史恢复范围检查通过：${faux.state.callCount} 次本地Pi/faux，0远程/业务DB/QQ。`);
+  } finally { chat.close(); }
 }
 
 async function checkStorageFailures(directory: string, store: CouponStore, factory: (identity: QQIdentity) => ReturnType<typeof createCouponSession>, faux: ReturnType<typeof fauxProvider>) {

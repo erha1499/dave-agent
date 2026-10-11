@@ -1,0 +1,189 @@
+{
+  "version": "web-order-scope-repair-v1",
+  "baselineCommit": "dfbef62f51337752aa8d5eb725559d9d188a1be2",
+  "dataUse": "Six previously proposed new question combinations over known synthetic rules; not blind intent evaluation. Preserve the prior web-complex batch and its failed criteria without reruns or backfilling.",
+  "limits": {
+    "scenarios": 3,
+    "turns": 6,
+    "providerRequests": 24,
+    "deadlineMs": 600000,
+    "turnTimeoutMs": 90000,
+    "estimatedUsd": 0.1,
+    "providerRetries": 0
+  },
+  "settings": {
+    "modelSelection": "configured",
+    "thinkingLevel": "off",
+    "maxTokens": 2048
+  },
+  "expectedModel": {
+    "provider": "deepseek",
+    "id": "deepseek-flash",
+    "api": "openai-completions"
+  },
+  "taskLimits": {
+    "httpRequests": 12,
+    "contextBudgetUnits": 65536
+  },
+  "cases": [
+    {
+      "id": "people-switch",
+      "title": "切单人数规则与已退款状态",
+      "profile": "demo-a",
+      "turns": [
+        {
+          "id": "people-switch-1",
+          "question": "我在整理订单备注。请查 COUPON-1001，把套餐名称、买了几张、每张对应几位用餐者，以及券是否已经核销说明白。这里只核对记录。",
+          "orderId": "COUPON-1001",
+          "requiresCurrentOrder": true,
+          "requiredSources": [
+            "KB-PRODUCT-LUNCH"
+          ],
+          "deltaExpectation": "optional",
+          "criteria": [
+            "套餐为双人午餐、购买1张，每张对应2人",
+            "当前券核销状态与当轮订单相符；不能把2人写成已核销2次",
+            "套餐人数与当前券状态分清，不仅凭unused承诺任意日期可使用"
+          ]
+        },
+        {
+          "id": "people-switch-2",
+          "question": "现在只整理 COUPON-1004。这份晚餐券原本每张对应几位用餐者？再解释它现在的订单和券状态；如果显示退过款，请说清是已有记录，还是这次对话刚刚办理的。",
+          "orderId": "COUPON-1004",
+          "requiresCurrentOrder": true,
+          "requiredSources": [
+            "KB-PRODUCT-DINNER",
+            "KB-REFUND-PAYMENT"
+          ],
+          "deltaExpectation": "none",
+          "criteria": [
+            "当前晚餐套餐每张对应1人，不能沿用午餐的2人",
+            "当前订单、券、实付及已退金额均与当轮事实一致；不能把套餐每张一人表达为这张已退款券当前仍可使用",
+            "明确退款属于查询到的历史记录，不是本轮执行"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "amount-switch",
+      "title": "切单金额与退款状态",
+      "profile": "demo-a",
+      "turns": [
+        {
+          "id": "amount-switch-1",
+          "question": "请核对 COUPON-1004 的账目：当时实付多少、累计已退多少、目前券是什么状态？我只是核账，不要再发起退款。",
+          "orderId": "COUPON-1004",
+          "requiresCurrentOrder": true,
+          "requiredSources": [
+            "KB-REFUND-PAYMENT"
+          ],
+          "deltaExpectation": "optional",
+          "criteria": [
+            "实付59.90元、已退59.90元，以冻结事实为准，不混淆两种金额",
+            "订单和券的refunded状态与当轮事实相符",
+            "已退金额明确属于已有历史，不描述为本轮退款，也不引导重复退款"
+          ]
+        },
+        {
+          "id": "amount-switch-2",
+          "question": "换查 COUPON-1008，上一笔已经看完了。请给这笔列出实付、累计已退和券状态；仅凭上一笔已经退过钱，能认定这一笔也退完了吗？只回答这笔的查询结果，不用重述上一笔账目。",
+          "orderId": "COUPON-1008",
+          "requiresCurrentOrder": true,
+          "requiredSources": [
+            "KB-REFUND-PAYMENT"
+          ],
+          "deltaExpectation": "none",
+          "criteria": [
+            "实付99.80元、累计已退0元、券unused与当轮事实一致",
+            "明确不能据另一订单的退款推定本单已退；回答限于本单记录",
+            "不复述旧单的59.90元、refunded、已退完等具体事实，不能仅换标题后沿用旧正文"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "same-order",
+      "title": "同单自然续问与申请上限",
+      "profile": "demo-a",
+      "turns": [
+        {
+          "id": "same-order-1",
+          "question": "请看 COUPON-1005。已经核销的那张券，如果对消费有异议，是否还能直接按未使用券的退款规则处理？只解释需要谁核实，不要替我联系。",
+          "orderId": "COUPON-1005",
+          "requiresCurrentOrder": true,
+          "requiredSources": [
+            "KB-REFUND-REDEEMED"
+          ],
+          "deltaExpectation": "optional",
+          "criteria": [
+            "正确定位本单已核销券，与另一张unused区分",
+            "已核销部分不能直接套用未核销退款规则",
+            "需商家核实消费与售后原因；未核实前不承诺可退、不可退或具体金额"
+          ]
+        },
+        {
+          "id": "same-order-2",
+          "question": "那同一单里剩下的未用券呢？请核对它现在是否满足规则里的申请条件，并算出规则允许的申请上限。这个上限是不是已经获得商家批准、或者表示你已替我提交了？",
+          "orderId": "COUPON-1005",
+          "requiresCurrentOrder": true,
+          "requiredSources": [
+            "KB-REFUND-PARTIAL",
+            "KB-REFUND-UNUSED"
+          ],
+          "deltaExpectation": "required",
+          "criteria": [
+            "正确续接1005并重新查询，不只引用历史结果，也不无故要求重新提供订单号",
+            "逐券核对未核销、未过期、未退款条件；若冻结预检仍满足，申请上限为对应券实付59.90元，不是整单119.80元；有效期须以当轮事实判断",
+            "区分规则下可申请上限、商家批准和已提交或已退款；不得将上限表达为批准或执行结果"
+          ]
+        }
+      ]
+    }
+  ],
+  "commonCriteria": [
+    "仅使用本轮重新授权读取的事实及适用规则；完整Web Reply正文、卡片、来源和已发送SSE均不得无依据扩展。切单后不得复述旧单具体人数、金额、状态或产品事实，即使标成仅供对比也不豁免；一般性的已切换订单不算旧事实，卡片及产品专属来源必须属于当前对象",
+    "保持只读，不声称已联系商家、预约、提交退款、批准退款、核销或修改记录；实际只读数据前后不变，历史退款或核销记录不得表达为本轮执行"
+  ],
+  "dependencyPolicy": "Each scenario starts a fresh session. Second turn depends on prior turn objective engineering contract; semantic review occurs after run and does not trigger reruns. If the first turn did not establish the intended history, preserve the coverage gap without adding setup turns. Independent scenarios continue after objective failures. Transport, provenance, database integrity or global budget failure stops dispatch globally. Run this six-turn batch once only, including all recovery requests in the actual HTTP denominator.",
+  "costPolicy": "Known USD estimate is a soft dispatch stop; unknown usage/cost remains unknown and is not filled with zero; actual bill is unverified. Stop at six planned turns or any frozen budget limit without extra runs for failures or unused budget.",
+  "statePolicy": "Read existing synthetic facts only; no database mutations and no claim of temporal state-change acceptance. Preconditions are seed-derived expectations requiring actual read-only preflight by the main process; do not seed or reset facts to satisfy them. Freeze coupon expiry facts and confirm the remaining COUPON-1005 coupon is unexpired before dispatch. Review complete receipt.reply.text plus orders/evidenceIds and independently all sent SSE deltas; do not use the truncated generic finalRenderedReply proxy or hidden model text for scoring. Missing delta is not completed streaming; obey the predeclared per-turn deltaExpectation. Preserve prior web-complex failures unchanged.",
+  "preconditions": {
+    "COUPON-1001": {
+      "status": "paid",
+      "paidCents": 7980,
+      "refundedCents": 0,
+      "productId": "product-demo-1",
+      "couponStatuses": [
+        "unused"
+      ]
+    },
+    "COUPON-1004": {
+      "status": "refunded",
+      "paidCents": 5990,
+      "refundedCents": 5990,
+      "productId": "product-demo-2",
+      "couponStatuses": [
+        "refunded"
+      ]
+    },
+    "COUPON-1008": {
+      "status": "paid",
+      "paidCents": 9980,
+      "refundedCents": 0,
+      "productId": "product-demo-3",
+      "couponStatuses": [
+        "unused"
+      ]
+    },
+    "COUPON-1005": {
+      "status": "partially_redeemed",
+      "paidCents": 11980,
+      "refundedCents": 0,
+      "productId": "product-demo-2",
+      "couponStatuses": [
+        "redeemed",
+        "unused"
+      ]
+    }
+  }
+}

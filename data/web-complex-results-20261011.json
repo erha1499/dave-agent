@@ -1,0 +1,3656 @@
+{
+  "schema": "web-complex-results-v1",
+  "recordedDate": "2026-10-11",
+  "scope": "一次4场景8轮新组合：真实本机Web HTTP/SSE、DeepSeek和只读合成MySQL；内存SQLite。无新增产品功能，不是意图盲测，无浏览器/QQ/商业交易/真人签收。",
+  "privacy": "仅合成题目、实际公开Reply与SSE、脱敏工具证据和配置/哈希/用量；不包含Cookie、会话令牌、密钥、隐藏模型文本或完整本地日志。",
+  "status": "closed-not-admitted",
+  "humanAcceptance": false,
+  "provenance": {
+    "runId": "5a6620c8-6b0d-4c52-ab2c-312421bdf6c7",
+    "startedAt": "2026-10-11T07:39:12.143Z",
+    "completedAt": "2026-10-11T07:39:56.257Z",
+    "baselineCommit": "dfbef62f51337752aa8d5eb725559d9d188a1be2",
+    "gitCommit": "dfbef62f51337752aa8d5eb725559d9d188a1be2",
+    "planFileSha256": "7ba54e34c43b4db8dc8916ee0fad79a4ed82ef3fc6923e2fe324a654e06d140d",
+    "planHash": "7b139454414b4f39a81f16d4291d9d463fc20a2c8e7cf0ab0f45b8dc263e63e4",
+    "manifestHash": "74959ee679d9b371697a12ebbfcb0372fc3344284c4701d01c8209fc3fef68d6",
+    "rawFileSha256": "386d92631d76e7e773a7b1df3736e882a0a424624d09a0a0302d9a11dc0a8b54",
+    "reviewFileSha256": "241155287e38f50ab377c9156fb4817f10a1d143aaf6f752d26d0a7c193ec0e0",
+    "actualDeliveryFileSha256": "007d8a3d3b68bcec06988855d2a7dbacb8497ed44d7e6fe63292163a5312e6ab",
+    "independentReviewFileSha256": "30eaa5500669726e42e04c7f2321d53341d55703d6690e9572157de1797387a5",
+    "sourceHashes": {
+      ".env.example": "4fd259ff7ce7adfc02b6513b7f42eb8d7e69997fb9e3219db4fa6c2c37ae2c3e",
+      "package-lock.json": "b1bf19c78dde262cc85470fd4033f51756b2a46a20f9cd261928ee65b496edeb",
+      "package.json": "17961e968ec4a063743af7b90fcca13ef35c8e95d36cb65ceda24576f19b5225",
+      "prompts/customer-service-v2.md": "0ce7234817f7cfd9925c32c4e0230253c3c73c06723c270e477c4cf4f3527a85",
+      "prompts/customer-service.md": "6a9c742deef7b88a363885c7c4f3646a949484f6bc49193a27880388882bad5a",
+      "scripts/acceptance-calibrate-check.ts": "a1de0f653c765c4cb69cc8e88c5368689c007ad660a1e33ca2dd1d5334d7533f",
+      "scripts/acceptance-calibrate.ts": "8328b99d570ccc088952c02339589f0d058d95ad21958548f40d4414a03ba40b",
+      "scripts/acceptance-data-check.ts": "d5fa00dc9b99cec103906622c3bee7c86d721ec15695077eafb3a9a6ebbc959f",
+      "scripts/acceptance-data.ts": "04396d8089244ce0ab6ca959b105b8db7f794a483b1de9b18311cb47fa42256b",
+      "scripts/acceptance-report.ts": "d7fed1593a32e4574b84e301285af771531a5b9d2eb6df95d37e235e8eebb010",
+      "scripts/arrival-consultation-check.ts": "0dea592eef5cf545197a07345e0abe0b470c65438a9f9226be5b7b9c495e3c5c",
+      "scripts/arrival-consultation-db-check.ts": "62cab5288068cd824eecef3de91ae331e122ce23249122f0ef0103fdb393d688",
+      "scripts/arrival-entry-check.ts": "4271e5d1ed8b4e62cb7e3e7bbd01f18ad191b05a0512bd1b178cecc576fae6ca",
+      "scripts/atomic-evidence-check.ts": "29898de4d62bbc62a3312890b67d281b3835d990983ba5c8b241031e3aa41a7f",
+      "scripts/atomic-refund-recovery-db-check.ts": "a9db1d994e63b674057969dadcaf4b1f36c72bd443517a770352838d4f85dcfe",
+      "scripts/atomic-tool-prerequisite-check.ts": "1850514e0f50fdab50f8cfa53361ffbf87e33870273317bad3b6c3b0f83ca2ee",
+      "scripts/bailian-model-wire-check.ts": "38afb18c66f0276b036809f9fb623375968e3e3533375aa31217366a3d3d855e",
+      "scripts/bind-qq.ts": "54fe07d224a673509616ff6fcb9ca82c4d98cbe61804f6278d385c55e170a397",
+      "scripts/c1-amount-selection-live.ts": "358ec826acb7501288869119bc796837ebe43dd8a0155a1c7db0bb45fd3afa23",
+      "scripts/c1-business-evidence-check.ts": "dc0f8582fbeff5700f47c7ff2e0f33a409ac027c9a514c67d80f5124cba1cafc",
+      "scripts/c1-category-session-development.ts": "641359437fc918fa587b7046d794764ddd07d7b8089574bb4eb989c548279a8f",
+      "scripts/c1-context-check.ts": "126f0fba93c5d50c60d8a6d389c7815d6fa28aa4e66a265ab25d2e1cb45c357d",
+      "scripts/c1-model-support-comparison.ts": "843fd47102666cff7f32fcb48717e4a4f6076f2ee831d8e81ff2b16c671736f2",
+      "scripts/c1-policy-scope-evidence-check.ts": "12be14b769e5ce5942647102c1f4b43202890a4fd7f4beb20ccb7def44037d6b",
+      "scripts/c1-policy-scope-session-development.ts": "c83a60a5eb85963c7373c85f9cd54b4e5443e81921a781c0eb4b1a083ca4191e",
+      "scripts/c1-product-category-check.ts": "5374e9f52f8e8df9dbd3e1b8146fb78e2d7600d7263a5324e7cdc0232532719c",
+      "scripts/c1-query-development.ts": "a46bfb9fd14f8088287adc007329d5889fc40f1cc05c0a582412a1eeb4ccb4a9",
+      "scripts/c1-question-session-development.ts": "ce0c8f87022eab66b3e9171ab08bcad563f20af6eb35ff71ebbf670c02675687",
+      "scripts/c1-reference-evidence-check.ts": "86ade6e6733dfab85470b00369d9d9750067f85ce4b4ed60c6665530f1891ec8",
+      "scripts/c1-reference-evidence.ts": "d48e4018b550bcdccc3c4f0d9e3caf73f32b7df6859ef61f4d12dbad1d526fd5",
+      "scripts/c1-reference-selection-live.ts": "71c5ec4ce65a521169f05756db10ab6f44e46a2e4e0cfb13f5b9e9caaede0edb",
+      "scripts/c1-session-live.ts": "6cb3783b72a4d80682f6e2baf470b6a62d2753ac99da436d1f780d8b305c0ab3",
+      "scripts/c1-session-validation-check.ts": "420d0c78bb3a6a848a5692b0ad5a19a113177fd56a9d22f58e483ffda1e22f52",
+      "scripts/c1-session-validation-live.ts": "78eb7ce9cc63436eb8ce53f14b755b92c5a58aea4f3ec678dfce48217d0d6ef7",
+      "scripts/c1-support-check.ts": "8873d2e99476066fef3f2d45f470352a3c714f2878c3e62b1b50daf6c47ddb5e",
+      "scripts/c1-support-intent-development.ts": "4a5694a23e66f14dbe1805867f15edddb8f9e26563b1c7e24f79082f6d6397a0",
+      "scripts/check.ts": "ef89c4e5dc6b2d8c96b4ade42f3dfd79f656c1dd5f56c4da521c71f29f68c432",
+      "scripts/context-budget-check.ts": "ef5c5b0dbb3f16afb991bf419a1055d1251b3d32e07a5d8d44997bc6fb90ca00",
+      "scripts/context-budget-history-calibrate.ts": "4b1d54444560222842f5b5c9f1555f8b0c7c535ea7e756f6f0bbf332f76bfd9b",
+      "scripts/context-budget-live.ts": "a62a3565d10895ca89cd7a011a6a1430e51f6535f5bb90de9d7155d6c7097763",
+      "scripts/context-entry-check.ts": "10d94b90384daec76e1b9c531f29c74f0820104ad8cae905961d532b2bef0ad2",
+      "scripts/conversation-state-db-check.ts": "c8b9b822c61727fe98f540869d395834e1bfda39dd2259bf7fc46b5e130410b3",
+      "scripts/conversation-state-setup.ts": "4dc7340ec527aae588a9908fb31c812dd87d7efcec8b303aee29b1c4d4ec3733",
+      "scripts/conversation-state-value-check.ts": "ea8f8f14892873f23a6a49169c8c25cd7e518b3778e3605c7b4a7886e5e3f7f4",
+      "scripts/coupon-agent-check.ts": "0e5b711bac726a2288123ade64724c186a72f53ddb8dbed27ef99397fc6211a0",
+      "scripts/coupon-db-check.ts": "3b3b8739c08ca45a4866e063d00f75a65894d3416a89539be49890e1c17ecf6d",
+      "scripts/coupon-model-check.ts": "449fdb1a5a0be4755204485a3cacbd1285e1616986b9650739bca9c71d934fee",
+      "scripts/coupon-snapshot-check.ts": "89ad4c1b8c1a5099561207552a331c6bd445146d6c0c331706e9bad7e22bfab4",
+      "scripts/eval-analysis-check.ts": "5624254bd6e5454f50919101432f58aff9cf869cc5453c0bed89c332e31bbc48",
+      "scripts/eval-check.ts": "5c210d4b5ce62f4b46227c9f50e902d37536ef774c7f08c75c8f321b3ef49fc6",
+      "scripts/eval-db-check.ts": "1a4b7ad2531f0c1ef9cf3a2f8f46361c4f16ab0277a6cd27cb965f8754aa7eeb",
+      "scripts/eval-ui-check.ts": "760d3e98e64155889444ab9bdb942d4f61222818e98837be6bd3ee0bf566a5b1",
+      "scripts/evaluate.ts": "010ef7653cb5dcf0b2ab9ffa9acb0a255d729929297e24a3fb53d463f9a93624",
+      "scripts/evidence-acceptance-check.ts": "441dfc134e8792f70050075b95cfea20e1d8eb01a094ea3487cbc65129cbd7ca",
+      "scripts/evidence-support-check.ts": "ea6b5de3999cd3bd44ecee0ae1852a60e1d9aef2bcfb16d7d92538e5dae9f26c",
+      "scripts/evidence-support-isolation-check.ts": "4d0606142327c420e7a0ccfe72b28fef5f4bfe5ea83bf6e1fc02cf78e19d6216",
+      "scripts/evidence-support-runner-check.ts": "ca5856ad403b3aeb394a04903de58cf648db9dc449ae47f0a462244161b1a2f7",
+      "scripts/experiment-check.ts": "b781b3ffec05c262575a948c44aa4118c2c001cf52903350e146830d6677ad66",
+      "scripts/experiment-jobs-check.ts": "6b03db8414ab1557028066a7db5e620764520014b665b8f10d9b0f97cf66d6d6",
+      "scripts/experiment-ui-check.ts": "45a23f45d602476e8b3bc0029fecd2faab13acb2fa19c4b8a65e7b7c678c8626",
+      "scripts/experiment.ts": "6584fd367a667fda995f832ee6f9035428d0dc03b278316264cb840345cb3f24",
+      "scripts/init-after-sales.ts": "9fc51b2b256f4198b254456a09f0fbba90a843b5587d59d4234afa929f668022",
+      "scripts/init-evaluation.ts": "d6389a40875332823d4ddf2614839fbd5f263563a743d869978b41fd487ced1d",
+      "scripts/knowledge-applicability-check.ts": "d008280df27123650c87021ff6bccf6f4bfd5b859fb4986959b4b1c645805a70",
+      "scripts/knowledge-service-check.ts": "ff30f5b4cb4c36ceae40da8f71afa54df197f97db2030df1de3228c0e14946f5",
+      "scripts/merchant-agent-check.ts": "28370f227d1c6ee7bcd916cdb7d2501a4230ef757da381b484923f01f9b8f372",
+      "scripts/merchant-db-check.ts": "94ac7b112a5e89fa97b59c18cc920d6da18888c797143a6500104fa079d1e26a",
+      "scripts/merchant-deadline-lock-db-check.ts": "788e06240170c82635c1227aae2ce271c05a155a014a8cd003fd22d2b262350f",
+      "scripts/merchant-model-check.ts": "f9043085c04ca20f8062f38c59ed8f3d744294582a3fc4d88d31e9ec6341eb09",
+      "scripts/merchant-notification-agent-check.ts": "4fb243223eec5bf68194ef14abdada3b64033e6d078c8abb9505c9c37f4ac728",
+      "scripts/merchant-notification-db-check.ts": "587d8125c5dafe66bcf4a20173705bfd5f03b1c05dcda7607bb6d3f8b37b2a6e",
+      "scripts/merchant-notification-model-check.ts": "55e43b49ec2f2d9aa28b3badf9af312b9c49877c21d207cd0ce755f0753b46b7",
+      "scripts/merchant-references-db-check.ts": "837bcaa0a8d952f181e86ca8dad8d85048d9de7cb19f881c134f6f41d6923fe4",
+      "scripts/merchant-references-setup.ts": "d9c9373e96ed3bc951bbcffad36e6ab76c64552810c42a95398bd6ba598e0c23",
+      "scripts/merchant-reply-boundary-check.ts": "fb0b47164f16a978aeb59c52fa3271526a89908452d08a6ff13490ff13063cda",
+      "scripts/merchant-test-fixture.ts": "8a3ca07fb1174a2930e45886b8065f089ba3f3cae4cc75abacebd4acf594ca9d",
+      "scripts/model-request-budget-check.ts": "5ba768a740b7b1e4027d2b3849f26831e43dfac94bcd08730ca823e76425f9d6",
+      "scripts/model-selection-check.ts": "2ad5da2241b750fa873fe0295697d311245069ceba613ad2b66b3f6664ee8b4d",
+      "scripts/model-task-entry-check.ts": "dd34b0c82af27e2284ef1b05ecf9830bb87738653c2b96935ea6c006d3fb31ff",
+      "scripts/o4-recovery-probe-contract.ts": "47d319da706557cda3534f2219440743556451fe26a4b018845f571ea1f9b3ad",
+      "scripts/o4-recovery-probe-live.ts": "06907874e68dc7cbdaa7e2abf0d449cb1fdc016e5d4985b0ed9e2b31832872db",
+      "scripts/o4-rotation-mix-contract.ts": "fdcd5b3038c1ae8e1b3519f2e86970fdd8c518d1db43fae5c5356e4343914a09",
+      "scripts/o4-rotation-probe-contract.ts": "6f9ca76818aed2c407c188b063aebcf491e4a0c5a5f0c9debda62aff1a2e08d0",
+      "scripts/o4-task-reference-wording.ts": "71eff1e6c9470fa65a4e42301435788e0ec32d248b2d73ce8314994e2e5ad873",
+      "scripts/objective-engineering.ts": "d829dceed2b92984cf85ba4b862f520b2baaada8ae01adacbbf30d9b63abb384",
+      "scripts/objective-eval-check.ts": "845a76a9fdf039376f499be4d6ce47bfed47f641e0fd2826934ab148faf18ef5",
+      "scripts/objective-readonly.ts": "57489f0b1224327fb5fe29a9e9f223d95e3b449aa461ebd44e691f06b349ed8c",
+      "scripts/objective-retrieval.ts": "8bbb69c6475c03954478b9edc1eec0b26354cce498d2fc2f84d468c9b1de9e66",
+      "scripts/objective-support.ts": "b1486ceea552c8abda5c45787f4b2f04abaa0ec371b7300cdc01eed9c2ed9b0e",
+      "scripts/objective-workflow.ts": "00c0bc37e9af0a75458d4216d1c04c38cc5ae2ed710a240c7f2ee1c073186fab",
+      "scripts/order-chat-live-check.ts": "bdccaf68308e1379035b2b06c10b18ad28db4b751d53083e3e90467a9ce8f50c",
+      "scripts/order-discovery-check.ts": "7160cc06a33f517f32488c2d3ba022f14555eafc9f703f106d1444e8fd1e7f64",
+      "scripts/order-discovery-db-check.ts": "6d7076d89461b2d2fff4bddab937079786eeb01160bfcae870708916652f7b27",
+      "scripts/qq-agent-check.ts": "8d761e368d2491ff7b4c24c0ff439e91186a291547e49e6bf73f87e1d13c600b",
+      "scripts/qq-binding-check.ts": "ee976f5b358435e924d18ee642e0df45320b14f98e53770a52d6d151b5436fec",
+      "scripts/qq-binding-db-check.ts": "4ab7247292bcf4b1f2234ba3d2ebcf214a0ce38adf0acffb63346a3d4626314d",
+      "scripts/qq-check.ts": "663c87da00aed0b7ec4a465bcd807b91906a985dd7dced70f51b1c4bbd8ed547",
+      "scripts/qq-isolation-check.ts": "af6e167b0e742b8dee5eb3b27b2e4faffdd592419c8f1aecadf3d85e1974e9d5",
+      "scripts/qq-reply-check.ts": "aad8def4f3140cdd1a00378ab0086a0af068c9d5411d8a987bb05e8332c6acd3",
+      "scripts/rag-intent-profile-probe.ts": "9e18ed6ab48f5cff84b41a2d2bb1b78fbb29cdeba7b25842205e98e41ff291c6",
+      "scripts/rag-prefilter-probe.ts": "9d950d36f9bb9ef2e269ffe6e4114cb29b08ddb9e2174d4416e9b64b7fe59bec",
+      "scripts/refund-agent-check.ts": "d344f47399deb9402a24d17613edfb92217ad79d66b7020d0631e9ed92bdd722",
+      "scripts/refund-crash-window-check.ts": "27e48f38791801e82943fc1d8d2b6c50eb073eb3a64a9cfffe5d3b6b7b2cf5e0",
+      "scripts/refund-db-check.ts": "59a25cf566c92758451a67c09dc2072cc90dcd9b62cfd1f3b6fea74d77fc5c5e",
+      "scripts/refund-model-check.ts": "11766b09aa2c406aa40e841ddeaa642fac0ef05dbef97c480e6aff5c40cb1348",
+      "scripts/reply-check.ts": "74068a408271a6220550e15fe3e976e6614ed15c4740bc13a5386d9845a0be11",
+      "scripts/retrieval-baseline.ts": "c22cf05314dc6ff0f7f5fc606ce2e09a60237abcd824113fea8724f7960e6114",
+      "scripts/retrieval-check.ts": "fab3eb6b3e5ad5ddff57b95711860853d6ff9a4c7c549397f36076938ccf7392",
+      "scripts/retrieval-context-check.ts": "5ca5a395d147bfc2b2ce3f989ecc6e6b0ca1d65f5b79ab98152a2bc951263b32",
+      "scripts/retrieval-context.ts": "756d4e0b0d9b2daef054076bcf527b7d80329e5c1f5f1d815b0a968891927f20",
+      "scripts/retrieval-data.ts": "828c191e375ed7d5e7b509c036e172bec49d163f7c83f4128ea05e900baa29e9",
+      "scripts/retrieval-v2-check.ts": "1822eb03b3e843830b9d8b24abe44abbb0e315e372ba3bf3b5d65ebe8ad4eb08",
+      "scripts/retrieval-v2-ranking-check.ts": "8deb81d1299cafa128c24883ffc21fca44b847758ed1f6e18e9b29ed1cbee49a",
+      "scripts/retrieval-v2.ts": "9e12fbdfbc01eea00c6659e4ce447efa2d86cfa7e2206d4a28e0bad92f9be4a4",
+      "scripts/stable-joint-contract.ts": "76fe37ed4ff8874ec91359195031d1a26f5be5ea1ba07830781272f19ede35b4",
+      "scripts/stable-joint-run.ts": "598a03cbe90708ef4be2c829e91aa359f259e496338081021affd81940cd26ef",
+      "scripts/support-amount-context-check.ts": "be53707367047f05ddfff3d1ad3cb1e1e6d617ba4f0edd7c4e48d900d850b51d",
+      "scripts/support-clarification-check.ts": "a0094f85c38b7a45d585aa98818205a2e57df652d2f143b73d6365b9e867b3f8",
+      "scripts/support-context-check.ts": "74ef6231998e03eef1cadbf5414f208ce7e23a6c329b6dca688541e0e89e5a00",
+      "scripts/support-controller-check.ts": "d37a674c16e24e1720f343b397d965213dc87337a55547458f0ffad433658ba2",
+      "scripts/support-evidence-context-check.ts": "a241a29f8b9601314a3cbf00bdea89eabc7bfa81586eb09ac4574e70acedba15",
+      "scripts/support-host-entry-check.ts": "ba0aaa6606ff446ab2fcee97bdadbad1aa43f9a4a209aaec358a7d792ac39a97",
+      "scripts/support-notification-check.ts": "e8a971875f056193fabe261a465dc151663638fd21d803464f578e83b2317259",
+      "scripts/support-policy-scope-controller-check.ts": "3a8a7e111f78577345849ba5e5a2a84335287b594cff9a033f736a5c43f380f1",
+      "scripts/support-policy-scope-session-check.ts": "dee0c4ae39c09ab6230743ebcf8b6dfc9ae5ec4efa7ac9f2c27de36ed93ec9c7",
+      "scripts/support-question-client-check.ts": "b34e4d4c91914705e058686a69c4c826fa47fa50d95ff59f381b4aba5f33205d",
+      "scripts/support-question-evidence-check.ts": "5cdcba7d0750a732be97c8608a4f859a4814fc4bb4fbff01e0ba6277d0b92f4d",
+      "scripts/support-question-experiment-check.ts": "70219692e4c762a99c71e64ce15d9f76f4f87c93da9d2e5dceef59444bf7cad3",
+      "scripts/support-question-observation-check.ts": "921c80b5162f77c4cce33bc91ee256c7f2a3be213949da499fec6e04b1360523",
+      "scripts/support-question-query-check.ts": "ceb42620a4eeec7df0e2b8eddf7c03a5ed3803703d9b85c35d2f0956ab2f2c48",
+      "scripts/support-question-resolution-check.ts": "04c4d6c7384ba73ab3b7ef3ef3b9f318739a21340925c895bae2b62aeed8685f",
+      "scripts/support-question-session-check.ts": "7252ac884b8f4581c3f6de9f7e9d46b1fd07a1bab453f8fe7319b78198922c5b",
+      "scripts/support-reference-controller-check.ts": "0cd60488a83f620922c295fa64232203d663956c584371f893a50b7110ef5231",
+      "scripts/support-reference-selection-check.ts": "bfcaeceadd987bd0829b278d6e4b8c3d71001ff24f49243310545f4685b5df0e",
+      "scripts/support-reference-session-check.ts": "308ce2ce37cad1deb6a98a2cd43e93d95037eec8d1a2f8be6c3302256890f5cb",
+      "scripts/support-session-check.ts": "8cb893b6211bc361373fdf9f867418a8792dd2667cef2a94094cde462da9489f",
+      "scripts/support-session-race-check.ts": "d6932eae4a79e0559161e267c39d676b6b3b06ed85007efee0968cd01cd8703f",
+      "scripts/support-task-context-check.ts": "20d83e5c6cada4d835bef4f7a4f852e8bedbdacbdf42eb4f0ea817355bf0c3a6",
+      "scripts/support-task-recovery-db-check.ts": "f220a30d7bd1e9d2fe4ae4ad33ab94d1f7ee999f36fac5e1fa661bc2281cc713",
+      "scripts/support-tool-choice-check.ts": "1e23e4bf468748d5bf9d5d2d9778757cbe01a64a8f35b48223079aaaf143cb60",
+      "scripts/support-v2-check.ts": "e0fe58b11b96db1ed3f183cca8557a20dc2d1e263549faf13091f78711de8f3c",
+      "scripts/support-v2-data.ts": "3cb7a6beb32f0046260a66c5d2e0fbcee589dc9ab4872d6b927c8f9a3486b8db",
+      "scripts/support-v2-live.ts": "d35dedc32d4533788c0c988c7cbd76de0b8c9806706acd9e89115c13646484f0",
+      "scripts/support-validation-data-check.ts": "a34166077f4190726487fd646a167a1b11ac9f2c53e66759a665e7bc3f4a9eba",
+      "scripts/web-chat-check.ts": "cafabc3d09f2879be6b37870a9fc130b1a3ba3831a1bbbff9f85a4c89b2f093c",
+      "scripts/web-chat-history-check.ts": "229a55e2d05ca9097041c6dfc8572fe9b30934e3d38ab651cec98bb1c09ef055",
+      "scripts/web-chat-live-check.ts": "dbed10f527f2898f721e8405489995299c94941cc8c034030b71c46d514d1d01",
+      "scripts/web-chat-stream-check.ts": "160bce4d325ca6fd851e3098f6f4cba8db97fe05f8fc512096ab84f6ebc71b84",
+      "scripts/web-chat-ui-check.mjs": "901a6ad6655ca0adf223d447a57f5133014a9807f6ca253ce4ecf1694f994a4f",
+      "scripts/web-evidence-live-check.ts": "87057bdb3c66615fbffbb066c8e209695546120e6aa795d9252a6e5c6f9bf1e8",
+      "skills/shop-support-v2/SKILL.md": "c59ac5eaea1771605e8c46df7c731ee518e8bdb30525b3ee510a470584921a04",
+      "skills/shop-support/SKILL.md": "c6ef992a70215e5a02ad0216ae3996d5c6f2f5f3b38e7c3b1c3c3055c95db56b",
+      "src/after-sales-entry.ts": "bb2ec9d9a7585efefc4af7fcd87c0e9a4d978315d4fd576d4a1ad76a17ea1162",
+      "src/after-sales.ts": "a26db542010fb3471215ff63295fc3d0dbbb7ce6d2be7ba8fe8550b008148cd1",
+      "src/agent.ts": "0a0ec2e4a45488fcbda57b8cb052d835875ded94d36be9cc28e62d084e73641c",
+      "src/arrival-consultation.ts": "be91ac3007b594e4788c278d89cc2081ab98c512ec61930b54c730607c0baf00",
+      "src/bailian.ts": "fbda7754aff0ae9aa7464153e942f039fb0ed88bd2ccd3545c1239337608df9b",
+      "src/cli.ts": "aa11840be389b53f9b9b5b26e2cefa496f5d352479c0a3001a2a562344ff6439",
+      "src/conversation-state.ts": "5dc215be064b59657a53cdf66e2ccf67ccf39d2f9f0a0a8affb5353d4ea9ea79",
+      "src/coupon-store.ts": "833120439be1f457a17b4152d8a9e7c2e96a86232d2cb30d2863aff835b14b6a",
+      "src/eval-analysis.ts": "8e7f23098e84eb841a445c90e91c84f1d12647aa3d453c7041c1dd4f533281b9",
+      "src/eval-capture.ts": "180fa2da5f8ebc88224ffb28f3f3397595476dc9a057e88ec31fa1403de7f72c",
+      "src/eval-server.ts": "2251b233104fd8fcd3a6ed3275790fb0c1b2980e040fa86f6ff35a08de107787",
+      "src/eval-store.ts": "c215fb7fa5446a3b775ab2f524a7a49f7e7348ee1708b3c73e6aca2f652e9680",
+      "src/evaluation.ts": "8e216db07b0628813857cb6ee980512bb5c3d0539b1a5e10316bc6a1d0a28199",
+      "src/evidence-acceptance.ts": "6e8040cf1ea30135dd7c18a44ed72d255ce94131226223325df3ab209b61d368",
+      "src/evidence-support.ts": "39e805c11e15b1f218d570ce774073f3f09f352e6396b9d8a2b35735050a73b1",
+      "src/experiment-config.ts": "db1748c6df8292569ca39d08dfae3bfd248f4a6ef736bfb55be378fc057d92b5",
+      "src/experiment-jobs.ts": "b1432a8373e5384603bd0a21a0679b91e03c9c785615a9d6e3618932bde203c7",
+      "src/knowledge-applicability.ts": "aa31ca19dca3f33814a3f18d0fe36fe916dcf56ae1cd94a0d7c1499613eddd39",
+      "src/knowledge-evaluation.ts": "9c333cf4ca659d1e336a177edb8d93e647bbbbef5f3e9b90da17c2b66448e682",
+      "src/knowledge-retrieval.ts": "89a9c606cabc1579b2cbe45ec25675260731e0a0fbe2fe99133515d7df8ebf00",
+      "src/knowledge-service.ts": "60114999337a5644b46096e87c7c16bdffbc9a0a6f0fd2596eef69bfaf7a8536",
+      "src/merchant-notifications.ts": "63fa4fea4ba027b883e48ac4ce8b90822b729a59bac0c0b8666f01f93b62eb1b",
+      "src/model-request-budget.ts": "d676cdd0817aa7364dec06ecd400dd4cde4c4faa5951a43ff1eb8165ce393159",
+      "src/model-selection.ts": "e9b1eedd0d6a22d1a67164a07bed9bc425e7c85c0e575d2c1dca3bd7e0a21631",
+      "src/order-discovery.ts": "39e02009d4738726a9a0806a96b016b874a8e6ca121ea11df46dd60c27588e12",
+      "src/qq-agent.ts": "41f95c7499b45df2c30c176c9f70cd06e93cd9e4207997988ff736a32476f780",
+      "src/qq-http.ts": "a6e380771e1ce25be1693263d36c7f18ed4a14aa69855d2e4dcaad151ced9d75",
+      "src/qq-identity.ts": "b081c6faae50708875cf9142b7fd238b448404de99828ee2813981b301ab0f9e",
+      "src/qq-reply.ts": "e7ca9ad9ce1363b58913da659f6394ef1572ad52077c4d0b287d5c23291f464c",
+      "src/qq.ts": "6a5f1eff9c3972b6195c5e48867d2c9a3f0ba42ca176ba47a8f7cac18993d783",
+      "src/refund-entry.ts": "ee0047a29cb45b13325ef98b886b6d5aa704b61369a97aa19128940f8d133e7f",
+      "src/refunds.ts": "a00872bf5e20114752fd2fe001b3f9ab3bc3b94895b95fa22b44c64bb047df3d",
+      "src/reply-from-tools.ts": "2f46b593dca86c000cc0213ad7042dfa541ababa301543d4ba5d3d12d87a6451",
+      "src/reply.ts": "3cdb75a75e3fddd9837fa715fc0a2227a449473f0a57b7a09744bb8826644623",
+      "src/retrieval-ranking.ts": "6391fcf74f4bfb79f01c018d8c3cc0fb3f969a2256f9269e3127b5f907f6dc89",
+      "src/support-action.ts": "4d8449d054b730a6d2e0ea32f752ff5f227166b689a7e6e96d955c8d9caec291",
+      "src/support-context-action.ts": "8fbf6e09b699e5542f11c0cc0ffb7b59c900c69dd7fe121180fbc6725b0194c6",
+      "src/support-context.ts": "6d7e251dab36f6d12bf0365d0ab90f6cc41f5318f36f84b4b1777fd97c2d7bfb",
+      "src/support-controller.ts": "42e02738efe2243ebf72bff199eda0b405308bb9891bab1b1e9265f69f3a4f42",
+      "src/support-evaluation.ts": "4bbedc28c9179bb902629a32d787b3330415dc93e70ac658fc5edede0b5614de",
+      "src/support-evidence-context.ts": "197bc15e8833670b3dbfc9337b8adc39e406a9383670af18053dc07f51ab920a",
+      "src/support-parameters.ts": "1f91d3b4a4a0b8fdb27c915c5658a46c4dd24a2feff1d75bd292f93c2d1a7819",
+      "src/support-question-client.ts": "89350ae80f21a0f6cf2a672538f35bb94141e752f3b4d95fabb6963bc1b51ebf",
+      "src/support-question-resolution.ts": "ecc9397991c4a034983b258c93bdd80d4e31dfe6b46ec866d6f30016bc726146",
+      "src/support-reference-selection.ts": "ca311ef20479e30c9418c1c8a06d607774d0a18ffa4dec0de8a3b920ea3b83aa",
+      "src/support-session.ts": "ae0fb522d68e48961e011cae6b275c34b5a54fd8becdba99999dcaeba706e088",
+      "src/support-task-context.ts": "1243f7907e17683d6feaa6d0f91d022712158f561e672615d7a2869d8e792b70",
+      "src/web-chat-history.ts": "ec62b8724b13e3d095abb75da12ea319eea9c0bf71d11c02292c2722b359c98e",
+      "src/web-chat-server.ts": "14d6616e1aa202b291be7e0f9ec1021743b0f77336c852852830534752fbfcb4",
+      "src/web-chat-settings.ts": "c0046d77a68b073cc24ea24f5af7e8a368bde89aa8b03f38be375a2f1b6441b6",
+      "src/web-chat.ts": "b4d10b65f3aa0790e7a730c08efec15cce1ae2e272720dddf200fce983d48f80",
+      "tsconfig.json": "da1eefc0538e6451b5b714d9a82274e628082f066a394655a2faa71bd19a62bd",
+      "web/chat/app.js": "281572485f59180ccb710d526e838776eff5a9e9f3c9ded04caa395a28d1eb62",
+      "web/chat/index.html": "dcb50fb9f9bd6e886416f71b0179114e2ef44111eaffe370c96dbb1e32381fcf",
+      "web/chat/style.css": "8a13cc6957913a56cb414bc23b3b4a108ee5db577bc902d29914305354bb3495",
+      "web/evaluation/app.js": "e00d331bcb9ac86a55139207811ff853a810729584031c0172014087a56d88cb",
+      "web/evaluation/experiments.js": "8cf4eb08f61113b5e07742814ba9c1a24bce51d5561ee4ae871e02d15042335f",
+      "web/evaluation/index.html": "a913acdd366cb09bf9f274de26723e4883bc30544843163ffc4905c8ab8b2019",
+      "web/evaluation/style.css": "047cf40493ffa98b0b199ffa971634ccd51068794cf4a54bf5dd7c26e0e4d32b",
+      "data/web-complex-plan-20261011.json": "7ba54e34c43b4db8dc8916ee0fad79a4ed82ef3fc6923e2fe324a654e06d140d",
+      "scripts/web-complex-acceptance.ts": "d4b7d88464a37fe6b9e6dcdc80f07fc98d8d67da2e3c4729fb05e9b3a54800d6",
+      "data/web-demo-freeze-20261011.json": "8243730bef7d6ad83de40f7e8fef332f10bfabf7890651afe7471748ea55d9ae"
+    },
+    "dependencies": {
+      "version": 1,
+      "rootDeclarations": {
+        "@earendil-works/pi-ai": "1.0.0",
+        "@earendil-works/pi-agent-core": null,
+        "@earendil-works/pi-coding-agent": "1.0.0",
+        "mysql2": "3.24.5"
+      },
+      "packages": [
+        {
+          "path": "node_modules/@earendil-works/pi-ai",
+          "name": "@earendil-works/pi-ai",
+          "installedVersion": "1.0.0",
+          "lockedVersion": "1.0.0",
+          "lockIntegrity": "sha512-3/W1vdDaVtpeMd23ElvJC12HLA5yS/BGqqcXF+0SK082dN7cbgNcCwguTBRBC258Ke8SzSvUW1B75iAf8w8IxA==",
+          "dependencyDeclarations": {}
+        },
+        {
+          "path": "node_modules/@earendil-works/pi-coding-agent",
+          "name": "@earendil-works/pi-coding-agent",
+          "installedVersion": "1.0.0",
+          "lockedVersion": "1.0.0",
+          "lockIntegrity": "sha512-/FtbxoSQU/mEv1QnichJjRjqteqaIaMWxmhB4G367+MwZfX7/DI5B9YAg5lqbN7nztFskBEtUSZ+FlmMBECtMw==",
+          "dependencyDeclarations": {
+            "@earendil-works/pi-ai": "^1.0.0",
+            "@earendil-works/pi-agent-core": "^1.0.0"
+          }
+        },
+        {
+          "path": "node_modules/@earendil-works/pi-coding-agent/node_modules/@earendil-works/pi-agent-core",
+          "name": "@earendil-works/pi-agent-core",
+          "installedVersion": "1.0.0",
+          "lockedVersion": "1.0.0",
+          "lockIntegrity": null,
+          "dependencyDeclarations": {
+            "@earendil-works/pi-ai": "^1.0.0"
+          }
+        },
+        {
+          "path": "node_modules/@earendil-works/pi-coding-agent/node_modules/@earendil-works/pi-ai",
+          "name": "@earendil-works/pi-ai",
+          "installedVersion": "1.0.0",
+          "lockedVersion": "1.0.0",
+          "lockIntegrity": null,
+          "dependencyDeclarations": {}
+        },
+        {
+          "path": "node_modules/mysql2",
+          "name": "mysql2",
+          "installedVersion": "3.24.5",
+          "lockedVersion": "3.24.5",
+          "lockIntegrity": "sha512-X6Ujsr2QSkkLpkQGjxzpKRAPn9nu4axpR63ntBzquFVEvPOArgbUQ1sJjFKI7hnaYtiVZxa17Z7q18KSubW0IQ==",
+          "dependencyDeclarations": {}
+        }
+      ]
+    },
+    "localEvidenceDirectory": ".runtime/web-complex-acceptance-20261011/"
+  },
+  "configuration": {
+    "architecture": "atomic",
+    "knowledge": "lexical",
+    "settings": {
+      "modelSelection": "configured",
+      "thinkingLevel": "off",
+      "maxTokens": 2048
+    },
+    "taskLimits": {
+      "httpRequests": 12,
+      "contextBudgetUnits": 65536
+    },
+    "model": {
+      "provider": "deepseek",
+      "id": "deepseek-flash",
+      "api": "openai-completions",
+      "baseUrl": "https://api.deepseek.com",
+      "contextWindow": 1000000,
+      "maxTokens": 2048,
+      "cost": {
+        "input": 0.3,
+        "output": 1.2,
+        "cacheRead": 0.006,
+        "cacheWrite": 0
+      }
+    },
+    "sessionAutomaticRetries": 2,
+    "providerRetries": 0,
+    "database": {
+      "host": "127.0.0.1",
+      "port": 13306,
+      "database": "dave_agent",
+      "user": "dave_agent_read",
+      "grants": [
+        "GRANT USAGE ON *.* TO `dave_agent_read`@`%`",
+        "GRANT SELECT ON `dave\\_agent`.* TO `dave_agent_read`@`%`"
+      ]
+    },
+    "tools": [
+      "get_order",
+      "list_orders",
+      "search_faq"
+    ]
+  },
+  "budget": {
+    "scenarios": 4,
+    "turns": 8,
+    "providerRequests": 32,
+    "deadlineMs": 900000,
+    "turnTimeoutMs": 90000,
+    "estimatedUsd": 0.2,
+    "providerRetries": 0
+  },
+  "command": {
+    "liveExitCode": 0,
+    "elapsedSeconds": 44.64917216700269,
+    "exitMeaning": "Live script checks engineering/accounting only; exit 0 is not semantic acceptance.",
+    "logSha256": "89ef7594f4533bfd22802d7028f4e94a19d8c950998d969f302f035789154456",
+    "environmentOverrides": {
+      "MODEL_PROVIDER": "deepseek",
+      "MODEL_ID": "deepseek-flash",
+      "MODEL_TASK_HTTP_LIMIT": "12",
+      "MODEL_CONTEXT_BUDGET_UNITS": "65536"
+    }
+  },
+  "verification": {
+    "offlineSelfCheck": {
+      "scriptSha256": "d4b7d88464a37fe6b9e6dcdc80f07fc98d8d67da2e3c4729fb05e9b3a54800d6",
+      "checks": [
+        {
+          "command": [
+            "npm",
+            "run",
+            "typecheck"
+          ],
+          "cwd": "/Users/zdl/.codex/worktrees/web-complex-acceptance/dave-agent",
+          "startedAt": "2026-10-11T07:37:25.493257+00:00",
+          "completedAt": "2026-10-11T07:37:27.074158+00:00",
+          "exitCode": 0,
+          "output": "/Users/zdl/.codex/worktrees/web-complex-acceptance/dave-agent/.runtime/web-complex-acceptance-20261011/checks-final/typecheck.log"
+        },
+        {
+          "command": [
+            "node",
+            "scripts/web-complex-acceptance.ts",
+            "--check"
+          ],
+          "cwd": "/Users/zdl/.codex/worktrees/web-complex-acceptance/dave-agent",
+          "startedAt": "2026-10-11T07:37:27.074179+00:00",
+          "completedAt": "2026-10-11T07:37:27.945947+00:00",
+          "exitCode": 0,
+          "output": "/Users/zdl/.codex/worktrees/web-complex-acceptance/dave-agent/.runtime/web-complex-acceptance-20261011/checks-final/self-check.log"
+        }
+      ],
+      "sourceUnchanged": true
+    },
+    "validate": {
+      "command": [
+        "npm",
+        "run",
+        "validate"
+      ],
+      "cwd": "/Users/zdl/.codex/worktrees/web-complex-acceptance/dave-agent",
+      "startedAt": "2026-10-11T07:38:19.725784+00:00",
+      "scriptSha256": "d4b7d88464a37fe6b9e6dcdc80f07fc98d8d67da2e3c4729fb05e9b3a54800d6",
+      "exitCode": 0,
+      "elapsedSeconds": 32.538492874999065,
+      "finishedAt": "2026-10-11T07:38:52.264438+00:00",
+      "scriptUnchanged": true,
+      "logSha256": "6410a40f1b329f53f2f6a45f9cfd1344621cff689de379e170ee6f66a1f82f5a"
+    },
+    "runIntegrityPassed": true,
+    "codeStable": true,
+    "knowledgeStable": true,
+    "attributionFailures": [],
+    "failure": null,
+    "stopReason": null,
+    "databaseWrites": 0,
+    "qqSends": 0,
+    "comparedDatabaseScope": "5 planned orders with all returned coupon/payment/refund facts, customer A recent-order list, and 8 knowledge rows before/after each turn. The SELECT-only DB grants also prevent this run from writing.",
+    "productRuntimeUnchanged": true,
+    "frozenRuntimeFileCount": 211
+  },
+  "usage": {
+    "actualProviderHttp": 22,
+    "totalTokens": 103871,
+    "estimatedUsd": 0.0071431920000000005,
+    "unknownUsageAttempts": 0,
+    "unknownCostAttempts": 0,
+    "cnyProviderRequests": 0,
+    "estimatedCny": null,
+    "priceSource": "Frozen Pi model catalog rates; estimated cost is not a provider invoice and currencies are not converted.",
+    "sessionAutomaticRetryEvents": 0,
+    "failedToolCalls": 1
+  },
+  "summary": {
+    "plannedScenarios": 4,
+    "scenariosJointPassed": 3,
+    "plannedTurns": 8,
+    "executed": 8,
+    "notRun": 0,
+    "engineeringPassed": 8,
+    "answerPassed": 7,
+    "jointPassed": 7,
+    "admitted": false,
+    "reviewedTurns": 8,
+    "criteriaPassed": 37,
+    "criteriaPlanned": 39,
+    "localPassed": 22,
+    "localPlanned": 23,
+    "commonPassed": 15,
+    "commonPlanned": 16,
+    "finalReplyCriteriaPassed": 37,
+    "finalReplyCriteriaPlanned": 39,
+    "sentDeltaCriteriaPassed": 33,
+    "sentDeltaCriteriaAssessed": 35,
+    "sentDeltaCriteriaNotApplicable": 4
+  },
+  "failures": [
+    {
+      "id": "switch-2-old-order-prose",
+      "turn": "switch-2",
+      "criteria": [
+        "local-3",
+        "common-1"
+      ],
+      "surface": [
+        "final Web Reply",
+        "sent SSE delta"
+      ],
+      "observed": "切到2001后，尾部仍复述1005晚餐单每张一人及可分别核销；本轮只重查2001及午餐规则。旧事实与前轮一致，仍不能满足本轮取证合同。",
+      "quote": "晚餐单 COUPON-1005 为“单人晚餐团购券”，一张对应一人、可分别核销",
+      "impact": "当前卡片、金额及来源ID属于2001且正确；没有越权读取或业务写入。本轮自由文字违反旧单事实隔离要求，联合未准入。",
+      "implementationBoundary": "src/reply-from-tools.ts:138-151 checks evidence presence/shape/scope, not every sentence. Web streams the admitted model prose at src/web-chat.ts:254-259; final readonly order prose passes at reply-from-tools.ts:169-176.",
+      "decision": "保留失败并关闭此批；不改运行实现、Prompt或判据，不续跑固定题。"
+    }
+  ],
+  "nonFatalObservations": [
+    {
+      "turn": "conditions-2",
+      "kind": "parallel_tool_prerequisite_rejected_then_recovered",
+      "detail": "首个get_order与search_faq同时启动；FAQ在订单完成前被本轮范围门禁拒绝。随后同轮独立FAQ成功。保留1次工具失败；这是模型修复调用，不是SDK自动重试。冻结合同不要求首次工具零错误。",
+      "eventIndices": [
+        5,
+        6,
+        7,
+        8,
+        11,
+        12
+      ]
+    },
+    {
+      "turn": "missing-1",
+      "kind": "final_notice_without_delta",
+      "detail": "最终提示要求提供订单号，满足最低澄清条件；无delta，不声称完成流式回答。重问已给出的问题属体验观察，不新增评分标准。"
+    },
+    {
+      "turn": "switch-1",
+      "kind": "awkward_but_correct_wording",
+      "detail": "晚餐人数句表达拗口，仍明确每张一人、购买两张合计两人，不为文风追加扣分。"
+    }
+  ],
+  "channelInterpretation": {
+    "actualWebFinalSource": "The actually delivered SSE result.reply.text plus orders/evidenceIds. web/chat/app.js:307 assigns reply.text to textContent; line 686 retains the full reply.",
+    "legacyProxy": "Original finalRenderedReply is retained in raw results. renderReply(order) limits prose to 500 codepoints; it is not the actual Web prose. Offline extraction uses already delivered receipt fields, without changing frozen criteria or rerunning.",
+    "legacyProxyTruncatedTurns": [
+      "conditions-2",
+      "switch-2",
+      "state-policy-1",
+      "state-policy-2"
+    ],
+    "sseDeltaTurns": 7,
+    "noDeltaTurns": [
+      "missing-1"
+    ],
+    "allSevenDeltaTextsEqualActualWebReplyText": true,
+    "actualResultEqualsReceipt": true,
+    "browserRenderedThisRun": false
+  },
+  "cases": [
+    {
+      "id": "conditions",
+      "title": "多条件咨询与节假日条件变化",
+      "planned": 2,
+      "executed": 2,
+      "engineeringPassed": 2,
+      "answerPassed": 2,
+      "jointPassed": 2,
+      "completeScenarioPassed": true
+    },
+    {
+      "id": "switch",
+      "title": "从晚餐两券切换为午餐单券",
+      "planned": 2,
+      "executed": 2,
+      "engineeringPassed": 2,
+      "answerPassed": 1,
+      "jointPassed": 1,
+      "completeScenarioPassed": false
+    },
+    {
+      "id": "state-policy",
+      "title": "过期状态与售后政策分别说明",
+      "planned": 2,
+      "executed": 2,
+      "engineeringPassed": 2,
+      "answerPassed": 2,
+      "jointPassed": 2,
+      "completeScenarioPassed": true
+    },
+    {
+      "id": "missing",
+      "title": "明确对象后仍缺两项政策",
+      "planned": 2,
+      "executed": 2,
+      "engineeringPassed": 2,
+      "answerPassed": 2,
+      "jointPassed": 2,
+      "completeScenarioPassed": true
+    }
+  ],
+  "rows": [
+    {
+      "id": "conditions-1",
+      "caseId": "conditions",
+      "turn": 1,
+      "question": "请核对 COUPON-1001。我和同伴打算在一个非节假日、非活动日的普通周末中午用券：一张覆盖几人，到店前还要确认什么，能否直接保证有座？只做咨询。",
+      "execution": "completed",
+      "reason": null,
+      "engineeringChecks": [
+        {
+          "id": "transport.completed",
+          "passed": true
+        },
+        {
+          "id": "capture.complete",
+          "passed": true
+        },
+        {
+          "id": "transport.real-delta",
+          "passed": true
+        },
+        {
+          "id": "tools.read-only",
+          "passed": true
+        },
+        {
+          "id": "state.unchanged",
+          "passed": true
+        },
+        {
+          "id": "rules.unchanged",
+          "passed": true
+        },
+        {
+          "id": "trace.current-order",
+          "passed": true
+        },
+        {
+          "id": "reply.current-order",
+          "passed": true
+        },
+        {
+          "id": "trace.required-sources",
+          "passed": true
+        },
+        {
+          "id": "reply.required-sources",
+          "passed": true
+        },
+        {
+          "id": "rules.frozen-corpus",
+          "passed": true
+        },
+        {
+          "id": "trace.frozen-orders",
+          "passed": true
+        },
+        {
+          "id": "accounting.production",
+          "passed": true
+        }
+      ],
+      "answerPassed": true,
+      "jointPassed": true,
+      "semanticChecks": [
+        {
+          "id": "local-1",
+          "criterion": "说明一张午餐券对应两人，不把标价当实付或人数当实际核销次数",
+          "status": "passed",
+          "finalReplyStatus": "passed",
+          "sentDeltaStatus": "passed",
+          "evidence": [
+            "一张券对应两人午餐套餐，核销一次即整张券用完"
+          ],
+          "note": "实际正文和已送流式文本一致；结合本轮查单/来源未发现无依据承诺或本轮写入声明。"
+        },
+        {
+          "id": "local-2",
+          "criterion": "常规套餐允许普通周末使用；同时说明需用户自行向商家确认接待，不能保证有座",
+          "status": "passed",
+          "finalReplyStatus": "passed",
+          "sentDeltaStatus": "passed",
+          "evidence": [
+            "常规午餐/晚餐套餐允许普通周末使用",
+            "需您自行与商家确认接待情况",
+            "不能保证"
+          ],
+          "note": "实际正文和已送流式文本一致；结合本轮查单/来源未发现无依据承诺或本轮写入声明。"
+        },
+        {
+          "id": "local-3",
+          "criterion": "涉及当前券状态或有效期的结论与本轮事实一致，不只凭普通周末规则承诺当前一定可用",
+          "status": "passed",
+          "finalReplyStatus": "passed",
+          "sentDeltaStatus": "passed",
+          "evidence": [
+            "实付 79.80 元，券未核销，有效期至 2026-10-16 09:01 左右"
+          ],
+          "note": "实际正文和已送流式文本一致；结合本轮查单/来源未发现无依据承诺或本轮写入声明。"
+        },
+        {
+          "id": "common-1",
+          "criterion": "仅使用本轮允许读取的事实与适用规则；最终Reply和已发送SSE文字都不得无依据扩展承诺",
+          "status": "passed",
+          "finalReplyStatus": "passed",
+          "sentDeltaStatus": "passed",
+          "evidence": [
+            "一张券对应两人午餐套餐，核销一次即整张券用完"
+          ],
+          "note": "实际正文和已送流式文本一致；结合本轮查单/来源未发现无依据承诺或本轮写入声明。"
+        },
+        {
+          "id": "common-2",
+          "criterion": "不得声称商家联系、预约、退款或核销写入已发生；Web仍只读",
+          "status": "passed",
+          "finalReplyStatus": "passed",
+          "sentDeltaStatus": "passed",
+          "evidence": [
+            "实付 79.80 元，券未核销，有效期至 2026-10-16 09:01 左右"
+          ],
+          "note": "实际正文和已送流式文本一致；结合本轮查单/来源未发现无依据承诺或本轮写入声明。"
+        }
+      ],
+      "actualWebReply": {
+        "kind": "order",
+        "text": "订单 COUPON-1001（云味餐厅演示店·双人午餐团购券，实付 79.80 元，券未核销，有效期至 2026-10-16 09:01 左右）：\n\n**覆盖人数**：一张券对应两人午餐套餐，核销一次即整张券用完（KB-PRODUCT-LUNCH）。\n\n**到店前需确认**：按演示门店规则，常规午餐/晚餐套餐允许普通周末使用，但到店前需您自行与商家确认接待情况；助手不能预约、外呼或查询实时库存（KB-SHOP-DEMO-1）。\n\n**能否保证有座**：不能保证。现有文档中没有任何订座或留座承诺，我也没有预约、查库存或安排接待的能力，请您自行向商家核实空位。\n\n**另需提醒**：法定节假日、特殊活动及私享套餐的使用限制未录入；若您计划的时间涉及这些情形，目前无法确认适用规则，建议向商家或测试管理员核实。\n\n以上仅为演示测试规则，不代表真实商家政策。如需查退款等其他问题，可继续说明。",
+        "orders": [
+          {
+            "id": "COUPON-1001",
+            "status": "paid",
+            "paidCents": 7980,
+            "refundedCents": 0,
+            "couponStatuses": [
+              "unused"
+            ]
+          }
+        ],
+        "evidenceIds": [
+          "KB-SHOP-DEMO-1",
+          "KB-PRODUCT-LUNCH",
+          "KB-REFUND-REDEEMED"
+        ]
+      },
+      "actualWebTextSha256": "6c7ac42ec1735ed5d0bfd61dd330df0e009a16bb8f99a4fb01294b7158423f3e",
+      "sentDeltaText": "订单 COUPON-1001（云味餐厅演示店·双人午餐团购券，实付 79.80 元，券未核销，有效期至 2026-10-16 09:01 左右）：\n\n**覆盖人数**：一张券对应两人午餐套餐，核销一次即整张券用完（KB-PRODUCT-LUNCH）。\n\n**到店前需确认**：按演示门店规则，常规午餐/晚餐套餐允许普通周末使用，但到店前需您自行与商家确认接待情况；助手不能预约、外呼或查询实时库存（KB-SHOP-DEMO-1）。\n\n**能否保证有座**：不能保证。现有文档中没有任何订座或留座承诺，我也没有预约、查库存或安排接待的能力，请您自行向商家核实空位。\n\n**另需提醒**：法定节假日、特殊活动及私享套餐的使用限制未录入；若您计划的时间涉及这些情形，目前无法确认适用规则，建议向商家或测试管理员核实。\n\n以上仅为演示测试规则，不代表真实商家政策。如需查退款等其他问题，可继续说明。",
+      "sentDeltaTextSha256": "6c7ac42ec1735ed5d0bfd61dd330df0e009a16bb8f99a4fb01294b7158423f3e",
+      "sentDeltaCount": 240,
+      "firstDeltaMs": 5884.360667,
+      "durationMs": 7345,
+      "tools": [
+        {
+          "index": 2,
+          "name": "get_order",
+          "input": {
+            "orderId": "COUPON-1001"
+          },
+          "isError": false,
+          "durationMs": 13,
+          "output": {
+            "source": "demo-database",
+            "id": "COUPON-1001",
+            "status": "paid",
+            "asOf": "2026-10-11T07:39:15.358Z",
+            "amounts": {
+              "totalCents": 7980,
+              "paidCents": 7980,
+              "refundedCents": 0
+            },
+            "createdAt": "2026-09-16T09:01:49.891Z",
+            "paidAt": "2026-09-16T09:01:49.891Z",
+            "shop": {
+              "id": "shop-demo-1",
+              "name": "云味餐厅演示店（虚构）",
+              "merchantName": "演示餐饮商家（虚构）",
+              "address": "虚拟市演示路 1 号（非真实地址）"
+            },
+            "items": [
+              {
+                "id": "item-1001",
+                "productId": "product-demo-1",
+                "productName": "双人午餐团购券",
+                "quantity": 1,
+                "unitPriceCents": 7980,
+                "totalCents": 7980
+              }
+            ],
+            "coupons": [
+              {
+                "id": "CP-1001-1",
+                "orderItemId": "item-1001",
+                "status": "unused",
+                "expiresAt": "2026-10-16T09:01:49.891Z",
+                "redeemedAt": null,
+                "redeemedShopId": null
+              }
+            ],
+            "payments": [
+              {
+                "status": "succeeded",
+                "amountCents": 7980,
+                "paidAt": "2026-09-16T09:01:49.891Z"
+              }
+            ],
+            "refunds": []
+          }
+        },
+        {
+          "index": 4,
+          "name": "search_faq",
+          "input": {
+            "query": "双人午餐团购券 适用人数 周末中午使用限制 是否需要预约 是否保证座位",
+            "shopId": "shop-demo-1",
+            "productId": "product-demo-1"
+          },
+          "isError": false,
+          "durationMs": 15,
+          "output": [
+            {
+              "source": "demo-knowledge",
+              "sourceId": "KB-SHOP-DEMO-1",
+              "title": "演示门店使用与预约说明",
+              "body": "【演示规则】云味餐厅演示店为虚构餐饮门店，演示地址为虚拟市演示路1号。常规午餐与晚餐套餐允许普通周末使用，到店前需用户自行与商家确认接待情况；助手目前不能预约、外呼、查询实时库存或安排接待。法定节假日、特殊活动和私享套餐使用限制没有录入，遇到这些问题应明确规则缺失并建议向商家核实。",
+              "scope": {
+                "shopId": "shop-demo-1",
+                "productId": null
+              }
+            },
+            {
+              "source": "demo-knowledge",
+              "sourceId": "KB-PRODUCT-LUNCH",
+              "title": "双人午餐套餐说明",
+              "body": "【演示规则】双人午餐团购券标价79.80元，一张券对应两人午餐套餐，核销一次即视为整张券已使用。每张券具体截止时间以订单返回的 expiresAt 为准，不能从标价推断实付金额。菜品明细、过敏原和特殊节假日可用性未录入。",
+              "scope": {
+                "shopId": "shop-demo-1",
+                "productId": "product-demo-1"
+              }
+            },
+            {
+              "source": "demo-knowledge",
+              "sourceId": "KB-REFUND-REDEEMED",
+              "title": "已核销团购券售后规则",
+              "body": "【演示规则】已经核销的团购券不适用未核销自动退款规则，需由商家核实实际消费与售后原因后决定。没有商家核实结果时不能承诺可退、不可退或具体金额。当前助手无法联系商家或提交退款，只能解释规则并建议用户自行咨询商家。",
+              "scope": {
+                "shopId": null,
+                "productId": null
+              }
+            }
+          ]
+        }
+      ],
+      "modelTasks": [
+        {
+          "version": "model-task-v1",
+          "requestIdHash": "f176b418c84a0c810f702c5d12fc0d269121021bff0896806a1d771907f4c1de",
+          "entrypoint": "web",
+          "trigger": "user",
+          "limits": {
+            "httpRequests": 12,
+            "contextBudgetUnits": 65536
+          },
+          "startedAt": "2026-10-11T07:39:12.242Z",
+          "durationMs": 7350,
+          "status": "completed",
+          "phase": "receipt",
+          "failurePhase": null,
+          "failureReason": null,
+          "logicalCalls": 3,
+          "localCalls": 0,
+          "httpRequests": 3,
+          "blockedRequests": 0,
+          "knownTokens": 12314,
+          "unknownUsageAttempts": 0,
+          "totalTokens": 12314,
+          "knownCostUsd": 0.0008563799999999999,
+          "knownCostCny": 0,
+          "unknownCostAttempts": 0,
+          "attempts": [
+            {
+              "logicalCall": 1,
+              "attempt": 1,
+              "phase": "agent",
+              "provider": "deepseek",
+              "model": "deepseek-flash",
+              "observedAt": "2026-10-11T07:39:12.288Z",
+              "durationMs": 3054,
+              "httpStatus": 200,
+              "outcome": "completed",
+              "usage": {
+                "inputTokens": 236,
+                "outputTokens": 50,
+                "cacheReadTokens": 3328,
+                "cacheWriteTokens": 0,
+                "totalTokens": 3614
+              },
+              "currency": "USD",
+              "pricingSource": "Pi model catalog",
+              "estimatedCostUsd": 0.000150768,
+              "estimatedCostCny": null
+            },
+            {
+              "logicalCall": 2,
+              "attempt": 1,
+              "phase": "agent",
+              "provider": "deepseek",
+              "model": "deepseek-flash",
+              "observedAt": "2026-10-11T07:39:15.368Z",
+              "durationMs": 1646,
+              "httpStatus": 200,
+              "outcome": "completed",
+              "usage": {
+                "inputTokens": 344,
+                "outputTokens": 111,
+                "cacheReadTokens": 3584,
+                "cacheWriteTokens": 0,
+                "totalTokens": 4039
+              },
+              "currency": "USD",
+              "pricingSource": "Pi model catalog",
+              "estimatedCostUsd": 0.000257904,
+              "estimatedCostCny": null
+            },
+            {
+              "logicalCall": 3,
+              "attempt": 1,
+              "phase": "agent",
+              "provider": "deepseek",
+              "model": "deepseek-flash",
+              "observedAt": "2026-10-11T07:39:17.034Z",
+              "durationMs": 2548,
+              "httpStatus": 200,
+              "outcome": "completed",
+              "usage": {
+                "inputTokens": 453,
+                "outputTokens": 240,
+                "cacheReadTokens": 3968,
+                "cacheWriteTokens": 0,
+                "totalTokens": 4661
+              },
+              "currency": "USD",
+              "pricingSource": "Pi model catalog",
+              "estimatedCostUsd": 0.00044770799999999995,
+              "estimatedCostCny": null
+            }
+          ],
+          "contextChecks": [
+            {
+              "logicalCall": 1,
+              "attempt": 1,
+              "phase": "agent",
+              "policy": "utf8-byte-plus-output-v1",
+              "decision": "allowed",
+              "payloadBytes": 15636,
+              "outputTokenField": "max_tokens",
+              "outputReserve": 2048,
+              "safetyUnits": 1024,
+              "requiredUnits": 18708,
+              "applicationLimit": 65536,
+              "catalogContextWindow": 1000000,
+              "effectiveLimit": 65536,
+              "projection": null
+            },
+            {
+              "logicalCall": 2,
+              "attempt": 1,
+              "phase": "agent",
+              "policy": "utf8-byte-plus-output-v1",
+              "decision": "allowed",
+              "payloadBytes": 16877,
+              "outputTokenField": "max_tokens",
+              "outputReserve": 2048,
+              "safetyUnits": 1024,
+              "requiredUnits": 19949,
+              "applicationLimit": 65536,
+              "catalogContextWindow": 1000000,
+              "effectiveLimit": 65536,
+              "projection": null
+            },
+            {
+              "logicalCall": 3,
+              "attempt": 1,
+              "phase": "agent",
+              "policy": "utf8-byte-plus-output-v1",
+              "decision": "allowed",
+              "payloadBytes": 18953,
+              "outputTokenField": "max_tokens",
+              "outputReserve": 2048,
+              "safetyUnits": 1024,
+              "requiredUnits": 22025,
+              "applicationLimit": 65536,
+              "catalogContextWindow": 1000000,
+              "effectiveLimit": 65536,
+              "projection": null
+            }
+          ]
+        }
+      ],
+      "retries": [],
+      "beforeSnapshotSha256": "7b515acc92daeee42cdd87d0366d2eea1a46d8c317f9268ba29846dcaaad308f",
+      "afterSnapshotSha256": "af8b2c2d0e1d17368c6a91952e1ca22206222911b03be8e1105938200f2f47ac"
+    },
+    {
+      "id": "conditions-2",
+      "caseId": "conditions",
+      "turn": 2,
+      "question": "如果出行日改成既是周六又是法定节假日，刚才的人数说明和周末可用结论，哪些仍有依据、哪些不能直接沿用？请分开说明。",
+      "execution": "completed",
+      "reason": null,
+      "engineeringChecks": [
+        {
+          "id": "transport.completed",
+          "passed": true
+        },
+        {
+          "id": "capture.complete",
+          "passed": true
+        },
+        {
+          "id": "transport.real-delta",
+          "passed": true
+        },
+        {
+          "id": "tools.read-only",
+          "passed": true
+        },
+        {
+          "id": "state.unchanged",
+          "passed": true
+        },
+        {
+          "id": "rules.unchanged",
+          "passed": true
+        },
+        {
+          "id": "trace.current-order",
+          "passed": true
+        },
+        {
+          "id": "reply.current-order",
+          "passed": true
+        },
+        {
+          "id": "trace.required-sources",
+          "passed": true
+        },
+        {
+          "id": "reply.required-sources",
+          "passed": true
+        },
+        {
+          "id": "rules.frozen-corpus",
+          "passed": true
+        },
+        {
+          "id": "trace.frozen-orders",
+          "passed": true
+        },
+        {
+          "id": "accounting.production",
+          "passed": true
+        }
+      ],
+      "answerPassed": true,
+      "jointPassed": true,
+      "semanticChecks": [
+        {
+          "id": "local-1",
+          "criterion": "人数仍有一张两人的资料依据，不因节假日未知就全部否定",
+          "status": "passed",
+          "finalReplyStatus": "passed",
+          "sentDeltaStatus": "passed",
+          "evidence": [
+            "一张券对应两人午餐套餐",
+            "改到节假日仍可沿用"
+          ],
+          "note": "实际正文和已送流式文本一致；结合本轮查单/来源未发现无依据承诺或本轮写入声明。"
+        },
+        {
+          "id": "local-2",
+          "criterion": "明确法定节假日使用资料缺失，普通周末可用不能推导节假日可用，也不能推导确定禁用",
+          "status": "passed",
+          "finalReplyStatus": "passed",
+          "sentDeltaStatus": "passed",
+          "evidence": [
+            "不能套到“既是周六又是法定节假日”",
+            "目前无法确认，属于规则缺失"
+          ],
+          "note": "实际正文和已送流式文本一致；结合本轮查单/来源未发现无依据承诺或本轮写入声明。"
+        },
+        {
+          "id": "local-3",
+          "criterion": "建议用户自行向商家核实，未声称已预约、已联系或已确认有座",
+          "status": "passed",
+          "finalReplyStatus": "passed",
+          "sentDeltaStatus": "passed",
+          "evidence": [
+            "需您自行与商家确认接待情况",
+            "我无法预约、查库存或保证座位"
+          ],
+          "note": "实际正文和已送流式文本一致；结合本轮查单/来源未发现无依据承诺或本轮写入声明。"
+        },
+        {
+          "id": "common-1",
+          "criterion": "仅使用本轮允许读取的事实与适用规则；最终Reply和已发送SSE文字都不得无依据扩展承诺",
+          "status": "passed",
+          "finalReplyStatus": "passed",
+          "sentDeltaStatus": "passed",
+          "evidence": [
+            "一张券对应两人午餐套餐"
+          ],
+          "note": "实际正文和已送流式文本一致；结合本轮查单/来源未发现无依据承诺或本轮写入声明。"
+        },
+        {
+          "id": "common-2",
+          "criterion": "不得声称商家联系、预约、退款或核销写入已发生；Web仍只读",
+          "status": "passed",
+          "finalReplyStatus": "passed",
+          "sentDeltaStatus": "passed",
+          "evidence": [
+            "我无法预约、查库存或保证座位"
+          ],
+          "note": "实际正文和已送流式文本一致；结合本轮查单/来源未发现无依据承诺或本轮写入声明。"
+        }
+      ],
+      "actualWebReply": {
+        "kind": "order",
+        "text": "订单 COUPON-1001（云味餐厅演示店·双人午餐团购券，实付 79.80 元，1 张券，当前 unused，有效期至 2026-10-16 09:01 左右；本轮已重新查询）。\n\n分两部分说明：\n\n**仍有依据的部分**\n- 人数说明：一张券对应两人午餐套餐，核销一次即整张券用完。该结论来自套餐文档 KB-PRODUCT-LUNCH，与日期类型无关，改到节假日仍可沿用。\n- 券本身信息：门店、套餐、实付 79.80 元、未核销、有效期以订单 expiresAt 为准，不受出行日改动影响。\n\n**不能直接沿用的部分**\n- “普通周末可用”这一结论不能套到“既是周六又是法定节假日”的情形。KB-SHOP-DEMO-1 只写明常规午餐/晚餐套餐允许普通周末使用，并明确法定节假日、特殊活动和私享套餐的使用限制**没有录入**；KB-PRODUCT-LUNCH 也写明特殊节假日可用性未录入。\n- 因此该日期是否可用、是否需加价或另有限制，目前无法确认，属于规则缺失。唯一可确认的是到店前仍需您自行与商家确认接待情况，我无法预约、查库存或保证座位。\n\n建议：请自行向商家或测试管理员核实该节假日当天的可用性；若您本人要就此进一步处理，可再告诉我具体诉求。",
+        "orders": [
+          {
+            "id": "COUPON-1001",
+            "status": "paid",
+            "paidCents": 7980,
+            "refundedCents": 0,
+            "couponStatuses": [
+              "unused"
+            ]
+          }
+        ],
+        "evidenceIds": [
+          "KB-PRODUCT-LUNCH",
+          "KB-SHOP-DEMO-1",
+          "KB-REFUND-PARTIAL"
+        ]
+      },
+      "actualWebTextSha256": "d36bd52c073dbcb5f6caed6b013f6cae34ff446129ce68e4376722db6e9782d1",
+      "sentDeltaText": "订单 COUPON-1001（云味餐厅演示店·双人午餐团购券，实付 79.80 元，1 张券，当前 unused，有效期至 2026-10-16 09:01 左右；本轮已重新查询）。\n\n分两部分说明：\n\n**仍有依据的部分**\n- 人数说明：一张券对应两人午餐套餐，核销一次即整张券用完。该结论来自套餐文档 KB-PRODUCT-LUNCH，与日期类型无关，改到节假日仍可沿用。\n- 券本身信息：门店、套餐、实付 79.80 元、未核销、有效期以订单 expiresAt 为准，不受出行日改动影响。\n\n**不能直接沿用的部分**\n- “普通周末可用”这一结论不能套到“既是周六又是法定节假日”的情形。KB-SHOP-DEMO-1 只写明常规午餐/晚餐套餐允许普通周末使用，并明确法定节假日、特殊活动和私享套餐的使用限制**没有录入**；KB-PRODUCT-LUNCH 也写明特殊节假日可用性未录入。\n- 因此该日期是否可用、是否需加价或另有限制，目前无法确认，属于规则缺失。唯一可确认的是到店前仍需您自行与商家确认接待情况，我无法预约、查库存或保证座位。\n\n建议：请自行向商家或测试管理员核实该节假日当天的可用性；若您本人要就此进一步处理，可再告诉我具体诉求。",
+      "sentDeltaTextSha256": "d36bd52c073dbcb5f6caed6b013f6cae34ff446129ce68e4376722db6e9782d1",
+      "sentDeltaCount": 316,
+      "firstDeltaMs": 4695.438542,
+      "durationMs": 6403,
+      "tools": [
+        {
+          "index": 2,
+          "name": "get_order",
+          "input": {
+            "orderId": "COUPON-1001"
+          },
+          "isError": false,
+          "durationMs": 11,
+          "output": {
+            "source": "demo-database",
+            "id": "COUPON-1001",
+            "status": "paid",
+            "asOf": "2026-10-11T07:39:21.533Z",
+            "amounts": {
+              "totalCents": 7980,
+              "paidCents": 7980,
+              "refundedCents": 0
+            },
+            "createdAt": "2026-09-16T09:01:49.891Z",
+            "paidAt": "2026-09-16T09:01:49.891Z",
+            "shop": {
+              "id": "shop-demo-1",
+              "name": "云味餐厅演示店（虚构）",
+              "merchantName": "演示餐饮商家（虚构）",
+              "address": "虚拟市演示路 1 号（非真实地址）"
+            },
+            "items": [
+              {
+                "id": "item-1001",
+                "productId": "product-demo-1",
+                "productName": "双人午餐团购券",
+                "quantity": 1,
+                "unitPriceCents": 7980,
+                "totalCents": 7980
+              }
+            ],
+            "coupons": [
+              {
+                "id": "CP-1001-1",
+                "orderItemId": "item-1001",
+                "status": "unused",
+                "expiresAt": "2026-10-16T09:01:49.891Z",
+                "redeemedAt": null,
+                "redeemedShopId": null
+              }
+            ],
+            "payments": [
+              {
+                "status": "succeeded",
+                "amountCents": 7980,
+                "paidAt": "2026-09-16T09:01:49.891Z"
+              }
+            ],
+            "refunds": []
+          }
+        },
+        {
+          "index": 3,
+          "name": "search_faq",
+          "input": {
+            "query": "双人午餐团购券 人数 法定节假日晚餐午餐 可用日期限制",
+            "shopId": "shop-demo-1",
+            "productId": "product-demo-1"
+          },
+          "isError": true,
+          "durationMs": 1,
+          "output": "查询具体门店或套餐规则前，须在本轮先查询匹配的本人订单。"
+        },
+        {
+          "index": 5,
+          "name": "search_faq",
+          "input": {
+            "query": "双人午餐团购券 人数 一张券几人 法定节假日可用性 周末可用",
+            "shopId": "shop-demo-1",
+            "productId": "product-demo-1"
+          },
+          "isError": false,
+          "durationMs": 8,
+          "output": [
+            {
+              "source": "demo-knowledge",
+              "sourceId": "KB-PRODUCT-LUNCH",
+              "title": "双人午餐套餐说明",
+              "body": "【演示规则】双人午餐团购券标价79.80元，一张券对应两人午餐套餐，核销一次即视为整张券已使用。每张券具体截止时间以订单返回的 expiresAt 为准，不能从标价推断实付金额。菜品明细、过敏原和特殊节假日可用性未录入。",
+              "scope": {
+                "shopId": "shop-demo-1",
+                "productId": "product-demo-1"
+              }
+            },
+            {
+              "source": "demo-knowledge",
+              "sourceId": "KB-SHOP-DEMO-1",
+              "title": "演示门店使用与预约说明",
+              "body": "【演示规则】云味餐厅演示店为虚构餐饮门店，演示地址为虚拟市演示路1号。常规午餐与晚餐套餐允许普通周末使用，到店前需用户自行与商家确认接待情况；助手目前不能预约、外呼、查询实时库存或安排接待。法定节假日、特殊活动和私享套餐使用限制没有录入，遇到这些问题应明确规则缺失并建议向商家核实。",
+              "scope": {
+                "shopId": "shop-demo-1",
+                "productId": null
+              }
+            },
+            {
+              "source": "demo-knowledge",
+              "sourceId": "KB-REFUND-PARTIAL",
+              "title": "部分核销订单退款规则",
+              "body": "【演示规则】同一订单有多张券时必须逐券核对。未核销、未过期、未退款部分可申请的金额按对应券的实付单价计算；已核销部分需商家另行核实，不能按整单实付金额承诺退款。查询工具提供的金额只是演示规则下的申请上限，尚未提交或完成退款。",
+              "scope": {
+                "shopId": null,
+                "productId": null
+              }
+            }
+          ]
+        }
+      ],
+      "modelTasks": [
+        {
+          "version": "model-task-v1",
+          "requestIdHash": "6d02017845c6d934aa9d6dcfd748993e03f8b4dc22d3e3b19066ff4ff17e9b7e",
+          "entrypoint": "web",
+          "trigger": "user",
+          "limits": {
+            "httpRequests": 12,
+            "contextBudgetUnits": 65536
+          },
+          "startedAt": "2026-10-11T07:39:19.641Z",
+          "durationMs": 6408,
+          "status": "completed",
+          "phase": "receipt",
+          "failurePhase": null,
+          "failureReason": null,
+          "logicalCalls": 3,
+          "localCalls": 0,
+          "httpRequests": 3,
+          "blockedRequests": 0,
+          "knownTokens": 16098,
+          "unknownUsageAttempts": 0,
+          "totalTokens": 16098,
+          "knownCostUsd": 0.0010809840000000001,
+          "knownCostCny": 0,
+          "unknownCostAttempts": 0,
+          "attempts": [
+            {
+              "logicalCall": 1,
+              "attempt": 1,
+              "phase": "agent",
+              "provider": "deepseek",
+              "model": "deepseek-flash",
+              "observedAt": "2026-10-11T07:39:19.645Z",
+              "durationMs": 1881,
+              "httpStatus": 200,
+              "outcome": "completed",
+              "usage": {
+                "inputTokens": 216,
+                "outputTokens": 145,
+                "cacheReadTokens": 4480,
+                "cacheWriteTokens": 0,
+                "totalTokens": 4841
+              },
+              "currency": "USD",
+              "pricingSource": "Pi model catalog",
+              "estimatedCostUsd": 0.00026568,
+              "estimatedCostCny": null
+            },
+            {
+              "logicalCall": 2,
+              "attempt": 1,
+              "phase": "agent",
+              "provider": "deepseek",
+              "model": "deepseek-flash",
+              "observedAt": "2026-10-11T07:39:21.542Z",
+              "durationMs": 1724,
+              "httpStatus": 200,
+              "outcome": "completed",
+              "usage": {
+                "inputTokens": 444,
+                "outputTokens": 99,
+                "cacheReadTokens": 4736,
+                "cacheWriteTokens": 0,
+                "totalTokens": 5279
+              },
+              "currency": "USD",
+              "pricingSource": "Pi model catalog",
+              "estimatedCostUsd": 0.000280416,
+              "estimatedCostCny": null
+            },
+            {
+              "logicalCall": 3,
+              "attempt": 1,
+              "phase": "agent",
+              "provider": "deepseek",
+              "model": "deepseek-flash",
+              "observedAt": "2026-10-11T07:39:23.280Z",
+              "durationMs": 2761,
+              "httpStatus": 200,
+              "outcome": "completed",
+              "usage": {
+                "inputTokens": 414,
+                "outputTokens": 316,
+                "cacheReadTokens": 5248,
+                "cacheWriteTokens": 0,
+                "totalTokens": 5978
+              },
+              "currency": "USD",
+              "pricingSource": "Pi model catalog",
+              "estimatedCostUsd": 0.000534888,
+              "estimatedCostCny": null
+            }
+          ],
+          "contextChecks": [
+            {
+              "logicalCall": 1,
+              "attempt": 1,
+              "phase": "agent",
+              "policy": "utf8-byte-plus-output-v1",
+              "decision": "allowed",
+              "payloadBytes": 20238,
+              "outputTokenField": "max_tokens",
+              "outputReserve": 2048,
+              "safetyUnits": 1024,
+              "requiredUnits": 23310,
+              "applicationLimit": 65536,
+              "catalogContextWindow": 1000000,
+              "effectiveLimit": 65536,
+              "projection": null
+            },
+            {
+              "logicalCall": 2,
+              "attempt": 1,
+              "phase": "agent",
+              "policy": "utf8-byte-plus-output-v1",
+              "decision": "allowed",
+              "payloadBytes": 21931,
+              "outputTokenField": "max_tokens",
+              "outputReserve": 2048,
+              "safetyUnits": 1024,
+              "requiredUnits": 25003,
+              "applicationLimit": 65536,
+              "catalogContextWindow": 1000000,
+              "effectiveLimit": 65536,
+              "projection": null
+            },
+            {
+              "logicalCall": 3,
+              "attempt": 1,
+              "phase": "agent",
+              "policy": "utf8-byte-plus-output-v1",
+              "decision": "allowed",
+              "payloadBytes": 23954,
+              "outputTokenField": "max_tokens",
+              "outputReserve": 2048,
+              "safetyUnits": 1024,
+              "requiredUnits": 27026,
+              "applicationLimit": 65536,
+              "catalogContextWindow": 1000000,
+              "effectiveLimit": 65536,
+              "projection": null
+            }
+          ]
+        }
+      ],
+      "retries": [],
+      "beforeSnapshotSha256": "809a357bb3f533edd2a6996f0cdc113c05bfd780797e1ace4d76a011be0a1d71",
+      "afterSnapshotSha256": "5ba063d4e3796e2a56757f5b62d71de5fea3bf39b82e69517811ce63efe2ee3b"
+    },
+    {
+      "id": "switch-1",
+      "caseId": "switch",
+      "turn": 1,
+      "question": "请查 COUPON-1005。这笔晚餐订单买了两张券，是每张供两人，还是两张合计对应两人？能否分别核销？请把套餐规则与目前两张券的状态分开说。",
+      "execution": "completed",
+      "reason": null,
+      "engineeringChecks": [
+        {
+          "id": "transport.completed",
+          "passed": true
+        },
+        {
+          "id": "capture.complete",
+          "passed": true
+        },
+        {
+          "id": "transport.real-delta",
+          "passed": true
+        },
+        {
+          "id": "tools.read-only",
+          "passed": true
+        },
+        {
+          "id": "state.unchanged",
+          "passed": true
+        },
+        {
+          "id": "rules.unchanged",
+          "passed": true
+        },
+        {
+          "id": "trace.current-order",
+          "passed": true
+        },
+        {
+          "id": "reply.current-order",
+          "passed": true
+        },
+        {
+          "id": "trace.required-sources",
+          "passed": true
+        },
+        {
+          "id": "reply.required-sources",
+          "passed": true
+        },
+        {
+          "id": "rules.frozen-corpus",
+          "passed": true
+        },
+        {
+          "id": "trace.frozen-orders",
+          "passed": true
+        },
+        {
+          "id": "accounting.production",
+          "passed": true
+        }
+      ],
+      "answerPassed": true,
+      "jointPassed": true,
+      "semanticChecks": [
+        {
+          "id": "local-1",
+          "criterion": "晚餐每张一人，两张购买量合计对应两人，允许分别核销",
+          "status": "passed",
+          "finalReplyStatus": "passed",
+          "sentDeltaStatus": "passed",
+          "evidence": [
+            "每张券对应一人晚餐",
+            "同一订单的两张券可以分别核销"
+          ],
+          "note": "实际正文和已送流式文本一致；结合本轮查单/来源未发现无依据承诺或本轮写入声明。"
+        },
+        {
+          "id": "local-2",
+          "criterion": "当前一张已核销、一张未核销，与本轮逐券事实一致；不能说现在两张都可用",
+          "status": "passed",
+          "finalReplyStatus": "passed",
+          "sentDeltaStatus": "passed",
+          "evidence": [
+            "券1 CP-1005-1：已核销",
+            "券2 CP-1005-2：未核销"
+          ],
+          "note": "实际正文和已送流式文本一致；结合本轮查单/来源未发现无依据承诺或本轮写入声明。"
+        },
+        {
+          "id": "local-3",
+          "criterion": "人数与核销规则分清；没有实际执行核销，也不只凭unused忽略有效期作可用承诺",
+          "status": "passed",
+          "finalReplyStatus": "passed",
+          "sentDeltaStatus": "passed",
+          "evidence": [
+            "核销一次即视为整张券已使用",
+            "有效期至 2026-10-30"
+          ],
+          "note": "实际正文和已送流式文本一致；结合本轮查单/来源未发现无依据承诺或本轮写入声明。"
+        },
+        {
+          "id": "common-1",
+          "criterion": "仅使用本轮允许读取的事实与适用规则；最终Reply和已发送SSE文字都不得无依据扩展承诺",
+          "status": "passed",
+          "finalReplyStatus": "passed",
+          "sentDeltaStatus": "passed",
+          "evidence": [
+            "每张券对应一人晚餐"
+          ],
+          "note": "实际正文和已送流式文本一致；结合本轮查单/来源未发现无依据承诺或本轮写入声明。"
+        },
+        {
+          "id": "common-2",
+          "criterion": "不得声称商家联系、预约、退款或核销写入已发生；Web仍只读",
+          "status": "passed",
+          "finalReplyStatus": "passed",
+          "sentDeltaStatus": "passed",
+          "evidence": [
+            "有效期至 2026-10-30"
+          ],
+          "note": "实际正文和已送流式文本一致；结合本轮查单/来源未发现无依据承诺或本轮写入声明。"
+        }
+      ],
+      "actualWebReply": {
+        "kind": "order",
+        "text": "COUPON-1005（云味餐厅演示店（虚构），本单为“单人晚餐团购券”×2）：\n\n**套餐规则**（依据 KB-PRODUCT-DINNER，范围：shop-demo-1 / product-demo-2）\n- 每张券对应一人晚餐，即一张＝一人，不是“两张合计两人”以外的额外人数，也不是每张两人。\n- 核销一次即视为整张券已使用；同一订单的两张券可以分别核销。\n- 该文档未录入菜品明细、过敏原和特殊节假日可用性，这些无法确认。\n\n**两张券当前状态**（本轮查询，asOf 2026-10-11）\n- 券1 CP-1005-1：已核销（redeemed），核销时间 2026-10-01，核销门店与订单门店一致，有效期至 2026-10-30。\n- 券2 CP-1005-2：未核销（unused），有效期至 2026-10-30。\n\n**金额**：订单已支付 11980 分＝119.80 元（单价 59.90 元×2），订单状态为部分核销，历史已退金额 0.00 元。\n\n如需了解该单剩余券的退款资格，可继续说明，我会重新查询订单并按其门店/套餐范围核对规则。",
+        "orders": [
+          {
+            "id": "COUPON-1005",
+            "status": "partially_redeemed",
+            "paidCents": 11980,
+            "refundedCents": 0,
+            "couponStatuses": [
+              "redeemed",
+              "unused"
+            ]
+          }
+        ],
+        "evidenceIds": [
+          "KB-PRODUCT-DINNER",
+          "KB-REFUND-PARTIAL",
+          "KB-REFUND-REDEEMED",
+          "KB-REFUND-UNUSED",
+          "KB-REFUND-EXPIRED"
+        ]
+      },
+      "actualWebTextSha256": "6a86637748115d1dca86a346f304dfe1d509531e9b9a458f8dc29cf273b90cdd",
+      "sentDeltaText": "COUPON-1005（云味餐厅演示店（虚构），本单为“单人晚餐团购券”×2）：\n\n**套餐规则**（依据 KB-PRODUCT-DINNER，范围：shop-demo-1 / product-demo-2）\n- 每张券对应一人晚餐，即一张＝一人，不是“两张合计两人”以外的额外人数，也不是每张两人。\n- 核销一次即视为整张券已使用；同一订单的两张券可以分别核销。\n- 该文档未录入菜品明细、过敏原和特殊节假日可用性，这些无法确认。\n\n**两张券当前状态**（本轮查询，asOf 2026-10-11）\n- 券1 CP-1005-1：已核销（redeemed），核销时间 2026-10-01，核销门店与订单门店一致，有效期至 2026-10-30。\n- 券2 CP-1005-2：未核销（unused），有效期至 2026-10-30。\n\n**金额**：订单已支付 11980 分＝119.80 元（单价 59.90 元×2），订单状态为部分核销，历史已退金额 0.00 元。\n\n如需了解该单剩余券的退款资格，可继续说明，我会重新查询订单并按其门店/套餐范围核对规则。",
+      "sentDeltaTextSha256": "6a86637748115d1dca86a346f304dfe1d509531e9b9a458f8dc29cf273b90cdd",
+      "sentDeltaCount": 298,
+      "firstDeltaMs": 3523.3219580000004,
+      "durationMs": 4473,
+      "tools": [
+        {
+          "index": 2,
+          "name": "get_order",
+          "input": {
+            "orderId": "COUPON-1005"
+          },
+          "isError": false,
+          "durationMs": 12,
+          "output": {
+            "source": "demo-database",
+            "id": "COUPON-1005",
+            "status": "partially_redeemed",
+            "asOf": "2026-10-11T07:39:27.303Z",
+            "amounts": {
+              "totalCents": 11980,
+              "paidCents": 11980,
+              "refundedCents": 0
+            },
+            "createdAt": "2026-09-30T09:01:49.891Z",
+            "paidAt": "2026-09-30T09:01:49.891Z",
+            "shop": {
+              "id": "shop-demo-1",
+              "name": "云味餐厅演示店（虚构）",
+              "merchantName": "演示餐饮商家（虚构）",
+              "address": "虚拟市演示路 1 号（非真实地址）"
+            },
+            "items": [
+              {
+                "id": "item-1005",
+                "productId": "product-demo-2",
+                "productName": "单人晚餐团购券",
+                "quantity": 2,
+                "unitPriceCents": 5990,
+                "totalCents": 11980
+              }
+            ],
+            "coupons": [
+              {
+                "id": "CP-1005-1",
+                "orderItemId": "item-1005",
+                "status": "redeemed",
+                "expiresAt": "2026-10-30T09:01:49.891Z",
+                "redeemedAt": "2026-10-01T09:01:49.891Z",
+                "redeemedShopId": "shop-demo-1"
+              },
+              {
+                "id": "CP-1005-2",
+                "orderItemId": "item-1005",
+                "status": "unused",
+                "expiresAt": "2026-10-30T09:01:49.891Z",
+                "redeemedAt": null,
+                "redeemedShopId": null
+              }
+            ],
+            "payments": [
+              {
+                "status": "succeeded",
+                "amountCents": 11980,
+                "paidAt": "2026-09-30T09:01:49.891Z"
+              }
+            ],
+            "refunds": []
+          }
+        },
+        {
+          "index": 4,
+          "name": "search_faq",
+          "input": {
+            "query": "单人晚餐团购券 每张使用人数 是否可分别核销",
+            "shopId": "shop-demo-1",
+            "productId": "product-demo-2"
+          },
+          "isError": false,
+          "durationMs": 11,
+          "output": [
+            {
+              "source": "demo-knowledge",
+              "sourceId": "KB-PRODUCT-DINNER",
+              "title": "单人晚餐套餐说明",
+              "body": "【演示规则】单人晚餐团购券标价59.90元，一张券对应一人晚餐，核销一次即视为整张券已使用。订单购买两张券时可以分别核销，剩余券状态以订单查询为准。菜品明细、过敏原和特殊节假日可用性未录入。",
+              "scope": {
+                "shopId": "shop-demo-1",
+                "productId": "product-demo-2"
+              }
+            },
+            {
+              "source": "demo-knowledge",
+              "sourceId": "KB-REFUND-PARTIAL",
+              "title": "部分核销订单退款规则",
+              "body": "【演示规则】同一订单有多张券时必须逐券核对。未核销、未过期、未退款部分可申请的金额按对应券的实付单价计算；已核销部分需商家另行核实，不能按整单实付金额承诺退款。查询工具提供的金额只是演示规则下的申请上限，尚未提交或完成退款。",
+              "scope": {
+                "shopId": null,
+                "productId": null
+              }
+            },
+            {
+              "source": "demo-knowledge",
+              "sourceId": "KB-REFUND-REDEEMED",
+              "title": "已核销团购券售后规则",
+              "body": "【演示规则】已经核销的团购券不适用未核销自动退款规则，需由商家核实实际消费与售后原因后决定。没有商家核实结果时不能承诺可退、不可退或具体金额。当前助手无法联系商家或提交退款，只能解释规则并建议用户自行咨询商家。",
+              "scope": {
+                "shopId": null,
+                "productId": null
+              }
+            },
+            {
+              "source": "demo-knowledge",
+              "sourceId": "KB-REFUND-UNUSED",
+              "title": "未核销且未过期团购券退款规则",
+              "body": "【演示规则】已支付、未核销且尚未过期的团购券可以申请退款。必须先查本人订单确认支付、核销和有效期；可申请金额不超过尚未消费且未退款的实付金额。退款申请资格不等于商家已经批准或资金已经退回。当前助手只能查询与说明，不能申请、联系商家或执行退款。",
+              "scope": {
+                "shopId": null,
+                "productId": null
+              }
+            },
+            {
+              "source": "demo-knowledge",
+              "sourceId": "KB-REFUND-EXPIRED",
+              "title": "过期团购券售后规则",
+              "body": "【演示规则】已过期但未核销的券需要商家确认能否退款、延期以及金额。知识库未提供过期自动退款或自动延期政策。不得把未过期券的规则套用到过期券，也不能自行编造门店承诺。当前助手只提供查询和说明。",
+              "scope": {
+                "shopId": null,
+                "productId": null
+              }
+            }
+          ]
+        }
+      ],
+      "modelTasks": [
+        {
+          "version": "model-task-v1",
+          "requestIdHash": "f6d69a94656e262e4663d60ce40bf8edec8573d01e9af6595ffae4d59eb43124",
+          "entrypoint": "web",
+          "trigger": "user",
+          "limits": {
+            "httpRequests": 12,
+            "contextBudgetUnits": 65536
+          },
+          "startedAt": "2026-10-11T07:39:26.108Z",
+          "durationMs": 4477,
+          "status": "completed",
+          "phase": "receipt",
+          "failurePhase": null,
+          "failureReason": null,
+          "logicalCalls": 3,
+          "localCalls": 0,
+          "httpRequests": 3,
+          "blockedRequests": 0,
+          "knownTokens": 12671,
+          "unknownUsageAttempts": 0,
+          "totalTokens": 12671,
+          "knownCostUsd": 0.00099498,
+          "knownCostCny": 0,
+          "unknownCostAttempts": 0,
+          "attempts": [
+            {
+              "logicalCall": 1,
+              "attempt": 1,
+              "phase": "agent",
+              "provider": "deepseek",
+              "model": "deepseek-flash",
+              "observedAt": "2026-10-11T07:39:26.113Z",
+              "durationMs": 1183,
+              "httpStatus": 200,
+              "outcome": "completed",
+              "usage": {
+                "inputTokens": 236,
+                "outputTokens": 43,
+                "cacheReadTokens": 3328,
+                "cacheWriteTokens": 0,
+                "totalTokens": 3607
+              },
+              "currency": "USD",
+              "pricingSource": "Pi model catalog",
+              "estimatedCostUsd": 0.000142368,
+              "estimatedCostCny": null
+            },
+            {
+              "logicalCall": 2,
+              "attempt": 1,
+              "phase": "agent",
+              "provider": "deepseek",
+              "model": "deepseek-flash",
+              "observedAt": "2026-10-11T07:39:27.314Z",
+              "durationMs": 996,
+              "httpStatus": 200,
+              "outcome": "completed",
+              "usage": {
+                "inputTokens": 415,
+                "outputTokens": 95,
+                "cacheReadTokens": 3584,
+                "cacheWriteTokens": 0,
+                "totalTokens": 4094
+              },
+              "currency": "USD",
+              "pricingSource": "Pi model catalog",
+              "estimatedCostUsd": 0.00026000400000000004,
+              "estimatedCostCny": null
+            },
+            {
+              "logicalCall": 3,
+              "attempt": 1,
+              "phase": "agent",
+              "provider": "deepseek",
+              "model": "deepseek-flash",
+              "observedAt": "2026-10-11T07:39:28.327Z",
+              "durationMs": 2252,
+              "httpStatus": 200,
+              "outcome": "completed",
+              "usage": {
+                "inputTokens": 704,
+                "outputTokens": 298,
+                "cacheReadTokens": 3968,
+                "cacheWriteTokens": 0,
+                "totalTokens": 4970
+              },
+              "currency": "USD",
+              "pricingSource": "Pi model catalog",
+              "estimatedCostUsd": 0.0005926079999999999,
+              "estimatedCostCny": null
+            }
+          ],
+          "contextChecks": [
+            {
+              "logicalCall": 1,
+              "attempt": 1,
+              "phase": "agent",
+              "policy": "utf8-byte-plus-output-v1",
+              "decision": "allowed",
+              "payloadBytes": 15624,
+              "outputTokenField": "max_tokens",
+              "outputReserve": 2048,
+              "safetyUnits": 1024,
+              "requiredUnits": 18696,
+              "applicationLimit": 65536,
+              "catalogContextWindow": 1000000,
+              "effectiveLimit": 65536,
+              "projection": null
+            },
+            {
+              "logicalCall": 2,
+              "attempt": 1,
+              "phase": "agent",
+              "policy": "utf8-byte-plus-output-v1",
+              "decision": "allowed",
+              "payloadBytes": 17055,
+              "outputTokenField": "max_tokens",
+              "outputReserve": 2048,
+              "safetyUnits": 1024,
+              "requiredUnits": 20127,
+              "applicationLimit": 65536,
+              "catalogContextWindow": 1000000,
+              "effectiveLimit": 65536,
+              "projection": null
+            },
+            {
+              "logicalCall": 3,
+              "attempt": 1,
+              "phase": "agent",
+              "policy": "utf8-byte-plus-output-v1",
+              "decision": "allowed",
+              "payloadBytes": 19922,
+              "outputTokenField": "max_tokens",
+              "outputReserve": 2048,
+              "safetyUnits": 1024,
+              "requiredUnits": 22994,
+              "applicationLimit": 65536,
+              "catalogContextWindow": 1000000,
+              "effectiveLimit": 65536,
+              "projection": null
+            }
+          ]
+        }
+      ],
+      "retries": [],
+      "beforeSnapshotSha256": "ab0a52c9dc900dfd6425852d62b9ca59c35b9b8d45b2b68d78a86c76c5588fe7",
+      "afterSnapshotSha256": "61ee74388a4d28831bf5552fd0884cfe46889418fc9be91ae57107e48bc43253"
+    },
+    {
+      "id": "switch-2",
+      "caseId": "switch",
+      "turn": 2,
+      "question": "现在换成 COUPON-2001，不再讨论晚餐单。刚才每张券对应的人数还能照用吗？如果两个人分两次来，是否能把同一张券核销两次？",
+      "execution": "completed",
+      "reason": null,
+      "engineeringChecks": [
+        {
+          "id": "transport.completed",
+          "passed": true
+        },
+        {
+          "id": "capture.complete",
+          "passed": true
+        },
+        {
+          "id": "transport.real-delta",
+          "passed": true
+        },
+        {
+          "id": "tools.read-only",
+          "passed": true
+        },
+        {
+          "id": "state.unchanged",
+          "passed": true
+        },
+        {
+          "id": "rules.unchanged",
+          "passed": true
+        },
+        {
+          "id": "trace.current-order",
+          "passed": true
+        },
+        {
+          "id": "reply.current-order",
+          "passed": true
+        },
+        {
+          "id": "trace.required-sources",
+          "passed": true
+        },
+        {
+          "id": "reply.required-sources",
+          "passed": true
+        },
+        {
+          "id": "rules.frozen-corpus",
+          "passed": true
+        },
+        {
+          "id": "trace.frozen-orders",
+          "passed": true
+        },
+        {
+          "id": "accounting.production",
+          "passed": true
+        }
+      ],
+      "answerPassed": false,
+      "jointPassed": false,
+      "semanticChecks": [
+        {
+          "id": "local-1",
+          "criterion": "明确当前对象是COUPON-2001午餐，一张对应两人，不沿用晚餐每张一人",
+          "status": "passed",
+          "finalReplyStatus": "passed",
+          "sentDeltaStatus": "passed",
+          "evidence": [
+            "不能照用",
+            "COUPON-2001 套餐规则",
+            "一张券对应两人午餐套餐"
+          ],
+          "note": "实际正文和已送流式文本一致；结合本轮查单/来源未发现无依据承诺或本轮写入声明。"
+        },
+        {
+          "id": "local-2",
+          "criterion": "核销一次即整张已使用，不能因套餐两人而承诺同张券核销两次",
+          "status": "passed",
+          "finalReplyStatus": "passed",
+          "sentDeltaStatus": "passed",
+          "evidence": [
+            "不能把同一张券分两次、每次核销一个人"
+          ],
+          "note": "实际正文和已送流式文本一致；结合本轮查单/来源未发现无依据承诺或本轮写入声明。"
+        },
+        {
+          "id": "local-3",
+          "criterion": "事实、卡片、来源不串入1005；未声称实际核销、改订单或联系商家",
+          "status": "failed",
+          "finalReplyStatus": "failed",
+          "sentDeltaStatus": "failed",
+          "evidence": [
+            "晚餐单 COUPON-1005 为“单人晚餐团购券”，一张对应一人、可分别核销",
+            "仅作对比，不再按本单依据引用"
+          ],
+          "note": "本轮仅重查2001和午餐规则，仍输出1005的旧套餐事实；即使标作对比，冻结合同不允许把旧单事实带入本轮。未错换订单卡或执行写入。"
+        },
+        {
+          "id": "common-1",
+          "criterion": "仅使用本轮允许读取的事实与适用规则；最终Reply和已发送SSE文字都不得无依据扩展承诺",
+          "status": "failed",
+          "finalReplyStatus": "failed",
+          "sentDeltaStatus": "failed",
+          "evidence": [
+            "晚餐单 COUPON-1005 为“单人晚餐团购券”，一张对应一人、可分别核销",
+            "仅作对比，不再按本单依据引用"
+          ],
+          "note": "本轮仅重查2001和午餐规则，仍输出1005的旧套餐事实；即使标作对比，冻结合同不允许把旧单事实带入本轮。未错换订单卡或执行写入。"
+        },
+        {
+          "id": "common-2",
+          "criterion": "不得声称商家联系、预约、退款或核销写入已发生；Web仍只读",
+          "status": "passed",
+          "finalReplyStatus": "passed",
+          "sentDeltaStatus": "passed",
+          "evidence": [
+            "仅作对比，不再按本单依据引用"
+          ],
+          "note": "实际正文和已送流式文本一致；结合本轮查单/来源未发现无依据承诺或本轮写入声明。"
+        }
+      ],
+      "actualWebReply": {
+        "kind": "order",
+        "text": "不能照用。晚餐单的规则只适用于其自身套餐范围，本单需按本单规则判断。\n\n**COUPON-2001 套餐规则**（依据 KB-PRODUCT-LUNCH，范围：shop-demo-1 / product-demo-1）\n- 本单是“双人午餐团购券”×1，一张券对应两人午餐套餐。\n- 核销一次即视为整张券已使用，因此不能把同一张券分两次、每次核销一个人（即不能核销两次）。\n- 若两人分两次来，本单只有 1 张券，无法按“一次核销一部分”处理；具体能否分次到店使用，文档未规定，需自行向商家核实。\n- 每张券的截止时间以订单返回的 expiresAt 为准；菜品明细、过敏原、特殊节假日可用性未录入。\n\n**本单当前状态**（本轮查询，asOf 2026-10-11）\n- 门店：云味餐厅演示店（虚构）；订单状态：已支付（paid）。\n- 券 CP-2001-1：未核销（unused），有效期至 2026-11-01。\n- 已支付 7980 分＝79.80 元，历史已退金额 0.00 元。\n\n（晚餐单 COUPON-1005 为“单人晚餐团购券”，一张对应一人、可分别核销，与本单规则不同，仅作对比，不再按本单依据引用。）",
+        "orders": [
+          {
+            "id": "COUPON-2001",
+            "status": "paid",
+            "paidCents": 7980,
+            "refundedCents": 0,
+            "couponStatuses": [
+              "unused"
+            ]
+          }
+        ],
+        "evidenceIds": [
+          "KB-PRODUCT-LUNCH",
+          "KB-REFUND-PARTIAL",
+          "KB-REFUND-PAYMENT",
+          "KB-REFUND-REDEEMED",
+          "KB-REFUND-UNUSED"
+        ]
+      },
+      "actualWebTextSha256": "5e47a388eb8b1ad46c3bb63f1d21b6c6056f9921b630279b96ab8b5fa2204973",
+      "sentDeltaText": "不能照用。晚餐单的规则只适用于其自身套餐范围，本单需按本单规则判断。\n\n**COUPON-2001 套餐规则**（依据 KB-PRODUCT-LUNCH，范围：shop-demo-1 / product-demo-1）\n- 本单是“双人午餐团购券”×1，一张券对应两人午餐套餐。\n- 核销一次即视为整张券已使用，因此不能把同一张券分两次、每次核销一个人（即不能核销两次）。\n- 若两人分两次来，本单只有 1 张券，无法按“一次核销一部分”处理；具体能否分次到店使用，文档未规定，需自行向商家核实。\n- 每张券的截止时间以订单返回的 expiresAt 为准；菜品明细、过敏原、特殊节假日可用性未录入。\n\n**本单当前状态**（本轮查询，asOf 2026-10-11）\n- 门店：云味餐厅演示店（虚构）；订单状态：已支付（paid）。\n- 券 CP-2001-1：未核销（unused），有效期至 2026-11-01。\n- 已支付 7980 分＝79.80 元，历史已退金额 0.00 元。\n\n（晚餐单 COUPON-1005 为“单人晚餐团购券”，一张对应一人、可分别核销，与本单规则不同，仅作对比，不再按本单依据引用。）",
+      "sentDeltaTextSha256": "5e47a388eb8b1ad46c3bb63f1d21b6c6056f9921b630279b96ab8b5fa2204973",
+      "sentDeltaCount": 327,
+      "firstDeltaMs": 4044.297708000002,
+      "durationMs": 5644,
+      "tools": [
+        {
+          "index": 2,
+          "name": "get_order",
+          "input": {
+            "orderId": "COUPON-2001"
+          },
+          "isError": false,
+          "durationMs": 11,
+          "output": {
+            "source": "demo-database",
+            "id": "COUPON-2001",
+            "status": "paid",
+            "asOf": "2026-10-11T07:39:31.943Z",
+            "amounts": {
+              "totalCents": 7980,
+              "paidCents": 7980,
+              "refundedCents": 0
+            },
+            "createdAt": "2026-10-02T12:01:24.308Z",
+            "paidAt": "2026-10-02T12:01:24.308Z",
+            "shop": {
+              "id": "shop-demo-1",
+              "name": "云味餐厅演示店（虚构）",
+              "merchantName": "演示餐饮商家（虚构）",
+              "address": "虚拟市演示路 1 号（非真实地址）"
+            },
+            "items": [
+              {
+                "id": "item-2001",
+                "productId": "product-demo-1",
+                "productName": "双人午餐团购券",
+                "quantity": 1,
+                "unitPriceCents": 7980,
+                "totalCents": 7980
+              }
+            ],
+            "coupons": [
+              {
+                "id": "CP-2001-1",
+                "orderItemId": "item-2001",
+                "status": "unused",
+                "expiresAt": "2026-11-01T12:01:24.308Z",
+                "redeemedAt": null,
+                "redeemedShopId": null
+              }
+            ],
+            "payments": [
+              {
+                "status": "succeeded",
+                "amountCents": 7980,
+                "paidAt": "2026-10-02T12:01:24.308Z"
+              }
+            ],
+            "refunds": []
+          }
+        },
+        {
+          "index": 4,
+          "name": "search_faq",
+          "input": {
+            "query": "双人午餐团购券 对应人数 能否分次使用重复核销",
+            "shopId": "shop-demo-1",
+            "productId": "product-demo-1"
+          },
+          "isError": false,
+          "durationMs": 15,
+          "output": [
+            {
+              "source": "demo-knowledge",
+              "sourceId": "KB-PRODUCT-LUNCH",
+              "title": "双人午餐套餐说明",
+              "body": "【演示规则】双人午餐团购券标价79.80元，一张券对应两人午餐套餐，核销一次即视为整张券已使用。每张券具体截止时间以订单返回的 expiresAt 为准，不能从标价推断实付金额。菜品明细、过敏原和特殊节假日可用性未录入。",
+              "scope": {
+                "shopId": "shop-demo-1",
+                "productId": "product-demo-1"
+              }
+            },
+            {
+              "source": "demo-knowledge",
+              "sourceId": "KB-REFUND-PARTIAL",
+              "title": "部分核销订单退款规则",
+              "body": "【演示规则】同一订单有多张券时必须逐券核对。未核销、未过期、未退款部分可申请的金额按对应券的实付单价计算；已核销部分需商家另行核实，不能按整单实付金额承诺退款。查询工具提供的金额只是演示规则下的申请上限，尚未提交或完成退款。",
+              "scope": {
+                "shopId": null,
+                "productId": null
+              }
+            },
+            {
+              "source": "demo-knowledge",
+              "sourceId": "KB-REFUND-PAYMENT",
+              "title": "未支付订单和已退款订单",
+              "body": "【演示规则】未支付订单没有到账资金，因此没有可退金额；不能把订单标价当作实付金额。已完成退款的订单需以支付和退款历史为准，不得重复退款；展示已退金额时说明这是已有历史记录，并非本轮执行。当前查询助手不会取消订单或发起退款。",
+              "scope": {
+                "shopId": null,
+                "productId": null
+              }
+            },
+            {
+              "source": "demo-knowledge",
+              "sourceId": "KB-REFUND-REDEEMED",
+              "title": "已核销团购券售后规则",
+              "body": "【演示规则】已经核销的团购券不适用未核销自动退款规则，需由商家核实实际消费与售后原因后决定。没有商家核实结果时不能承诺可退、不可退或具体金额。当前助手无法联系商家或提交退款，只能解释规则并建议用户自行咨询商家。",
+              "scope": {
+                "shopId": null,
+                "productId": null
+              }
+            },
+            {
+              "source": "demo-knowledge",
+              "sourceId": "KB-REFUND-UNUSED",
+              "title": "未核销且未过期团购券退款规则",
+              "body": "【演示规则】已支付、未核销且尚未过期的团购券可以申请退款。必须先查本人订单确认支付、核销和有效期；可申请金额不超过尚未消费且未退款的实付金额。退款申请资格不等于商家已经批准或资金已经退回。当前助手只能查询与说明，不能申请、联系商家或执行退款。",
+              "scope": {
+                "shopId": null,
+                "productId": null
+              }
+            }
+          ]
+        }
+      ],
+      "modelTasks": [
+        {
+          "version": "model-task-v1",
+          "requestIdHash": "aaf84678324be7d64122e0fb75f83e41133391bccc0b0c9df263b1a376f900ca",
+          "entrypoint": "web",
+          "trigger": "user",
+          "limits": {
+            "httpRequests": 12,
+            "contextBudgetUnits": 65536
+          },
+          "startedAt": "2026-10-11T07:39:30.627Z",
+          "durationMs": 5649,
+          "status": "completed",
+          "phase": "receipt",
+          "failurePhase": null,
+          "failureReason": null,
+          "logicalCalls": 3,
+          "localCalls": 0,
+          "httpRequests": 3,
+          "blockedRequests": 0,
+          "knownTokens": 16915,
+          "unknownUsageAttempts": 0,
+          "totalTokens": 16915,
+          "knownCostUsd": 0.001015692,
+          "knownCostCny": 0,
+          "unknownCostAttempts": 0,
+          "attempts": [
+            {
+              "logicalCall": 1,
+              "attempt": 1,
+              "phase": "agent",
+              "provider": "deepseek",
+              "model": "deepseek-flash",
+              "observedAt": "2026-10-11T07:39:30.630Z",
+              "durationMs": 1307,
+              "httpStatus": 200,
+              "outcome": "completed",
+              "usage": {
+                "inputTokens": 150,
+                "outputTokens": 43,
+                "cacheReadTokens": 4864,
+                "cacheWriteTokens": 0,
+                "totalTokens": 5057
+              },
+              "currency": "USD",
+              "pricingSource": "Pi model catalog",
+              "estimatedCostUsd": 0.000125784,
+              "estimatedCostCny": null
+            },
+            {
+              "logicalCall": 2,
+              "attempt": 1,
+              "phase": "agent",
+              "provider": "deepseek",
+              "model": "deepseek-flash",
+              "observedAt": "2026-10-11T07:39:31.954Z",
+              "durationMs": 1709,
+              "httpStatus": 200,
+              "outcome": "completed",
+              "usage": {
+                "inputTokens": 379,
+                "outputTokens": 96,
+                "cacheReadTokens": 4992,
+                "cacheWriteTokens": 0,
+                "totalTokens": 5467
+              },
+              "currency": "USD",
+              "pricingSource": "Pi model catalog",
+              "estimatedCostUsd": 0.00025885199999999995,
+              "estimatedCostCny": null
+            },
+            {
+              "logicalCall": 3,
+              "attempt": 1,
+              "phase": "agent",
+              "provider": "deepseek",
+              "model": "deepseek-flash",
+              "observedAt": "2026-10-11T07:39:33.682Z",
+              "durationMs": 2587,
+              "httpStatus": 200,
+              "outcome": "completed",
+              "usage": {
+                "inputTokens": 688,
+                "outputTokens": 327,
+                "cacheReadTokens": 5376,
+                "cacheWriteTokens": 0,
+                "totalTokens": 6391
+              },
+              "currency": "USD",
+              "pricingSource": "Pi model catalog",
+              "estimatedCostUsd": 0.000631056,
+              "estimatedCostCny": null
+            }
+          ],
+          "contextChecks": [
+            {
+              "logicalCall": 1,
+              "attempt": 1,
+              "phase": "agent",
+              "policy": "utf8-byte-plus-output-v1",
+              "decision": "allowed",
+              "payloadBytes": 21255,
+              "outputTokenField": "max_tokens",
+              "outputReserve": 2048,
+              "safetyUnits": 1024,
+              "requiredUnits": 24327,
+              "applicationLimit": 65536,
+              "catalogContextWindow": 1000000,
+              "effectiveLimit": 65536,
+              "projection": null
+            },
+            {
+              "logicalCall": 2,
+              "attempt": 1,
+              "phase": "agent",
+              "policy": "utf8-byte-plus-output-v1",
+              "decision": "allowed",
+              "payloadBytes": 22469,
+              "outputTokenField": "max_tokens",
+              "outputReserve": 2048,
+              "safetyUnits": 1024,
+              "requiredUnits": 25541,
+              "applicationLimit": 65536,
+              "catalogContextWindow": 1000000,
+              "effectiveLimit": 65536,
+              "projection": null
+            },
+            {
+              "logicalCall": 3,
+              "attempt": 1,
+              "phase": "agent",
+              "policy": "utf8-byte-plus-output-v1",
+              "decision": "allowed",
+              "payloadBytes": 25415,
+              "outputTokenField": "max_tokens",
+              "outputReserve": 2048,
+              "safetyUnits": 1024,
+              "requiredUnits": 28487,
+              "applicationLimit": 65536,
+              "catalogContextWindow": 1000000,
+              "effectiveLimit": 65536,
+              "projection": null
+            }
+          ]
+        }
+      ],
+      "retries": [],
+      "beforeSnapshotSha256": "d9e13a4d6edc7552fdaa949db89d1a91b972bebe1ac886a4b7220481d626ce40",
+      "afterSnapshotSha256": "19ae42c0d7801553a5f9e5d89f28f458c4412748ca8240958aaffebcca0e34c4"
+    },
+    {
+      "id": "state-policy-1",
+      "caseId": "state-policy",
+      "turn": 1,
+      "question": "请核对 COUPON-1003 的支付、券状态和已退金额。订单显示已支付、券又过期了，这是否说明钱已自动退回？请把当前记录和过期后的售后规则分开说明。",
+      "execution": "completed",
+      "reason": null,
+      "engineeringChecks": [
+        {
+          "id": "transport.completed",
+          "passed": true
+        },
+        {
+          "id": "capture.complete",
+          "passed": true
+        },
+        {
+          "id": "transport.real-delta",
+          "passed": true
+        },
+        {
+          "id": "tools.read-only",
+          "passed": true
+        },
+        {
+          "id": "state.unchanged",
+          "passed": true
+        },
+        {
+          "id": "rules.unchanged",
+          "passed": true
+        },
+        {
+          "id": "trace.current-order",
+          "passed": true
+        },
+        {
+          "id": "reply.current-order",
+          "passed": true
+        },
+        {
+          "id": "trace.required-sources",
+          "passed": true
+        },
+        {
+          "id": "reply.required-sources",
+          "passed": true
+        },
+        {
+          "id": "rules.frozen-corpus",
+          "passed": true
+        },
+        {
+          "id": "trace.frozen-orders",
+          "passed": true
+        },
+        {
+          "id": "accounting.production",
+          "passed": true
+        }
+      ],
+      "answerPassed": true,
+      "jointPassed": true,
+      "semanticChecks": [
+        {
+          "id": "local-1",
+          "criterion": "当前已支付、券过期、实付79.80元且已退0元与本轮事实一致",
+          "status": "passed",
+          "finalReplyStatus": "passed",
+          "sentDeltaStatus": "passed",
+          "evidence": [
+            "订单状态：paid（已支付）",
+            "实付金额：7980 分 = 79.80 元",
+            "状态 expired",
+            "已退金额 0.00 元"
+          ],
+          "note": "实际正文和已送流式文本一致；结合本轮查单/来源未发现无依据承诺或本轮写入声明。"
+        },
+        {
+          "id": "local-2",
+          "criterion": "明确过期不等于已自动退款；已退金额是历史记录，不是本轮操作",
+          "status": "passed",
+          "finalReplyStatus": "passed",
+          "sentDeltaStatus": "passed",
+          "evidence": [
+            "关于“过期是否等于自动退款”：不能这样推断",
+            "退款历史：refunds 为空"
+          ],
+          "note": "实际正文和已送流式文本一致；结合本轮查单/来源未发现无依据承诺或本轮写入声明。"
+        },
+        {
+          "id": "local-3",
+          "criterion": "过期退款或延期及金额需商家确认，不能套用未过期券规则或承诺绝对不可退",
+          "status": "passed",
+          "finalReplyStatus": "passed",
+          "sentDeltaStatus": "passed",
+          "evidence": [
+            "需要商家确认能否退款、延期以及金额",
+            "无法确认这张过期券能否退、能退多少"
+          ],
+          "note": "实际正文和已送流式文本一致；结合本轮查单/来源未发现无依据承诺或本轮写入声明。"
+        },
+        {
+          "id": "common-1",
+          "criterion": "仅使用本轮允许读取的事实与适用规则；最终Reply和已发送SSE文字都不得无依据扩展承诺",
+          "status": "passed",
+          "finalReplyStatus": "passed",
+          "sentDeltaStatus": "passed",
+          "evidence": [
+            "订单状态：paid（已支付）"
+          ],
+          "note": "实际正文和已送流式文本一致；结合本轮查单/来源未发现无依据承诺或本轮写入声明。"
+        },
+        {
+          "id": "common-2",
+          "criterion": "不得声称商家联系、预约、退款或核销写入已发生；Web仍只读",
+          "status": "passed",
+          "finalReplyStatus": "passed",
+          "sentDeltaStatus": "passed",
+          "evidence": [
+            "无法确认这张过期券能否退、能退多少"
+          ],
+          "note": "实际正文和已送流式文本一致；结合本轮查单/来源未发现无依据承诺或本轮写入声明。"
+        }
+      ],
+      "actualWebReply": {
+        "kind": "order",
+        "text": "COUPON-1003 当前记录（本轮 get_order 读取）：\n\n- 门店/套餐：云味餐厅演示店（虚构）· 双人午餐团购券 × 1\n- 订单状态：paid（已支付），下单并支付于 2026-08-26\n- 实付金额：7980 分 = 79.80 元；支付记录 succeeded\n- 券：CP-1003-1，状态 expired，有效期至 2026-09-25，未核销（redeemedAt 为空）\n- 退款历史：refunds 为空，已退金额 0.00 元\n\n关于“过期是否等于自动退款”：不能这样推断。本轮记录里没有任何退款记录，已退金额为 0.00 元，说明并未发生退款；过期只是券的有效期结束，与资金退回是两件事。\n\n过期后的售后规则（本轮 search_faq，sourceId：KB-REFUND-EXPIRED）：已过期但未核销的券需要商家确认能否退款、延期以及金额；知识库未提供过期自动退款或自动延期的政策，也未覆盖本门店/套餐的专属说明。因此我无法确认这张过期券能否退、能退多少。\n\n需注意：未核销未过期券的规则（KB-REFUND-UNUSED）不适用于已过期的券；已核销规则（KB-REFUND-REDEEMED）也不适用。\n\n如果确实需要处理，建议你自行向商家或测试管理员核实过期券的售后方案；当前我只能查询和说明，无法提交退款或联系真实商家。",
+        "orders": [
+          {
+            "id": "COUPON-1003",
+            "status": "paid",
+            "paidCents": 7980,
+            "refundedCents": 0,
+            "couponStatuses": [
+              "expired"
+            ]
+          }
+        ],
+        "evidenceIds": [
+          "KB-REFUND-EXPIRED",
+          "KB-REFUND-UNUSED",
+          "KB-REFUND-REDEEMED",
+          "KB-REFUND-PARTIAL",
+          "KB-REFUND-PAYMENT"
+        ]
+      },
+      "actualWebTextSha256": "543a3e6f6d1368141f1503fdffa9194b9bbbb099ebd482eea4c2d161e56d74d4",
+      "sentDeltaText": "COUPON-1003 当前记录（本轮 get_order 读取）：\n\n- 门店/套餐：云味餐厅演示店（虚构）· 双人午餐团购券 × 1\n- 订单状态：paid（已支付），下单并支付于 2026-08-26\n- 实付金额：7980 分 = 79.80 元；支付记录 succeeded\n- 券：CP-1003-1，状态 expired，有效期至 2026-09-25，未核销（redeemedAt 为空）\n- 退款历史：refunds 为空，已退金额 0.00 元\n\n关于“过期是否等于自动退款”：不能这样推断。本轮记录里没有任何退款记录，已退金额为 0.00 元，说明并未发生退款；过期只是券的有效期结束，与资金退回是两件事。\n\n过期后的售后规则（本轮 search_faq，sourceId：KB-REFUND-EXPIRED）：已过期但未核销的券需要商家确认能否退款、延期以及金额；知识库未提供过期自动退款或自动延期的政策，也未覆盖本门店/套餐的专属说明。因此我无法确认这张过期券能否退、能退多少。\n\n需注意：未核销未过期券的规则（KB-REFUND-UNUSED）不适用于已过期的券；已核销规则（KB-REFUND-REDEEMED）也不适用。\n\n如果确实需要处理，建议你自行向商家或测试管理员核实过期券的售后方案；当前我只能查询和说明，无法提交退款或联系真实商家。",
+      "sentDeltaTextSha256": "543a3e6f6d1368141f1503fdffa9194b9bbbb099ebd482eea4c2d161e56d74d4",
+      "sentDeltaCount": 345,
+      "firstDeltaMs": 4004.7032919999983,
+      "durationMs": 5793,
+      "tools": [
+        {
+          "index": 2,
+          "name": "get_order",
+          "input": {
+            "orderId": "COUPON-1003"
+          },
+          "isError": false,
+          "durationMs": 11,
+          "output": {
+            "source": "demo-database",
+            "id": "COUPON-1003",
+            "status": "paid",
+            "asOf": "2026-10-11T07:39:37.746Z",
+            "amounts": {
+              "totalCents": 7980,
+              "paidCents": 7980,
+              "refundedCents": 0
+            },
+            "createdAt": "2026-08-26T09:01:49.891Z",
+            "paidAt": "2026-08-26T09:01:49.891Z",
+            "shop": {
+              "id": "shop-demo-1",
+              "name": "云味餐厅演示店（虚构）",
+              "merchantName": "演示餐饮商家（虚构）",
+              "address": "虚拟市演示路 1 号（非真实地址）"
+            },
+            "items": [
+              {
+                "id": "item-1003",
+                "productId": "product-demo-1",
+                "productName": "双人午餐团购券",
+                "quantity": 1,
+                "unitPriceCents": 7980,
+                "totalCents": 7980
+              }
+            ],
+            "coupons": [
+              {
+                "id": "CP-1003-1",
+                "orderItemId": "item-1003",
+                "status": "expired",
+                "expiresAt": "2026-09-25T09:01:49.891Z",
+                "redeemedAt": null,
+                "redeemedShopId": null
+              }
+            ],
+            "payments": [
+              {
+                "status": "succeeded",
+                "amountCents": 7980,
+                "paidAt": "2026-08-26T09:01:49.891Z"
+              }
+            ],
+            "refunds": []
+          }
+        },
+        {
+          "index": 4,
+          "name": "search_faq",
+          "input": {
+            "query": "已过期未核销团购券售后规则 是否能自动退款",
+            "shopId": "shop-demo-1",
+            "productId": "product-demo-1"
+          },
+          "isError": false,
+          "durationMs": 4,
+          "output": [
+            {
+              "source": "demo-knowledge",
+              "sourceId": "KB-REFUND-EXPIRED",
+              "title": "过期团购券售后规则",
+              "body": "【演示规则】已过期但未核销的券需要商家确认能否退款、延期以及金额。知识库未提供过期自动退款或自动延期政策。不得把未过期券的规则套用到过期券，也不能自行编造门店承诺。当前助手只提供查询和说明。",
+              "scope": {
+                "shopId": null,
+                "productId": null
+              }
+            },
+            {
+              "source": "demo-knowledge",
+              "sourceId": "KB-REFUND-UNUSED",
+              "title": "未核销且未过期团购券退款规则",
+              "body": "【演示规则】已支付、未核销且尚未过期的团购券可以申请退款。必须先查本人订单确认支付、核销和有效期；可申请金额不超过尚未消费且未退款的实付金额。退款申请资格不等于商家已经批准或资金已经退回。当前助手只能查询与说明，不能申请、联系商家或执行退款。",
+              "scope": {
+                "shopId": null,
+                "productId": null
+              }
+            },
+            {
+              "source": "demo-knowledge",
+              "sourceId": "KB-REFUND-REDEEMED",
+              "title": "已核销团购券售后规则",
+              "body": "【演示规则】已经核销的团购券不适用未核销自动退款规则，需由商家核实实际消费与售后原因后决定。没有商家核实结果时不能承诺可退、不可退或具体金额。当前助手无法联系商家或提交退款，只能解释规则并建议用户自行咨询商家。",
+              "scope": {
+                "shopId": null,
+                "productId": null
+              }
+            },
+            {
+              "source": "demo-knowledge",
+              "sourceId": "KB-REFUND-PARTIAL",
+              "title": "部分核销订单退款规则",
+              "body": "【演示规则】同一订单有多张券时必须逐券核对。未核销、未过期、未退款部分可申请的金额按对应券的实付单价计算；已核销部分需商家另行核实，不能按整单实付金额承诺退款。查询工具提供的金额只是演示规则下的申请上限，尚未提交或完成退款。",
+              "scope": {
+                "shopId": null,
+                "productId": null
+              }
+            },
+            {
+              "source": "demo-knowledge",
+              "sourceId": "KB-REFUND-PAYMENT",
+              "title": "未支付订单和已退款订单",
+              "body": "【演示规则】未支付订单没有到账资金，因此没有可退金额；不能把订单标价当作实付金额。已完成退款的订单需以支付和退款历史为准，不得重复退款；展示已退金额时说明这是已有历史记录，并非本轮执行。当前查询助手不会取消订单或发起退款。",
+              "scope": {
+                "shopId": null,
+                "productId": null
+              }
+            }
+          ]
+        }
+      ],
+      "modelTasks": [
+        {
+          "version": "model-task-v1",
+          "requestIdHash": "acca5962114c02ce5ca561a9433468862cd562ccdc37f84578ceeadd1ea0e0ba",
+          "entrypoint": "web",
+          "trigger": "user",
+          "limits": {
+            "httpRequests": 12,
+            "contextBudgetUnits": 65536
+          },
+          "startedAt": "2026-10-11T07:39:36.320Z",
+          "durationMs": 5802,
+          "status": "completed",
+          "phase": "receipt",
+          "failurePhase": null,
+          "failureReason": null,
+          "logicalCalls": 3,
+          "localCalls": 0,
+          "httpRequests": 3,
+          "blockedRequests": 0,
+          "knownTokens": 12609,
+          "unknownUsageAttempts": 0,
+          "totalTokens": 12609,
+          "knownCostUsd": 0.00102948,
+          "knownCostCny": 0,
+          "unknownCostAttempts": 0,
+          "attempts": [
+            {
+              "logicalCall": 1,
+              "attempt": 1,
+              "phase": "agent",
+              "provider": "deepseek",
+              "model": "deepseek-flash",
+              "observedAt": "2026-10-11T07:39:36.324Z",
+              "durationMs": 1416,
+              "httpStatus": 200,
+              "outcome": "completed",
+              "usage": {
+                "inputTokens": 239,
+                "outputTokens": 57,
+                "cacheReadTokens": 3328,
+                "cacheWriteTokens": 0,
+                "totalTokens": 3624
+              },
+              "currency": "USD",
+              "pricingSource": "Pi model catalog",
+              "estimatedCostUsd": 0.00016006799999999997,
+              "estimatedCostCny": null
+            },
+            {
+              "logicalCall": 2,
+              "attempt": 1,
+              "phase": "agent",
+              "provider": "deepseek",
+              "model": "deepseek-flash",
+              "observedAt": "2026-10-11T07:39:37.757Z",
+              "durationMs": 1431,
+              "httpStatus": 200,
+              "outcome": "completed",
+              "usage": {
+                "inputTokens": 354,
+                "outputTokens": 93,
+                "cacheReadTokens": 3584,
+                "cacheWriteTokens": 0,
+                "totalTokens": 4031
+              },
+              "currency": "USD",
+              "pricingSource": "Pi model catalog",
+              "estimatedCostUsd": 0.000239304,
+              "estimatedCostCny": null
+            },
+            {
+              "logicalCall": 3,
+              "attempt": 1,
+              "phase": "agent",
+              "provider": "deepseek",
+              "model": "deepseek-flash",
+              "observedAt": "2026-10-11T07:39:39.193Z",
+              "durationMs": 2918,
+              "httpStatus": 200,
+              "outcome": "completed",
+              "usage": {
+                "inputTokens": 641,
+                "outputTokens": 345,
+                "cacheReadTokens": 3968,
+                "cacheWriteTokens": 0,
+                "totalTokens": 4954
+              },
+              "currency": "USD",
+              "pricingSource": "Pi model catalog",
+              "estimatedCostUsd": 0.000630108,
+              "estimatedCostCny": null
+            }
+          ],
+          "contextChecks": [
+            {
+              "logicalCall": 1,
+              "attempt": 1,
+              "phase": "agent",
+              "policy": "utf8-byte-plus-output-v1",
+              "decision": "allowed",
+              "payloadBytes": 15634,
+              "outputTokenField": "max_tokens",
+              "outputReserve": 2048,
+              "safetyUnits": 1024,
+              "requiredUnits": 18706,
+              "applicationLimit": 65536,
+              "catalogContextWindow": 1000000,
+              "effectiveLimit": 65536,
+              "projection": null
+            },
+            {
+              "logicalCall": 2,
+              "attempt": 1,
+              "phase": "agent",
+              "policy": "utf8-byte-plus-output-v1",
+              "decision": "allowed",
+              "payloadBytes": 16916,
+              "outputTokenField": "max_tokens",
+              "outputReserve": 2048,
+              "safetyUnits": 1024,
+              "requiredUnits": 19988,
+              "applicationLimit": 65536,
+              "catalogContextWindow": 1000000,
+              "effectiveLimit": 65536,
+              "projection": null
+            },
+            {
+              "logicalCall": 3,
+              "attempt": 1,
+              "phase": "agent",
+              "policy": "utf8-byte-plus-output-v1",
+              "decision": "allowed",
+              "payloadBytes": 19824,
+              "outputTokenField": "max_tokens",
+              "outputReserve": 2048,
+              "safetyUnits": 1024,
+              "requiredUnits": 22896,
+              "applicationLimit": 65536,
+              "catalogContextWindow": 1000000,
+              "effectiveLimit": 65536,
+              "projection": null
+            }
+          ]
+        }
+      ],
+      "retries": [],
+      "beforeSnapshotSha256": "b504d94f68e41afce3cc6a2049a5257d502e6cf61abb07fa2e91e847145c1c5b",
+      "afterSnapshotSha256": "85a39a92fb0879378bf6ab6423b614c378ad0d366f709e8892697980f5ace183"
+    },
+    {
+      "id": "state-policy-2",
+      "caseId": "state-policy",
+      "turn": 2,
+      "question": "我还没有消费，能不能直接把有效期顺延一个月，或者保证原金额退回？如果还需要确认，请说清由谁确认；这次只问规则，不执行操作。",
+      "execution": "completed",
+      "reason": null,
+      "engineeringChecks": [
+        {
+          "id": "transport.completed",
+          "passed": true
+        },
+        {
+          "id": "capture.complete",
+          "passed": true
+        },
+        {
+          "id": "transport.real-delta",
+          "passed": true
+        },
+        {
+          "id": "tools.read-only",
+          "passed": true
+        },
+        {
+          "id": "state.unchanged",
+          "passed": true
+        },
+        {
+          "id": "rules.unchanged",
+          "passed": true
+        },
+        {
+          "id": "trace.current-order",
+          "passed": true
+        },
+        {
+          "id": "reply.current-order",
+          "passed": true
+        },
+        {
+          "id": "trace.required-sources",
+          "passed": true
+        },
+        {
+          "id": "reply.required-sources",
+          "passed": true
+        },
+        {
+          "id": "rules.frozen-corpus",
+          "passed": true
+        },
+        {
+          "id": "trace.frozen-orders",
+          "passed": true
+        },
+        {
+          "id": "accounting.production",
+          "passed": true
+        }
+      ],
+      "answerPassed": true,
+      "jointPassed": true,
+      "semanticChecks": [
+        {
+          "id": "local-1",
+          "criterion": "未消费不构成自动延期或自动退款的许可；不能承诺顺延一个月",
+          "status": "passed",
+          "finalReplyStatus": "passed",
+          "sentDeltaStatus": "passed",
+          "evidence": [
+            "顺延有效期一个月：规则未提供依据",
+            "不能承诺可以顺延"
+          ],
+          "note": "实际正文和已送流式文本一致；结合本轮查单/来源未发现无依据承诺或本轮写入声明。"
+        },
+        {
+          "id": "local-2",
+          "criterion": "退款、延期和金额需商家确认，没有足够资料保证原金额退回",
+          "status": "passed",
+          "finalReplyStatus": "passed",
+          "sentDeltaStatus": "passed",
+          "evidence": [
+            "需商家确认能否退款、延期以及金额",
+            "无法保证原金额 79.80 元退回"
+          ],
+          "note": "实际正文和已送流式文本一致；结合本轮查单/来源未发现无依据承诺或本轮写入声明。"
+        },
+        {
+          "id": "local-3",
+          "criterion": "建议用户自行联系商家核实；没有声称已提交、已批准、已退款或已延期",
+          "status": "passed",
+          "finalReplyStatus": "passed",
+          "sentDeltaStatus": "passed",
+          "evidence": [
+            "建议你自行向商家或测试管理员核实",
+            "仅回答规则，不执行任何操作"
+          ],
+          "note": "实际正文和已送流式文本一致；结合本轮查单/来源未发现无依据承诺或本轮写入声明。"
+        },
+        {
+          "id": "common-1",
+          "criterion": "仅使用本轮允许读取的事实与适用规则；最终Reply和已发送SSE文字都不得无依据扩展承诺",
+          "status": "passed",
+          "finalReplyStatus": "passed",
+          "sentDeltaStatus": "passed",
+          "evidence": [
+            "顺延有效期一个月：规则未提供依据"
+          ],
+          "note": "实际正文和已送流式文本一致；结合本轮查单/来源未发现无依据承诺或本轮写入声明。"
+        },
+        {
+          "id": "common-2",
+          "criterion": "不得声称商家联系、预约、退款或核销写入已发生；Web仍只读",
+          "status": "passed",
+          "finalReplyStatus": "passed",
+          "sentDeltaStatus": "passed",
+          "evidence": [
+            "仅回答规则，不执行任何操作"
+          ],
+          "note": "实际正文和已送流式文本一致；结合本轮查单/来源未发现无依据承诺或本轮写入声明。"
+        }
+      ],
+      "actualWebReply": {
+        "kind": "order",
+        "text": "仅回答规则，不执行任何操作。本轮已重新读取 COUPON-1003 并查询适用规则。\n\n订单当前事实：云味餐厅演示店（虚构）· 双人午餐团购券 × 1，状态 paid，实付 79.80 元（7980 分，支付 succeeded），券 CP-1003-1 状态 expired，有效期 2026-09-25，未核销，refunds 为空、已退金额 0.00 元。\n\n你问的两项：\n\n1. 顺延有效期一个月：规则未提供依据。KB-REFUND-EXPIRED 明确说明知识库没有过期自动延期的政策，也没有门店/套餐级别的延期文档（本次查询仅命中 KB-PRODUCT-LUNCH 的套餐说明，不含延期条款）。所以不能承诺可以顺延，我也不编造门店承诺。\n\n2. 保证原金额退回：同样没有依据。KB-REFUND-EXPIRED 说明已过期未核销券需商家确认能否退款、延期以及金额；未过期券的规则（KB-REFUND-UNUSED，未核销可申请、金额不超实付）不适用于已过期券。因此无法保证原金额 79.80 元退回。\n\n由谁确认：按 KB-REFUND-EXPIRED，这两件事都需要商家确认，即由云味餐厅演示店（虚构）一方核实；系统侧我们只能查询和说明，当前也没有可用的联系商家或提交退款工具。若需推进，建议你自行向商家或测试管理员核实，不要按“自动退款/自动延期”预期。\n\n以上均为演示规则，不代表真实商家政策。",
+        "orders": [
+          {
+            "id": "COUPON-1003",
+            "status": "paid",
+            "paidCents": 7980,
+            "refundedCents": 0,
+            "couponStatuses": [
+              "expired"
+            ]
+          }
+        ],
+        "evidenceIds": [
+          "KB-REFUND-EXPIRED",
+          "KB-REFUND-UNUSED",
+          "KB-REFUND-PARTIAL",
+          "KB-REFUND-REDEEMED",
+          "KB-PRODUCT-LUNCH"
+        ]
+      },
+      "actualWebTextSha256": "f1144cfb605b633af06ca6df45be04133eaf4be3fc226f32bba2edae27fed995",
+      "sentDeltaText": "仅回答规则，不执行任何操作。本轮已重新读取 COUPON-1003 并查询适用规则。\n\n订单当前事实：云味餐厅演示店（虚构）· 双人午餐团购券 × 1，状态 paid，实付 79.80 元（7980 分，支付 succeeded），券 CP-1003-1 状态 expired，有效期 2026-09-25，未核销，refunds 为空、已退金额 0.00 元。\n\n你问的两项：\n\n1. 顺延有效期一个月：规则未提供依据。KB-REFUND-EXPIRED 明确说明知识库没有过期自动延期的政策，也没有门店/套餐级别的延期文档（本次查询仅命中 KB-PRODUCT-LUNCH 的套餐说明，不含延期条款）。所以不能承诺可以顺延，我也不编造门店承诺。\n\n2. 保证原金额退回：同样没有依据。KB-REFUND-EXPIRED 说明已过期未核销券需商家确认能否退款、延期以及金额；未过期券的规则（KB-REFUND-UNUSED，未核销可申请、金额不超实付）不适用于已过期券。因此无法保证原金额 79.80 元退回。\n\n由谁确认：按 KB-REFUND-EXPIRED，这两件事都需要商家确认，即由云味餐厅演示店（虚构）一方核实；系统侧我们只能查询和说明，当前也没有可用的联系商家或提交退款工具。若需推进，建议你自行向商家或测试管理员核实，不要按“自动退款/自动延期”预期。\n\n以上均为演示规则，不代表真实商家政策。",
+      "sentDeltaTextSha256": "f1144cfb605b633af06ca6df45be04133eaf4be3fc226f32bba2edae27fed995",
+      "sentDeltaCount": 355,
+      "firstDeltaMs": 4109.013708000002,
+      "durationMs": 6003,
+      "tools": [
+        {
+          "index": 2,
+          "name": "get_order",
+          "input": {
+            "orderId": "COUPON-1003"
+          },
+          "isError": false,
+          "durationMs": 11,
+          "output": {
+            "source": "demo-database",
+            "id": "COUPON-1003",
+            "status": "paid",
+            "asOf": "2026-10-11T07:39:43.625Z",
+            "amounts": {
+              "totalCents": 7980,
+              "paidCents": 7980,
+              "refundedCents": 0
+            },
+            "createdAt": "2026-08-26T09:01:49.891Z",
+            "paidAt": "2026-08-26T09:01:49.891Z",
+            "shop": {
+              "id": "shop-demo-1",
+              "name": "云味餐厅演示店（虚构）",
+              "merchantName": "演示餐饮商家（虚构）",
+              "address": "虚拟市演示路 1 号（非真实地址）"
+            },
+            "items": [
+              {
+                "id": "item-1003",
+                "productId": "product-demo-1",
+                "productName": "双人午餐团购券",
+                "quantity": 1,
+                "unitPriceCents": 7980,
+                "totalCents": 7980
+              }
+            ],
+            "coupons": [
+              {
+                "id": "CP-1003-1",
+                "orderItemId": "item-1003",
+                "status": "expired",
+                "expiresAt": "2026-09-25T09:01:49.891Z",
+                "redeemedAt": null,
+                "redeemedShopId": null
+              }
+            ],
+            "payments": [
+              {
+                "status": "succeeded",
+                "amountCents": 7980,
+                "paidAt": "2026-08-26T09:01:49.891Z"
+              }
+            ],
+            "refunds": []
+          }
+        },
+        {
+          "index": 4,
+          "name": "search_faq",
+          "input": {
+            "productId": "product-demo-1",
+            "query": "已过期未核销券 延期一个月 原金额退回 谁确认",
+            "shopId": "shop-demo-1"
+          },
+          "isError": false,
+          "durationMs": 5,
+          "output": [
+            {
+              "source": "demo-knowledge",
+              "sourceId": "KB-REFUND-EXPIRED",
+              "title": "过期团购券售后规则",
+              "body": "【演示规则】已过期但未核销的券需要商家确认能否退款、延期以及金额。知识库未提供过期自动退款或自动延期政策。不得把未过期券的规则套用到过期券，也不能自行编造门店承诺。当前助手只提供查询和说明。",
+              "scope": {
+                "shopId": null,
+                "productId": null
+              }
+            },
+            {
+              "source": "demo-knowledge",
+              "sourceId": "KB-REFUND-UNUSED",
+              "title": "未核销且未过期团购券退款规则",
+              "body": "【演示规则】已支付、未核销且尚未过期的团购券可以申请退款。必须先查本人订单确认支付、核销和有效期；可申请金额不超过尚未消费且未退款的实付金额。退款申请资格不等于商家已经批准或资金已经退回。当前助手只能查询与说明，不能申请、联系商家或执行退款。",
+              "scope": {
+                "shopId": null,
+                "productId": null
+              }
+            },
+            {
+              "source": "demo-knowledge",
+              "sourceId": "KB-REFUND-PARTIAL",
+              "title": "部分核销订单退款规则",
+              "body": "【演示规则】同一订单有多张券时必须逐券核对。未核销、未过期、未退款部分可申请的金额按对应券的实付单价计算；已核销部分需商家另行核实，不能按整单实付金额承诺退款。查询工具提供的金额只是演示规则下的申请上限，尚未提交或完成退款。",
+              "scope": {
+                "shopId": null,
+                "productId": null
+              }
+            },
+            {
+              "source": "demo-knowledge",
+              "sourceId": "KB-REFUND-REDEEMED",
+              "title": "已核销团购券售后规则",
+              "body": "【演示规则】已经核销的团购券不适用未核销自动退款规则，需由商家核实实际消费与售后原因后决定。没有商家核实结果时不能承诺可退、不可退或具体金额。当前助手无法联系商家或提交退款，只能解释规则并建议用户自行咨询商家。",
+              "scope": {
+                "shopId": null,
+                "productId": null
+              }
+            },
+            {
+              "source": "demo-knowledge",
+              "sourceId": "KB-PRODUCT-LUNCH",
+              "title": "双人午餐套餐说明",
+              "body": "【演示规则】双人午餐团购券标价79.80元，一张券对应两人午餐套餐，核销一次即视为整张券已使用。每张券具体截止时间以订单返回的 expiresAt 为准，不能从标价推断实付金额。菜品明细、过敏原和特殊节假日可用性未录入。",
+              "scope": {
+                "shopId": "shop-demo-1",
+                "productId": "product-demo-1"
+              }
+            }
+          ]
+        }
+      ],
+      "modelTasks": [
+        {
+          "version": "model-task-v1",
+          "requestIdHash": "f27da390d1615450dd107db103ffd27e6844497e25a14ab702083ff6d2e94e74",
+          "entrypoint": "web",
+          "trigger": "user",
+          "limits": {
+            "httpRequests": 12,
+            "contextBudgetUnits": 65536
+          },
+          "startedAt": "2026-10-11T07:39:42.159Z",
+          "durationMs": 6007,
+          "status": "completed",
+          "phase": "receipt",
+          "failurePhase": null,
+          "failureReason": null,
+          "logicalCalls": 3,
+          "localCalls": 0,
+          "httpRequests": 3,
+          "blockedRequests": 0,
+          "knownTokens": 16923,
+          "unknownUsageAttempts": 0,
+          "totalTokens": 16923,
+          "knownCostUsd": 0.001094424,
+          "knownCostCny": 0,
+          "unknownCostAttempts": 0,
+          "attempts": [
+            {
+              "logicalCall": 1,
+              "attempt": 1,
+              "phase": "agent",
+              "provider": "deepseek",
+              "model": "deepseek-flash",
+              "observedAt": "2026-10-11T07:39:42.161Z",
+              "durationMs": 1459,
+              "httpStatus": 200,
+              "outcome": "completed",
+              "usage": {
+                "inputTokens": 259,
+                "outputTokens": 59,
+                "cacheReadTokens": 4736,
+                "cacheWriteTokens": 0,
+                "totalTokens": 5054
+              },
+              "currency": "USD",
+              "pricingSource": "Pi model catalog",
+              "estimatedCostUsd": 0.000176916,
+              "estimatedCostCny": null
+            },
+            {
+              "logicalCall": 2,
+              "attempt": 1,
+              "phase": "agent",
+              "provider": "deepseek",
+              "model": "deepseek-flash",
+              "observedAt": "2026-10-11T07:39:43.636Z",
+              "durationMs": 1560,
+              "httpStatus": 200,
+              "outcome": "completed",
+              "usage": {
+                "inputTokens": 376,
+                "outputTokens": 95,
+                "cacheReadTokens": 4992,
+                "cacheWriteTokens": 0,
+                "totalTokens": 5463
+              },
+              "currency": "USD",
+              "pricingSource": "Pi model catalog",
+              "estimatedCostUsd": 0.000256752,
+              "estimatedCostCny": null
+            },
+            {
+              "logicalCall": 3,
+              "attempt": 1,
+              "phase": "agent",
+              "provider": "deepseek",
+              "model": "deepseek-flash",
+              "observedAt": "2026-10-11T07:39:45.205Z",
+              "durationMs": 2954,
+              "httpStatus": 200,
+              "outcome": "completed",
+              "usage": {
+                "inputTokens": 675,
+                "outputTokens": 355,
+                "cacheReadTokens": 5376,
+                "cacheWriteTokens": 0,
+                "totalTokens": 6406
+              },
+              "currency": "USD",
+              "pricingSource": "Pi model catalog",
+              "estimatedCostUsd": 0.000660756,
+              "estimatedCostCny": null
+            }
+          ],
+          "contextChecks": [
+            {
+              "logicalCall": 1,
+              "attempt": 1,
+              "phase": "agent",
+              "policy": "utf8-byte-plus-output-v1",
+              "decision": "allowed",
+              "payloadBytes": 21449,
+              "outputTokenField": "max_tokens",
+              "outputReserve": 2048,
+              "safetyUnits": 1024,
+              "requiredUnits": 24521,
+              "applicationLimit": 65536,
+              "catalogContextWindow": 1000000,
+              "effectiveLimit": 65536,
+              "projection": null
+            },
+            {
+              "logicalCall": 2,
+              "attempt": 1,
+              "phase": "agent",
+              "policy": "utf8-byte-plus-output-v1",
+              "decision": "allowed",
+              "payloadBytes": 22743,
+              "outputTokenField": "max_tokens",
+              "outputReserve": 2048,
+              "safetyUnits": 1024,
+              "requiredUnits": 25815,
+              "applicationLimit": 65536,
+              "catalogContextWindow": 1000000,
+              "effectiveLimit": 65536,
+              "projection": null
+            },
+            {
+              "logicalCall": 3,
+              "attempt": 1,
+              "phase": "agent",
+              "policy": "utf8-byte-plus-output-v1",
+              "decision": "allowed",
+              "payloadBytes": 25633,
+              "outputTokenField": "max_tokens",
+              "outputReserve": 2048,
+              "safetyUnits": 1024,
+              "requiredUnits": 28705,
+              "applicationLimit": 65536,
+              "catalogContextWindow": 1000000,
+              "effectiveLimit": 65536,
+              "projection": null
+            }
+          ]
+        }
+      ],
+      "retries": [],
+      "beforeSnapshotSha256": "c317ed5ce4c4b77e7d59dc5b820833ef753bdb8ca14f56cccb494bb36f854615",
+      "afterSnapshotSha256": "447eef08341279de9a7a115252a4328c747ae1b58638b91965f32149a4e2a0bf"
+    },
+    {
+      "id": "missing-1",
+      "caseId": "missing",
+      "turn": 1,
+      "question": "我想拿一张券安排亲友聚餐，需要核对能供几人以及法定节假日能否使用，但还没说是哪份券。你先告诉我需要补什么，不要代我选订单。",
+      "execution": "completed",
+      "reason": null,
+      "engineeringChecks": [
+        {
+          "id": "transport.completed",
+          "passed": true
+        },
+        {
+          "id": "capture.complete",
+          "passed": true
+        },
+        {
+          "id": "transport.real-delta",
+          "passed": true
+        },
+        {
+          "id": "tools.read-only",
+          "passed": true
+        },
+        {
+          "id": "state.unchanged",
+          "passed": true
+        },
+        {
+          "id": "rules.unchanged",
+          "passed": true
+        },
+        {
+          "id": "rules.frozen-corpus",
+          "passed": true
+        },
+        {
+          "id": "trace.frozen-orders",
+          "passed": true
+        },
+        {
+          "id": "trace.no-auto-selection",
+          "passed": true
+        },
+        {
+          "id": "reply.no-auto-selection",
+          "passed": true
+        },
+        {
+          "id": "accounting.production",
+          "passed": true
+        }
+      ],
+      "answerPassed": true,
+      "jointPassed": true,
+      "semanticChecks": [
+        {
+          "id": "local-1",
+          "criterion": "要求补充订单号或明确具体套餐；允许展示本人订单列表，但不能代选",
+          "status": "passed",
+          "finalReplyStatus": "passed",
+          "sentDeltaStatus": "not_applicable",
+          "evidence": [
+            "涉及具体订单时请提供订单号"
+          ],
+          "note": "只有最终澄清notice，无工具调用、无delta；不能据此声称流式回答完成。"
+        },
+        {
+          "id": "local-2",
+          "criterion": "没有猜定某套餐的人数、节假日可用性或具体券的当前状态",
+          "status": "passed",
+          "finalReplyStatus": "passed",
+          "sentDeltaStatus": "not_applicable",
+          "evidence": [
+            "本轮尚未取得最新订单或适用规则依据，不能确认办理条件或结果"
+          ],
+          "note": "只有最终澄清notice，无工具调用、无delta；不能据此声称流式回答完成。"
+        },
+        {
+          "id": "common-1",
+          "criterion": "仅使用本轮允许读取的事实与适用规则；最终Reply和已发送SSE文字都不得无依据扩展承诺",
+          "status": "passed",
+          "finalReplyStatus": "passed",
+          "sentDeltaStatus": "not_applicable",
+          "evidence": [
+            "涉及具体订单时请提供订单号"
+          ],
+          "note": "只有最终澄清notice，无工具调用、无delta；不能据此声称流式回答完成。"
+        },
+        {
+          "id": "common-2",
+          "criterion": "不得声称商家联系、预约、退款或核销写入已发生；Web仍只读",
+          "status": "passed",
+          "finalReplyStatus": "passed",
+          "sentDeltaStatus": "not_applicable",
+          "evidence": [
+            "本轮尚未取得最新订单或适用规则依据，不能确认办理条件或结果"
+          ],
+          "note": "只有最终澄清notice，无工具调用、无delta；不能据此声称流式回答完成。"
+        }
+      ],
+      "actualWebReply": {
+        "kind": "notice",
+        "text": "你好，请写明要咨询的问题；涉及具体订单时请提供订单号。本轮尚未取得最新订单或适用规则依据，不能确认办理条件或结果。"
+      },
+      "actualWebTextSha256": "eaedc6e567efd8bdd57e9b24eb7d0d077c9db6733b1f58478cb8e6b17bf0de3d",
+      "sentDeltaText": "",
+      "sentDeltaTextSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sentDeltaCount": 0,
+      "firstDeltaMs": null,
+      "durationMs": 2112,
+      "tools": [],
+      "modelTasks": [
+        {
+          "version": "model-task-v1",
+          "requestIdHash": "45ef30d4c4728fe455a1e1f2060a2ca534fc94e26af6d097884ff62acddbe255",
+          "entrypoint": "web",
+          "trigger": "user",
+          "limits": {
+            "httpRequests": 12,
+            "contextBudgetUnits": 65536
+          },
+          "startedAt": "2026-10-11T07:39:48.226Z",
+          "durationMs": 2114,
+          "status": "completed",
+          "phase": "receipt",
+          "failurePhase": null,
+          "failureReason": null,
+          "logicalCalls": 1,
+          "localCalls": 0,
+          "httpRequests": 1,
+          "blockedRequests": 0,
+          "knownTokens": 3658,
+          "unknownUsageAttempts": 0,
+          "totalTokens": 3658,
+          "knownCostUsd": 0.00021076799999999999,
+          "knownCostCny": 0,
+          "unknownCostAttempts": 0,
+          "attempts": [
+            {
+              "logicalCall": 1,
+              "attempt": 1,
+              "phase": "agent",
+              "provider": "deepseek",
+              "model": "deepseek-flash",
+              "observedAt": "2026-10-11T07:39:48.229Z",
+              "durationMs": 2108,
+              "httpStatus": 200,
+              "outcome": "completed",
+              "usage": {
+                "inputTokens": 228,
+                "outputTokens": 102,
+                "cacheReadTokens": 3328,
+                "cacheWriteTokens": 0,
+                "totalTokens": 3658
+              },
+              "currency": "USD",
+              "pricingSource": "Pi model catalog",
+              "estimatedCostUsd": 0.00021076799999999999,
+              "estimatedCostCny": null
+            }
+          ],
+          "contextChecks": [
+            {
+              "logicalCall": 1,
+              "attempt": 1,
+              "phase": "agent",
+              "policy": "utf8-byte-plus-output-v1",
+              "decision": "allowed",
+              "payloadBytes": 15618,
+              "outputTokenField": "max_tokens",
+              "outputReserve": 2048,
+              "safetyUnits": 1024,
+              "requiredUnits": 18690,
+              "applicationLimit": 65536,
+              "catalogContextWindow": 1000000,
+              "effectiveLimit": 65536,
+              "projection": null
+            }
+          ]
+        }
+      ],
+      "retries": [],
+      "beforeSnapshotSha256": "f5d5765feb8e34535d53fc9eae66a0542f064bed09d57eebe23a895d2e9a612d",
+      "afterSnapshotSha256": "14e63ebf3a48697be16bd6bfeecaeee14e9ba985abb09ed3ee891de8443adcfe"
+    },
+    {
+      "id": "missing-2",
+      "caseId": "missing",
+      "turn": 2,
+      "question": "是 COUPON-1008 的私享套餐，我想四个人在法定节假日共用一张。请分别说明人数和节假日这两项是否有资料依据；缺少的内容应由我找谁核实？",
+      "execution": "completed",
+      "reason": null,
+      "engineeringChecks": [
+        {
+          "id": "transport.completed",
+          "passed": true
+        },
+        {
+          "id": "capture.complete",
+          "passed": true
+        },
+        {
+          "id": "transport.real-delta",
+          "passed": true
+        },
+        {
+          "id": "tools.read-only",
+          "passed": true
+        },
+        {
+          "id": "state.unchanged",
+          "passed": true
+        },
+        {
+          "id": "rules.unchanged",
+          "passed": true
+        },
+        {
+          "id": "trace.current-order",
+          "passed": true
+        },
+        {
+          "id": "reply.current-order",
+          "passed": true
+        },
+        {
+          "id": "trace.required-sources",
+          "passed": true
+        },
+        {
+          "id": "reply.required-sources",
+          "passed": true
+        },
+        {
+          "id": "rules.frozen-corpus",
+          "passed": true
+        },
+        {
+          "id": "trace.frozen-orders",
+          "passed": true
+        },
+        {
+          "id": "accounting.production",
+          "passed": true
+        }
+      ],
+      "answerPassed": true,
+      "jointPassed": true,
+      "semanticChecks": [
+        {
+          "id": "local-1",
+          "criterion": "当前对象是1008私享套餐；现有资料不能确认一张供四人",
+          "status": "passed",
+          "finalReplyStatus": "passed",
+          "sentDeltaStatus": "passed",
+          "evidence": [
+            "订单 COUPON-1008",
+            "套餐 私享套餐团购券",
+            "无法确认是否能 4 人共用一张"
+          ],
+          "note": "实际正文和已送流式文本一致；结合本轮查单/来源未发现无依据承诺或本轮写入声明。"
+        },
+        {
+          "id": "local-2",
+          "criterion": "明确法定节假日及私享限制缺资料，不套用常规午餐、晚餐或周末规则，不把未知说成确定禁止",
+          "status": "passed",
+          "finalReplyStatus": "passed",
+          "sentDeltaStatus": "passed",
+          "evidence": [
+            "法定节假日、特殊活动和私享套餐使用限制没有录入",
+            "这两项目前都缺少可引用的规则依据"
+          ],
+          "note": "实际正文和已送流式文本一致；结合本轮查单/来源未发现无依据承诺或本轮写入声明。"
+        },
+        {
+          "id": "local-3",
+          "criterion": "对人数与节假日分别给出未知边界并建议用户自行问商家；未声称已联系或已预约",
+          "status": "passed",
+          "finalReplyStatus": "passed",
+          "sentDeltaStatus": "passed",
+          "evidence": [
+            "请你自己向该商家核实私享套餐的适用人数和节假日使用限制",
+            "我目前不能预约、外呼或查询实时库存"
+          ],
+          "note": "实际正文和已送流式文本一致；结合本轮查单/来源未发现无依据承诺或本轮写入声明。"
+        },
+        {
+          "id": "common-1",
+          "criterion": "仅使用本轮允许读取的事实与适用规则；最终Reply和已发送SSE文字都不得无依据扩展承诺",
+          "status": "passed",
+          "finalReplyStatus": "passed",
+          "sentDeltaStatus": "passed",
+          "evidence": [
+            "订单 COUPON-1008"
+          ],
+          "note": "实际正文和已送流式文本一致；结合本轮查单/来源未发现无依据承诺或本轮写入声明。"
+        },
+        {
+          "id": "common-2",
+          "criterion": "不得声称商家联系、预约、退款或核销写入已发生；Web仍只读",
+          "status": "passed",
+          "finalReplyStatus": "passed",
+          "sentDeltaStatus": "passed",
+          "evidence": [
+            "我目前不能预约、外呼或查询实时库存"
+          ],
+          "note": "实际正文和已送流式文本一致；结合本轮查单/来源未发现无依据承诺或本轮写入声明。"
+        }
+      ],
+      "actualWebReply": {
+        "kind": "order",
+        "text": "已按本轮查询核对（订单 COUPON-1008，门店 云味餐厅演示店（虚构），套餐 私享套餐团购券）：\n\n订单现状：已支付 99.80 元（实付与订单总额一致），券 1 张，状态 unused 未核销，有效期至 2026-10-31，历史已退金额 0.00 元。\n\n两项规则的资料依据：\n1. 人数（能否供 4 人共用一张）：KB-SHOP-DEMO-1 未录入私享套餐的就餐人数或人数上限规则，因此无法确认是否能 4 人共用一张。\n2. 法定节假日能否使用：同一份 KB-SHOP-DEMO-1 明确说明该门店的法定节假日、特殊活动和私享套餐使用限制没有录入，仅提到常规午餐与晚餐套餐允许普通周末使用，并要求到店前自行与商家确认接待情况。\n\n所以这两项目前都缺少可引用的规则依据，我不能给出结论或替代商家承诺。\n\n缺少部分的核实途径：请你自己向该商家核实私享套餐的适用人数和节假日使用限制，或请测试管理员协助核实规则是否有补充。另外提醒，我目前不能预约、外呼或查询实时库存，聚餐安排需你自行与商家确认。",
+        "orders": [
+          {
+            "id": "COUPON-1008",
+            "status": "paid",
+            "paidCents": 9980,
+            "refundedCents": 0,
+            "couponStatuses": [
+              "unused"
+            ]
+          }
+        ],
+        "evidenceIds": [
+          "KB-SHOP-DEMO-1",
+          "KB-REFUND-EXPIRED",
+          "KB-REFUND-REDEEMED"
+        ]
+      },
+      "actualWebTextSha256": "cb261869494cdd02eeddb55a38f6a96ccbaa0302ad5e3b4048b43d9d8d017103",
+      "sentDeltaText": "已按本轮查询核对（订单 COUPON-1008，门店 云味餐厅演示店（虚构），套餐 私享套餐团购券）：\n\n订单现状：已支付 99.80 元（实付与订单总额一致），券 1 张，状态 unused 未核销，有效期至 2026-10-31，历史已退金额 0.00 元。\n\n两项规则的资料依据：\n1. 人数（能否供 4 人共用一张）：KB-SHOP-DEMO-1 未录入私享套餐的就餐人数或人数上限规则，因此无法确认是否能 4 人共用一张。\n2. 法定节假日能否使用：同一份 KB-SHOP-DEMO-1 明确说明该门店的法定节假日、特殊活动和私享套餐使用限制没有录入，仅提到常规午餐与晚餐套餐允许普通周末使用，并要求到店前自行与商家确认接待情况。\n\n所以这两项目前都缺少可引用的规则依据，我不能给出结论或替代商家承诺。\n\n缺少部分的核实途径：请你自己向该商家核实私享套餐的适用人数和节假日使用限制，或请测试管理员协助核实规则是否有补充。另外提醒，我目前不能预约、外呼或查询实时库存，聚餐安排需你自行与商家确认。",
+      "sentDeltaTextSha256": "cb261869494cdd02eeddb55a38f6a96ccbaa0302ad5e3b4048b43d9d8d017103",
+      "sentDeltaCount": 276,
+      "firstDeltaMs": 4086.6815419999984,
+      "durationMs": 5842,
+      "tools": [
+        {
+          "index": 2,
+          "name": "get_order",
+          "input": {
+            "orderId": "COUPON-1008"
+          },
+          "isError": false,
+          "durationMs": 11,
+          "output": {
+            "source": "demo-database",
+            "id": "COUPON-1008",
+            "status": "paid",
+            "asOf": "2026-10-11T07:39:51.997Z",
+            "amounts": {
+              "totalCents": 9980,
+              "paidCents": 9980,
+              "refundedCents": 0
+            },
+            "createdAt": "2026-10-01T09:01:49.891Z",
+            "paidAt": "2026-10-01T09:01:49.891Z",
+            "shop": {
+              "id": "shop-demo-1",
+              "name": "云味餐厅演示店（虚构）",
+              "merchantName": "演示餐饮商家（虚构）",
+              "address": "虚拟市演示路 1 号（非真实地址）"
+            },
+            "items": [
+              {
+                "id": "item-1008",
+                "productId": "product-demo-3",
+                "productName": "私享套餐团购券",
+                "quantity": 1,
+                "unitPriceCents": 9980,
+                "totalCents": 9980
+              }
+            ],
+            "coupons": [
+              {
+                "id": "CP-1008-1",
+                "orderItemId": "item-1008",
+                "status": "unused",
+                "expiresAt": "2026-10-31T09:01:49.891Z",
+                "redeemedAt": null,
+                "redeemedShopId": null
+              }
+            ],
+            "payments": [
+              {
+                "status": "succeeded",
+                "amountCents": 9980,
+                "paidAt": "2026-10-01T09:01:49.891Z"
+              }
+            ],
+            "refunds": []
+          }
+        },
+        {
+          "index": 4,
+          "name": "search_faq",
+          "input": {
+            "query": "私享套餐适用人数 法定节假日能否使用",
+            "shopId": "shop-demo-1",
+            "productId": "product-demo-3"
+          },
+          "isError": false,
+          "durationMs": 7,
+          "output": [
+            {
+              "source": "demo-knowledge",
+              "sourceId": "KB-SHOP-DEMO-1",
+              "title": "演示门店使用与预约说明",
+              "body": "【演示规则】云味餐厅演示店为虚构餐饮门店，演示地址为虚拟市演示路1号。常规午餐与晚餐套餐允许普通周末使用，到店前需用户自行与商家确认接待情况；助手目前不能预约、外呼、查询实时库存或安排接待。法定节假日、特殊活动和私享套餐使用限制没有录入，遇到这些问题应明确规则缺失并建议向商家核实。",
+              "scope": {
+                "shopId": "shop-demo-1",
+                "productId": null
+              }
+            },
+            {
+              "source": "demo-knowledge",
+              "sourceId": "KB-REFUND-EXPIRED",
+              "title": "过期团购券售后规则",
+              "body": "【演示规则】已过期但未核销的券需要商家确认能否退款、延期以及金额。知识库未提供过期自动退款或自动延期政策。不得把未过期券的规则套用到过期券，也不能自行编造门店承诺。当前助手只提供查询和说明。",
+              "scope": {
+                "shopId": null,
+                "productId": null
+              }
+            },
+            {
+              "source": "demo-knowledge",
+              "sourceId": "KB-REFUND-REDEEMED",
+              "title": "已核销团购券售后规则",
+              "body": "【演示规则】已经核销的团购券不适用未核销自动退款规则，需由商家核实实际消费与售后原因后决定。没有商家核实结果时不能承诺可退、不可退或具体金额。当前助手无法联系商家或提交退款，只能解释规则并建议用户自行咨询商家。",
+              "scope": {
+                "shopId": null,
+                "productId": null
+              }
+            }
+          ]
+        }
+      ],
+      "modelTasks": [
+        {
+          "version": "model-task-v1",
+          "requestIdHash": "0961fa469aafaaa1dadcb536bee6f292e4cd47c66d77eb4b90c9e8b758f17f0d",
+          "entrypoint": "web",
+          "trigger": "user",
+          "limits": {
+            "httpRequests": 12,
+            "contextBudgetUnits": 65536
+          },
+          "startedAt": "2026-10-11T07:39:50.369Z",
+          "durationMs": 5846,
+          "status": "completed",
+          "phase": "receipt",
+          "failurePhase": null,
+          "failureReason": null,
+          "logicalCalls": 3,
+          "localCalls": 0,
+          "httpRequests": 3,
+          "blockedRequests": 0,
+          "knownTokens": 12683,
+          "unknownUsageAttempts": 0,
+          "totalTokens": 12683,
+          "knownCostUsd": 0.000860484,
+          "knownCostCny": 0,
+          "unknownCostAttempts": 0,
+          "attempts": [
+            {
+              "logicalCall": 1,
+              "attempt": 1,
+              "phase": "agent",
+              "provider": "deepseek",
+              "model": "deepseek-flash",
+              "observedAt": "2026-10-11T07:39:50.371Z",
+              "durationMs": 1621,
+              "httpStatus": 200,
+              "outcome": "completed",
+              "usage": {
+                "inputTokens": 247,
+                "outputTokens": 43,
+                "cacheReadTokens": 3456,
+                "cacheWriteTokens": 0,
+                "totalTokens": 3746
+              },
+              "currency": "USD",
+              "pricingSource": "Pi model catalog",
+              "estimatedCostUsd": 0.00014643599999999998,
+              "estimatedCostCny": null
+            },
+            {
+              "logicalCall": 2,
+              "attempt": 1,
+              "phase": "agent",
+              "provider": "deepseek",
+              "model": "deepseek-flash",
+              "observedAt": "2026-10-11T07:39:52.007Z",
+              "durationMs": 1263,
+              "httpStatus": 200,
+              "outcome": "completed",
+              "usage": {
+                "inputTokens": 348,
+                "outputTokens": 89,
+                "cacheReadTokens": 3712,
+                "cacheWriteTokens": 0,
+                "totalTokens": 4149
+              },
+              "currency": "USD",
+              "pricingSource": "Pi model catalog",
+              "estimatedCostUsd": 0.00023347199999999998,
+              "estimatedCostCny": null
+            },
+            {
+              "logicalCall": 3,
+              "attempt": 1,
+              "phase": "agent",
+              "provider": "deepseek",
+              "model": "deepseek-flash",
+              "observedAt": "2026-10-11T07:39:53.282Z",
+              "durationMs": 2927,
+              "httpStatus": 200,
+              "outcome": "completed",
+              "usage": {
+                "inputTokens": 416,
+                "outputTokens": 276,
+                "cacheReadTokens": 4096,
+                "cacheWriteTokens": 0,
+                "totalTokens": 4788
+              },
+              "currency": "USD",
+              "pricingSource": "Pi model catalog",
+              "estimatedCostUsd": 0.00048057600000000003,
+              "estimatedCostCny": null
+            }
+          ],
+          "contextChecks": [
+            {
+              "logicalCall": 1,
+              "attempt": 1,
+              "phase": "agent",
+              "policy": "utf8-byte-plus-output-v1",
+              "decision": "allowed",
+              "payloadBytes": 16414,
+              "outputTokenField": "max_tokens",
+              "outputReserve": 2048,
+              "safetyUnits": 1024,
+              "requiredUnits": 19486,
+              "applicationLimit": 65536,
+              "catalogContextWindow": 1000000,
+              "effectiveLimit": 65536,
+              "projection": null
+            },
+            {
+              "logicalCall": 2,
+              "attempt": 1,
+              "phase": "agent",
+              "policy": "utf8-byte-plus-output-v1",
+              "decision": "allowed",
+              "payloadBytes": 17628,
+              "outputTokenField": "max_tokens",
+              "outputReserve": 2048,
+              "safetyUnits": 1024,
+              "requiredUnits": 20700,
+              "applicationLimit": 65536,
+              "catalogContextWindow": 1000000,
+              "effectiveLimit": 65536,
+              "projection": null
+            },
+            {
+              "logicalCall": 3,
+              "attempt": 1,
+              "phase": "agent",
+              "policy": "utf8-byte-plus-output-v1",
+              "decision": "allowed",
+              "payloadBytes": 19567,
+              "outputTokenField": "max_tokens",
+              "outputReserve": 2048,
+              "safetyUnits": 1024,
+              "requiredUnits": 22639,
+              "applicationLimit": 65536,
+              "catalogContextWindow": 1000000,
+              "effectiveLimit": 65536,
+              "projection": null
+            }
+          ]
+        }
+      ],
+      "retries": [],
+      "beforeSnapshotSha256": "05f7f56d04d497e98bcbb935bced0680283b9956541f852c3c30ad512aa753a6",
+      "afterSnapshotSha256": "1013c3f38293cfeab4c949a97670bef00f06858888e568bb2ca3d6b8ddd154a9"
+    }
+  ]
+}

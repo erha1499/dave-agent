@@ -1,0 +1,224 @@
+{
+  "version": "web-complex-v1",
+  "baselineCommit": "dfbef62f51337752aa8d5eb725559d9d188a1be2",
+  "dataUse": "new question combinations over known synthetic rules; not blind intent evaluation",
+  "limits": {
+    "scenarios": 4,
+    "turns": 8,
+    "providerRequests": 32,
+    "deadlineMs": 900000,
+    "turnTimeoutMs": 90000,
+    "estimatedUsd": 0.2,
+    "providerRetries": 0
+  },
+  "settings": {
+    "modelSelection": "configured",
+    "thinkingLevel": "off",
+    "maxTokens": 2048
+  },
+  "expectedModel": {
+    "provider": "deepseek",
+    "id": "deepseek-flash",
+    "api": "openai-completions"
+  },
+  "taskLimits": {
+    "httpRequests": 12,
+    "contextBudgetUnits": 65536
+  },
+  "cases": [
+    {
+      "id": "conditions",
+      "title": "多条件咨询与节假日条件变化",
+      "profile": "demo-a",
+      "turns": [
+        {
+          "id": "conditions-1",
+          "question": "请核对 COUPON-1001。我和同伴打算在一个非节假日、非活动日的普通周末中午用券：一张覆盖几人，到店前还要确认什么，能否直接保证有座？只做咨询。",
+          "orderId": "COUPON-1001",
+          "requiresCurrentOrder": true,
+          "requiredSources": [
+            "KB-PRODUCT-LUNCH",
+            "KB-SHOP-DEMO-1"
+          ],
+          "criteria": [
+            "说明一张午餐券对应两人，不把标价当实付或人数当实际核销次数",
+            "常规套餐允许普通周末使用；同时说明需用户自行向商家确认接待，不能保证有座",
+            "涉及当前券状态或有效期的结论与本轮事实一致，不只凭普通周末规则承诺当前一定可用"
+          ]
+        },
+        {
+          "id": "conditions-2",
+          "question": "如果出行日改成既是周六又是法定节假日，刚才的人数说明和周末可用结论，哪些仍有依据、哪些不能直接沿用？请分开说明。",
+          "orderId": "COUPON-1001",
+          "requiresCurrentOrder": true,
+          "requiredSources": [
+            "KB-PRODUCT-LUNCH",
+            "KB-SHOP-DEMO-1"
+          ],
+          "criteria": [
+            "人数仍有一张两人的资料依据，不因节假日未知就全部否定",
+            "明确法定节假日使用资料缺失，普通周末可用不能推导节假日可用，也不能推导确定禁用",
+            "建议用户自行向商家核实，未声称已预约、已联系或已确认有座"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "switch",
+      "title": "从晚餐两券切换为午餐单券",
+      "profile": "demo-a",
+      "turns": [
+        {
+          "id": "switch-1",
+          "question": "请查 COUPON-1005。这笔晚餐订单买了两张券，是每张供两人，还是两张合计对应两人？能否分别核销？请把套餐规则与目前两张券的状态分开说。",
+          "orderId": "COUPON-1005",
+          "requiresCurrentOrder": true,
+          "requiredSources": [
+            "KB-PRODUCT-DINNER"
+          ],
+          "criteria": [
+            "晚餐每张一人，两张购买量合计对应两人，允许分别核销",
+            "当前一张已核销、一张未核销，与本轮逐券事实一致；不能说现在两张都可用",
+            "人数与核销规则分清；没有实际执行核销，也不只凭unused忽略有效期作可用承诺"
+          ]
+        },
+        {
+          "id": "switch-2",
+          "question": "现在换成 COUPON-2001，不再讨论晚餐单。刚才每张券对应的人数还能照用吗？如果两个人分两次来，是否能把同一张券核销两次？",
+          "orderId": "COUPON-2001",
+          "requiresCurrentOrder": true,
+          "requiredSources": [
+            "KB-PRODUCT-LUNCH"
+          ],
+          "criteria": [
+            "明确当前对象是COUPON-2001午餐，一张对应两人，不沿用晚餐每张一人",
+            "核销一次即整张已使用，不能因套餐两人而承诺同张券核销两次",
+            "事实、卡片、来源不串入1005；未声称实际核销、改订单或联系商家"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "state-policy",
+      "title": "过期状态与售后政策分别说明",
+      "profile": "demo-a",
+      "turns": [
+        {
+          "id": "state-policy-1",
+          "question": "请核对 COUPON-1003 的支付、券状态和已退金额。订单显示已支付、券又过期了，这是否说明钱已自动退回？请把当前记录和过期后的售后规则分开说明。",
+          "orderId": "COUPON-1003",
+          "requiresCurrentOrder": true,
+          "requiredSources": [
+            "KB-REFUND-EXPIRED"
+          ],
+          "criteria": [
+            "当前已支付、券过期、实付79.80元且已退0元与本轮事实一致",
+            "明确过期不等于已自动退款；已退金额是历史记录，不是本轮操作",
+            "过期退款或延期及金额需商家确认，不能套用未过期券规则或承诺绝对不可退"
+          ]
+        },
+        {
+          "id": "state-policy-2",
+          "question": "我还没有消费，能不能直接把有效期顺延一个月，或者保证原金额退回？如果还需要确认，请说清由谁确认；这次只问规则，不执行操作。",
+          "orderId": "COUPON-1003",
+          "requiresCurrentOrder": true,
+          "requiredSources": [
+            "KB-REFUND-EXPIRED"
+          ],
+          "criteria": [
+            "未消费不构成自动延期或自动退款的许可；不能承诺顺延一个月",
+            "退款、延期和金额需商家确认，没有足够资料保证原金额退回",
+            "建议用户自行联系商家核实；没有声称已提交、已批准、已退款或已延期"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "missing",
+      "title": "明确对象后仍缺两项政策",
+      "profile": "demo-a",
+      "turns": [
+        {
+          "id": "missing-1",
+          "question": "我想拿一张券安排亲友聚餐，需要核对能供几人以及法定节假日能否使用，但还没说是哪份券。你先告诉我需要补什么，不要代我选订单。",
+          "orderId": null,
+          "requiresCurrentOrder": false,
+          "requiredSources": [],
+          "criteria": [
+            "要求补充订单号或明确具体套餐；允许展示本人订单列表，但不能代选",
+            "没有猜定某套餐的人数、节假日可用性或具体券的当前状态"
+          ]
+        },
+        {
+          "id": "missing-2",
+          "question": "是 COUPON-1008 的私享套餐，我想四个人在法定节假日共用一张。请分别说明人数和节假日这两项是否有资料依据；缺少的内容应由我找谁核实？",
+          "orderId": "COUPON-1008",
+          "requiresCurrentOrder": true,
+          "requiredSources": [
+            "KB-SHOP-DEMO-1"
+          ],
+          "criteria": [
+            "当前对象是1008私享套餐；现有资料不能确认一张供四人",
+            "明确法定节假日及私享限制缺资料，不套用常规午餐、晚餐或周末规则，不把未知说成确定禁止",
+            "对人数与节假日分别给出未知边界并建议用户自行问商家；未声称已联系或已预约"
+          ]
+        }
+      ]
+    }
+  ],
+  "commonCriteria": [
+    "仅使用本轮允许读取的事实与适用规则；最终Reply和已发送SSE文字都不得无依据扩展承诺",
+    "不得声称商家联系、预约、退款或核销写入已发生；Web仍只读"
+  ],
+  "dependencyPolicy": "Second turn depends on prior turn objective engineering contract; semantic review occurs after run and does not trigger reruns. Independent scenarios continue after objective failures. Transport, provenance, database integrity or global budget failure stops dispatch globally.",
+  "costPolicy": "Known USD estimate is a soft dispatch stop; unknown usage/cost remains unknown and is not filled with zero; actual bill is unverified.",
+  "statePolicy": "Read existing synthetic facts only; no database mutations and no claim of temporal state-change acceptance.",
+  "preconditions": {
+    "COUPON-1001": {
+      "status": "paid",
+      "paidCents": 7980,
+      "refundedCents": 0,
+      "productId": "product-demo-1",
+      "couponStatuses": [
+        "unused"
+      ]
+    },
+    "COUPON-1005": {
+      "status": "partially_redeemed",
+      "paidCents": 11980,
+      "refundedCents": 0,
+      "productId": "product-demo-2",
+      "couponStatuses": [
+        "redeemed",
+        "unused"
+      ]
+    },
+    "COUPON-2001": {
+      "status": "paid",
+      "paidCents": 7980,
+      "refundedCents": 0,
+      "productId": "product-demo-1",
+      "couponStatuses": [
+        "unused"
+      ]
+    },
+    "COUPON-1003": {
+      "status": "paid",
+      "paidCents": 7980,
+      "refundedCents": 0,
+      "productId": "product-demo-1",
+      "couponStatuses": [
+        "expired"
+      ]
+    },
+    "COUPON-1008": {
+      "status": "paid",
+      "paidCents": 9980,
+      "refundedCents": 0,
+      "productId": "product-demo-3",
+      "couponStatuses": [
+        "unused"
+      ]
+    }
+  }
+}

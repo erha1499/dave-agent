@@ -11,7 +11,7 @@ import { confirmMerchantReply, merchantSourceKey } from "./after-sales-entry.ts"
 import { RefundStore, readRefundDatabaseConfig } from "./refunds.ts";
 import { confirmRefundReply, markRefundReplyPresented } from "./refund-entry.ts";
 import { renderReply, type Reply } from "./reply.ts";
-import { replyFromTools, toolEvidenceFromEvent, type Evidence } from "./reply-from-tools.ts";
+import { replyFromTools, toolEvidenceFromEvent, type Evidence, type ReadOnlyOrderContext } from "./reply-from-tools.ts";
 import { cancelSupportTurn, createSupportSession, getSupportHostReceipt, getSupportResult, prepareSupportPrompt, readSupportArchitecture, readSupportContextMode, supportReply } from "./support-session.ts";
 import { ConversationStateStore } from "./conversation-state.ts";
 import { createKnowledgeService } from "./knowledge-service.ts";
@@ -53,6 +53,7 @@ export async function runCliPrompt(
   afterDeliver?: (reply: Reply) => Promise<void>,
   beforePrompt?: (text: string) => Promise<Reply | undefined>,
   preparedDiscovery?: { prompt: string; reply?: Reply },
+  readOnlyOrderContext?: ReadOnlyOrderContext,
 ) {
   return withModelTask({ requestId: randomUUID(), entrypoint: "cli",
     onComplete: summary => console.error(`[model-task] ${JSON.stringify(summary)}`) }, async task => {
@@ -94,7 +95,7 @@ export async function runCliPrompt(
     } finally { unsubscribe(); }
     task.setPhase("render");
     const assistantText = modelFailed ? "" : session.getLastAssistantText() ?? "未生成回复，请重试。";
-    const reply = supportReply(session, assistantText) ?? replyFromTools(assistantText, results, session.getActiveToolNames());
+    const reply = supportReply(session, assistantText) ?? replyFromTools(assistantText, results, session.getActiveToolNames(), readOnlyOrderContext);
     // Delivery failures do not re-enter the model fallback or retry any business action.
     const rendered = `客服：${renderReply(reply).text}\n`;
     task.setPhase("send");

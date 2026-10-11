@@ -4,6 +4,7 @@ import { isRefundOperation, type Reply } from "./reply.ts";
 
 type ToolResult = Extract<AgentSession["messages"][number], { role: "toolResult" }>;
 export type Evidence = Pick<ToolResult, "toolName" | "isError" | "content">;
+export type ReadOnlyOrderContext = { previousOrderIds: readonly string[]; requestedOrderIds: readonly string[]; allowOrderList?: boolean };
 const record = (value: unknown): value is Record<string, unknown> => !!value && typeof value === "object" && !Array.isArray(value);
 const cents = (value: unknown): value is number => Number.isSafeInteger(value) && Number(value) >= 0;
 const orderId = (value: unknown): value is string => typeof value === "string" && /^COUPON-\d{4}$/.test(value);
@@ -42,6 +43,7 @@ function readEvidence(results: readonly Evidence[]) {
   let refundFailed = false;
   const failed = new Set<string>();
   const orderScopes: Array<{ orderId: string; shopId: string; productIds: string[] }> = [];
+  const observedOrderIds = new Set<string>();
   const ruleScopes: Array<{ shopId: string | null; productId: string | null }> = [];
   let orderScopeKnown = true;
   let merchantEmpty = false;
@@ -77,11 +79,13 @@ function readEvidence(results: readonly Evidence[]) {
         orders.push({ id: row.id, status: row.status, paidCents: row.paidCents, refundedCents: row.refundedCents,
           couponStatuses: row.couponStatuses as string[], productName: row.productName, shopName: row.shopName,
           createdAt: row.createdAt, selectionText: `选择订单 ${row.id}` });
+        observedOrderIds.add(row.id);
       }
     } else if (result.toolName === "get_order") {
       if (!record(value) || value.source !== "demo-database" || !orderId(value.id) || typeof value.status !== "string"
         || !record(value.amounts) || !cents(value.amounts.paidCents) || !cents(value.amounts.refundedCents)
         || !Array.isArray(value.coupons) || !value.coupons.every(item => record(item) && typeof item.status === "string")) throw new Error();
+      observedOrderIds.add(value.id);
       // A new order snapshot needs rules read after it, including a reread of the same order.
       evidenceIds.clear(); ruleScopes.length = 0; documents.length = 0;
       merchant = undefined; refund = undefined; merchantEmpty = false; refundEmpty = false;
@@ -131,8 +135,24 @@ function readEvidence(results: readonly Evidence[]) {
     if (group === "order") failed.delete("list");
     if (group === "order" || group === "list") listFailed = false;
   }
-  return { orders, orderScopes, orderScopeKnown, ruleScopes, evidenceIds, documents, hasMore, listed, listFailed, merchant, refund, refundFailed,
+  return { orders, orderScopes, observedOrderIds, orderScopeKnown, ruleScopes, evidenceIds, documents, hasMore, listed, listFailed, merchant, refund, refundFailed,
     toolFailed: failed.size > 0, orderFailed: failed.has("order") || failed.has("list"), merchantEmpty, refundEmpty };
+}
+
+export function readOnlyEvidenceOrderIds(evidence: Evidence): string[] {
+  if (evidence.isError || !["get_order", "list_orders"].includes(evidence.toolName)) return [];
+  try { return [...readEvidence([evidence]).observedOrderIds]; } catch { return []; }
+}
+
+function matchesRequestedOrder(facts: ReturnType<typeof readEvidence>, context: ReadOnlyOrderContext) {
+  return context.requestedOrderIds.length === 1 && orderId(context.requestedOrderIds[0])
+    && facts.orders.length === 1 && facts.orders[0]!.id === context.requestedOrderIds[0]
+    && [...facts.observedOrderIds].every(id => id === context.requestedOrderIds[0]);
+}
+
+function allowsReadOnlyProse(facts: ReturnType<typeof readEvidence>, context?: ReadOnlyOrderContext) {
+  return !context || matchesRequestedOrder(facts, context)
+    && context.previousOrderIds.every(id => id === context.requestedOrderIds[0]);
 }
 
 function allowsBusinessText(value: ReturnType<typeof readEvidence>) {
@@ -147,11 +167,11 @@ function allowsBusinessText(value: ReturnType<typeof readEvidence>) {
     && value.orderScopes.every(order => order.productIds.every(productId => value.ruleScopes.some(rule => matches(rule, order, productId))));
 }
 
-export function canStreamBusinessText(results: readonly Evidence[]): boolean {
-  try { return allowsBusinessText(readEvidence(results)); } catch { return false; }
+export function canStreamBusinessText(results: readonly Evidence[], context?: ReadOnlyOrderContext): boolean {
+  try { const facts = readEvidence(results); return allowsReadOnlyProse(facts, context) && allowsBusinessText(facts); } catch { return false; }
 }
 
-export function replyFromTools(text: string, results: readonly Evidence[], activeToolNames: readonly string[] = ["get_order"]): Reply {
+export function replyFromTools(text: string, results: readonly Evidence[], activeToolNames: readonly string[] = ["get_order"], context?: ReadOnlyOrderContext): Reply {
   if (!activeToolNames.some(name => businessTools.includes(name))) return { kind: "answer", text };
   let facts: ReturnType<typeof readEvidence>;
   try { facts = readEvidence(results); }
@@ -161,6 +181,12 @@ export function replyFromTools(text: string, results: readonly Evidence[], activ
   const { orders, evidenceIds, hasMore, listed, listFailed, merchant, refund, refundFailed, toolFailed, merchantEmpty, refundEmpty } = facts;
   if (facts.orderFailed) return { kind: "notice", text: listFailed ? "最近订单暂时无法查询，请稍后重试或核对本人身份绑定。"
     : "本轮订单读取未能完成，无法继续展示该轮办理信息。仅支持当前客户本人订单，不能代查他人订单或披露其券状态、金额。请核对本人订单号或联系人工核实；不能据此判断操作是否执行。" };
+  if (context && (context.requestedOrderIds.length > 1
+    || new Set(context.previousOrderIds).size > 1 && context.requestedOrderIds.length !== 1
+    || (!listed || context.allowOrderList !== true || results.some(result => result.toolName === "get_order" && !result.isError))
+      && facts.observedOrderIds.size > 0 && !matchesRequestedOrder(facts, context))) {
+    return { kind: "notice", text: "请明确本次要咨询的一笔本人订单号；当前不能把不同订单的事实或规则合并答复。选择订单只用于定位，不会办理操作。" };
+  }
   if (refund) return refund;
   if (refundFailed) return { kind: "notice", text: "无法确认当前模拟退款状态，请在原会话按订单号重新查询，或联系测试管理员核实。" };
   if (refundEmpty) return { kind: "notice", text: "本轮未查到当前会话的退款方案。这个结果不能证明订单从未退款或真实资金是否到账；请按本人订单核对退款记录，必要时联系人工核实。" };
@@ -169,7 +195,10 @@ export function replyFromTools(text: string, results: readonly Evidence[], activ
   const hasRules = allowsBusinessText(facts);
   const orderText = hasRules ? activeToolNames.includes("get_merchant_request")
     ? "以下仅为本轮读取的订单事实。本轮尚未取得当前协商状态，不能沿用历史拒绝或批准，也不能确认退款方案；请继续查询当前协商结果。"
-    : text : "以下仅为本轮读取的订单事实。本轮未取得完整适用规则依据，不能据此判断退款资格或可退金额；如需办理，请继续核对规则。";
+    : allowsReadOnlyProse(facts, context) ? text
+      : "以下为本轮读取的订单事实和适用规则原文。其他订单的历史记录不能用于判断本单。金额、核销及退款状态是查询到的历史记录；本轮未办理退款、核销、延期、预约或联系商家。\n\n"
+        + facts.documents.map(document => `${document.title}（${document.sourceId}）\n${document.body}`).join("\n\n")
+    : "以下仅为本轮读取的订单事实。本轮未取得完整适用规则依据，不能据此判断退款资格或可退金额；如需办理，请继续核对规则。";
   if (orders.length || listed) return { kind: "order", text: !orders.length ? "当前客户没有订单记录。"
     : listed ? "这是本轮读取的本人最近订单，仅供选单；选择订单不会提交退款，办理条件仍须重新查询订单与适用规则。"
       : orderText,

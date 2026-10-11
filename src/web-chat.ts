@@ -5,7 +5,7 @@ import { createArrivalConsultation } from "./arrival-consultation.ts";
 import { runCliPrompt } from "./cli.ts";
 import { withModelTask, readModelTaskLimits } from "./model-request-budget.ts";
 import { renderReply, type Reply } from "./reply.ts";
-import { canStreamBusinessText, toolEvidenceFromEvent, type Evidence } from "./reply-from-tools.ts";
+import { canStreamBusinessText, readOnlyEvidenceOrderIds, toolEvidenceFromEvent, type Evidence, type ReadOnlyOrderContext } from "./reply-from-tools.ts";
 import { createOrderDiscovery } from "./order-discovery.ts";
 import { createWebChatSettingsCatalog, validateWebChatSettings, type WebChatSettings, type WebChatSettingsCatalog } from "./web-chat-settings.ts";
 import { chatTokenHash, WebChatError, WebChatHistory } from "./web-chat-history.ts";
@@ -36,6 +36,7 @@ type Entry = { public: PublicSession; identity: QQIdentity; messages: WebChatMes
   ownerToken: string; owner: string; tokenHash: string; binding: QQIdentityBinding;
   agent?: AgentSession; busy: boolean; active: boolean; abort?: AbortController;
   discovery: ReturnType<typeof createOrderDiscovery>;
+  knownOrderIds: Set<string>;
   turns: number };
 
 export class WebChatSessions {
@@ -128,7 +129,7 @@ export class WebChatSessions {
       ...(model.available ? {} : { modelUnavailableReason: "此对话的模型设置当前不可用，可查看记录、查询订单或新建对话选择模型。" }),
       profileId, label: profile.label, settings, model: saved.model }, identity,
       ownerToken: ownerCapability, owner, tokenHash: chatTokenHash(capability), binding,
-      discovery: createOrderDiscovery(this.store, identity),
+      discovery: createOrderDiscovery(this.store, identity), knownOrderIds: new Set(),
       messages: [], touched: Date.now(), busy: false, active: true, turns: 0 };
     this.entries.set(capability, entry);
     return { token: capability, ownerToken: ownerCapability, ...structuredClone({ session: entry.public, messages: entry.messages }) };
@@ -157,6 +158,7 @@ export class WebChatSessions {
       ...(modelAvailable ? {} : { modelUnavailableReason: "此对话的模型设置当前不可用或已变化，可查看记录、查询订单或新建对话选择模型。" }),
       profileId, label: webChatProfiles.find(row => row.id === profileId)!.label, settings, model: active.model },
       ownerToken, owner, tokenHash: chatTokenHash(capability), binding, identity, discovery: createOrderDiscovery(this.store, identity),
+      knownOrderIds: new Set(active.messages.flatMap(message => message.reply?.kind === "order" ? message.reply.orders.map(order => order.id) : [])),
       messages: active.messages, touched: Date.now(), busy: false, active: true, turns: active.turns };
     this.entries.set(capability, entry);
     return { token: capability, ownerToken, ...structuredClone({ session: entry.public, messages: entry.messages }) };
@@ -222,10 +224,17 @@ export class WebChatSessions {
       step("request", "受理咨询", "running");
       const processing = async (): Promise<WebChatResult> => {
         task.setPhase("host");
+        const previousOrderIds = Object.freeze([...entry.knownOrderIds]);
         const arrivalReply = preflight ? undefined : await createArrivalConsultation(this.store, { signal: abort.signal })(entry.identity, text);
         assertActive();
-        const prepared = preflight ?? (arrivalReply === undefined ? await entry.discovery.prepare(text) : { prompt: text, reply: arrivalReply });
-        const hostReply = prepared.reply;
+        let prepared = preflight ?? (arrivalReply === undefined ? await entry.discovery.prepare(text) : { prompt: text, reply: arrivalReply });
+        const explicitOrderIds = [...new Set(prepared.prompt.match(/\bCOUPON-\d{4}\b/gu) ?? [])];
+        const requestedOrderIds = Object.freeze(explicitOrderIds.length ? explicitOrderIds : previousOrderIds.length === 1 ? [...previousOrderIds] : []);
+        const readOnlyOrderContext: ReadOnlyOrderContext = { previousOrderIds, requestedOrderIds, allowOrderList: explicitOrderIds.length === 0 };
+        if (!explicitOrderIds.length && requestedOrderIds.length === 1)
+          prepared = { ...prepared, prompt: `${prepared.prompt}\n订单：${requestedOrderIds[0]}` };
+        const hostReply = prepared.reply ?? (explicitOrderIds.length > 1 || previousOrderIds.length > 1 && !explicitOrderIds.length
+          ? { kind: "notice" as const, text: "请明确本次要咨询的一笔本人订单号；当前不能把不同订单的事实或规则合并答复。选择订单只用于定位，不会办理操作。" } : undefined);
         assertActive();
         if (hostReply?.kind === "order") step("orders", "查询最近订单", "done");
         step("request", "受理咨询", "done");
@@ -254,7 +263,7 @@ export class WebChatSessions {
             if (!entry.active || abort.signal.aborted) return;
             if (event.type === "message_start" && event.message.role === "assistant") {
               messageId = `assistant-${++messages}`;
-              streamAllowed = canStreamBusinessText(currentEvidence);
+              streamAllowed = canStreamBusinessText(currentEvidence, readOnlyOrderContext);
               step(messageId, "整理答复", "running");
             } else if (event.type === "message_update" && event.assistantMessageEvent.type === "text_delta" && messageId && streamAllowed) {
               emit({ type: "delta", messageId, text: event.assistantMessageEvent.delta });
@@ -266,19 +275,23 @@ export class WebChatSessions {
               step(pending.id, pending.label, "running");
             } else if (event.type === "tool_execution_end") {
               const evidence = toolEvidenceFromEvent(event);
-              if (evidence) currentEvidence.push(evidence);
+              if (evidence) {
+                currentEvidence.push(evidence);
+                for (const id of readOnlyEvidenceOrderIds(evidence)) entry.knownOrderIds.add(id);
+              }
               const pending = pendingTools.get(event.toolCallId);
               if (pending) { step(pending.id, pending.label, event.isError ? "error" : "done"); pendingTools.delete(event.toolCallId); }
             }
           });
           // The existing atomic CLI driver owns the Pi prompt and actual tool-to-Reply conversion.
           task.setPhase("model");
-          reply = await runCliPrompt(entry.agent, text, async () => {}, undefined, undefined, prepared);
+          reply = await runCliPrompt(entry.agent, text, async () => {}, undefined, undefined, prepared, readOnlyOrderContext);
         }
         assertActive();
         task.setPhase("render");
         if (!["answer", "notice", "order"].includes(reply.kind)) throw new Error("网页仅支持只读回复");
         const actual = reply as ReadReply;
+        if (actual.kind === "order") for (const order of actual.orders) entry.knownOrderIds.add(order.id);
         const result: WebChatResult = { sessionId: entry.public.id, requestId, reply: actual,
           durationMs: Date.now() - started, origin: hostReply === undefined ? "agent" : "host", steps: structuredClone(steps) };
         task.setPhase("authorization");
