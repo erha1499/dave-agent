@@ -170,7 +170,7 @@ export async function checkWebChatStream() {
       if (["order", "reread"].includes(evidence)) assert.equal(reply.orders[0].paidCents, 7980);
       if (evidence === "faq") {
         assert.equal(reply.kind, "answer"); assert.match(reply.text, /尚未核对具体订单/);
-        assert.match(reply.text, /测试规则（KB-STREAM）\n本入口仅提供只读咨询。/);
+        assert.match(reply.text, /测试规则\n本入口仅提供只读咨询。/);
       }
       const history = await http("/api/chat/session", undefined, client.cookie).finished;
       assert.doesNotMatch(history.data.messages.at(-1).text, /99999|政策允许|本轮核实已退款/);

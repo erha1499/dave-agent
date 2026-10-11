@@ -9,6 +9,9 @@ const record = (value: unknown): value is Record<string, unknown> => !!value && 
 const cents = (value: unknown): value is number => Number.isSafeInteger(value) && Number(value) >= 0;
 const orderId = (value: unknown): value is string => typeof value === "string" && /^COUPON-\d{4}$/.test(value);
 const scopeId = (value: unknown) => value === null || typeof value === "string" && Boolean(value.trim());
+// Host-rendered rule excerpts keep the title and body; internal IDs stay in evidence metadata
+// and the leading synthetic-data tag is dropped. The remaining body text is unchanged.
+const ruleExcerpt = (document: { title: string; body: string }) => `${document.title}\n${document.body.replace(/^【演示规则】/u, "")}`;
 const businessTools = ["list_orders", "get_order", "search_faq", "prepare_merchant_request", "get_merchant_request", "prepare_refund", "get_refund"];
 
 export function toolEvidenceFromEvent(event: AgentSessionEvent): Evidence | undefined {
@@ -48,6 +51,7 @@ function readEvidence(results: readonly Evidence[]) {
   let orderScopeKnown = true;
   let merchantEmpty = false;
   let refundEmpty = false;
+  let rulesSearched = false;
   for (const result of results) {
     if (!businessTools.includes(result.toolName)) continue;
     const group = result.toolName.includes("refund") ? "refund" : result.toolName.includes("merchant") ? "merchant"
@@ -102,7 +106,7 @@ function readEvidence(results: readonly Evidence[]) {
       orderScopeKnown = orderScopes.length === orders.length;
     } else if (result.toolName === "search_faq") {
       if (!Array.isArray(value)) throw new Error();
-      evidenceIds.clear(); ruleScopes.length = 0; documents.length = 0;
+      evidenceIds.clear(); ruleScopes.length = 0; documents.length = 0; rulesSearched = true;
       for (const document of value) {
         if (!record(document) || document.source !== "demo-knowledge" || typeof document.sourceId !== "string"
           || !/^KB-[A-Z0-9-]{1,80}$/.test(document.sourceId) || typeof document.title !== "string" || !document.title.trim()
@@ -136,7 +140,7 @@ function readEvidence(results: readonly Evidence[]) {
     if (group === "order" || group === "list") listFailed = false;
   }
   return { orders, orderScopes, observedOrderIds, orderScopeKnown, ruleScopes, evidenceIds, documents, hasMore, listed, listFailed, merchant, refund, refundFailed,
-    toolFailed: failed.size > 0, orderFailed: failed.has("order") || failed.has("list"), merchantEmpty, refundEmpty };
+    toolFailed: failed.size > 0, orderFailed: failed.has("order") || failed.has("list"), merchantEmpty, refundEmpty, rulesSearched };
 }
 
 export function readOnlyEvidenceOrderIds(evidence: Evidence): string[] {
@@ -196,18 +200,22 @@ export function replyFromTools(text: string, results: readonly Evidence[], activ
   const orderText = hasRules ? activeToolNames.includes("get_merchant_request")
     ? "以下仅为本轮读取的订单事实。本轮尚未取得当前协商状态，不能沿用历史拒绝或批准，也不能确认退款方案；请继续查询当前协商结果。"
     : allowsReadOnlyProse(facts, context) ? text
-      : "以下为本轮读取的订单事实和适用规则原文。其他订单的历史记录不能用于判断本单。金额、核销及退款状态是查询到的历史记录；本轮未办理退款、核销、延期、预约或联系商家。\n\n"
-        + facts.documents.map(document => `${document.title}（${document.sourceId}）\n${document.body}`).join("\n\n")
-    : "以下仅为本轮读取的订单事实。本轮未取得完整适用规则依据，不能据此判断退款资格或可退金额；如需办理，请继续核对规则。";
+      : "以下是刚刚查询到的这笔订单信息和适用规则。其他订单的历史记录不会用来判断这笔订单；金额、核销和退款状态是已有记录，本次未办理退款、核销、延期、预约或联系商家。\n\n"
+        + facts.documents.map(ruleExcerpt).join("\n\n")
+    : "这是刚刚查询到的订单信息。本轮未取得完整适用规则依据，不能据此判断退款资格或可退金额；需要的话可以继续核对规则。";
   if (orders.length || listed) return { kind: "order", text: !orders.length ? "当前客户没有订单记录。"
-    : listed ? "这是本轮读取的本人最近订单，仅供选单；选择订单不会提交退款，办理条件仍须重新查询订单与适用规则。"
+    : listed ? "这是你最近的订单，仅供选单：请选择要咨询的一笔，我会按这笔订单重新查询订单和适用规则。选择订单不会办理任何操作。"
       : orderText,
     orders: [...new Map(orders.map(order => [order.id, order])).values()], evidenceIds: hasRules ? [...evidenceIds] : [], ...(hasMore ? { hasMore } : {}) };
   if (toolFailed) return { kind: "notice", text: "本轮查询未能完成，无法确认当前订单、规则或办理结果。请核对本人订单号，必要时联系人工核实。" };
   if (facts.documents.length) return { kind: "answer", evidenceIds: [...evidenceIds],
-    text: "以下仅展示本轮查到的规则原文，尚未核对具体订单；不表示订单已满足条件，也不构成退款批准。\n\n"
-      + facts.documents.map(document => `${document.title}（${document.sourceId}）\n${document.body}`).join("\n\n") };
+    text: "以下是查到的通用规则，尚未核对具体订单，不代表你的订单已满足条件，也不构成退款批准。\n\n"
+      + facts.documents.map(ruleExcerpt).join("\n\n") };
   const confirmation = activeToolNames.some(name => name === "prepare_merchant_request" || name === "prepare_refund")
     ? "涉及业务办理时，仍须本人发送对应的完整确认，普通同意不构成授权。" : "";
-  return { kind: "notice", text: "你好，请写明要咨询的问题；涉及具体订单时请提供订单号。本轮尚未取得最新订单或适用规则依据，不能确认办理条件或结果。" + confirmation };
+  // No evidence this turn: say what is missing and how to continue instead of a generic greeting.
+  const next = "可以发送订单号，或发送“我有哪些订单”先选择订单。";
+  return { kind: "notice", text: (facts.rulesSearched
+    ? `通用规则里没有查到相关说明；门店和套餐的具体规定要按订单查询。${next}本轮尚未取得订单依据，暂不能确认办理条件或结果。`
+    : `请补充要咨询的订单或具体问题：${next}本轮尚未取得订单或规则依据，暂不能确认办理条件或结果。`) + confirmation };
 }

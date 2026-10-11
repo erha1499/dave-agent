@@ -59,7 +59,7 @@ for (const poison of ["旧单 COUPON-1042 实付99999元，每张供九人。", 
   assert.doesNotMatch(renderReply(reply).text, /COUPON-1042|99999|九人/, "Fresh new-order evidence must not release old-order prose with or without an ID");
   assert.equal(reply.kind, "order");
   if (reply.kind === "order") { assert.deepEqual(reply.orders.map(value => value.id), ["COUPON-1043"]); assert.deepEqual(reply.evidenceIds, [faq.sourceId]); }
-  assert.match(reply.text, /历史记录/); assert.match(reply.text, /未办理/); assert.match(reply.text, /查询范围（KB-CHECK-EVIDENCE）\n当前记录不构成退款批准。/);
+  assert.match(reply.text, /历史记录/); assert.match(reply.text, /未办理/); assert.match(reply.text, /查询范围\n当前记录不构成退款批准。/); assert.doesNotMatch(reply.text, /KB-CHECK-EVIDENCE/);
   assert.equal(canStreamBusinessText([nextOrder, rule], switchedContext), false, "A switching turn must refuse all free deltas before inspecting their words");
 }
 for (const previousOrderIds of [[], [order.id], [order.id, order.id]]) {
@@ -109,6 +109,7 @@ const list = tool("list_orders", { source: "demo-database", hasMore: false, orde
   refundedCents: 0, couponStatuses: ["redeemed"], productName: "餐饮券", shopName: "门店", createdAt: null }] });
 assert.doesNotMatch(rendered([list, rule]).text, /UNVERIFIED_SENTINEL/);
 assert.match(rendered([list]).text, /仅供选单/); assert.equal(canStreamBusinessText([list, rule]), false);
+assert.doesNotMatch(renderReply(replyFromTools(injected, [list])).text, /提交退款/, "a list for any question is not framed as a refund flow");
 const listedIds = [order.id, "COUPON-1043"];
 const multipleList = tool("list_orders", { source: "demo-database", hasMore: true,
   orders: listedIds.map(id => ({ id, status: "paid", paidCents: 5680, refundedCents: 0,
@@ -180,7 +181,8 @@ for (const name of ["get_refund", "get_merchant_request"]) {
 assert.deepEqual(replyFromTools("通信回显", [], ["echo"]), { kind: "answer", text: "通信回显" });
 for (const active of [["get_order", "list_orders", "search_faq"], ["get_order", "get_merchant_request", "get_refund"]]) {
   const clarification = renderReply(replyFromTools(injected, [], active)).text;
-  assert.match(clarification, /请写明要咨询的问题/);
+  assert.match(clarification, /请补充要咨询的订单或具体问题/); assert.match(clarification, /我有哪些订单/);
+  assert.doesNotMatch(clarification, /你好/, "a missing-evidence notice does not restart the conversation with a greeting");
   assert.doesNotMatch(clarification, /完整确认|普通同意|UNVERIFIED_SENTINEL/,
     "read-only capabilities must not instruct the user to confirm a write operation");
 }
@@ -192,7 +194,18 @@ for (const prepare of ["prepare_merchant_request", "prepare_refund"]) {
 assert.equal(canStreamBusinessText([rule]), false, "FAQ-only evidence never unlocks free model deltas");
 const publicRules = replyFromTools(injected, [rule]);
 assert.equal(publicRules.kind, "answer"); assert.doesNotMatch(publicRules.text, /UNVERIFIED_SENTINEL/);
-assert.match(publicRules.text, /尚未核对具体订单/); assert.ok(publicRules.text.includes(`${faq.title}（${faq.sourceId}）\n${faq.body}`));
+assert.match(publicRules.text, /尚未核对具体订单/); assert.ok(publicRules.text.includes(`${faq.title}\n${faq.body}`));
+assert.ok(!publicRules.text.includes(faq.sourceId), "rule excerpts name titles; knowledge IDs stay in evidenceIds");
+assert.deepEqual((publicRules as { evidenceIds?: string[] }).evidenceIds, [faq.sourceId]);
+const taggedRules = replyFromTools(injected, [tool("search_faq", [{ ...faq, body: "【演示规则】" + faq.body }])]);
+assert.ok(taggedRules.kind === "answer" && taggedRules.text.includes(`${faq.title}\n${faq.body}`) && !taggedRules.text.includes("【演示规则】"),
+  "the synthetic-data tag is not shown as part of the rule");
+for (const active of [["get_order", "list_orders", "search_faq"], ["get_order", "search_faq", "prepare_refund"]]) {
+  const emptyRules = replyFromTools(injected, [tool("search_faq", [])], active);
+  assert.equal(emptyRules.kind, "notice"); assert.match(emptyRules.text, /通用规则里没有查到相关说明/); assert.match(emptyRules.text, /我有哪些订单/);
+  assert.doesNotMatch(emptyRules.text, /你好|UNVERIFIED_SENTINEL/);
+  assert.equal(/完整确认/.test(emptyRules.text), active.includes("prepare_refund"), "write confirmation hints only appear where writes exist");
+}
 assert.equal(canStreamBusinessText([fresh, rule]), true);
 const grounded = replyFromTools("本轮规则说明需继续核对。", [fresh, rule]);
 assert.equal(grounded.kind, "order"); assert.equal(grounded.text, "本轮规则说明需继续核对。");
@@ -275,7 +288,7 @@ try {
   faux.setResponses([fauxAssistantMessage(fauxToolCall("search_faq", { query: "退款查询范围" }), { stopReason: "toolUse" }),
     fauxAssistantMessage(injected)]);
   await runCliPrompt(session, "一般规则怎样说明查询与批准", write);
-  assert.equal(searches, 1); assert.match(output.at(-1)!, /查询范围（KB-CHECK-EVIDENCE）\n当前记录不构成退款批准/);
+  assert.equal(searches, 1); assert.match(output.at(-1)!, /查询范围\n当前记录不构成退款批准/);
   assert.match(output.at(-1)!, /尚未核对具体订单/); assert.doesNotMatch(output.at(-1)!, /UNVERIFIED_SENTINEL/);
 } finally { session.dispose(); }
 

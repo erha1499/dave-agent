@@ -351,7 +351,7 @@ export async function checkWebChat() {
     faux.setResponses([fauxAssistantMessage(fauxToolCall("search_faq", { query: "只读咨询规则" }), { stopReason: "toolUse" }),
       () => { requests++; return fauxAssistantMessage("新身份的独立回复"); }]);
     const freshFactoryReply = (await factoryChat.send(newFactorySession.token, randomUUID(), "新身份正常问题", newFactorySession.session.id)).reply;
-    assert.match(freshFactoryReply.text, /仅展示本轮查到的规则原文/);
+    assert.match(freshFactoryReply.text, /以下是查到的通用规则，尚未核对具体订单/);
     assert.doesNotMatch(freshFactoryReply.text, /旧身份|迟到|新身份的独立回复/);
     releaseFactory(); await new Promise<void>(resolve => setTimeout(resolve, 10));
     assert.equal(lateDisposals, 1); assert.equal((await factoryChat.get(lateFactorySession.token)).session, null);
@@ -384,7 +384,7 @@ export async function checkWebChat() {
     faux.setResponses([fauxAssistantMessage(fauxToolCall("search_faq", { query: "只读咨询规则" }), { stopReason: "toolUse" }),
       () => { requests++; return fauxAssistantMessage("当前身份的回复"); }]);
     const freshPromptReply = (await promptChat.send(newPromptSession.token, randomUUID(), "当前身份的问题", newPromptSession.session.id)).reply;
-    assert.match(freshPromptReply.text, /仅展示本轮查到的规则原文/);
+    assert.match(freshPromptReply.text, /以下是查到的通用规则，尚未核对具体订单/);
     assert.doesNotMatch(freshPromptReply.text, /旧身份|迟到|当前身份的回复/);
     releaseProvider(); await new Promise<void>(resolve => setTimeout(resolve, 10));
     assert.equal((await promptChat.get(latePromptSession.token)).session, null);
