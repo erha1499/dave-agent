@@ -5,6 +5,7 @@ import { createArrivalConsultation } from "./arrival-consultation.ts";
 import { runCliPrompt } from "./cli.ts";
 import { withModelTask, readModelTaskLimits } from "./model-request-budget.ts";
 import { renderReply, type Reply } from "./reply.ts";
+import { createOfferStreamGate } from "./channel-offer.ts";
 import { canStreamBusinessText, readOnlyEvidenceOrderIds, toolEvidenceFromEvent, type Evidence, type ReadOnlyOrderContext } from "./reply-from-tools.ts";
 import { createOrderDiscovery } from "./order-discovery.ts";
 import { createWebChatSettingsCatalog, validateWebChatSettings, type WebChatSettings, type WebChatSettingsCatalog } from "./web-chat-settings.ts";
@@ -282,16 +283,22 @@ export class WebChatSessions {
           }
           assertActive();
           let messageId = "", messages = 0, calls = 0, streamAllowed = false;
+          const activeTools = entry.agent.getActiveToolNames();
+          let gate = createOfferStreamGate(activeTools);
           const pendingTools = new Map<string, { id: string; label: string }>();
           unsubscribe = entry.agent.subscribe(event => {
             if (!entry.active || abort.signal.aborted) return;
             if (event.type === "message_start" && event.message.role === "assistant") {
               messageId = `assistant-${++messages}`;
               streamAllowed = canStreamBusinessText(currentEvidence, readOnlyOrderContext);
+              gate = createOfferStreamGate(activeTools);
               step(messageId, "整理答复", "running");
             } else if (event.type === "message_update" && event.assistantMessageEvent.type === "text_delta" && messageId && streamAllowed) {
-              emit({ type: "delta", messageId, text: event.assistantMessageEvent.delta });
+              const text = gate.push(event.assistantMessageEvent.delta);
+              if (text) emit({ type: "delta", messageId, text });
             } else if (event.type === "message_end" && event.message.role === "assistant" && messageId) {
+              const rest = streamAllowed ? gate.end() : "";
+              if (rest) emit({ type: "delta", messageId, text: rest });
               step(messageId, "整理答复", ["error", "aborted"].includes(event.message.stopReason) ? "error" : "done");
             } else if (event.type === "tool_execution_start" && Object.hasOwn(toolLabels, event.toolName)) {
               const pending = { id: `tool-${++calls}`, label: toolLabels[event.toolName]! };

@@ -1,5 +1,6 @@
 import type { AgentSession, AgentSessionEvent } from "@earendil-works/pi-coding-agent";
 import { merchantReasonControls, type MerchantTask } from "./after-sales.ts";
+import { offersUnavailableAction } from "./channel-offer.ts";
 import { isRefundOperation, type Reply } from "./reply.ts";
 
 type ToolResult = Extract<AgentSession["messages"][number], { role: "toolResult" }>;
@@ -197,10 +198,13 @@ export function replyFromTools(text: string, results: readonly Evidence[], activ
   if (merchant) return merchant;
   if (merchantEmpty) return { kind: "notice", text: "本轮未查到当前会话的协商任务，不能据此认定商家已经批准。请核对本人订单号和原会话，必要时联系人工核实。" };
   const hasRules = allowsBusinessText(facts);
+  const prose = allowsReadOnlyProse(facts, context);
+  // Grounded prose still cannot invite a write action this session has no tool for.
   const orderText = hasRules ? activeToolNames.includes("get_merchant_request")
     ? "以下仅为本轮读取的订单事实。本轮尚未取得当前协商状态，不能沿用历史拒绝或批准，也不能确认退款方案；请继续查询当前协商结果。"
-    : allowsReadOnlyProse(facts, context) ? text
-      : "以下是刚刚查询到的这笔订单信息和适用规则。其他订单的历史记录不会用来判断这笔订单；金额、核销和退款状态是已有记录，本次未办理退款、核销、延期、预约或联系商家。\n\n"
+    : prose && !offersUnavailableAction(text, activeToolNames) ? text
+      : "以下是刚刚查询到的这笔订单信息和适用规则。" + (prose ? "当前渠道只能查询订单和规则，不能代为发起商家协商或退款申请；"
+        : "其他订单的历史记录不会用来判断这笔订单；") + "金额、核销和退款状态是已有记录，本次未办理退款、核销、延期、预约或联系商家。\n\n"
         + facts.documents.map(ruleExcerpt).join("\n\n")
     : "这是刚刚查询到的订单信息。本轮未取得完整适用规则依据，不能据此判断退款资格或可退金额；需要的话可以继续核对规则。";
   if (orders.length || listed) return { kind: "order", text: !orders.length ? "当前客户没有订单记录。"

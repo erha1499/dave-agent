@@ -60,6 +60,7 @@ await (await import("./arrival-consultation-check.ts")).checkArrivalConsultation
 await (await import("./arrival-entry-check.ts")).checkArrivalEntry();
 await (await import("./web-chat-check.ts")).checkWebChat();
 await (await import("./web-chat-stream-check.ts")).checkWebChatStream();
+await (await import("./channel-offer-check.ts")).checkChannelOffer();
 await (await import("./web-chat-history-check.ts")).checkWebChatHistory();
 await (await import("./order-chat-live-check.ts")).checkOrderChatLiveContract();
 await (await import("./web-chat-live-check.ts")).checkWebChatLiveContract();
